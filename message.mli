@@ -40,6 +40,9 @@ module type SLICE = sig
   }
 
   val get_segment : 'cap t -> 'cap segment_t
+  val get         : 'cap t -> int -> int
+  val set         : rw t -> int -> int -> unit
+  val get_end     : 'cap t -> int
 end
 
 module type S = sig
@@ -59,4 +62,6 @@ end
 module Make (Storage : MessageStorage.S) :
   (S with type Segment.storage_t = Storage.t and type Message.storage_t = Storage.t)
 
+exception Invalid_message of string
+val invalid_msg : string -> 'a
 

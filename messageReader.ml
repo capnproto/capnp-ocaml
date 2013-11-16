@@ -69,7 +69,7 @@ module Make (Storage : MessageStorage.S) = struct
       | Empty
 
       (** list(bool), tightly packed bits *)
-      | Bits
+      | Bit
 
       (** either primitive values or a data-only struct; argument is the byte count *)
       | Bytes of int
@@ -162,7 +162,7 @@ module Make (Storage : MessageStorage.S) = struct
           ~storage_type:ListStorage.Empty
       | OneBitValue ->
         make_list_storage_aux ~offset:0 ~num_words:(Util.ceil_int list_pointer.num_elements 64)
-          ~num_elements:list_pointer.num_elements ~storage_type:ListStorage.Bits
+          ~num_elements:list_pointer.num_elements ~storage_type:ListStorage.Bit
       | OneByteValue ->
         make_list_storage_aux ~offset:0 ~num_words:(Util.ceil_int list_pointer.num_elements 8)
           ~num_elements:list_pointer.num_elements ~storage_type:(ListStorage.Bytes 1)
@@ -320,6 +320,116 @@ module Make (Storage : MessageStorage.S) = struct
       buf
     | _ ->
       invalid_msg "decoded non-UInt8 list where string data was expected"
+
+
+  let rmap_generic
+    (list_storage : 'cap ListStorage.t)
+    ~(get : 'cap ListStorage.t -> int -> 'a)
+    ~(f : 'a -> 'b)
+  : 'b list =
+    let rec loop acc i =
+      if i < 0 then
+        acc
+      else
+        let mapped_val = f (get list_storage i) in
+        loop (mapped_val :: acc) (i - 1)
+    in
+    loop [] (list_storage.ListStorage.num_elements - 1)
+
+
+  module BitList = struct
+    let get (list_storage : 'cap ListStorage.t) (i : int) : bool =
+      match list_storage.ListStorage.storage_type with
+      | ListStorage.Bit ->
+        let byte_ofs = i / 8 in
+        let bit_ofs  = i mod 8 in
+        let byte_val = Slice.get list_storage.ListStorage.storage byte_ofs in
+        (byte_val land (1 lsl bit_ofs)) <> 0
+      | _ ->
+        invalid_msg "decoded non-bool list where bool list was expected"
+
+    (** As List.map, but for efficiency [f] is evaluated starting at the end of the list
+     *  and moving to the head. *)
+    let rmap (list_storage : 'cap ListStorage.t) ~(f : bool -> 'a) : 'a list =
+      rmap_generic list_storage ~get ~f
+  end
+
+
+  module BytesList = struct
+    let get (list_storage : 'cap ListStorage.t) (i : int) : 'cap Slice.t =
+      let byte_count =
+        match list_storage.ListStorage.storage_type with
+        | ListStorage.Bytes byte_count -> byte_count
+        | ListStorage.Pointer          -> sizeof_uint64
+        | _ -> invalid_msg "decoded non-bytes list where bytes list was expected"
+      in {
+        list_storage.ListStorage.storage with
+        Slice.start = list_storage.ListStorage.storage.Slice.start + (i * byte_count);
+        Slice.len   = byte_count
+      }
+
+    (** As List.map, but for efficiency [f] is evaluated starting at the end of the list
+     *  and moving to the head. *)
+    let rmap (list_storage : 'cap ListStorage.t) ~(f : 'cap Slice.t -> 'a) : 'a list =
+      rmap_generic list_storage ~get ~f
+  end
+
+
+  module StructList = struct
+    let get (list_storage : 'cap ListStorage.t) (i : int) : 'cap StructStorage.t =
+      match list_storage.ListStorage.storage_type with
+      | ListStorage.Bytes byte_count ->
+        let data = {
+          list_storage.ListStorage.storage with
+          Slice.start = list_storage.ListStorage.storage.Slice.start + (i * byte_count);
+          Slice.len   = byte_count;
+        } in
+        let pointers = {
+          list_storage.ListStorage.storage with
+          Slice.start = 0;
+          Slice.len   = 0;
+        }
+        in
+        { StructStorage.data; StructStorage.pointers; }
+      | ListStorage.Pointer ->
+        let data = {
+          list_storage.ListStorage.storage with
+          Slice.start = 0;
+          Slice.len   = 0;
+        } in
+        let pointers = {
+          list_storage.ListStorage.storage with
+          Slice.start = list_storage.ListStorage.storage.Slice.start + (i * sizeof_uint64);
+          Slice.len   = sizeof_uint64;
+        }
+        in
+        { StructStorage.data; StructStorage.pointers; }
+      | ListStorage.Composite (data_words, pointers_words) ->
+        let data_size     = data_words * sizeof_uint64 in
+        let pointers_size = pointers_words * sizeof_uint64 in
+        let total_size    = data_size + pointers_size in
+        let data = {
+          list_storage.ListStorage.storage with
+          Slice.start = list_storage.ListStorage.storage.Slice.start + (i + total_size);
+          Slice.len   = data_size;
+        } in
+        let pointers = {
+          data with
+          Slice.start = Slice.get_end data;
+          Slice.len   = pointers_size;
+        } in
+        { StructStorage.data; StructStorage.pointers; }
+      | ListStorage.Empty | ListStorage.Bit ->
+        invalid_msg "decoded non-struct list where struct list was expected"
+
+
+    (** As List.map, but for efficiency [f] is evaluated starting at the end of the list
+     *  and moving to the head. *)
+    let rmap (list_storage : 'cap ListStorage.t) ~(f : 'cap StructStorage.t -> 'a) : 'a list =
+      rmap_generic list_storage ~get ~f
+
+  end
+
 
 end
 

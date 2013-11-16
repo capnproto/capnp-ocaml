@@ -42,6 +42,9 @@ module type SLICE = sig
   }
 
   val get_segment : 'cap t -> 'cap segment_t
+  val get         : 'cap t -> int -> int
+  val set         : rw t -> int -> int -> unit
+  val get_end     : 'cap t -> int
 end
 
 module type S = sig
@@ -112,8 +115,27 @@ module Make (Storage : MessageStorage.S) = struct
     }
 
     let get_segment slice = Message.get_segment slice.msg slice.segment_id
-  end
 
+    let get slice i =
+      if i < 0 || i >= slice.len then
+        invalid_arg "Slice.get"
+      else
+        let segment = get_segment slice in
+        Segment.get segment (slice.start + i)
+
+    let set slice i v =
+      if i < 0 || i >= slice.len then
+        invalid_arg "Slice.get"
+      else
+        let segment = get_segment slice in
+        Segment.set segment (slice.start + i) v
+
+    let get_end slice = slice.start + slice.len
+  end
 end
+
+
+exception Invalid_message of string
+let invalid_msg s = raise (Invalid_message s)
 
 
