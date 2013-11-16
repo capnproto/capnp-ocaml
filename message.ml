@@ -1,17 +1,23 @@
+open Core.Std
+
 type ro
 type rw
 
 module type SEGMENT = sig
+  type storage_t
   type -'cap t
 
-  val create   : int -> rw t
-  val length   : 'cap t -> int
-  val get      : 'cap t -> int -> int
-  val set      : rw t -> int -> int -> unit
-  val readonly : 'cap t -> ro t
+  val create     : int -> rw t
+  val length     : 'cap t -> int
+  val get        : 'cap t -> int -> int
+  val set        : rw t -> int -> int -> unit
+  val readonly   : 'cap t -> ro t
+  val of_storage : storage_t -> rw t
+  val to_storage : 'cap t -> storage_t
 end
 
 module type MESSAGE = sig
+  type storage_t
   type -'cap segment_t
   type -'cap t
 
@@ -20,6 +26,22 @@ module type MESSAGE = sig
   val get_segment  : 'cap t -> int -> 'cap segment_t
   val add_segment  : rw t -> int -> unit
   val readonly     : 'cap t -> ro t
+  val of_storage   : storage_t list -> rw t
+  val to_storage   : 'cap t -> storage_t list
+end
+
+module type SLICE = sig
+  type -'cap segment_t
+  type -'cap message_t
+
+  type 'cap t = {
+    msg        : 'cap message_t;
+    segment_id : int;
+    start      : int;
+    len        : int;
+  }
+
+  val get_segment : 'cap t -> 'cap segment_t
 end
 
 module type S = sig
@@ -28,23 +50,31 @@ module type S = sig
   end
 
   module Message : sig
-    include MESSAGE with type 'a segment_t = 'a Segment.t
+    include MESSAGE with type 'a segment_t := 'a Segment.t
+  end
+
+  module Slice : sig
+    include SLICE with type 'a segment_t := 'a Segment.t and type 'a message_t := 'a Message.t
   end
 end
 
 module Make (Storage : MessageStorage.S) = struct
 
   module Segment = struct
+    type storage_t = Storage.t
     type -'cap t = Storage.t
 
-    let create = Storage.create
-    let length = Storage.length
-    let get    = Storage.get
-    let set    = Storage.set
-    let readonly s = s
+    let create       = Storage.create
+    let length       = Storage.length
+    let get          = Storage.get
+    let set          = Storage.set
+    let readonly s   = s
+    let of_storage s = s
+    let to_storage s = s
   end
 
   module Message = struct
+    type storage_t = Storage.t
     type -'cap segment_t = Storage.t
     type -'cap t = Storage.t Res.Array.t
 
@@ -59,8 +89,31 @@ module Make (Storage : MessageStorage.S) = struct
     let add_segment m size =
       let new_segment = Storage.create size in
       Res.Array.add_one m new_segment
+
     let readonly m = m
+
+    let of_storage ms =
+      let arr = Res.Array.empty () in
+      let () = List.iter ms ~f:(fun x -> Res.Array.add_one arr x) in
+      arr
+
+    let to_storage m = Res.Array.fold_right (fun x acc -> x :: acc) m []
   end
+
+  module Slice = struct
+    type -'cap segment_t = Storage.t
+    type -'cap message_t = Storage.t Res.Array.t
+
+    type 'cap t = {
+      msg        : 'cap message_t;
+      segment_id : int;
+      start      : int;
+      len        : int;
+    }
+
+    let get_segment slice = Message.get_segment slice.msg slice.segment_id
+  end
+
 end
 
 
