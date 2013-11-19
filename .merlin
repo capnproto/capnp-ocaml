@@ -1,0 +1,5 @@
+S .
+B _build
+PKG uint
+PKG core
+PKG res
