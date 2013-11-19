@@ -415,8 +415,6 @@ module Make (Storage : MessageStorage.S) = struct
         Slice.len   = byte_count
       }
 
-    (** As List.map, but for efficiency [f] is evaluated starting at the end of the list
-     *  and moving to the head. *)
     let fold_left (list_storage : 'cap ListStorage.t) ~(f : 'a -> 'cap Slice.t -> 'a) ~(acc : 'a) : 'a =
       list_fold_left_generic list_storage ~get ~f ~acc
 
@@ -473,8 +471,6 @@ module Make (Storage : MessageStorage.S) = struct
         invalid_msg "decoded non-struct list where struct list was expected"
 
 
-    (** As List.map, but for efficiency [f] is evaluated starting at the end of the list
-     *  and moving to the head. *)
     let fold_left (list_storage : 'cap ListStorage.t)
       ~(f : 'a -> 'cap StructStorage.t -> 'a)
       ~(acc : 'a)
@@ -488,6 +484,17 @@ module Make (Storage : MessageStorage.S) = struct
     : 'a =
       list_fold_right_generic list_storage ~get ~f ~acc
   end
+
+
+  let get_struct_pointer
+    (struct_storage : 'cap StructStorage.t option)
+    (pointer_word : int)
+  : 'cap Slice.t option =
+    match struct_storage with
+    | Some storage ->
+        StructStorage.get_pointer storage pointer_word
+    | None ->
+        None
 
 
   let get_struct_text_field
@@ -511,41 +518,44 @@ module Make (Storage : MessageStorage.S) = struct
         ""
 
 
-  (** Struct data sections are stored xor'd with their default values.  So if
-    * the field has a nonzero default, the caller can provide the default bytes
-    * in array format.  On the other hand, if the field has no default defined,
-    * then we can skip the xor. *)
-  let get_struct_byte_field
+  let make_struct_byte_reader
     (struct_storage : 'cap StructStorage.t option)
     ?(default_bytes : int array option)
     (start : int) (len : int)
-  : int array =
-    let result = Array.create ~len 0 in
-    let () =
-      match struct_storage with
-      | Some storage ->
-          let data = storage.StructStorage.data in
-          if start + len <= data.Slice.len then
-            begin
-              for i = 0 to len - 1 do
-                result.(i) <- Slice.get data (start + i)
-              done
-            end;
-      | None ->
-          ()
-    in
-    let () =
-      match default_bytes with
-      | Some xor_bytes ->
-          let () = assert (Array.length xor_bytes = len) in
-          for i = 0 to len - 1 do
-            result.(i) <- result.(i) lxor xor_bytes.(i)
-          done
-      | None ->
-          ()
-    in
-    result
+  : (int -> int) =
+    match struct_storage with
+    | Some { StructStorage.data = data; _ } when start + len <= data.Slice.len ->
+        begin match default_bytes with
+        | Some xor_bytes ->
+            let () = assert (Array.length xor_bytes = len) in
+            (fun i -> (Slice.get data (start + i)) lxor xor_bytes.(i))
+        | None ->
+            (fun i -> (Slice.get data (start + i)))
+        end
+    | _ ->
+        begin match default_bytes with
+        | Some xor_bytes ->
+            let () = assert (Array.length xor_bytes = len) in
+            (fun i -> xor_bytes.(i))
+        | None ->
+            (fun _ -> 0)
+        end
 
+
+  let get_struct_bit
+    (struct_storage : 'cap StructStorage.t option)
+    ?(default_bit = false)
+    (byte_ofs : int) (bit_ofs : int)
+  : bool =
+    let byte_val =
+      match struct_storage with
+      | Some { StructStorage.data = data; _ } when byte_ofs < data.Slice.len ->
+          Slice.get data byte_ofs
+      | _ ->
+          0
+    in
+    let bit_val = (byte_val land (1 lsl bit_ofs)) <> 0 in
+    if default_bit then not bit_val else bit_val
 
 end
 
