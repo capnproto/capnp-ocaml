@@ -1,3 +1,6 @@
 *.cmi
 *.swp
 *.cmo
+*.byte
+*.native
+_build
