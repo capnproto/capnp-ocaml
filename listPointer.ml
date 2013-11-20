@@ -1,3 +1,4 @@
+
 module Int64 = Core.Core_int64;;
 
 type element_type_t =
@@ -16,13 +17,14 @@ type t = {
   num_elements : int;
 }
 
-let offset_shift = 32
+let offset_shift = 2
 let offset_mask  = Int64.shift_left (Int64.of_int 0x3fffffff) offset_shift
 
-let type_shift = 29
+let type_shift = 32
 let type_mask  = Int64.shift_left (Int64.of_int 0x7) type_shift
 
-let count_mask = Int64.of_int 0x1fffffff
+let count_shift = 35
+let count_mask  = Int64.shift_left (Int64.of_int 0x1fffffff) count_shift
 
 let decode (pointer64 : Int64.t) : t =
   let offset =
@@ -46,8 +48,9 @@ let decode (pointer64 : Int64.t) : t =
     | _ -> assert false
   in
   let num_elements =
-    let masked = Int64.bit_and pointer64 count_mask in
-    Int64.to_int_exn masked
+    let masked  = Int64.bit_and pointer64 count_mask in
+    let count64 = Int64.shift_right_logical masked count_shift in
+    Int64.to_int_exn count64
   in {
     offset;
     element_type;
