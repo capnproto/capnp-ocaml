@@ -69,24 +69,24 @@ module Make (Storage : MessageStorage.S) = struct
       | Object of 'cap Slice.t option
 
     let unnamed_union_get (x : 'cap t) : 'cap unnamed_union_t =
-      let tag = Util.decode_uint16_le (make_struct_byte_reader x 0 2) in
+      let tag = get_struct_data_uint16 x 0 in
       match tag with
       | 0  -> Void
       | 1  -> Bool (get_struct_bit x 2 0)
-      | 2  -> Int8 (Util.decode_int8 (make_struct_byte_reader x 2 1))
-      | 3  -> Int16 (Util.decode_int16_le (make_struct_byte_reader x 2 2))
-      | 4  -> Int32 (Util.decode_int32_le (make_struct_byte_reader x 4 4))
-      | 5  -> Int64 (Util.decode_int64_le (make_struct_byte_reader x 8 8))
-      | 6  -> Uint8 ((make_struct_byte_reader x 2 1) 0)
-      | 7  -> Uint16 (Util.decode_uint16_le (make_struct_byte_reader x 2 2))
-      | 8  -> Uint32 (Util.decode_uint32_le (make_struct_byte_reader x 4 4))
-      | 9  -> Uint64 (Util.decode_uint64_le (make_struct_byte_reader x 8 8))
-      | 10 -> Float32 (Int32.float_of_bits (Util.decode_int32_le (make_struct_byte_reader x 4 4)))
-      | 11 -> Float64 (Int64.float_of_bits (Util.decode_int64_le (make_struct_byte_reader x 8 8)))
+      | 2  -> Int8 (get_struct_data_int8 x 2)
+      | 3  -> Int16 (get_struct_data_int16 x 2)
+      | 4  -> Int32 (get_struct_data_int32 x 4)
+      | 5  -> Int64 (get_struct_data_int64 x 8)
+      | 6  -> Uint8 (get_struct_data_uint8 x 2)
+      | 7  -> Uint16 (get_struct_data_uint16 x 2)
+      | 8  -> Uint32 (get_struct_data_uint32 x 4)
+      | 9  -> Uint64 (get_struct_data_uint64 x 8)
+      | 10 -> Float32 (Int32.float_of_bits (get_struct_data_int32 x 4))
+      | 11 -> Float64 (Int64.float_of_bits (get_struct_data_int64 x 8))
       | 12 -> Text (get_struct_text_field x 0)
       | 13 -> Data (get_struct_text_field x 0)
       | 14 -> List (get_struct_pointer x 0)
-      | 15 -> Enum (Util.decode_uint16_le (make_struct_byte_reader x 2 2))
+      | 15 -> Enum (get_struct_data_uint16 x 2)
       | 16 -> Struct (get_struct_pointer x 0)
       | 17 -> Interface
       | 18 -> Object (get_struct_pointer x 0)
@@ -97,7 +97,7 @@ module Make (Storage : MessageStorage.S) = struct
     type 'cap t = 'cap StructStorage.t option
 
     let id_get (x : 'cap t) : Uint64.t =
-      Util.decode_uint64_le (make_struct_byte_reader x 0 8)
+      get_struct_data_uint64 x 0
 
     let value_get (x : 'cap t) : 'cap Value.t =
       match get_struct_pointer x 0 with
@@ -121,21 +121,21 @@ module Make (Storage : MessageStorage.S) = struct
       type 'cap t = 'cap StructStorage.t option
 
       let typeId_get (x : 'cap t) : Uint64.t =
-        Util.decode_uint64_le (make_struct_byte_reader x 8 8)
+        get_struct_data_uint64 x 8
     end
 
     module Struct = struct
       type 'cap t = 'cap StructStorage.t option
 
       let typeId_get (x : 'cap t) : Uint64.t =
-        Util.decode_uint64_le (make_struct_byte_reader x 8 8)
+        get_struct_data_uint64 x 8
     end
 
     module Interface = struct
       type 'cap t = 'cap StructStorage.t option
 
       let typeId_get (x : 'cap t) : Uint64.t =
-        Util.decode_uint64_le (make_struct_byte_reader x 8 8)
+        get_struct_data_uint64 x 8
     end
 
     type 'cap unnamed_union_t =
@@ -160,7 +160,7 @@ module Make (Storage : MessageStorage.S) = struct
       | Object
 
     let unnamed_union_get (x : 'cap t) : 'cap unnamed_union_t =
-      let tag = Util.decode_uint16_le (make_struct_byte_reader x 0 2) in
+      let tag = get_struct_data_uint16 x 0 in
       match tag with
       | 0  -> Void
       | 1  -> Bool
@@ -191,13 +191,13 @@ module Make (Storage : MessageStorage.S) = struct
       get_struct_text_field x 0
 
     let codeOrder_get (x : 'cap t) : int =
-      Util.decode_uint16_le (make_struct_byte_reader x 0 2)
+      get_struct_data_uint16 x 0
 
     let paramStructType_get (x : 'cap t) : Uint64.t =
-      Util.decode_uint64_le (make_struct_byte_reader x 8 8)
+      get_struct_data_uint64 x 8
 
     let resultStructType_get (x : 'cap t) : Uint64.t =
-      Util.decode_uint64_le (make_struct_byte_reader x 16 8)
+      get_struct_data_uint64 x 16
 
     let annotations_get (x : 'cap t) : ('cap, 'cap Annotation.t) List.t =
       match get_struct_pointer x 1 with
@@ -222,7 +222,7 @@ module Make (Storage : MessageStorage.S) = struct
       get_struct_text_field x 0
 
     let codeOrder_get (x : 'cap t) : int =
-      Util.decode_uint16_le (make_struct_byte_reader x 0 2)
+      get_struct_data_uint16 x 0
 
     let annotations_get (x : 'cap t) : ('cap, 'cap Annotation.t) List.t =
       match get_struct_pointer x 1 with
@@ -247,7 +247,7 @@ module Make (Storage : MessageStorage.S) = struct
       type 'cap t = 'cap StructStorage.t option
 
       let offset_get (x : 'cap t) : Uint32.t =
-        Util.decode_uint32_le (make_struct_byte_reader x 4 4)
+        get_struct_data_uint32 x 4
 
       let type_get (x : 'cap t) : 'cap Type.t =
         match get_struct_pointer x 2 with
@@ -267,7 +267,7 @@ module Make (Storage : MessageStorage.S) = struct
       type 'cap t = 'cap StructStorage.t option
 
       let typeId_get (x : 'cap t) : Uint64.t =
-        Util.decode_uint64_le (make_struct_byte_reader x 16 8)
+        get_struct_data_uint64 x 16
     end
 
     type 'cap unnamed_union_t =
@@ -282,9 +282,9 @@ module Make (Storage : MessageStorage.S) = struct
         | Explicit of int
 
       let unnamed_union_get (x : 'cap t) : unnamed_union_t =
-        match Util.decode_uint16_le (make_struct_byte_reader x 10 2) with
+        match get_struct_data_uint16 x 10 with
         | 0 -> Implicit
-        | 1 -> Explicit (Util.decode_uint16_le (make_struct_byte_reader x 12 2))
+        | 1 -> Explicit (get_struct_data_uint16 x 12)
         | _ -> invalid_msg "invalid Field.Ordinal.unnamed_union_t type tag"
     end
 
@@ -292,7 +292,7 @@ module Make (Storage : MessageStorage.S) = struct
       get_struct_text_field x 0
 
     let codeOrder_get (x : 'cap t) : int =
-      Util.decode_uint16_le (make_struct_byte_reader x 0 2)
+      get_struct_data_uint16 x 0
 
     let annotations_get (x : 'cap t) : ('cap, 'cap Annotation.t) List.t =
       match get_struct_pointer x 1 with
@@ -310,10 +310,10 @@ module Make (Storage : MessageStorage.S) = struct
           None
 
     let discriminantValue_get (x : 'cap t) : int =
-      Util.decode_uint16_le (make_struct_byte_reader x ~default_bytes:[| 0xff; 0xff |] 2 2)
+      get_struct_data_uint16 ~default:0xffff x 2
 
     let unnamed_union_get (x : 'cap t) : 'cap unnamed_union_t =
-      match Util.decode_uint16_le (make_struct_byte_reader x 8 2) with
+      match get_struct_data_uint16 x 8 with
       | 0 -> Slot x
       | 1 -> Group x
       | _ -> invalid_arg "invalid Field.unnamed_union_t type tag"
@@ -331,20 +331,20 @@ module Make (Storage : MessageStorage.S) = struct
         get_struct_text_field x 0
 
       let id_get (x : 'cap t) : Uint64.t =
-        Util.decode_uint64_le (make_struct_byte_reader x 0 8)
+        get_struct_data_uint64 x 0
     end
 
     module Struct = struct
       type 'cap t = 'cap StructStorage.t option
 
       let dataWordCount_get (x : 'cap t) : int =
-        Util.decode_uint16_le (make_struct_byte_reader x 14 2)
+        get_struct_data_uint16 x 14
 
       let pointerCount_get (x : 'cap t) : int =
-        Util.decode_uint16_le (make_struct_byte_reader x 24 2)
+        get_struct_data_uint16 x 24
 
       let preferredListEncoding_get (x : 'cap t) : ElementSize.t =
-        let int_val = Util.decode_uint16_le (make_struct_byte_reader x 26 2) in
+        let int_val = get_struct_data_uint16 x 26 in
         match int_val with
         | 0 -> ElementSize.Empty
         | 1 -> ElementSize.Bit
@@ -360,10 +360,10 @@ module Make (Storage : MessageStorage.S) = struct
         get_struct_bit x 28 0
 
       let discriminantCount_get (x : 'cap t) : int =
-        Util.decode_uint16_le (make_struct_byte_reader x 30 2)
+        get_struct_data_uint16 x 30
 
       let discriminantOffset_get (x : 'cap t) : Uint32.t =
-        Util.decode_uint32_le (make_struct_byte_reader x 32 4)
+        get_struct_data_uint32 x 32
 
       let fields_get (x : 'cap t) : ('cap, 'cap Field.t) List.t =
         match get_struct_pointer x 3 with
@@ -428,7 +428,7 @@ module Make (Storage : MessageStorage.S) = struct
                     Some {
                       List.storage  = list_storage;
                       List.get_item = fun storage i ->
-                        Util.decode_uint64_le (Slice.get (BytesList.get storage i));
+                        Slice.get_uint64 (BytesList.get storage i) 0
                     }
                 | _ ->
                     invalid_msg "decoded non-bytes pointer where bytes pointer was expected"
@@ -509,16 +509,16 @@ module Make (Storage : MessageStorage.S) = struct
       | Annotation of 'cap Annotation.t
 
     let id_get (x : 'cap t) : Uint64.t =
-      Util.decode_uint64_le (make_struct_byte_reader x 0 8)
+      get_struct_data_uint64 x 0
 
     let displayName_get (x : 'cap t) : string =
       get_struct_text_field x 0
 
     let displayNamePrefixLength_get (x : 'cap t) : Uint32.t =
-      Util.decode_uint32_le (make_struct_byte_reader x 8 4)
+      get_struct_data_uint32 x 8
 
     let scopeId_get (x : 'cap t) : Uint64.t =
-      Util.decode_uint64_le (make_struct_byte_reader x 8 8)
+      get_struct_data_uint64 x 16
 
     let nestedNodes_get (x : 'cap t) : ('cap, 'cap NestedNode.t) List.t =
       match get_struct_pointer x 1 with
@@ -551,7 +551,7 @@ module Make (Storage : MessageStorage.S) = struct
           None
 
     let unnamed_union_get (x : 'cap t) : 'cap unnamed_union_t =
-      match Util.decode_uint16_le (make_struct_byte_reader x 12 2) with
+      match get_struct_data_uint16 x 12 with
       | 0 -> File
       | 1 -> Struct x
       | 2 -> Enum x

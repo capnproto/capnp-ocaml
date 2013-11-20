@@ -9,11 +9,26 @@ module type SEGMENT = sig
 
   val create     : int -> rw t
   val length     : 'cap t -> int
-  val get        : 'cap t -> int -> int
-  val set        : rw t -> int -> int -> unit
   val readonly   : 'cap t -> ro t
   val of_storage : storage_t -> rw t
   val to_storage : 'cap t -> storage_t
+
+  val get_uint8  : 'cap t -> int -> int
+  val get_uint16 : 'cap t -> int -> int
+  val get_uint32 : 'cap t -> int -> Uint32.t
+  val get_uint64 : 'cap t -> int -> Uint64.t
+  val get_int8   : 'cap t -> int -> int
+  val get_int16  : 'cap t -> int -> int
+  val get_int32  : 'cap t -> int -> Int32.t
+  val get_int64  : 'cap t -> int -> Int64.t
+  val set_uint8  : rw t -> int -> int -> unit
+  val set_uint16 : rw t -> int -> int -> unit
+  val set_uint32 : rw t -> int -> Uint32.t -> unit
+  val set_uint64 : rw t -> int -> Uint64.t -> unit
+  val set_int8   : rw t -> int -> int -> unit
+  val set_int16  : rw t -> int -> int -> unit
+  val set_int32  : rw t -> int -> Int32.t -> unit
+  val set_int64  : rw t -> int -> Int64.t -> unit
 end
 
 module type MESSAGE = sig
@@ -42,9 +57,24 @@ module type SLICE = sig
   }
 
   val get_segment : 'cap t -> 'cap segment_t
-  val get         : 'cap t -> int -> int
-  val set         : rw t -> int -> int -> unit
   val get_end     : 'cap t -> int
+
+  val get_uint8  : 'cap t -> int -> int
+  val get_uint16 : 'cap t -> int -> int
+  val get_uint32 : 'cap t -> int -> Uint32.t
+  val get_uint64 : 'cap t -> int -> Uint64.t
+  val get_int8   : 'cap t -> int -> int
+  val get_int16  : 'cap t -> int -> int
+  val get_int32  : 'cap t -> int -> Int32.t
+  val get_int64  : 'cap t -> int -> Int64.t
+  val set_uint8  : rw t -> int -> int -> unit
+  val set_uint16 : rw t -> int -> int -> unit
+  val set_uint32 : rw t -> int -> Uint32.t -> unit
+  val set_uint64 : rw t -> int -> Uint64.t -> unit
+  val set_int8   : rw t -> int -> int -> unit
+  val set_int16  : rw t -> int -> int -> unit
+  val set_int32  : rw t -> int -> Int32.t -> unit
+  val set_int64  : rw t -> int -> Int64.t -> unit
 end
 
 module type S = sig
@@ -69,11 +99,26 @@ module Make (Storage : MessageStorage.S) = struct
 
     let create       = Storage.create
     let length       = Storage.length
-    let get          = Storage.get
-    let set          = Storage.set
     let readonly s   = s
     let of_storage s = s
     let to_storage s = s
+
+    let get_uint8  = Storage.get_uint8
+    let get_uint16 = Storage.get_uint16
+    let get_uint32 = Storage.get_uint32
+    let get_uint64 = Storage.get_uint64
+    let get_int8   = Storage.get_int8
+    let get_int16  = Storage.get_int16
+    let get_int32  = Storage.get_int32
+    let get_int64  = Storage.get_int64
+    let set_uint8  = Storage.set_uint8
+    let set_uint16 = Storage.set_uint16
+    let set_uint32 = Storage.set_uint32
+    let set_uint64 = Storage.set_uint64
+    let set_int8   = Storage.set_int8
+    let set_int16  = Storage.set_int16
+    let set_int32  = Storage.set_int32
+    let set_int64  = Storage.set_int64
   end
 
   module Message = struct
@@ -116,21 +161,119 @@ module Make (Storage : MessageStorage.S) = struct
 
     let get_segment slice = Message.get_segment slice.msg slice.segment_id
 
-    let get slice i =
-      if i < 0 || i >= slice.len then
-        invalid_arg "Slice.get"
-      else
-        let segment = get_segment slice in
-        Segment.get segment (slice.start + i)
-
-    let set slice i v =
-      if i < 0 || i >= slice.len then
-        invalid_arg "Slice.get"
-      else
-        let segment = get_segment slice in
-        Segment.set segment (slice.start + i) v
-
     let get_end slice = slice.start + slice.len
+
+    let get_uint8 slice i =
+      if i < 0 || i > slice.len - 1 then
+        invalid_arg "Slice.get_uint8"
+      else
+        let segment = get_segment slice in
+        Segment.get_uint8 segment (slice.start + i)
+
+    let get_uint16 slice i =
+      if i < 0 || i > slice.len - 2 then
+        invalid_arg "Slice.get_uint16"
+      else
+        let segment = get_segment slice in
+        Segment.get_uint16 segment (slice.start + i)
+
+    let get_uint32 slice i =
+      if i < 0 || i > slice.len - 4 then
+        invalid_arg "Slice.get_uint32"
+      else
+        let segment = get_segment slice in
+        Segment.get_uint32 segment (slice.start + i)
+
+    let get_uint64 slice i =
+      if i < 0 || i > slice.len - 8 then
+        invalid_arg "Slice.get_uint64"
+      else
+        let segment = get_segment slice in
+        Segment.get_uint64 segment (slice.start + i)
+
+    let get_int8 slice i =
+      if i < 0 || i > slice.len - 1 then
+        invalid_arg "Slice.get_int8"
+      else
+        let segment = get_segment slice in
+        Segment.get_int8 segment (slice.start + i)
+
+    let get_int16 slice i =
+      if i < 0 || i > slice.len - 2 then
+        invalid_arg "Slice.get_int16"
+      else
+        let segment = get_segment slice in
+        Segment.get_int16 segment (slice.start + i)
+
+    let get_int32 slice i =
+      if i < 0 || i > slice.len - 4 then
+        invalid_arg "Slice.get_int32"
+      else
+        let segment = get_segment slice in
+        Segment.get_int32 segment (slice.start + i)
+
+    let get_int64 slice i =
+      if i < 0 || i > slice.len - 8 then
+        invalid_arg "Slice.get_int64"
+      else
+        let segment = get_segment slice in
+        Segment.get_int64 segment (slice.start + i)
+
+    let set_uint8 slice i v =
+      if i < 0 || i > slice.len - 1 then
+        invalid_arg "Slice.set_uint8"
+      else
+        let segment = get_segment slice in
+        Segment.set_uint8 segment (slice.start + i) v
+
+    let set_uint16 slice i v =
+      if i < 0 || i > slice.len - 2 then
+        invalid_arg "Slice.set_uint16"
+      else
+        let segment = get_segment slice in
+        Segment.set_uint16 segment (slice.start + i) v
+
+    let set_uint32 slice i v =
+      if i < 0 || i > slice.len - 4 then
+        invalid_arg "Slice.set_uint32"
+      else
+        let segment = get_segment slice in
+        Segment.set_uint32 segment (slice.start + i) v
+
+    let set_uint64 slice i v =
+      if i < 0 || i > slice.len - 8 then
+        invalid_arg "Slice.set_uint64"
+      else
+        let segment = get_segment slice in
+        Segment.set_uint64 segment (slice.start + i) v
+
+    let set_int8 slice i v =
+      if i < 0 || i > slice.len - 1 then
+        invalid_arg "Slice.set_int8"
+      else
+        let segment = get_segment slice in
+        Segment.set_int8 segment (slice.start + i) v
+
+    let set_int16 slice i v =
+      if i < 0 || i > slice.len - 2 then
+        invalid_arg "Slice.set_int16"
+      else
+        let segment = get_segment slice in
+        Segment.set_int16 segment (slice.start + i) v
+
+    let set_int32 slice i v =
+      if i < 0 || i > slice.len - 4 then
+        invalid_arg "Slice.set_int32"
+      else
+        let segment = get_segment slice in
+        Segment.set_int32 segment (slice.start + i) v
+
+    let set_int64 slice i v =
+      if i < 0 || i > slice.len - 8 then
+        invalid_arg "Slice.set_int64"
+      else
+        let segment = get_segment slice in
+        Segment.set_int64 segment (slice.start + i) v
   end
 end
 

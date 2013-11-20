@@ -10,34 +10,6 @@ module Make (Storage : MessageStorage.S) = struct
   let sizeof_uint64 = 8
 
 
-  let uint64_le_of_slice (slice : 'cap Slice.t) : Uint64.t =
-    let open Slice in
-    let () = assert (slice.len = sizeof_uint64) in
-    let rec decode acc i =
-      if i = slice.len then
-        acc
-      else
-        let byte = Uint64.of_int (Slice.get slice i) in
-        let shifted_byte = Uint64.shift_left byte (8 * i) in
-        decode (Uint64.logor acc shifted_byte) (i + 1)
-    in
-    decode Uint64.zero 0
-
-
-  let uint32_le_of_slice (slice : 'cap Slice.t) : Uint32.t =
-    let open Slice in
-    let () = assert (slice.len = sizeof_uint32) in
-    let rec decode acc i =
-      if i = slice.len then
-        acc
-      else
-        let byte = Uint32.of_int (Slice.get slice i) in
-        let shifted_byte = Uint32.shift_left byte (8 * i) in
-        decode (Uint32.logor acc shifted_byte) (i + 1)
-    in
-    decode Uint32.zero 0
-
-
   let bounds_check_slice_exn ?err (slice : 'cap Slice.t) : unit =
     let open Slice in
     if slice.segment_id < 0 ||
@@ -118,17 +90,17 @@ module Make (Storage : MessageStorage.S) = struct
 
 
   let decode_pointer (pointer_bytes : 'cap Slice.t) : Pointer.t =
-    let pointer64 = uint64_le_of_slice pointer_bytes in
-    if Uint64.compare pointer64 Uint64.zero = 0 then
+    let pointer64 = Slice.get_int64 pointer_bytes 0 in
+    if Int64.compare pointer64 Int64.zero = 0 then
       Pointer.Null
     else
       let module B = Pointer.Bitfield in
-      let tag = Uint64.logand pointer64 B.tag_mask in
-      if Uint64.compare tag B.tag_val_list = 0 then
+      let tag = Int64.bit_and pointer64 B.tag_mask in
+      if Int64.compare tag B.tag_val_list = 0 then
         Pointer.List (ListPointer.decode pointer64)
-      else if Uint64.compare tag B.tag_val_struct = 0 then
+      else if Int64.compare tag B.tag_val_struct = 0 then
         Pointer.Struct (StructPointer.decode pointer64)
-      else if Uint64.compare tag B.tag_val_far = 0 then
+      else if Int64.compare tag B.tag_val_far = 0 then
         Pointer.Far (FarPointer.decode pointer64)
       else
         invalid_msg "pointer has undefined type tag"
@@ -343,7 +315,7 @@ module Make (Storage : MessageStorage.S) = struct
     | Bytes 1 ->
       let buf = String.create list_storage.num_elements in
       for i = 0 to list_storage.num_elements - 1 do
-        buf.[i] <- Char.of_int_exn (Slice.get list_storage.storage i)
+        buf.[i] <- Char.of_int_exn (Slice.get_uint8 list_storage.storage i)
       done;
       buf
     | _ ->
@@ -389,7 +361,7 @@ module Make (Storage : MessageStorage.S) = struct
       | ListStorage.Bit ->
         let byte_ofs = i / 8 in
         let bit_ofs  = i mod 8 in
-        let byte_val = Slice.get list_storage.ListStorage.storage byte_ofs in
+        let byte_val = Slice.get_uint8 list_storage.ListStorage.storage byte_ofs in
         (byte_val land (1 lsl bit_ofs)) <> 0
       | _ ->
         invalid_msg "decoded non-bool list where bool list was expected"
@@ -517,31 +489,6 @@ module Make (Storage : MessageStorage.S) = struct
     | None ->
         ""
 
-
-  let make_struct_byte_reader
-    (struct_storage : 'cap StructStorage.t option)
-    ?(default_bytes : int array option)
-    (start : int) (len : int)
-  : (int -> int) =
-    match struct_storage with
-    | Some { StructStorage.data = data; _ } when start + len <= data.Slice.len ->
-        begin match default_bytes with
-        | Some xor_bytes ->
-            let () = assert (Array.length xor_bytes = len) in
-            (fun i -> (Slice.get data (start + i)) lxor xor_bytes.(i))
-        | None ->
-            (fun i -> (Slice.get data (start + i)))
-        end
-    | _ ->
-        begin match default_bytes with
-        | Some xor_bytes ->
-            let () = assert (Array.length xor_bytes = len) in
-            (fun i -> xor_bytes.(i))
-        | None ->
-            (fun _ -> 0)
-        end
-
-
   let get_struct_bit
     (struct_storage : 'cap StructStorage.t option)
     ?(default_bit = false)
@@ -550,12 +497,124 @@ module Make (Storage : MessageStorage.S) = struct
     let byte_val =
       match struct_storage with
       | Some { StructStorage.data = data; _ } when byte_ofs < data.Slice.len ->
-          Slice.get data byte_ofs
+          Slice.get_uint8 data byte_ofs
       | _ ->
           0
     in
     let bit_val = (byte_val land (1 lsl bit_ofs)) <> 0 in
     if default_bit then not bit_val else bit_val
+
+
+  let get_struct_data_uint8
+    (struct_storage : 'cap StructStorage.t option)
+    ?(default = 0) (i : int)
+  : int =
+    let numeric =
+      match struct_storage with
+      | Some { StructStorage.data = data; _ } when i < data.Slice.len ->
+          Slice.get_uint8 data i
+      | _ ->
+          0
+    in
+    numeric lxor default
+
+
+  let get_struct_data_uint16
+    (struct_storage : 'cap StructStorage.t option)
+    ?(default = 0) (i : int)
+  : int =
+    let numeric =
+      match struct_storage with
+      | Some { StructStorage.data = data; _ } when i < data.Slice.len - 1 ->
+          Slice.get_uint16 data i
+      | _ ->
+          0
+    in
+    numeric lxor default
+
+
+  let get_struct_data_uint32
+    (struct_storage : 'cap StructStorage.t option)
+    ?(default = Uint32.zero) (i : int)
+  : Uint32.t =
+    let numeric =
+      match struct_storage with
+      | Some { StructStorage.data = data; _ } when i < data.Slice.len - 3 ->
+          Slice.get_uint32 data i
+      | _ ->
+          Uint32.zero
+    in
+    Uint32.logxor numeric default
+
+
+  let get_struct_data_uint64
+    (struct_storage : 'cap StructStorage.t option)
+    ?(default = Uint64.zero) (i : int)
+  : Uint64.t =
+    let numeric =
+      match struct_storage with
+      | Some { StructStorage.data = data; _ } when i < data.Slice.len - 7 ->
+          Slice.get_uint64 data i
+      | _ ->
+          Uint64.zero
+    in
+    Uint64.logxor numeric default
+
+
+  let get_struct_data_int8
+    (struct_storage : 'cap StructStorage.t option)
+    ?(default = 0) (i : int)
+  : int =
+    let numeric =
+      match struct_storage with
+      | Some { StructStorage.data = data; _ } when i < data.Slice.len ->
+          Slice.get_int8 data i
+      | _ ->
+          0
+    in
+    numeric lxor default
+
+
+  let get_struct_data_int16
+    (struct_storage : 'cap StructStorage.t option)
+    ?(default = 0) (i : int)
+  : int =
+    let numeric =
+      match struct_storage with
+      | Some { StructStorage.data = data; _ } when i < data.Slice.len - 1 ->
+          Slice.get_int16 data i
+      | _ ->
+          0
+    in
+    numeric lxor default
+
+
+  let get_struct_data_int32
+    (struct_storage : 'cap StructStorage.t option)
+    ?(default = Int32.zero) (i : int)
+  : Int32.t =
+    let numeric =
+      match struct_storage with
+      | Some { StructStorage.data = data; _ } when i < data.Slice.len - 3 ->
+          Slice.get_int32 data i
+      | _ ->
+          Int32.zero
+    in
+    Int32.bit_xor numeric default
+
+
+  let get_struct_data_int64
+    (struct_storage : 'cap StructStorage.t option)
+    ?(default = Int64.zero) (i : int)
+  : Int64.t =
+    let numeric =
+      match struct_storage with
+      | Some { StructStorage.data = data; _ } when i < data.Slice.len - 7 ->
+          Slice.get_int64 data i
+      | _ ->
+          Int64.zero
+    in
+    Int64.bit_xor numeric default
 
 end
 

@@ -7,11 +7,26 @@ module type SEGMENT = sig
 
   val create     : int -> rw t
   val length     : 'cap t -> int
-  val get        : 'cap t -> int -> int
-  val set        : rw t -> int -> int -> unit
   val readonly   : 'cap t -> ro t
   val of_storage : storage_t -> rw t
   val to_storage : 'cap t -> storage_t
+
+  val get_uint8  : 'cap t -> int -> int
+  val get_uint16 : 'cap t -> int -> int
+  val get_uint32 : 'cap t -> int -> Uint32.t
+  val get_uint64 : 'cap t -> int -> Uint64.t
+  val get_int8   : 'cap t -> int -> int
+  val get_int16  : 'cap t -> int -> int
+  val get_int32  : 'cap t -> int -> Int32.t
+  val get_int64  : 'cap t -> int -> Int64.t
+  val set_uint8  : rw t -> int -> int -> unit
+  val set_uint16 : rw t -> int -> int -> unit
+  val set_uint32 : rw t -> int -> Uint32.t -> unit
+  val set_uint64 : rw t -> int -> Uint64.t -> unit
+  val set_int8   : rw t -> int -> int -> unit
+  val set_int16  : rw t -> int -> int -> unit
+  val set_int32  : rw t -> int -> Int32.t -> unit
+  val set_int64  : rw t -> int -> Int64.t -> unit
 end
 
 module type MESSAGE = sig
@@ -40,9 +55,24 @@ module type SLICE = sig
   }
 
   val get_segment : 'cap t -> 'cap segment_t
-  val get         : 'cap t -> int -> int
-  val set         : rw t -> int -> int -> unit
   val get_end     : 'cap t -> int
+
+  val get_uint8  : 'cap t -> int -> int
+  val get_uint16 : 'cap t -> int -> int
+  val get_uint32 : 'cap t -> int -> Uint32.t
+  val get_uint64 : 'cap t -> int -> Uint64.t
+  val get_int8   : 'cap t -> int -> int
+  val get_int16  : 'cap t -> int -> int
+  val get_int32  : 'cap t -> int -> Int32.t
+  val get_int64  : 'cap t -> int -> Int64.t
+  val set_uint8  : rw t -> int -> int -> unit
+  val set_uint16 : rw t -> int -> int -> unit
+  val set_uint32 : rw t -> int -> Uint32.t -> unit
+  val set_uint64 : rw t -> int -> Uint64.t -> unit
+  val set_int8   : rw t -> int -> int -> unit
+  val set_int16  : rw t -> int -> int -> unit
+  val set_int32  : rw t -> int -> Int32.t -> unit
+  val set_int64  : rw t -> int -> Int64.t -> unit
 end
 
 module type S = sig
