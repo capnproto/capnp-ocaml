@@ -560,5 +560,77 @@ module Make (Storage : MessageStorage.S) = struct
       | 5 -> Annotation x
       | _ -> invalid_msg "invalid Node.unnamed_union_t type tag"
   end
+
+  module CodeGeneratorRequest = struct
+    type 'cap t = 'cap StructStorage.t option
+
+    module RequestedFile = struct
+      type 'cap t = 'cap StructStorage.t option
+
+      module Import = struct
+        type 'cap t = 'cap StructStorage.t option
+
+        let id_get (x : 'cap t) : Uint64.t =
+          get_struct_data_uint64 x 0
+
+        let name_get (x : 'cap t) : string =
+          get_struct_text_field x 0
+      end
+
+      let id_get (x : 'cap t) : Uint64.t =
+        get_struct_data_uint64 x 0
+
+      let filename_get (x : 'cap t) : string =
+        get_struct_text_field x 0
+
+      let imports_get (x : 'cap t) : ('cap, 'cap Import.t) List.t =
+        match get_struct_pointer x 1 with
+        | Some slice ->
+            begin match deref_list_pointer slice with
+            | Some list_storage ->
+                Some {
+                  List.storage  = list_storage;
+                  List.get_item = fun storage i -> Some (StructList.get storage i);
+                }
+            | None ->
+                None
+            end
+        | None ->
+            None
+    end
+
+    let nodes_get (x : 'cap t) : ('cap, 'cap Node.t) List.t =
+      match get_struct_pointer x 0 with
+      | Some slice ->
+          begin match deref_list_pointer slice with
+          | Some list_storage ->
+              Some {
+                List.storage  = list_storage;
+                List.get_item = fun storage i -> Some (StructList.get storage i);
+              }
+          | None ->
+              None
+          end
+      | None ->
+          None
+
+    let requestedFiles_get (x : 'cap t) : ('cap, 'cap Node.t) List.t =
+      match get_struct_pointer x 1 with
+      | Some slice ->
+          begin match deref_list_pointer slice with
+          | Some list_storage ->
+              Some {
+                List.storage  = list_storage;
+                List.get_item = fun storage i -> Some (StructList.get storage i);
+              }
+          | None ->
+              None
+          end
+      | None ->
+          None
+
+    let of_message (m : 'cap Message.t) : 'cap t =
+      get_root_struct m
+  end
 end
 

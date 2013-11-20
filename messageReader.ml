@@ -234,7 +234,7 @@ module Make (Storage : MessageStorage.S) = struct
       Some (make_list_storage
         ~message:pointer_bytes.Slice.msg
         ~segment_id:pointer_bytes.Slice.segment_id
-        ~segment_offset:(pointer_bytes.Slice.start + pointer_bytes.Slice.len +
+        ~segment_offset:((Slice.get_end pointer_bytes) +
                            (list_pointer.ListPointer.offset * sizeof_uint64))
         ~list_pointer)
     | Pointer.Far far_pointer ->
@@ -615,6 +615,20 @@ module Make (Storage : MessageStorage.S) = struct
           Int64.zero
     in
     Int64.bit_xor numeric default
+
+
+  let get_root_struct (m : 'cap Message.t) : 'cap StructStorage.t option =
+    let first_segment = Message.get_segment m 0 in
+    if Segment.length first_segment < sizeof_uint64 then
+      None
+    else
+      let pointer_bytes = {
+        Slice.msg        = m;
+        Slice.segment_id = 0;
+        Slice.start      = 0;
+        Slice.len        = sizeof_uint64
+      } in
+      deref_struct_pointer pointer_bytes
 
 end
 
