@@ -1,0 +1,15 @@
+OASISFormat: 0.3
+Name:        capnp
+Version:     0.0.1
+Synopsis:    OCaml code generator plugin for Cap'n Proto compiler
+Authors:     Paul Pelzl
+License:     FreeBSD
+
+Executable "capnpc-ocaml"
+  Path:       src
+  BuildTools: ocamlbuild
+  MainIs:     main.ml
+  ByteOpt:    -g -thread -bin-annot
+  NativeOpt:  -g -thread -bin-annot
+  BuildDepends: core, uint, ocplib-endian
+  
