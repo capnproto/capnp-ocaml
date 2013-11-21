@@ -430,7 +430,7 @@ module Make (Storage : MessageStorage.S) = struct
         let total_size    = data_size + pointers_size in
         let data = {
           list_storage.ListStorage.storage with
-          Slice.start = list_storage.ListStorage.storage.Slice.start + (i + total_size);
+          Slice.start = list_storage.ListStorage.storage.Slice.start + (i * total_size);
           Slice.len   = data_size;
         } in
         let pointers = {
@@ -467,6 +467,17 @@ module Make (Storage : MessageStorage.S) = struct
         StructStorage.get_pointer storage pointer_word
     | None ->
         None
+
+
+  let string_of_pointer pointer_bytes =
+    let rec loop acc i : string list =
+      if i = 8 then
+        List.rev acc
+      else
+        let byte_rep = Printf.sprintf "%02x" (Slice.get_uint8 pointer_bytes i) in
+        loop (byte_rep :: acc) (i + 1)
+    in
+    String.concat ~sep:"" (loop [] 0)
 
 
   let get_struct_text_field
