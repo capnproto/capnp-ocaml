@@ -15,3 +15,4 @@ let decode_signed n num =
 let ceil_int num denom = (num + denom - 1) / denom
 
 
+let uint64_equal a b : bool = Uint64.compare a b = 0

@@ -18,8 +18,13 @@ let main () : int =
       let open M in
       let message = Message.readonly (Message.of_storage segments) in
       let request = PS.CodeGeneratorRequest.of_message message in
-      let () = Generate.compile request "dir_name" in
-      ExitCode.success
+      begin try
+        let () = Generate.compile request "dir_name" in
+        ExitCode.success
+      with Failure msg ->
+        let () = prerr_endline msg in
+        ExitCode.general_error
+      end
   | Result.Error StrStorage.FramingError.Incomplete ->
       let () = Printf.printf "incomplete message\n" in
       ExitCode.general_error

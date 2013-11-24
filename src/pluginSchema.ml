@@ -271,8 +271,8 @@ module Make (Storage : MessageStorage.S) = struct
     end
 
     type 'cap unnamed_union_t =
-        | Slot of 'cap Slot.t
-        | Group of 'cap Group.t
+      | Slot of 'cap Slot.t
+      | Group of 'cap Group.t
 
     module Ordinal = struct
       type 'cap t = 'cap StructStorage.t option

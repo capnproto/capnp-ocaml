@@ -313,11 +313,20 @@ module Make (Storage : MessageStorage.S) = struct
     let open ListStorage in
     match list_storage.storage_type with
     | Bytes 1 ->
-      let buf = String.create list_storage.num_elements in
-      for i = 0 to list_storage.num_elements - 1 do
-        buf.[i] <- Char.of_int_exn (Slice.get_uint8 list_storage.storage i)
-      done;
-      buf
+      if list_storage.num_elements < 1 then
+        invalid_msg "empty string list has no space for null terminator"
+      else
+        let terminator = Slice.get_uint8 list_storage.storage (list_storage.num_elements - 1) in
+        if terminator <> 0 then
+          invalid_msg "string list is not null terminated"
+        else
+          let buf = String.create (list_storage.num_elements - 1) in
+          let () =
+            for i = 0 to list_storage.num_elements - 2 do
+              buf.[i] <- Char.of_int_exn (Slice.get_uint8 list_storage.storage i)
+            done
+          in
+          buf
     | _ ->
       invalid_msg "decoded non-UInt8 list where string data was expected"
 
