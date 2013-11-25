@@ -77,28 +77,137 @@ let get_unqualified_name
       end
 
 
-(* Generate the OCaml module corresponding to a struct definition.  [scope] is a
- * stack of scope IDs corresponding to this lexical context, and is used to figure
- * out what module prefixes are required to properly qualify a type.
- *
- * Raises: Failure if the children of this node contain a cycle. *)
-let rec generate_struct_node nodes_table scope struct_def =
-  let unsorted_fields =
-    let fields_accessor = PS.Node.Struct.fields_get struct_def in
-    let rec loop_fields acc i =
-      if i = CArray.length fields_accessor then
-        acc
-      else
-        let field = CArray.get fields_accessor i in
-        loop_fields (field :: acc) (i + 1)
-    in
-    loop_fields [] 0
+(* Get a representation of the fully-qualified module name for [node].
+ * The resulting list associates each component of the name with the parent scope
+ * in which it is defined.  The head of the list is at the outermost scope. *)
+let get_fully_qualified_name nodes_table node : (string * Uint64.t) list =
+  let rec loop acc curr_node =
+    let scope_id = PS.Node.scopeId_get curr_node in
+    if Util.uint64_equal scope_id Uint64.zero then
+      acc
+    else
+      let parent = Hashtbl.find_exn nodes_table scope_id in
+      (get_unqualified_name ~parent ~child:curr_node, scope_id) :: acc
   in
-  (* Sorting in reverse code order allows us to avoid a List.rev *)
-  let fields = List.sort unsorted_fields ~cmp:(fun x y ->
-    - (Int.compare (PS.Field.codeOrder_get x) (PS.Field.codeOrder_get y)))
+  loop [] node
+
+
+(* Get a the qualified module name for [node] which is suitable for use at the given
+ * [scope_stack} position. *)
+let get_scope_relative_name nodes_table (scope_stack : Uint64.t list) node =
+  let rec pop_components components scope =
+    match components, scope with
+    | ( (component_name, component_scope_id) :: other_components, scope_id :: scope_ids) ->
+        if Util.uint64_equal component_scope_id scope_id then
+          pop_components other_components scope_ids
+        else
+          components
+    | _ ->
+        components
   in
-  let indent = "  " ^ String.concat (List.rev_map scope ~f:(fun x -> "  ")) in
+  let fq_name = get_fully_qualified_name nodes_table node in
+  let rel_name = pop_components fq_name (List.rev scope_stack) in
+  String.concat ~sep:"." (List.map rel_name ~f:fst)
+
+
+let no_discriminant = 0xffff
+
+
+(* Construct an ocaml name for the given schema-defined type. *)
+let rec type_name nodes_table scope tp : string =
+  match PS.Type.unnamed_union_get tp with
+  | PS.Type.Void    -> "unit"
+  | PS.Type.Bool    -> "bool"
+  | PS.Type.Int8    -> "int"
+  | PS.Type.Int16   -> "int"
+  | PS.Type.Int32   -> "int32"
+  | PS.Type.Int64   -> "int64"
+  | PS.Type.Uint8   -> "int"
+  | PS.Type.Uint16  -> "int"
+  | PS.Type.Uint32  -> "Uint32.t"
+  | PS.Type.Uint64  -> "Uint64.t"
+  | PS.Type.Float32 -> "float"
+  | PS.Type.Float64 -> "float"
+  | PS.Type.Text    -> "string"
+  | PS.Type.Data    -> "string"
+  | PS.Type.List list_descr ->
+      let list_type = PS.Type.List.elementType_get list_descr in
+      (type_name nodes_table scope list_type) ^ " list"
+  | PS.Type.Enum enum_descr ->
+      let enum_id = PS.Type.Enum.typeId_get enum_descr in
+      let enum_node = Hashtbl.find_exn nodes_table enum_id in
+      let enum_module_name = get_scope_relative_name nodes_table scope enum_node in
+      enum_module_name ^ ".t"
+  | PS.Type.Struct struct_descr ->
+      let struct_id = PS.Type.Struct.typeId_get struct_descr in
+      let struct_node = Hashtbl.find_exn nodes_table struct_id in
+      let struct_module_name = get_scope_relative_name nodes_table scope struct_node in
+      struct_module_name ^ ".t"
+  | PS.Type.Interface iface_descr ->
+      let iface_id = PS.Type.Interface.typeId_get iface_descr in
+      let iface_node = Hashtbl.find_exn nodes_table iface_id in
+      let iface_module_name = get_scope_relative_name nodes_table scope iface_node in
+      iface_module_name ^ ".t"
+  | PS.Type.Object ->
+      "Object.t"
+
+
+let generate_union_type nodes_table scope struct_def fields =
+  let indent = String.make (2 * (List.length scope + 1)) ' ' in
+  let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
+    let field_name = PS.Field.name_get field in
+    match PS.Field.unnamed_union_get field with
+    | PS.Field.Slot slot ->
+        let field_type = PS.Field.Slot.type_get slot in
+        begin match PS.Type.unnamed_union_get field_type with
+        | PS.Type.Void ->
+            (Printf.sprintf "%s  | %s" indent field_name) :: acc
+        | _ ->
+            (Printf.sprintf "%s  | %s of %s" indent field_name
+              (type_name nodes_table scope field_type)) :: acc
+        end
+    | PS.Field.Group group ->
+        let group_type_name =
+          let group_id = PS.Field.Group.typeId_get group in
+          let group_node = Hashtbl.find_exn nodes_table group_id in
+          let group_module_name = get_scope_relative_name nodes_table scope group_node in
+          group_module_name ^ ".t"
+        in
+        (Printf.sprintf "%s  | %s of %s" indent field_name group_type_name) :: acc)
+  in
+  let header = [
+    Printf.sprintf "%stype unnamed_union_t =" indent;
+  ] in
+  let footer = [
+    Printf.sprintf "%s  | Undefined_ of int\n" indent
+  ] in
+  String.concat ~sep:"\n" (header @ cases @ footer)
+
+
+let generate_union_accessors nodes_table scope struct_def fields =
+  let indent = String.make (2 * (List.length scope + 1)) ' ' in
+  let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
+    let field_name  = PS.Field.name_get field in
+    let field_value = PS.Field.discriminantValue_get field in
+    (Printf.sprintf "%s  | %u -> %s"
+      indent
+      field_value
+      field_name) :: acc)
+  in
+  let header = [
+    Printf.sprintf "%slet unnamed_union_get x =" indent;
+    Printf.sprintf "%s  match get_struct_field_uint16 x %u with"
+      indent ((Uint32.to_int (PS.Node.Struct.discriminantOffset_get struct_def)) * 2);
+  ] in
+  let footer = [
+    Printf.sprintf "%s  | v -> Undefined_ v\n" indent
+  ] in
+  (generate_union_type nodes_table scope struct_def fields) ^ "\n\n" ^
+  String.concat ~sep:"\n" (header @ cases @ footer)
+
+
+let generate_non_union_accessors nodes_table scope struct_def fields =
+  let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let accessors = List.fold_left fields ~init:[] ~f:(fun acc field ->
     let field_accessors : string =
       let field_name = PS.Field.name_get field in
@@ -235,6 +344,43 @@ let rec generate_struct_node nodes_table scope struct_def =
   String.concat ~sep:"\n" accessors
 
 
+(* Generate the OCaml module corresponding to a struct definition.  [scope] is a
+ * stack of scope IDs corresponding to this lexical context, and is used to figure
+ * out what module prefixes are required to properly qualify a type.
+ *
+ * Raises: Failure if the children of this node contain a cycle. *)
+let rec generate_struct_node nodes_table scope struct_def =
+  let unsorted_fields =
+    let fields_accessor = PS.Node.Struct.fields_get struct_def in
+    let rec loop_fields acc i =
+      if i = CArray.length fields_accessor then
+        acc
+      else
+        let field = CArray.get fields_accessor i in
+        loop_fields (field :: acc) (i + 1)
+    in
+    loop_fields [] 0
+  in
+  (* Sorting in reverse code order allows us to avoid a List.rev *)
+  let all_fields = List.sort unsorted_fields ~cmp:(fun x y ->
+    - (Int.compare (PS.Field.codeOrder_get x) (PS.Field.codeOrder_get y)))
+  in
+  let union_fields, non_union_fields = List.partition_tf all_fields ~f:(fun field ->
+    (PS.Field.discriminantValue_get field) <> no_discriminant)
+  in
+  let union_accessors =
+    match union_fields with
+    | [] -> ""
+    | _  -> generate_union_accessors nodes_table scope struct_def union_fields
+  in
+  let non_union_acccessors =
+    match non_union_fields with
+    | [] -> ""
+    | _  -> generate_non_union_accessors nodes_table scope struct_def non_union_fields
+  in
+  union_accessors ^ non_union_acccessors
+
+
 
 (* Generate the OCaml module corresponding to a node.  [scope] is a stack of
  * scope IDs corresponding to this lexical context, and is used to figure out
@@ -267,7 +413,7 @@ and generate_node
         generate_node nodes_table (node_id :: scope) child child_name)
       in
       begin match scope with
-      | [] ->
+      | [_] | [] ->
           String.concat ~sep:"\n" child_modules
       | x :: _ ->
           String.concat ~sep:"\n" (header :: (child_modules @ [accessors ^ footer]))
@@ -295,7 +441,9 @@ let compile (request : Message.ro PS.CodeGeneratorRequest.t) (dest_dir : string)
     let requested_file_id = RequestedFile.id_get requested_file in
     let requested_file_node = Hashtbl.find_exn nodes_table requested_file_id in
     let requested_filename = RequestedFile.filename_get requested_file_node in
-    let file_content = generate_node nodes_table [] requested_file_node requested_filename in
+    let file_content = generate_node nodes_table [requested_file_id]
+      requested_file_node requested_filename
+    in
     print_endline file_content
   done
 
