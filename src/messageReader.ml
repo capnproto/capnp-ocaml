@@ -1,9 +1,8 @@
 open Core.Std
 
 module Make (Storage : MessageStorage.S) = struct
-  module M = Message.Make(Storage)
   let invalid_msg = Message.invalid_msg
-  open M
+  include Message.Make(Storage)
 
 
   let sizeof_uint32 = 4
@@ -86,6 +85,30 @@ module Make (Storage : MessageStorage.S) = struct
       storage_type : storage_type_t;
       num_elements : int
     }
+  end
+
+
+  module CapnpArray = struct
+    type ('cap, 'a) list_t = {
+      storage  : 'cap ListStorage.t;
+      get_item : 'cap ListStorage.t -> int -> 'a;
+    }
+
+    type ('cap, 'a) t = ('cap, 'a) list_t option
+
+    let length (x : ('cap, 'a)  t) : int =
+      match x with
+      | Some {storage; _} ->
+          storage.ListStorage.num_elements
+      | None ->
+          0
+
+    let get (x : ('cap, 'a) t) (i : int) : 'a =
+      match x with
+      | Some {storage; get_item;} ->
+          get_item storage i
+      | None ->
+          invalid_arg "index out of bounds"
   end
 
 
@@ -309,24 +332,31 @@ module Make (Storage : MessageStorage.S) = struct
       invalid_msg "decoded list pointer where struct pointer was expected"
 
 
-  let string_of_uint8_list (list_storage : 'cap ListStorage.t) : string =
+  let string_of_uint8_list ~(null_terminated : bool) (list_storage : 'cap ListStorage.t) : string =
     let open ListStorage in
     match list_storage.storage_type with
     | Bytes 1 ->
-      if list_storage.num_elements < 1 then
-        invalid_msg "empty string list has no space for null terminator"
-      else
-        let terminator = Slice.get_uint8 list_storage.storage (list_storage.num_elements - 1) in
-        if terminator <> 0 then
-          invalid_msg "string list is not null terminated"
-        else
-          let buf = String.create (list_storage.num_elements - 1) in
-          let () =
-            for i = 0 to list_storage.num_elements - 2 do
-              buf.[i] <- Char.of_int_exn (Slice.get_uint8 list_storage.storage i)
-            done
-          in
-          buf
+        let result_byte_count =
+          if null_terminated then
+            let () =
+              if list_storage.num_elements < 1 then
+                invalid_msg "empty string list has no space for null terminator"
+            in
+            let terminator = Slice.get_uint8 list_storage.storage (list_storage.num_elements - 1) in
+            let () = if terminator <> 0 then
+              invalid_msg "string list is not null terminated"
+            in
+            list_storage.num_elements - 1
+          else
+            list_storage.num_elements
+        in
+        let buf = String.create result_byte_count in
+        let () =
+          for i = 0 to result_byte_count - 1 do
+            buf.[i] <- Char.of_int_exn (Slice.get_uint8 list_storage.storage i)
+          done
+        in
+        buf
     | _ ->
       invalid_msg "decoded non-UInt8 list where string data was expected"
 
@@ -468,8 +498,8 @@ module Make (Storage : MessageStorage.S) = struct
 
 
   let get_struct_pointer
-    (struct_storage : 'cap StructStorage.t option)
-    (pointer_word : int)
+      (struct_storage : 'cap StructStorage.t option)
+      (pointer_word : int)
   : 'cap Slice.t option =
     match struct_storage with
     | Some storage ->
@@ -489,9 +519,9 @@ module Make (Storage : MessageStorage.S) = struct
     String.concat ~sep:"" (loop [] 0)
 
 
-  let get_struct_text_field
-    (struct_storage : 'cap StructStorage.t option)
-    (pointer_word : int)
+  let get_struct_field_blob
+      (struct_storage : 'cap StructStorage.t option)
+      (pointer_word : int)
   : string =
     match struct_storage with
     | Some storage ->
@@ -499,7 +529,7 @@ module Make (Storage : MessageStorage.S) = struct
         | Some pointer_bytes ->
           begin match deref_list_pointer pointer_bytes with
           | Some list_storage ->
-              string_of_uint8_list list_storage
+              string_of_uint8_list ~null_terminated:false list_storage
           | None ->
               ""
           end
@@ -509,10 +539,99 @@ module Make (Storage : MessageStorage.S) = struct
     | None ->
         ""
 
-  let get_struct_bit
-    (struct_storage : 'cap StructStorage.t option)
-    ?(default_bit = false)
-    (byte_ofs : int) (bit_ofs : int)
+
+  let get_struct_field_text
+      (struct_storage : 'cap StructStorage.t option)
+      (pointer_word : int)
+  : string =
+    match struct_storage with
+    | Some storage ->
+        begin match StructStorage.get_pointer storage pointer_word with
+        | Some pointer_bytes ->
+          begin match deref_list_pointer pointer_bytes with
+          | Some list_storage ->
+              string_of_uint8_list ~null_terminated:true list_storage
+          | None ->
+              ""
+          end
+        | None ->
+            ""
+        end
+    | None ->
+        ""
+
+
+  let get_struct_field_bit_list
+      (struct_storage : 'cap StructStorage.t option)
+      (pointer_word : int)
+  : ('cap, 'a) CapnpArray.t =
+    match get_struct_pointer struct_storage pointer_word with
+    | Some slice ->
+        begin match deref_list_pointer slice with
+        | Some list_storage ->
+            Some {
+              CapnpArray.storage  = list_storage;
+              CapnpArray.get_item = fun storage i -> Some (BitList.get storage i)
+            }
+        | None ->
+            None
+        end
+    | None ->
+        None
+
+
+  let get_struct_field_bytes_list
+      (struct_storage : 'cap StructStorage.t option)
+      (pointer_word : int)
+      (convert : 'cap Slice.t -> 'a)
+  : ('cap, 'a) CapnpArray.t =
+    match get_struct_pointer struct_storage pointer_word with
+    | Some slice ->
+        begin match deref_list_pointer slice with
+        | Some list_storage ->
+            Some {
+              CapnpArray.storage  = list_storage;
+              CapnpArray.get_item = fun storage i -> convert (BytesList.get storage i);
+            }
+        | None ->
+            None
+        end
+    | None ->
+        None
+
+
+  let get_struct_field_struct_list
+      (struct_storage : 'cap StructStorage.t option)
+      (pointer_word : int)
+  : ('cap, 'a) CapnpArray.t =
+    match get_struct_pointer struct_storage pointer_word with
+    | Some slice ->
+        begin match deref_list_pointer slice with
+        | Some list_storage ->
+            Some {
+              CapnpArray.storage  = list_storage;
+              CapnpArray.get_item = fun storage i -> Some (StructList.get storage i)
+            }
+        | None ->
+            None
+        end
+    | None ->
+        None
+
+
+  let get_struct_field_struct
+      (struct_storage : 'cap StructStorage.t option)
+      (pointer_word : int)
+  : 'cap StructStorage.t option =
+    match get_struct_pointer struct_storage pointer_word with
+    | Some pointer_bytes -> deref_struct_pointer pointer_bytes
+    | None -> None
+
+
+  let get_struct_field_bit
+      (struct_storage : 'cap StructStorage.t option)
+      ?(default_bit = false)
+      (byte_ofs : int) (bit_ofs : int)
   : bool =
     let byte_val =
       match struct_storage with
@@ -525,9 +644,9 @@ module Make (Storage : MessageStorage.S) = struct
     if default_bit then not bit_val else bit_val
 
 
-  let get_struct_data_uint8
-    (struct_storage : 'cap StructStorage.t option)
-    ?(default = 0) (i : int)
+  let get_struct_field_uint8
+      (struct_storage : 'cap StructStorage.t option)
+      ?(default = 0) (i : int)
   : int =
     let numeric =
       match struct_storage with
@@ -539,9 +658,9 @@ module Make (Storage : MessageStorage.S) = struct
     numeric lxor default
 
 
-  let get_struct_data_uint16
-    (struct_storage : 'cap StructStorage.t option)
-    ?(default = 0) (i : int)
+  let get_struct_field_uint16
+      (struct_storage : 'cap StructStorage.t option)
+      ?(default = 0) (i : int)
   : int =
     let numeric =
       match struct_storage with
@@ -553,9 +672,9 @@ module Make (Storage : MessageStorage.S) = struct
     numeric lxor default
 
 
-  let get_struct_data_uint32
-    (struct_storage : 'cap StructStorage.t option)
-    ?(default = Uint32.zero) (i : int)
+  let get_struct_field_uint32
+      (struct_storage : 'cap StructStorage.t option)
+      ?(default = Uint32.zero) (i : int)
   : Uint32.t =
     let numeric =
       match struct_storage with
@@ -567,9 +686,9 @@ module Make (Storage : MessageStorage.S) = struct
     Uint32.logxor numeric default
 
 
-  let get_struct_data_uint64
-    (struct_storage : 'cap StructStorage.t option)
-    ?(default = Uint64.zero) (i : int)
+  let get_struct_field_uint64
+      (struct_storage : 'cap StructStorage.t option)
+      ?(default = Uint64.zero) (i : int)
   : Uint64.t =
     let numeric =
       match struct_storage with
@@ -581,9 +700,9 @@ module Make (Storage : MessageStorage.S) = struct
     Uint64.logxor numeric default
 
 
-  let get_struct_data_int8
-    (struct_storage : 'cap StructStorage.t option)
-    ?(default = 0) (i : int)
+  let get_struct_field_int8
+      (struct_storage : 'cap StructStorage.t option)
+      ?(default = 0) (i : int)
   : int =
     let numeric =
       match struct_storage with
@@ -595,9 +714,9 @@ module Make (Storage : MessageStorage.S) = struct
     numeric lxor default
 
 
-  let get_struct_data_int16
-    (struct_storage : 'cap StructStorage.t option)
-    ?(default = 0) (i : int)
+  let get_struct_field_int16
+      (struct_storage : 'cap StructStorage.t option)
+      ?(default = 0) (i : int)
   : int =
     let numeric =
       match struct_storage with
@@ -609,9 +728,9 @@ module Make (Storage : MessageStorage.S) = struct
     numeric lxor default
 
 
-  let get_struct_data_int32
-    (struct_storage : 'cap StructStorage.t option)
-    ?(default = Int32.zero) (i : int)
+  let get_struct_field_int32
+      (struct_storage : 'cap StructStorage.t option)
+      ?(default = Int32.zero) (i : int)
   : Int32.t =
     let numeric =
       match struct_storage with
@@ -623,9 +742,9 @@ module Make (Storage : MessageStorage.S) = struct
     Int32.bit_xor numeric default
 
 
-  let get_struct_data_int64
-    (struct_storage : 'cap StructStorage.t option)
-    ?(default = Int64.zero) (i : int)
+  let get_struct_field_int64
+      (struct_storage : 'cap StructStorage.t option)
+      ?(default = Int64.zero) (i : int)
   : Int64.t =
     let numeric =
       match struct_storage with

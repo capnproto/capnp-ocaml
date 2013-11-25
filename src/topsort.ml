@@ -2,6 +2,7 @@
 open Core.Std
 
 module PS = PluginSchema.Make(StrStorage)
+module CArray = PS.CapnpArray
 
 
 let add_parentage_maps
@@ -12,8 +13,8 @@ let add_parentage_maps
   let node_id = PS.Node.id_get node in
   let rec add_children parent =
     let child_nodes = PS.Node.nestedNodes_get parent in
-    for i = 0 to PS.List.length child_nodes - 1 do
-      let child_nested_node = PS.List.get child_nodes i in
+    for i = 0 to PS.CapnpArray.length child_nodes - 1 do
+      let child_nested_node = CArray.get child_nodes i in
       let child_node = Hashtbl.find_exn nodes_table (PS.Node.NestedNode.id_get child_nested_node) in
       let child_node_id = PS.Node.id_get child_node in
       let () = add_children child_node in
@@ -99,8 +100,8 @@ let build_reference_graph
     in
     let () =
       let child_nodes = PS.Node.nestedNodes_get node in
-      for i = 0 to PS.List.length child_nodes - 1 do
-        let child_nested_node = PS.List.get child_nodes i in
+      for i = 0 to CArray.length child_nodes - 1 do
+        let child_nested_node = CArray.get child_nodes i in
         let child_node = Hashtbl.find_exn nodes_table (PS.Node.NestedNode.id_get child_nested_node) in
         add_edges ~parentage_table ~edges ~parent_id_opt:parent_id child_node;
       done
@@ -115,8 +116,8 @@ let build_reference_graph
         ()
     | PS.Node.Struct node_struct ->
         let fields = PS.Node.Struct.fields_get node_struct in
-        for j = 0 to PS.List.length fields - 1 do
-          let field = PS.List.get fields j in
+        for j = 0 to CArray.length fields - 1 do
+          let field = CArray.get fields j in
           match PS.Field.unnamed_union_get field with
           | PS.Field.Slot slot ->
               register_type_reference ~parentage_table ~edges
@@ -127,8 +128,8 @@ let build_reference_graph
         done
     | PS.Node.Interface node_iface ->
         let methods = PS.Node.Interface.methods_get node_iface in
-        for j = 0 to PS.List.length methods - 1 do
-          let meth = PS.List.get methods j in
+        for j = 0 to CArray.length methods - 1 do
+          let meth = CArray.get methods j in
           register_reference ~parentage_table ~edges
             ~referrer:parent_id ~referee:(PS.Method.paramStructType_get meth);
           register_reference ~parentage_table ~edges
