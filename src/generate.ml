@@ -206,6 +206,96 @@ let generate_union_accessors nodes_table scope struct_def fields =
   String.concat ~sep:"\n" (header @ cases @ footer)
 
 
+let generate_list_accessor ~list_type ~indent ~field_name ~field_ofs =
+  match PS.Type.unnamed_union_get list_type with
+  | PS.Type.Void ->
+      Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
+        indent
+        field_name
+  | PS.Type.Bool ->
+      Printf.sprintf "%slet %s_get x = get_struct_field_bit_list x %u\n"
+        indent
+        field_name
+        field_ofs
+  | PS.Type.Int8 ->
+      Printf.sprintf "%slet %s_get x = get_struct_field_int8_list x %u\n"
+        indent
+        field_name
+        field_ofs
+  | PS.Type.Int16 ->
+      Printf.sprintf "%slet %s_get x = get_struct_field_int16_list x %u\n"
+        indent
+        field_name
+        field_ofs
+  | PS.Type.Int32 ->
+      Printf.sprintf "%slet %s_get x = get_struct_field_int32_list x %u\n"
+        indent
+        field_name
+        field_ofs
+  | PS.Type.Int64 ->
+      Printf.sprintf "%slet %s_get x = get_struct_field_int64_list x %u\n"
+        indent
+        field_name
+        field_ofs
+  | PS.Type.Uint8 ->
+      Printf.sprintf "%slet %s_get x = get_struct_field_uint8_list x %u\n"
+        indent
+        field_name
+        field_ofs
+  | PS.Type.Uint16 ->
+      Printf.sprintf "%slet %s_get x = get_struct_field_uint16_list x %u\n"
+        indent
+        field_name
+        field_ofs
+  | PS.Type.Uint32 ->
+      Printf.sprintf "%slet %s_get x = get_struct_field_uint32_list x %u\n"
+        indent
+        field_name
+        field_ofs
+  | PS.Type.Uint64 ->
+      Printf.sprintf "%slet %s_get x = get_struct_field_uint64_list x %u\n"
+        indent
+        field_name
+        field_ofs
+  | PS.Type.Float32
+  | PS.Type.Float64 ->
+      Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
+        indent
+        field_name
+  | PS.Type.Text ->
+      Printf.sprintf "%slet %s_get x = get_struct_field_text_list x %u\n"
+        indent
+        field_name
+        field_ofs
+  | PS.Type.Data ->
+      Printf.sprintf "%slet %s_get x = get_struct_field_blob_list x %u\n"
+        indent
+        field_name
+        field_ofs
+  | PS.Type.List _ ->
+      Printf.sprintf "%slet %s_get x = get_struct_field_list_list x %u\n"
+        indent
+        field_name
+        field_ofs
+  | PS.Type.Enum _ ->
+      Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
+        indent
+        field_name
+  | PS.Type.Struct _ ->
+      Printf.sprintf "%slet %s_get x = get_struct_field_struct_list x %u\n"
+        indent
+        field_name
+        field_ofs
+  | PS.Type.Interface _ ->
+      Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
+        indent
+        field_name
+  | PS.Type.Object ->
+      Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
+        indent
+        field_name
+
+
 let generate_non_union_accessors nodes_table scope struct_def fields =
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let accessors = List.fold_left fields ~init:[] ~f:(fun acc field ->
@@ -315,11 +405,8 @@ let generate_non_union_accessors nodes_table scope struct_def fields =
                 field_name
                 field_ofs
           | PS.Type.List list ->
-              (* Note: [list] element provides access to the list type *)
-              Printf.sprintf "%slet %s_get x = get_struct_list_field x %u\n"
-                indent
-                field_name
-                field_ofs
+              let list_type = PS.Type.List.elementType_get list in
+              generate_list_accessor ~list_type ~indent ~field_name ~field_ofs
           | PS.Type.Enum enum ->
               Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
                 indent

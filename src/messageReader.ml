@@ -600,6 +600,86 @@ module Make (Storage : MessageStorage.S) = struct
         None
 
 
+  let get_struct_field_int8_list
+    (struct_storage : 'cap StructStorage.t option)
+    (pointer_word : int)
+  : ('cap, int) CapnpArray.t =
+    get_struct_field_bytes_list struct_storage pointer_word (fun slice -> Slice.get_int8 slice 0)
+
+
+  let get_struct_field_int16_list
+    (struct_storage : 'cap StructStorage.t option)
+    (pointer_word : int)
+  : ('cap, int) CapnpArray.t =
+    get_struct_field_bytes_list struct_storage pointer_word (fun slice -> Slice.get_int16 slice 0)
+
+
+  let get_struct_field_int32_list
+    (struct_storage : 'cap StructStorage.t option)
+    (pointer_word : int)
+  : ('cap, int32) CapnpArray.t =
+    get_struct_field_bytes_list struct_storage pointer_word (fun slice -> Slice.get_int32 slice 0)
+
+
+  let get_struct_field_int64_list
+    (struct_storage : 'cap StructStorage.t option)
+    (pointer_word : int)
+  : ('cap, int64) CapnpArray.t =
+    get_struct_field_bytes_list struct_storage pointer_word (fun slice -> Slice.get_int64 slice 0)
+
+
+  let get_struct_field_uint8_list
+    (struct_storage : 'cap StructStorage.t option)
+    (pointer_word : int)
+  : ('cap, int) CapnpArray.t =
+    get_struct_field_bytes_list struct_storage pointer_word (fun slice -> Slice.get_uint8 slice 0)
+
+
+  let get_struct_field_uint16_list
+    (struct_storage : 'cap StructStorage.t option)
+    (pointer_word : int)
+  : ('cap, int) CapnpArray.t =
+    get_struct_field_bytes_list struct_storage pointer_word (fun slice -> Slice.get_uint16 slice 0)
+
+
+  let get_struct_field_uint32_list
+    (struct_storage : 'cap StructStorage.t option)
+    (pointer_word : int)
+  : ('cap, Uint32.t) CapnpArray.t =
+    get_struct_field_bytes_list struct_storage pointer_word (fun slice -> Slice.get_uint32 slice 0)
+
+
+  let get_struct_field_uint64_list
+    (struct_storage : 'cap StructStorage.t option)
+    (pointer_word : int)
+  : ('cap, Uint64.t) CapnpArray.t =
+    get_struct_field_bytes_list struct_storage pointer_word (fun slice -> Slice.get_uint64 slice 0)
+
+
+  let get_struct_field_text_list
+      (struct_storage : 'cap StructStorage.t option)
+      (pointer_word : int)
+  : ('cap, string) CapnpArray.t =
+    get_struct_field_bytes_list struct_storage pointer_word (fun slice ->
+      match deref_list_pointer slice with
+      | Some list_storage ->
+          string_of_uint8_list ~null_terminated:true list_storage
+      | None ->
+          "")
+
+
+  let get_struct_field_blob_list
+      (struct_storage : 'cap StructStorage.t option)
+      (pointer_word : int)
+  : ('cap, string) CapnpArray.t =
+    get_struct_field_bytes_list struct_storage pointer_word (fun slice ->
+      match deref_list_pointer slice with
+      | Some list_storage ->
+          string_of_uint8_list ~null_terminated:false list_storage
+      | None ->
+          "")
+
+
   let get_struct_field_struct_list
       (struct_storage : 'cap StructStorage.t option)
       (pointer_word : int)
@@ -617,6 +697,13 @@ module Make (Storage : MessageStorage.S) = struct
         end
     | None ->
         None
+
+
+  let get_struct_field_list_list
+    (struct_storage : 'cap StructStorage.t option)
+    (pointer_word : int)
+  : ('cap, 'cap ListStorage.t option) CapnpArray.t =
+    get_struct_field_bytes_list struct_storage pointer_word (fun slice -> deref_list_pointer slice)
 
 
   let get_struct_field_struct
