@@ -78,8 +78,8 @@ let get_unqualified_name
 
 
 (* Get a representation of the fully-qualified module name for [node].
- * The resulting list associates each component of the name with the parent scope
- * in which it is defined.  The head of the list is at the outermost scope. *)
+ * The resulting list associates each component of the name with scope which it
+ * defines.  The head of the list is at the outermost scope. *)
 let get_fully_qualified_name nodes_table node : (string * Uint64.t) list =
   let rec loop acc curr_node =
     let scope_id = PS.Node.scopeId_get curr_node in
@@ -87,14 +87,14 @@ let get_fully_qualified_name nodes_table node : (string * Uint64.t) list =
       acc
     else
       let parent = Hashtbl.find_exn nodes_table scope_id in
-      (get_unqualified_name ~parent ~child:curr_node, scope_id) :: acc
+      (get_unqualified_name ~parent ~child:curr_node, PS.Node.id_get node) :: acc
   in
   loop [] node
 
 
 (* Get a the qualified module name for [node] which is suitable for use at the given
- * [scope_stack} position. *)
-let get_scope_relative_name nodes_table (scope_stack : Uint64.t list) node =
+ * [scope_stack] position. *)
+let get_scope_relative_name nodes_table (scope_stack : Uint64.t list) node : string =
   let rec pop_components components scope =
     match components, scope with
     | ( (component_name, component_scope_id) :: other_components, scope_id :: scope_ids) ->
@@ -152,6 +152,7 @@ let rec type_name nodes_table scope tp : string =
       "Object.t"
 
 
+(* Generate a variant type declaration for a capnp union type. *)
 let generate_union_type nodes_table scope struct_def fields =
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
@@ -184,6 +185,7 @@ let generate_union_type nodes_table scope struct_def fields =
   String.concat ~sep:"\n" (header @ cases @ footer)
 
 
+(* Generate a function for unpacking a capnp union type as an OCaml variant. *)
 let generate_union_accessors nodes_table scope struct_def fields =
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
@@ -206,6 +208,7 @@ let generate_union_accessors nodes_table scope struct_def fields =
   String.concat ~sep:"\n" (header @ cases @ footer)
 
 
+(* Generate an accessor for retrieving a list of the given type. *)
 let generate_list_accessor ~list_type ~indent ~field_name ~field_ofs =
   match PS.Type.unnamed_union_get list_type with
   | PS.Type.Void ->
@@ -296,6 +299,43 @@ let generate_list_accessor ~list_type ~indent ~field_name ~field_ofs =
         field_name
 
 
+let generate_enum_accessor ~nodes_table ~scope ~enum_node ~enum_type ~indent ~field_name ~field_ofs =
+  let header =
+    Printf.sprintf "%slet %s_get x = \n%s  match get_struct_field_uint16 x %u with\n"
+      indent
+      field_name
+      indent
+      (2 * field_ofs)
+  in
+  let match_cases =
+    let scope_relative_name = get_scope_relative_name nodes_table scope enum_node in
+    let enumerants =
+      match PS.Node.unnamed_union_get enum_node with
+      | PS.Node.Enum enum_group ->
+          PS.Node.Enum.enumerants_get enum_group
+      | _ ->
+          failwith "decoded non-enum node where enum node was expected"
+    in
+    let buf = Buffer.create 512 in
+    for i = 0 to CArray.length enumerants - 1 do
+      let enumerant = CArray.get enumerants i in
+      let match_case =
+        Printf.sprintf "%s  | %u -> %s.%s\n"
+          indent
+          i
+          scope_relative_name
+          (PS.Enumerant.name_get enumerant)
+      in
+      Buffer.add_string buf match_case
+    done;
+    let footer = Printf.sprintf "%s  | v -> %s.Undefined_ v\n" indent scope_relative_name in
+    let () = Buffer.add_string buf footer in
+    Buffer.contents buf
+  in
+  header ^ match_cases
+
+
+(* Generate accessors for retrieving all non-union fields of a struct. *)
 let generate_non_union_accessors nodes_table scope struct_def fields =
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let accessors = List.fold_left fields ~init:[] ~f:(fun acc field ->
@@ -408,9 +448,10 @@ let generate_non_union_accessors nodes_table scope struct_def fields =
               let list_type = PS.Type.List.elementType_get list in
               generate_list_accessor ~list_type ~indent ~field_name ~field_ofs
           | PS.Type.Enum enum ->
-              Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
-                indent
-                field_name
+              let enum_id = PS.Type.Enum.typeId_get enum in
+              let enum_node = Hashtbl.find_exn nodes_table enum_id in
+              generate_enum_accessor ~nodes_table ~scope ~enum_node
+                ~enum_type:tp ~indent ~field_name ~field_ofs
           | PS.Type.Struct struct_def ->
               Printf.sprintf "%slet %s_get x = get_struct_field_struct x %u\n"
                 indent
@@ -500,9 +541,9 @@ and generate_node
         generate_node nodes_table (node_id :: scope) child child_name)
       in
       begin match scope with
-      | [_] | [] ->
+      | [] ->
           String.concat ~sep:"\n" child_modules
-      | x :: _ ->
+      | _ ->
           String.concat ~sep:"\n" (header :: (child_modules @ [accessors ^ footer]))
       end
   | None ->
@@ -528,7 +569,7 @@ let compile (request : Message.ro PS.CodeGeneratorRequest.t) (dest_dir : string)
     let requested_file_id = RequestedFile.id_get requested_file in
     let requested_file_node = Hashtbl.find_exn nodes_table requested_file_id in
     let requested_filename = RequestedFile.filename_get requested_file_node in
-    let file_content = generate_node nodes_table [requested_file_id]
+    let file_content = generate_node nodes_table []
       requested_file_node requested_filename
     in
     print_endline file_content
