@@ -69,9 +69,9 @@ let get_unqualified_name
                  loop_fields (i + 1)
              | PS.Field.Group group ->
                  if Util.uint64_equal child_id (PS.Field.Group.typeId_get group) then
-                   PS.Field.name_get field
-                  else
-                    loop_fields (i + 1)
+                   String.capitalize (PS.Field.name_get field)
+                 else
+                   loop_fields (i + 1)
           in
           loop_fields 0
       end
@@ -153,7 +153,7 @@ let rec type_name nodes_table scope tp : string =
 let generate_union_type nodes_table scope struct_def fields =
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
-    let field_name = PS.Field.name_get field in
+    let field_name = String.capitalize (PS.Field.name_get field) in
     match PS.Field.unnamed_union_get field with
     | PS.Field.Slot slot ->
         let field_type = PS.Field.Slot.type_get slot in

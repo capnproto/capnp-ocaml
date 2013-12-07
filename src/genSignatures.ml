@@ -11,7 +11,7 @@ let no_discriminant = 0xffff
 (* Generate a function for unpacking a capnp union type as an OCaml variant. *)
 let generate_union_accessors nodes_table scope struct_def fields =
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
-  (GenCommon.generate_union_type nodes_table scope struct_def fields) ^ "\n\n" ^
+  (GenCommon.generate_union_type nodes_table scope struct_def fields) ^ "\n" ^
   (Printf.sprintf "%sval unnamed_union_get : t -> unnamed_union_t\n" indent)
 
 
@@ -69,22 +69,22 @@ let generate_non_union_accessors nodes_table scope struct_def fields =
           let tp = PS.Field.Slot.type_get slot in
           begin match PS.Type.unnamed_union_get tp with
           | PS.Type.Int32 ->
-              String.concat ~sep:"\n" [
+              String.concat ~sep:"" [
                 Printf.sprintf "%sval %s_get : t -> int32\n" indent field_name;
                 Printf.sprintf "%sval %s_get_int_exn : t -> int\n" indent field_name;
               ]
           | PS.Type.Int64 ->
-              String.concat ~sep:"\n" [
+              String.concat ~sep:"" [
                 Printf.sprintf "%sval %s_get : t -> int64\n" indent field_name;
                 Printf.sprintf "%sval %s_get_int_exn : t -> int\n" indent field_name;
               ]
           | PS.Type.Uint32 ->
-              String.concat ~sep:"\n" [
+              String.concat ~sep:"" [
                 Printf.sprintf "%sval %s_get : t -> Uint32.t\n" indent field_name;
                 Printf.sprintf "%sval %s_get_int_exn : t -> int\n" indent field_name;
               ]
           | PS.Type.Uint64 ->
-              String.concat ~sep:"\n" [
+              String.concat ~sep:"" [
                 Printf.sprintf "%sval %s_get : t -> Uint64.t\n" indent field_name;
                 Printf.sprintf "%sval %s_get_int_exn : t -> int\n" indent field_name;
               ]
@@ -111,7 +111,7 @@ let generate_non_union_accessors nodes_table scope struct_def fields =
     in
     (field_accessors :: acc))
   in
-  String.concat ~sep:"\n" accessors
+  String.concat ~sep:"" accessors
 
 
 (* Generate the OCaml type signature corresponding to a struct definition.  [scope] is a

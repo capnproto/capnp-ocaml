@@ -148,7 +148,7 @@ let generate_enum_accessor ~nodes_table ~scope ~enum_node ~enum_type ~indent ~fi
           indent
           i
           scope_relative_name
-          (PS.Enumerant.name_get enumerant)
+          (String.capitalize (PS.Enumerant.name_get enumerant))
       in
       Buffer.add_string buf match_case
     done;
