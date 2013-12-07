@@ -27,7 +27,7 @@ let generate_union_accessors nodes_table scope struct_def fields =
   let footer = [
     Printf.sprintf "%s  | v -> Undefined_ v\n" indent
   ] in
-  GenCommon.(generate_union_type nodes_table scope struct_def fields) ^ "\n\n" ^
+  GenCommon.(generate_union_type nodes_table scope struct_def fields) ^ "\n" ^
   String.concat ~sep:"\n" (header @ cases @ footer)
 
 
@@ -197,7 +197,7 @@ let generate_non_union_accessors nodes_table scope struct_def fields =
                 field_name
                 (2 * field_ofs)
           | PS.Type.Int32 ->
-              String.concat ~sep:"\n" [
+              String.concat ~sep:"" [
                 Printf.sprintf "%slet %s_get x = get_struct_field_int32 x %u\n"
                   indent
                   field_name
@@ -208,7 +208,7 @@ let generate_non_union_accessors nodes_table scope struct_def fields =
                   field_name
               ]
           | PS.Type.Int64 ->
-              String.concat ~sep:"\n" [
+              String.concat ~sep:"" [
                 Printf.sprintf "%slet %s_get x = get_struct_field_int64 x %u\n"
                   indent
                   field_name
@@ -229,7 +229,7 @@ let generate_non_union_accessors nodes_table scope struct_def fields =
                 field_name
                 (2 * field_ofs)
           | PS.Type.Uint32 ->
-              String.concat ~sep:"\n" [
+              String.concat ~sep:"" [
                 Printf.sprintf "%slet %s_get x = get_struct_field_uint32 x %u\n"
                   indent
                   field_name
@@ -240,7 +240,7 @@ let generate_non_union_accessors nodes_table scope struct_def fields =
                   field_name
               ]
           | PS.Type.Uint64 ->
-              String.concat ~sep:"\n" [
+              String.concat ~sep:"" [
                 Printf.sprintf "%slet %s_get x = get_struct_field_uint64 x %u\n"
                   indent
                   field_name
@@ -293,7 +293,7 @@ let generate_non_union_accessors nodes_table scope struct_def fields =
     in
     (field_accessors :: acc))
   in
-  String.concat ~sep:"\n" accessors
+  String.concat ~sep:"" accessors
 
 
 (* Generate the OCaml module corresponding to a struct definition.  [scope] is a
@@ -346,7 +346,7 @@ and generate_node
     (node_name : string)
 : string =
   let node_id = PS.Node.id_get node in
-  let indent = String.concat (List.rev_map scope ~f:(fun x -> "  ")) in
+  let indent = String.make (2 * (List.length scope)) ' ' in
   let header = Printf.sprintf "%smodule %s = struct\n" indent node_name in
   let footer = indent ^ "end\n" in
   let accessors =
@@ -355,6 +355,8 @@ and generate_node
         ""
     | PS.Node.Struct struct_def ->
         generate_struct_node nodes_table scope struct_def
+    | PS.Node.Enum enum_def ->
+        GenCommon.generate_enum_sig ~nodes_table ~scope ~enum_node:enum_def
     |_ ->
         ""
   in
@@ -368,7 +370,10 @@ and generate_node
       | [] ->
           String.concat ~sep:"\n" child_modules
       | _ ->
-          String.concat ~sep:"\n" (header :: (child_modules @ [accessors ^ footer]))
+          let nested = List.fold_left child_modules ~init:"" ~f:(fun acc x ->
+            acc ^ x ^ "\n")
+          in
+          header ^ nested ^ accessors ^ footer
       end
   | None ->
       let error_msg = Printf.sprintf

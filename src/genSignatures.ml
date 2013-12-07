@@ -15,43 +15,6 @@ let generate_union_accessors nodes_table scope struct_def fields =
   (Printf.sprintf "%sval unnamed_union_get : t -> unnamed_union_t\n" indent)
 
 
-(* Generate an accessor for decoding an enum type. *)
-let generate_enum_accessor ~nodes_table ~scope ~enum_node ~enum_type ~indent ~field_name ~field_ofs =
-  let header =
-    Printf.sprintf "%slet %s_get x = \n%s  match get_struct_field_uint16 x %u with\n"
-      indent
-      field_name
-      indent
-      (2 * field_ofs)
-  in
-  let match_cases =
-    let scope_relative_name = GenCommon.get_scope_relative_name nodes_table scope enum_node in
-    let enumerants =
-      match PS.Node.unnamed_union_get enum_node with
-      | PS.Node.Enum enum_group ->
-          PS.Node.Enum.enumerants_get enum_group
-      | _ ->
-          failwith "decoded non-enum node where enum node was expected"
-    in
-    let buf = Buffer.create 512 in
-    for i = 0 to CArray.length enumerants - 1 do
-      let enumerant = CArray.get enumerants i in
-      let match_case =
-        Printf.sprintf "%s  | %u -> %s.%s\n"
-          indent
-          i
-          scope_relative_name
-          (PS.Enumerant.name_get enumerant)
-      in
-      Buffer.add_string buf match_case
-    done;
-    let footer = Printf.sprintf "%s  | v -> %s.Undefined_ v\n" indent scope_relative_name in
-    let () = Buffer.add_string buf footer in
-    Buffer.contents buf
-  in
-  header ^ match_cases
-
-
 (* Generate accessors for retrieving all non-union fields of a struct. *)
 let generate_non_union_accessors nodes_table scope struct_def fields =
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
@@ -65,7 +28,6 @@ let generate_non_union_accessors nodes_table scope struct_def fields =
           let group_name = GenCommon.get_scope_relative_name nodes_table scope group_node in
           Printf.sprintf "%sval %s_get : t -> %s.t\n" indent field_name group_name
       | PS.Field.Slot slot ->
-          let field_ofs  = Uint32.to_int (PS.Field.Slot.offset_get slot) in
           let tp = PS.Field.Slot.type_get slot in
           begin match PS.Type.unnamed_union_get tp with
           | PS.Type.Int32 ->
@@ -164,15 +126,17 @@ and generate_node
     (node_name : string)
 : string =
   let node_id = PS.Node.id_get node in
-  let indent = String.concat (List.rev_map scope ~f:(fun x -> "  ")) in
+  let indent = String.make (2 * (List.length scope)) ' ' in
   let header = Printf.sprintf "%smodule %s : sig\n" indent node_name in
   let footer = indent ^ "end\n" in
-  let accessors =
+  let body =
     match PS.Node.unnamed_union_get node with
     | PS.Node.File ->
         ""
     | PS.Node.Struct struct_def ->
         generate_struct_node nodes_table scope struct_def
+    | PS.Node.Enum enum_def ->
+        GenCommon.generate_enum_sig ~nodes_table ~scope ~enum_node:enum_def
     |_ ->
         ""
   in
@@ -186,7 +150,10 @@ and generate_node
       | [] ->
           String.concat ~sep:"\n" child_modules
       | _ ->
-          String.concat ~sep:"\n" (header :: (child_modules @ [accessors ^ footer]))
+          let nested = List.fold_left child_modules ~init:"" ~f:(fun acc x ->
+            acc ^ x ^ "\n")
+          in
+          header ^ nested ^ body ^ footer
       end
   | None ->
       let error_msg = Printf.sprintf

@@ -182,3 +182,32 @@ let generate_union_type nodes_table scope struct_def fields =
   String.concat ~sep:"\n" (header @ cases @ footer)
 
 
+(* Generate the signature for an enum type. *)
+let generate_enum_sig ~nodes_table ~scope ~enum_node =
+  let indent = String.make (2 * (List.length scope + 1)) ' ' in
+  let header = Printf.sprintf "%stype t =\n" indent in
+  let variants =
+    let enumerants =
+      match PS.Node.unnamed_union_get enum_node with
+      | PS.Node.Enum enum_group ->
+          PS.Node.Enum.enumerants_get enum_group
+      | _ ->
+          failwith "decoded non-enum node where enum node was expected"
+    in
+    let buf = Buffer.create 512 in
+    for i = 0 to CArray.length enumerants - 1 do
+      let enumerant = CArray.get enumerants i in
+      let match_case =
+        Printf.sprintf "%s  | %s\n"
+          indent
+          (String.capitalize (PS.Enumerant.name_get enumerant))
+      in
+      Buffer.add_string buf match_case
+    done;
+    let footer = Printf.sprintf "%s  | Undefined_ of int\n" indent in
+    let () = Buffer.add_string buf footer in
+    Buffer.contents buf
+  in
+  header ^ variants
+
+
