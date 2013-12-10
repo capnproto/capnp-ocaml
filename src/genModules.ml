@@ -12,12 +12,63 @@ let no_discriminant = 0xffff
 let generate_union_accessors nodes_table scope struct_def fields =
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
-    let field_name  = PS.Field.name_get field in
+    let field_name = String.capitalize (PS.Field.name_get field) in
+    let field_decoder =
+      (* FIXME: decode default values here *)
+      match PS.Field.unnamed_union_get field with
+      | PS.Field.Slot slot ->
+          let ofs = Uint32.to_int (PS.Field.Slot.offset_get slot) in
+          let tp  = PS.Field.Slot.type_get slot in
+          begin match PS.Type.unnamed_union_get tp with
+          | PS.Type.Void ->
+              ""
+          | PS.Type.Bool ->
+              Printf.sprintf " (get_struct_field_bit x %u %u)" (ofs / 8) (ofs mod 8)
+          | PS.Type.Int8 ->
+              Printf.sprintf " (get_struct_field_int8 x %u)" ofs
+          | PS.Type.Int16 ->
+              Printf.sprintf " (get_struct_field_int16 x %u)" (ofs * 2)
+          | PS.Type.Int32 ->
+              Printf.sprintf " (get_struct_field_int32 x %u)" (ofs * 4)
+          | PS.Type.Int64 ->
+              Printf.sprintf " (get_struct_field_int64 x %u)" (ofs * 8)
+          | PS.Type.Uint8 ->
+              Printf.sprintf " (get_struct_field_uint8 x %u)" ofs
+          | PS.Type.Uint16 ->
+              Printf.sprintf " (get_struct_field_uint16 x %u)" (ofs * 2)
+          | PS.Type.Uint32 ->
+              Printf.sprintf " (get_struct_field_uint32 x %u)" (ofs * 4)
+          | PS.Type.Uint64 ->
+              Printf.sprintf " (get_struct_field_uint64 x %u)" (ofs * 8)
+          | PS.Type.Float32 ->
+              Printf.sprintf " (Int32.float_of_bits (get_struct_field_int32 x %u))" (ofs * 4)
+          | PS.Type.Float64 ->
+              Printf.sprintf " (Int64.float_of_bits (get_struct_field_int64 x %u))" (ofs * 8)
+          | PS.Type.Text ->
+              Printf.sprintf " (get_struct_field_text x %u)" (ofs * 8)
+          | PS.Type.Data ->
+              Printf.sprintf " (get_struct_field_blob x %u)" (ofs * 8)
+          | PS.Type.List _ ->
+              failwith "list type unexpected in union field"
+          | PS.Type.Enum _ ->
+              failwith "enum type unexpected in union field"
+          | PS.Type.Struct _ ->
+              failwith "struct type unexpected in union field"
+          | PS.Type.Interface _ ->
+              failwith "interface type unexpected in union field"
+          | PS.Type.Object ->
+              Printf.sprintf " (get_struct_pointer x %u)" (ofs * 8)
+          end
+      | PS.Field.Group group ->
+          (* Groups are just a different view of the storage associated with the parent node *)
+          " x"
+    in
     let field_value = PS.Field.discriminantValue_get field in
-    (Printf.sprintf "%s  | %u -> %s"
+    (Printf.sprintf "%s  | %u -> %s%s"
       indent
       field_value
-      field_name) :: acc)
+      field_name
+      field_decoder) :: acc)
   in
   let header = [
     Printf.sprintf "%slet unnamed_union_get x =" indent;
@@ -27,7 +78,7 @@ let generate_union_accessors nodes_table scope struct_def fields =
   let footer = [
     Printf.sprintf "%s  | v -> Undefined_ v\n" indent
   ] in
-  GenCommon.(generate_union_type nodes_table scope struct_def fields) ^ "\n" ^
+  (GenCommon.generate_union_type nodes_table scope struct_def fields) ^ "\n" ^
   String.concat ~sep:"\n" (header @ cases @ footer)
 
 
@@ -164,7 +215,7 @@ let generate_non_union_accessors nodes_table scope struct_def fields =
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let accessors = List.fold_left fields ~init:[] ~f:(fun acc field ->
     let field_accessors : string =
-      let field_name = PS.Field.name_get field in
+      let field_name = String.uncapitalize (PS.Field.name_get field) in
       match PS.Field.unnamed_union_get field with
       | PS.Field.Group group ->
           Printf.sprintf "%slet %s_get x = x\n"
@@ -330,6 +381,8 @@ let rec generate_struct_node nodes_table scope struct_def =
     | [] -> ""
     | _  -> generate_non_union_accessors nodes_table scope struct_def non_union_fields
   in
+  let indent = String.make (2 * (List.length scope + 1)) ' ' in
+  (Printf.sprintf "%stype t = Message.ro StructStorage.t option\n\n" indent) ^
   union_accessors ^ non_union_acccessors
 
 

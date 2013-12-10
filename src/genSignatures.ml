@@ -20,7 +20,7 @@ let generate_non_union_accessors nodes_table scope struct_def fields =
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let accessors = List.fold_left fields ~init:[] ~f:(fun acc field ->
     let field_accessors : string =
-      let field_name = PS.Field.name_get field in
+      let field_name = String.uncapitalize (PS.Field.name_get field) in
       match PS.Field.unnamed_union_get field with
       | PS.Field.Group group ->
           let group_id = PS.Field.Group.typeId_get group in
@@ -110,7 +110,8 @@ let rec generate_struct_node nodes_table scope struct_def =
     | [] -> ""
     | _  -> generate_non_union_accessors nodes_table scope struct_def non_union_fields
   in
-  union_accessors ^ non_union_acccessors
+  let indent = String.make (2 * (List.length scope + 1)) ' ' in
+  (Printf.sprintf "%stype t\n\n" indent) ^ union_accessors ^ non_union_acccessors
 
 
 
