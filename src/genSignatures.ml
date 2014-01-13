@@ -81,7 +81,7 @@ let generate_non_union_accessors nodes_table scope struct_def fields =
  * out what module prefixes are required to properly qualify a type.
  *
  * Raises: Failure if the children of this node contain a cycle. *)
-let rec generate_struct_node nodes_table scope struct_def =
+let rec generate_struct_node ~nodes_table ~scope ~nested_modules struct_def : string =
   let unsorted_fields =
     let fields_accessor = PS.Node.Struct.fields_get struct_def in
     let rec loop_fields acc i =
@@ -111,7 +111,8 @@ let rec generate_struct_node nodes_table scope struct_def =
     | _  -> generate_non_union_accessors nodes_table scope struct_def non_union_fields
   in
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
-  (Printf.sprintf "%stype t\n\n" indent) ^ union_accessors ^ non_union_acccessors
+  (Printf.sprintf "%stype t\n\n" indent) ^
+    nested_modules ^ union_accessors ^ non_union_acccessors
 
 
 
@@ -121,6 +122,7 @@ let rec generate_struct_node nodes_table scope struct_def =
  *
  * Raises: Failure if the children of this node contain a cycle. *)
 and generate_node
+    ~(suppress_module_wrapper : bool)
     (nodes_table : (Uint64.t, Message.ro PS.Node.t) Hashtbl.t)
     (scope : Uint64.t list)
     (node : Message.ro PS.Node.t)
@@ -130,38 +132,39 @@ and generate_node
   let indent = String.make (2 * (List.length scope)) ' ' in
   let header = Printf.sprintf "%smodule %s : sig\n" indent node_name in
   let footer = indent ^ "end\n" in
+  let nested_modules =
+    match Topsort.topological_sort nodes_table (GenCommon.children_of nodes_table node) with
+    | Some child_nodes ->
+        let child_modules = List.map child_nodes ~f:(fun child ->
+          let child_name = GenCommon.get_unqualified_name ~parent:node ~child in
+          generate_node ~suppress_module_wrapper:false nodes_table (node_id :: scope) child child_name)
+        in
+        begin match child_modules with
+        | [] -> ""
+        | _  -> (String.concat ~sep:"\n" child_modules) ^ "\n"
+        end
+    | None ->
+        let error_msg = Printf.sprintf
+          "The children of node %s (%s) have a cyclic dependency."
+          (Uint64.to_string node_id)
+          (PS.Node.displayName_get node)
+        in
+        failwith error_msg
+  in
   let body =
     match PS.Node.unnamed_union_get node with
     | PS.Node.File ->
-        ""
+        nested_modules
     | PS.Node.Struct struct_def ->
-        generate_struct_node nodes_table scope struct_def
+        generate_struct_node ~nodes_table ~scope ~nested_modules struct_def
     | PS.Node.Enum enum_def ->
-        GenCommon.generate_enum_sig ~nodes_table ~scope ~enum_node:enum_def
+        GenCommon.generate_enum_sig ~nodes_table ~scope ~nested_modules ~enum_node:enum_def
     |_ ->
-        ""
+        nested_modules
   in
-  match Topsort.topological_sort nodes_table (GenCommon.children_of nodes_table node) with
-  | Some child_nodes ->
-      let child_modules = List.map child_nodes ~f:(fun child ->
-        let child_name = GenCommon.get_unqualified_name ~parent:node ~child in
-        generate_node nodes_table (node_id :: scope) child child_name)
-      in
-      begin match scope with
-      | [] ->
-          String.concat ~sep:"\n" child_modules
-      | _ ->
-          let nested = List.fold_left child_modules ~init:"" ~f:(fun acc x ->
-            acc ^ x ^ "\n")
-          in
-          header ^ nested ^ body ^ footer
-      end
-  | None ->
-      let error_msg = Printf.sprintf
-        "The children of node %s (%s) have a cyclic dependency."
-        (Uint64.to_string node_id)
-        (PS.Node.displayName_get node)
-      in
-      failwith error_msg
+  if suppress_module_wrapper then
+    body
+  else
+    header ^ body ^ footer
 
 

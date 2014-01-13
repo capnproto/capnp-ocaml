@@ -183,7 +183,7 @@ let generate_union_type nodes_table scope struct_def fields =
 
 
 (* Generate the signature for an enum type. *)
-let generate_enum_sig ~nodes_table ~scope ~enum_node =
+let generate_enum_sig ~nodes_table ~scope ~nested_modules ~enum_node =
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let header = Printf.sprintf "%stype t =\n" indent in
   let variants =
@@ -208,6 +208,6 @@ let generate_enum_sig ~nodes_table ~scope ~enum_node =
     let () = Buffer.add_string buf footer in
     Buffer.contents buf
   in
-  header ^ variants
+  nested_modules ^ header ^ variants
 
 
