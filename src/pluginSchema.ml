@@ -39,7 +39,7 @@ module Make (Storage : MessageStorage.S) = struct
       | Enum of int
       | Struct of 'cap Slice.t option
       | Interface
-      | Object of 'cap Slice.t option
+      | AnyPointer of 'cap Slice.t option
 
     let unnamed_union_get (x : 'cap t) : 'cap unnamed_union_t =
       let tag = get_struct_field_uint16 x 0 in
@@ -62,7 +62,7 @@ module Make (Storage : MessageStorage.S) = struct
       | 15 -> Enum (get_struct_field_uint16 x 2)
       | 16 -> Struct (get_struct_pointer x 0)
       | 17 -> Interface
-      | 18 -> Object (get_struct_pointer x 0)
+      | 18 -> AnyPointer (get_struct_pointer x 0)
       | _  -> invalid_msg "invalid Value.unnamed_union_t type tag"
   end
 
@@ -130,7 +130,7 @@ module Make (Storage : MessageStorage.S) = struct
       | Enum of 'cap Enum.t
       | Struct of 'cap Struct.t
       | Interface of 'cap Interface.t
-      | Object
+      | AnyPointer
 
     let unnamed_union_get (x : 'cap t) : 'cap unnamed_union_t =
       let tag = get_struct_field_uint16 x 0 in
@@ -153,7 +153,7 @@ module Make (Storage : MessageStorage.S) = struct
       | 15 -> Enum x
       | 16 -> Struct x
       | 17 -> Interface x
-      | 18 -> Object
+      | 18 -> AnyPointer
       | _  -> invalid_msg "invalid Type.unnamed_union_t type tag"
   end
 

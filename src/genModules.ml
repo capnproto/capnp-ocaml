@@ -56,7 +56,7 @@ let generate_union_accessors nodes_table scope struct_def fields =
               failwith "struct type unexpected in union field"
           | PS.Type.Interface _ ->
               failwith "interface type unexpected in union field"
-          | PS.Type.Object ->
+          | PS.Type.AnyPointer ->
               Printf.sprintf " (get_struct_pointer x %u)" (ofs * 8)
           end
       | PS.Field.Group group ->
@@ -167,7 +167,7 @@ let generate_list_accessor ~list_type ~indent ~field_name ~field_ofs =
       Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
         indent
         field_name
-  | PS.Type.Object ->
+  | PS.Type.AnyPointer ->
       Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
         indent
         field_name
@@ -336,7 +336,7 @@ let generate_non_union_accessors nodes_table scope struct_def fields =
               Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
                 indent
                 field_name
-          | PS.Type.Object ->
+          | PS.Type.AnyPointer ->
               Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
                 indent
                 field_name

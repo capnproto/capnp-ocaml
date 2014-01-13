@@ -145,8 +145,8 @@ let rec type_name nodes_table scope tp : string =
       let iface_node = Hashtbl.find_exn nodes_table iface_id in
       let iface_module_name = get_scope_relative_name nodes_table scope iface_node in
       iface_module_name ^ ".t"
-  | PS.Type.Object ->
-      "Object.t"
+  | PS.Type.AnyPointer ->
+      "AnyPointer.t"
 
 
 (* Generate a variant type declaration for a capnp union type. *)
