@@ -2,6 +2,7 @@ open Core.Std
 
 module Make (Storage : MessageStorage.S) = struct
   let invalid_msg = Message.invalid_msg
+  type ro = Message.ro
   include Message.Make(Storage)
 
 
@@ -85,30 +86,6 @@ module Make (Storage : MessageStorage.S) = struct
       storage_type : storage_type_t;
       num_elements : int
     }
-  end
-
-
-  module CapnpArray = struct
-    type ('cap, 'a) list_t = {
-      storage  : 'cap ListStorage.t;
-      get_item : 'cap ListStorage.t -> int -> 'a;
-    }
-
-    type ('cap, 'a) t = ('cap, 'a) list_t option
-
-    let length (x : ('cap, 'a)  t) : int =
-      match x with
-      | Some {storage; _} ->
-          storage.ListStorage.num_elements
-      | None ->
-          0
-
-    let get (x : ('cap, 'a) t) (i : int) : 'a =
-      match x with
-      | Some {storage; get_item;} ->
-          get_item storage i
-      | None ->
-          invalid_arg "index out of bounds"
   end
 
 
@@ -562,104 +539,104 @@ module Make (Storage : MessageStorage.S) = struct
 
 
   let get_struct_field_bit_list
-      (struct_storage : 'cap StructStorage.t option)
+      (struct_storage : ro StructStorage.t option)
       (pointer_word : int)
-  : ('cap, 'a) CapnpArray.t =
+  : ('a, 'b) Runtime.Array.t =
     match get_struct_pointer struct_storage pointer_word with
     | Some slice ->
         begin match deref_list_pointer slice with
         | Some list_storage ->
-            Some {
-              CapnpArray.storage  = list_storage;
-              CapnpArray.get_item = fun storage i -> Some (BitList.get storage i)
-            }
+            Runtime.Array.make
+              ~length:(fun x -> x.ListStorage.num_elements)
+              ~get:BitList.get
+              list_storage
         | None ->
-            None
+            Runtime.Array.make_default ()
         end
     | None ->
-        None
+        Runtime.Array.make_default ()
 
 
   let get_struct_field_bytes_list
-      (struct_storage : 'cap StructStorage.t option)
+      (struct_storage : ro StructStorage.t option)
       (pointer_word : int)
-      (convert : 'cap Slice.t -> 'a)
-  : ('cap, 'a) CapnpArray.t =
+      (convert : ro Slice.t -> 'a)
+  : ('a, 'b) Runtime.Array.t =
     match get_struct_pointer struct_storage pointer_word with
     | Some slice ->
         begin match deref_list_pointer slice with
         | Some list_storage ->
-            Some {
-              CapnpArray.storage  = list_storage;
-              CapnpArray.get_item = fun storage i -> convert (BytesList.get storage i);
-            }
+            Runtime.Array.make
+              ~length:(fun x -> x.ListStorage.num_elements)
+              ~get:(fun x i -> convert (BytesList.get x i))
+              list_storage
         | None ->
-            None
+            Runtime.Array.make_default ()
         end
     | None ->
-        None
+        Runtime.Array.make_default ()
 
 
   let get_struct_field_int8_list
-    (struct_storage : 'cap StructStorage.t option)
+    (struct_storage : ro StructStorage.t option)
     (pointer_word : int)
-  : ('cap, int) CapnpArray.t =
+  : (int, 'b) Runtime.Array.t =
     get_struct_field_bytes_list struct_storage pointer_word (fun slice -> Slice.get_int8 slice 0)
 
 
   let get_struct_field_int16_list
-    (struct_storage : 'cap StructStorage.t option)
+    (struct_storage : ro StructStorage.t option)
     (pointer_word : int)
-  : ('cap, int) CapnpArray.t =
+  : (int, 'b) Runtime.Array.t =
     get_struct_field_bytes_list struct_storage pointer_word (fun slice -> Slice.get_int16 slice 0)
 
 
   let get_struct_field_int32_list
-    (struct_storage : 'cap StructStorage.t option)
+    (struct_storage : ro StructStorage.t option)
     (pointer_word : int)
-  : ('cap, int32) CapnpArray.t =
+  : (int32, 'b) Runtime.Array.t =
     get_struct_field_bytes_list struct_storage pointer_word (fun slice -> Slice.get_int32 slice 0)
 
 
   let get_struct_field_int64_list
-    (struct_storage : 'cap StructStorage.t option)
+    (struct_storage : ro StructStorage.t option)
     (pointer_word : int)
-  : ('cap, int64) CapnpArray.t =
+  : (int64, 'b) Runtime.Array.t =
     get_struct_field_bytes_list struct_storage pointer_word (fun slice -> Slice.get_int64 slice 0)
 
 
   let get_struct_field_uint8_list
-    (struct_storage : 'cap StructStorage.t option)
+    (struct_storage : ro StructStorage.t option)
     (pointer_word : int)
-  : ('cap, int) CapnpArray.t =
+  : (int, 'b) Runtime.Array.t =
     get_struct_field_bytes_list struct_storage pointer_word (fun slice -> Slice.get_uint8 slice 0)
 
 
   let get_struct_field_uint16_list
-    (struct_storage : 'cap StructStorage.t option)
+    (struct_storage : ro StructStorage.t option)
     (pointer_word : int)
-  : ('cap, int) CapnpArray.t =
+  : (int, 'b) Runtime.Array.t =
     get_struct_field_bytes_list struct_storage pointer_word (fun slice -> Slice.get_uint16 slice 0)
 
 
   let get_struct_field_uint32_list
-    (struct_storage : 'cap StructStorage.t option)
+    (struct_storage : 'ro StructStorage.t option)
     (pointer_word : int)
-  : ('cap, Uint32.t) CapnpArray.t =
+  : (Uint32.t, 'b) Runtime.Array.t =
     get_struct_field_bytes_list struct_storage pointer_word (fun slice -> Slice.get_uint32 slice 0)
 
 
   let get_struct_field_uint64_list
-    (struct_storage : 'cap StructStorage.t option)
+    (struct_storage : ro StructStorage.t option)
     (pointer_word : int)
-  : ('cap, Uint64.t) CapnpArray.t =
+  : (Uint64.t, 'b) Runtime.Array.t =
     get_struct_field_bytes_list struct_storage pointer_word (fun slice -> Slice.get_uint64 slice 0)
 
 
   let get_struct_field_text_list
-      (struct_storage : 'cap StructStorage.t option)
+      (struct_storage : ro StructStorage.t option)
       (pointer_word : int)
-  : ('cap, string) CapnpArray.t =
+  : (string, 'b) Runtime.Array.t =
     get_struct_field_bytes_list struct_storage pointer_word (fun slice ->
       match deref_list_pointer slice with
       | Some list_storage ->
@@ -669,9 +646,9 @@ module Make (Storage : MessageStorage.S) = struct
 
 
   let get_struct_field_blob_list
-      (struct_storage : 'cap StructStorage.t option)
+      (struct_storage : ro StructStorage.t option)
       (pointer_word : int)
-  : ('cap, string) CapnpArray.t =
+  : (string, 'b) Runtime.Array.t =
     get_struct_field_bytes_list struct_storage pointer_word (fun slice ->
       match deref_list_pointer slice with
       | Some list_storage ->
@@ -681,28 +658,28 @@ module Make (Storage : MessageStorage.S) = struct
 
 
   let get_struct_field_struct_list
-      (struct_storage : 'cap StructStorage.t option)
+      (struct_storage : ro StructStorage.t option)
       (pointer_word : int)
-  : ('cap, 'a) CapnpArray.t =
+  : ('a, 'b) Runtime.Array.t =
     match get_struct_pointer struct_storage pointer_word with
     | Some slice ->
         begin match deref_list_pointer slice with
         | Some list_storage ->
-            Some {
-              CapnpArray.storage  = list_storage;
-              CapnpArray.get_item = fun storage i -> Some (StructList.get storage i)
-            }
+            Runtime.Array.make
+              ~length:(fun x -> x.ListStorage.num_elements)
+              ~get:(fun x i -> Some (StructList.get x i))
+              list_storage
         | None ->
-            None
+            Runtime.Array.make_default ()
         end
     | None ->
-        None
+        Runtime.Array.make_default ()
 
 
   let get_struct_field_list_list
-    (struct_storage : 'cap StructStorage.t option)
+    (struct_storage : ro StructStorage.t option)
     (pointer_word : int)
-  : ('cap, 'cap ListStorage.t option) CapnpArray.t =
+  : (ro ListStorage.t option, 'b) Runtime.Array.t =
     get_struct_field_bytes_list struct_storage pointer_word (fun slice -> deref_list_pointer slice)
 
 

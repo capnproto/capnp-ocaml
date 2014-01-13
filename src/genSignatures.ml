@@ -2,7 +2,7 @@
 open Core.Std
 
 module PS = PluginSchema.Make(StrStorage)
-module CArray = PS.CapnpArray
+module R  = Runtime
 
 
 let no_discriminant = 0xffff
@@ -85,10 +85,10 @@ let rec generate_struct_node nodes_table scope struct_def =
   let unsorted_fields =
     let fields_accessor = PS.Node.Struct.fields_get struct_def in
     let rec loop_fields acc i =
-      if i = CArray.length fields_accessor then
+      if i = R.Array.length fields_accessor then
         acc
       else
-        let field = CArray.get fields_accessor i in
+        let field = R.Array.get fields_accessor i in
         loop_fields (field :: acc) (i + 1)
     in
     loop_fields [] 0

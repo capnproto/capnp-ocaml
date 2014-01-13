@@ -2,7 +2,7 @@
 open Core.Std
 
 module PS = PluginSchema.Make(StrStorage)
-module CArray = PS.CapnpArray
+module R  = Runtime
 
 
 let children_of
@@ -30,10 +30,10 @@ let get_unqualified_name
   let child_id = PS.Node.id_get child in
   let nested_nodes = PS.Node.nestedNodes_get parent in
   let rec loop_nested_nodes i =
-    if i = CArray.length nested_nodes then
+    if i = R.Array.length nested_nodes then
       None
     else
-      let nested_node = CArray.get nested_nodes i in
+      let nested_node = R.Array.get nested_nodes i in
       if Util.uint64_equal child_id (PS.Node.NestedNode.id_get nested_node) then
         Some (PS.Node.NestedNode.name_get nested_node)
       else
@@ -60,10 +60,10 @@ let get_unqualified_name
       | PS.Node.Struct node_struct ->
           let fields = PS.Node.Struct.fields_get node_struct in
           let rec loop_fields i =
-            if i = CArray.length fields then
+            if i = R.Array.length fields then
               failwith error_msg
             else
-             let field = CArray.get fields i in
+             let field = R.Array.get fields i in
              match PS.Field.unnamed_union_get field with
              | PS.Field.Slot _ ->
                  loop_fields (i + 1)
@@ -129,7 +129,7 @@ let rec type_name nodes_table scope tp : string =
   | PS.Type.Data    -> "string"
   | PS.Type.List list_descr ->
       let list_type = PS.Type.List.elementType_get list_descr in
-      (type_name nodes_table scope list_type) ^ " CapnpArray.t"
+      Printf.sprintf "(%s, 'arr) Runtime.Array.t" (type_name nodes_table scope list_type)
   | PS.Type.Enum enum_descr ->
       let enum_id = PS.Type.Enum.typeId_get enum_descr in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
@@ -195,8 +195,8 @@ let generate_enum_sig ~nodes_table ~scope ~enum_node =
           failwith "decoded non-enum node where enum node was expected"
     in
     let buf = Buffer.create 512 in
-    for i = 0 to CArray.length enumerants - 1 do
-      let enumerant = CArray.get enumerants i in
+    for i = 0 to R.Array.length enumerants - 1 do
+      let enumerant = R.Array.get enumerants i in
       let match_case =
         Printf.sprintf "%s  | %s\n"
           indent

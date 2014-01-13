@@ -3,9 +3,7 @@ module Make (Storage : MessageStorage.S) = struct
   let invalid_msg = Message.invalid_msg
 
   module Reader = MessageReader.Make(Storage)
-  module CapnpArray = Reader.CapnpArray
   open Reader
-
 
   module ElementSize = struct
     type t =
@@ -174,7 +172,7 @@ module Make (Storage : MessageStorage.S) = struct
     let resultStructType_get (x : 'cap t) : Uint64.t =
       get_struct_field_uint64 x 16
 
-    let annotations_get (x : 'cap t) : ('cap, 'cap Annotation.t) CapnpArray.t =
+    let annotations_get (x : 'cap t) : ('cap Annotation.t, 'b) Runtime.Array.t =
       get_struct_field_struct_list x 1
   end
 
@@ -187,7 +185,7 @@ module Make (Storage : MessageStorage.S) = struct
     let codeOrder_get (x : 'cap t) : int =
       get_struct_field_uint16 x 0
 
-    let annotations_get (x : 'cap t) : ('cap, 'cap Annotation.t) CapnpArray.t =
+    let annotations_get (x : 'cap t) : ('cap Annotation.t, 'b) Runtime.Array.t =
       get_struct_field_struct_list x 1
   end
 
@@ -245,7 +243,7 @@ module Make (Storage : MessageStorage.S) = struct
     let codeOrder_get (x : 'cap t) : int =
       get_struct_field_uint16 x 0
 
-    let annotations_get (x : 'cap t) : ('cap, 'cap Annotation.t) CapnpArray.t =
+    let annotations_get (x : 'cap t) : ('cap Annotation.t, 'b) Runtime.Array.t =
       get_struct_field_struct_list x 1
 
     let discriminantValue_get (x : 'cap t) : int =
@@ -304,24 +302,24 @@ module Make (Storage : MessageStorage.S) = struct
       let discriminantOffset_get (x : 'cap t) : Uint32.t =
         get_struct_field_uint32 x 32
 
-      let fields_get (x : 'cap t) : ('cap, 'cap Field.t) CapnpArray.t =
+      let fields_get (x : 'cap t) : ('cap Field.t, 'b) Runtime.Array.t =
         get_struct_field_struct_list x 3
     end
 
     module Enum = struct
       type 'cap t = 'cap StructStorage.t option
 
-      let enumerants_get (x : 'cap t) : ('cap, 'cap Enumerant.t) CapnpArray.t =
+      let enumerants_get (x : 'cap t) : ('cap Enumerant.t, 'b) Runtime.Array.t =
         get_struct_field_struct_list x 3
     end
 
     module Interface = struct
       type 'cap t = 'cap StructStorage.t option
 
-      let methods_get (x : 'cap t) : ('cap, 'cap Method.t) CapnpArray.t =
+      let methods_get (x : 'cap t) : ('cap Method.t, 'b) Runtime.Array.t =
         get_struct_field_struct_list x 3
 
-      let extends_get (x : 'cap t) : ('cap, Uint64.t) CapnpArray.t =
+      let extends_get (x : 'cap t) : (Uint64.t, 'b) Runtime.Array.t =
         get_struct_field_bytes_list x 4 (fun slice -> Slice.get_uint64 slice 0)
     end
 
@@ -404,10 +402,10 @@ module Make (Storage : MessageStorage.S) = struct
     let scopeId_get (x : 'cap t) : Uint64.t =
       get_struct_field_uint64 x 16
 
-    let nestedNodes_get (x : 'cap t) : ('cap, 'cap NestedNode.t) CapnpArray.t =
+    let nestedNodes_get (x : 'cap t) : ('cap NestedNode.t, 'b) Runtime.Array.t =
       get_struct_field_struct_list x 1
 
-    let annotations_get (x : 'cap t) : ('cap, 'cap Annotation.t) CapnpArray.t =
+    let annotations_get (x : 'cap t) : ('cap Annotation.t, 'b) Runtime.Array.t =
       get_struct_field_struct_list x 2
 
     let unnamed_union_get (x : 'cap t) : 'cap unnamed_union_t =
@@ -443,14 +441,14 @@ module Make (Storage : MessageStorage.S) = struct
       let filename_get (x : 'cap t) : string =
         get_struct_field_text x 0
 
-      let imports_get (x : 'cap t) : ('cap, 'cap Import.t) CapnpArray.t =
+      let imports_get (x : 'cap t) : ('cap Import.t, 'b) Runtime.Array.t =
         get_struct_field_struct_list x 1
     end
 
-    let nodes_get (x : 'cap t) : ('cap, 'cap Node.t) CapnpArray.t =
+    let nodes_get (x : 'cap t) : ('cap Node.t, 'b) Runtime.Array.t =
       get_struct_field_struct_list x 0
 
-    let requestedFiles_get (x : 'cap t) : ('cap, 'cap Node.t) CapnpArray.t =
+    let requestedFiles_get (x : 'cap t) : ('cap Node.t, 'b) Runtime.Array.t =
       get_struct_field_struct_list x 1
 
     let of_message (m : 'cap Message.t) : 'cap t =

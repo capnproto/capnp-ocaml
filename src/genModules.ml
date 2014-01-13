@@ -2,7 +2,7 @@
 open Core.Std
 
 module PS = PluginSchema.Make(StrStorage)
-module CArray = PS.CapnpArray
+module R  = Runtime
 
 
 let no_discriminant = 0xffff
@@ -192,8 +192,8 @@ let generate_enum_accessor ~nodes_table ~scope ~enum_node ~enum_type ~indent ~fi
           failwith "decoded non-enum node where enum node was expected"
     in
     let buf = Buffer.create 512 in
-    for i = 0 to CArray.length enumerants - 1 do
-      let enumerant = CArray.get enumerants i in
+    for i = 0 to R.Array.length enumerants - 1 do
+      let enumerant = R.Array.get enumerants i in
       let match_case =
         Printf.sprintf "%s  | %u -> %s.%s\n"
           indent
@@ -356,10 +356,10 @@ let rec generate_struct_node nodes_table scope struct_def =
   let unsorted_fields =
     let fields_accessor = PS.Node.Struct.fields_get struct_def in
     let rec loop_fields acc i =
-      if i = CArray.length fields_accessor then
+      if i = R.Array.length fields_accessor then
         acc
       else
-        let field = CArray.get fields_accessor i in
+        let field = R.Array.get fields_accessor i in
         loop_fields (field :: acc) (i + 1)
     in
     loop_fields [] 0
