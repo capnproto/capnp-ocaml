@@ -1,9 +1,9 @@
 open Core.Std
 
-module Make (Storage : MessageStorage.S) = struct
+module Make (MessageWrapper : Message.S) = struct
   let invalid_msg = Message.invalid_msg
   type ro = Message.ro
-  include Message.Make(Storage)
+  include MessageWrapper
 
 
   let sizeof_uint32 = 4

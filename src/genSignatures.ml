@@ -1,7 +1,7 @@
 
 open Core.Std
 
-module PS = PluginSchema.Make(StrStorage)
+module PS = GenCommon.PS
 module R  = Runtime
 
 
@@ -64,12 +64,16 @@ let generate_non_union_accessors nodes_table scope struct_def fields =
           | PS.Type.Enum _
           | PS.Type.Struct _
           | PS.Type.Interface _
-          | PS.Type.AnyPointer ->
+          | PS.Type.Object ->
               Printf.sprintf "%sval %s_get : t -> %s\n"
               indent
               field_name
               (GenCommon.type_name nodes_table scope tp)
+          | PS.Type.Undefined_ x ->
+              failwith (Printf.sprintf "Unknown Type union discriminant %d" x)
           end
+      | PS.Field.Undefined_ x ->
+          failwith (Printf.sprintf "Unknown Field union discriminant %d" x)
     in
     (field_accessors :: acc))
   in
@@ -111,8 +115,9 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules struct_def : st
     | _  -> generate_non_union_accessors nodes_table scope struct_def non_union_fields
   in
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
-  (Printf.sprintf "%stype t\n\n" indent) ^
-    nested_modules ^ union_accessors ^ non_union_acccessors
+  (Printf.sprintf "%stype t\n%stype array_t\n\n" indent indent) ^
+    nested_modules ^ union_accessors ^ non_union_acccessors ^
+    (Printf.sprintf "%sval of_message : message_t -> t\n" indent)
 
 
 
@@ -123,9 +128,9 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules struct_def : st
  * Raises: Failure if the children of this node contain a cycle. *)
 and generate_node
     ~(suppress_module_wrapper : bool)
-    (nodes_table : (Uint64.t, Message.ro PS.Node.t) Hashtbl.t)
+    (nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
     (scope : Uint64.t list)
-    (node : Message.ro PS.Node.t)
+    (node : PS.Node.t)
     (node_name : string)
 : string =
   let node_id = PS.Node.id_get node in
@@ -158,7 +163,7 @@ and generate_node
     | PS.Node.Struct struct_def ->
         generate_struct_node ~nodes_table ~scope ~nested_modules struct_def
     | PS.Node.Enum enum_def ->
-        GenCommon.generate_enum_sig ~nodes_table ~scope ~nested_modules ~enum_node:enum_def
+        GenCommon.generate_enum_sig ~nodes_table ~scope ~nested_modules enum_def
     |_ ->
         nested_modules
   in

@@ -1,14 +1,15 @@
 
 open Core.Std
 
-module PS = PluginSchema.Make(StrStorage)
+module M  = Message.Make(StrStorage)
+module PS = PluginSchema.Make(M)
 module R  = Runtime
 
 
 let children_of
-    (nodes_table : (Uint64.t, Message.ro PS.Node.t) Hashtbl.t)
-    (parent : Message.ro PS.Node.t)
-: Message.ro PS.Node.t list =
+    (nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
+    (parent : PS.Node.t)
+: PS.Node.t list =
   let parent_id = PS.Node.id_get parent in
   Hashtbl.fold nodes_table ~init:[] ~f:(fun ~key:id ~data:node acc ->
     if Util.uint64_equal parent_id (PS.Node.scopeId_get node) then
@@ -24,8 +25,8 @@ let children_of
  * Raises: Failure if we can't find the node in its parent.  (This means that capnpc
  * emitted a schema that we don't fully understand...) *)
 let get_unqualified_name
-    ~(parent : Message.ro PS.Node.t)
-    ~(child  : Message.ro PS.Node.t)
+    ~(parent : PS.Node.t)
+    ~(child  : PS.Node.t)
 : string =
   let child_id = PS.Node.id_get child in
   let nested_nodes = PS.Node.nestedNodes_get parent in
@@ -63,17 +64,21 @@ let get_unqualified_name
             if i = R.Array.length fields then
               failwith error_msg
             else
-             let field = R.Array.get fields i in
-             match PS.Field.unnamed_union_get field with
-             | PS.Field.Slot _ ->
-                 loop_fields (i + 1)
-             | PS.Field.Group group ->
-                 if Util.uint64_equal child_id (PS.Field.Group.typeId_get group) then
-                   String.capitalize (PS.Field.name_get field)
-                 else
-                   loop_fields (i + 1)
+              let field = R.Array.get fields i in
+              match PS.Field.unnamed_union_get field with
+              | PS.Field.Slot _ ->
+                  loop_fields (i + 1)
+              | PS.Field.Group group ->
+                  if Util.uint64_equal child_id (PS.Field.Group.typeId_get group) then
+                    String.capitalize (PS.Field.name_get field)
+                  else
+                    loop_fields (i + 1)
+              | PS.Field.Undefined_ x ->
+                  failwith (Printf.sprintf "Unknown Field union discriminant %d" x)
           in
           loop_fields 0
+      | PS.Node.Undefined_ x ->
+          failwith (Printf.sprintf "Unknown Node union discriminant %d" x)
       end
 
 
@@ -129,7 +134,7 @@ let rec type_name nodes_table scope tp : string =
   | PS.Type.Data    -> "string"
   | PS.Type.List list_descr ->
       let list_type = PS.Type.List.elementType_get list_descr in
-      Printf.sprintf "(%s, 'arr) Runtime.Array.t" (type_name nodes_table scope list_type)
+      Printf.sprintf "(%s, array_t) Runtime.Array.t" (type_name nodes_table scope list_type)
   | PS.Type.Enum enum_descr ->
       let enum_id = PS.Type.Enum.typeId_get enum_descr in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
@@ -145,8 +150,10 @@ let rec type_name nodes_table scope tp : string =
       let iface_node = Hashtbl.find_exn nodes_table iface_id in
       let iface_module_name = get_scope_relative_name nodes_table scope iface_node in
       iface_module_name ^ ".t"
-  | PS.Type.AnyPointer ->
+  | PS.Type.Object ->
       "AnyPointer.t"
+  | PS.Type.Undefined_ x ->
+      failwith (Printf.sprintf "Unknown Type union discriminant %d" x)
 
 
 (* Generate a variant type declaration for a capnp union type. *)
@@ -171,7 +178,9 @@ let generate_union_type nodes_table scope struct_def fields =
           let group_module_name = get_scope_relative_name nodes_table scope group_node in
           group_module_name ^ ".t"
         in
-        (Printf.sprintf "%s  | %s of %s" indent field_name group_type_name) :: acc)
+        (Printf.sprintf "%s  | %s of %s" indent field_name group_type_name) :: acc
+    | PS.Field.Undefined_ x ->
+        failwith (Printf.sprintf "Unknown Field union discriminant %d" x))
   in
   let header = [
     Printf.sprintf "%stype unnamed_union_t =" indent;
@@ -183,17 +192,11 @@ let generate_union_type nodes_table scope struct_def fields =
 
 
 (* Generate the signature for an enum type. *)
-let generate_enum_sig ~nodes_table ~scope ~nested_modules ~enum_node =
+let generate_enum_sig ~nodes_table ~scope ~nested_modules enum_def =
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let header = Printf.sprintf "%stype t =\n" indent in
   let variants =
-    let enumerants =
-      match PS.Node.unnamed_union_get enum_node with
-      | PS.Node.Enum enum_group ->
-          PS.Node.Enum.enumerants_get enum_group
-      | _ ->
-          failwith "decoded non-enum node where enum node was expected"
-    in
+    let enumerants = PS.Node.Enum.enumerants_get enum_def in
     let buf = Buffer.create 512 in
     for i = 0 to R.Array.length enumerants - 1 do
       let enumerant = R.Array.get enumerants i in

@@ -1,7 +1,7 @@
 
 open Core.Std
 
-module PS = PluginSchema.Make(StrStorage)
+module PS = GenCommon.PS
 module R  = Runtime
 
 
@@ -56,12 +56,16 @@ let generate_union_accessors nodes_table scope struct_def fields =
               failwith "struct type unexpected in union field"
           | PS.Type.Interface _ ->
               failwith "interface type unexpected in union field"
-          | PS.Type.AnyPointer ->
+          | PS.Type.Object ->
               Printf.sprintf " (get_struct_pointer x %u)" (ofs * 8)
+          | PS.Type.Undefined_ x ->
+              failwith (Printf.sprintf "Unknown Type union discriminant %d" x)
           end
       | PS.Field.Group group ->
           (* Groups are just a different view of the storage associated with the parent node *)
           " x"
+      | PS.Field.Undefined_ x ->
+          failwith (Printf.sprintf "Unknown Field union discriminant %d" x)
     in
     let field_value = PS.Field.discriminantValue_get field in
     (Printf.sprintf "%s  | %u -> %s%s"
@@ -167,10 +171,12 @@ let generate_list_accessor ~list_type ~indent ~field_name ~field_ofs =
       Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
         indent
         field_name
-  | PS.Type.AnyPointer ->
+  | PS.Type.Object ->
       Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
         indent
         field_name
+  | PS.Type.Undefined_ x ->
+       failwith (Printf.sprintf "Unknown Type union discriminant %d" x)
 
 
 (* Generate an accessor for decoding an enum type. *)
@@ -336,11 +342,15 @@ let generate_non_union_accessors nodes_table scope struct_def fields =
               Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
                 indent
                 field_name
-          | PS.Type.AnyPointer ->
+          | PS.Type.Object ->
               Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
                 indent
                 field_name
+          | PS.Type.Undefined_ x ->
+              failwith (Printf.sprintf "Unknown Type union discriminant %d" x)
           end
+      | PS.Field.Undefined_ x ->
+          failwith (Printf.sprintf "Unknown Field union discriminant %d" x)
     in
     (field_accessors :: acc))
   in
@@ -382,8 +392,10 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules struct_def =
     | _  -> generate_non_union_accessors nodes_table scope struct_def non_union_fields
   in
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
-  (Printf.sprintf "%stype t = Message.ro StructStorage.t option\n\n" indent) ^
-    nested_modules ^ union_accessors ^ non_union_acccessors
+  (Printf.sprintf "%stype t = ro StructStorage.t option\n" indent) ^
+  (Printf.sprintf "%stype array_t = ro ListStorage.t\n\n" indent) ^
+    nested_modules ^ union_accessors ^ non_union_acccessors ^
+    (Printf.sprintf "%slet of_message x = get_root_struct x\n" indent)
 
 
 
@@ -394,9 +406,9 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules struct_def =
  * Raises: Failure if the children of this node contain a cycle. *)
 and generate_node
     ~(suppress_module_wrapper : bool)
-    (nodes_table : (Uint64.t, Message.ro PS.Node.t) Hashtbl.t)
+    (nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
     (scope : Uint64.t list)
-    (node : Message.ro PS.Node.t)
+    (node : PS.Node.t)
     (node_name : string)
 : string =
   let node_id = PS.Node.id_get node in
@@ -429,7 +441,7 @@ and generate_node
     | PS.Node.Struct struct_def ->
         generate_struct_node ~nodes_table ~scope ~nested_modules struct_def
     | PS.Node.Enum enum_def ->
-        GenCommon.generate_enum_sig ~nodes_table ~scope ~nested_modules:"" ~enum_node:enum_def
+        GenCommon.generate_enum_sig ~nodes_table ~scope ~nested_modules enum_def
     |_ ->
         nested_modules
   in

@@ -1,8 +1,8 @@
 
 open Core.Std
 
-module M  = Message.Make(StrStorage)
-module PS = PluginSchema.Make(StrStorage)
+module M  = GenCommon.M
+module PS = GenCommon.PS
 
 module ExitCode = struct
   let success       = 0

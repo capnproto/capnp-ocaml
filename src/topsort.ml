@@ -1,14 +1,14 @@
 
 open Core.Std
 
-module PS = PluginSchema.Make(StrStorage)
+module PS = GenCommon.PS
 module R  = Runtime
 
 
 let add_parentage_maps
-    (nodes_table : (Uint64.t, Message.ro PS.Node.t) Hashtbl.t)
+    (nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
     (parentage_table : (Uint64.t, Uint64.t) Hashtbl.t)
-    (node : Message.ro PS.Node.t)
+    (node : PS.Node.t)
 : unit =
   let node_id = PS.Node.id_get node in
   let rec add_children parent =
@@ -27,8 +27,8 @@ let add_parentage_maps
 
 
 let build_parentage_table
-    (nodes_table : (Uint64.t, Message.ro PS.Node.t) Hashtbl.t)
-    (nodes : Message.ro PS.Node.t list)
+    (nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
+    (nodes : PS.Node.t list)
 : (Uint64.t, Uint64.t) Hashtbl.t =
   let parentage_table = Hashtbl.Poly.create () in
   let () =
@@ -60,7 +60,7 @@ let rec register_type_reference
     ~parentage_table
     ~edges
     ~referrer
-    ~referee_type:(tp : Message.ro PS.Type.t)
+    ~referee_type:(tp : PS.Type.t)
 : unit =
   match PS.Type.unnamed_union_get tp with
   | PS.Type.List x ->
@@ -84,8 +84,8 @@ let rec register_type_reference
  * the generated code for node A must be instantiated prior to the generated
  * code for node B. *)
 let build_reference_graph
-    (nodes_table : (Uint64.t, Message.ro PS.Node.t) Hashtbl.t)
-    (nodes_to_graph : Message.ro PS.Node.t list)
+    (nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
+    (nodes_to_graph : PS.Node.t list)
 : (Uint64.t, Uint64.t list) Hashtbl.t =
   let rec add_edges ~parentage_table ~edges ?parent_id_opt node =
     (* While iterating through a node's children, we create edges from the *parent*
@@ -125,6 +125,8 @@ let build_reference_graph
           | PS.Field.Group group ->
               let group_node = Hashtbl.find_exn nodes_table (PS.Field.Group.typeId_get group) in
               add_edges ~parentage_table ~edges ~parent_id_opt:parent_id group_node
+          | PS.Field.Undefined_ x ->
+              failwith (Printf.sprintf "Unknown Field union discriminant %d" x)
         done
     | PS.Node.Interface node_iface ->
         let methods = PS.Node.Interface.methods_get node_iface in
@@ -138,6 +140,8 @@ let build_reference_graph
     | PS.Node.Const node_const ->
         register_type_reference ~parentage_table ~edges
           ~referrer:parent_id ~referee_type:(PS.Node.Const.type_get node_const)
+    | PS.Node.Undefined_ x ->
+        failwith (Printf.sprintf "Unknown Node union discriminant %d" x)
   in
   let parentage_table = build_parentage_table nodes_table nodes_to_graph in
   let edges = Hashtbl.Poly.create () in
@@ -162,9 +166,9 @@ let has_incoming_edges reference_graph (node_id : Uint64.t) : bool =
  *
  * Returns None if there are cyclic references. *)
 let topological_sort
-    (nodes_table : (Uint64.t, Message.ro PS.Node.t) Hashtbl.t)
-    (nodes : Message.ro PS.Node.t list)
-: Message.ro PS.Node.t list option =
+    (nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
+    (nodes : PS.Node.t list)
+: PS.Node.t list option =
   (* [priority_nodes] is a list of nodes without any incoming edges.  Such a node
    * can be emitted immediately, because it doesn't depend on anything else. *)
   let rec kahn_sort ~reference_graph ~sorted_output_ids ~priority_node_ids =
