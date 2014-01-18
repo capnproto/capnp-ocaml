@@ -362,7 +362,7 @@ let generate_non_union_accessors nodes_table scope struct_def fields =
  * out what module prefixes are required to properly qualify a type.
  *
  * Raises: Failure if the children of this node contain a cycle. *)
-let rec generate_struct_node ~nodes_table ~scope ~nested_modules struct_def =
+let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_def =
   let unsorted_fields =
     let fields_accessor = PS.Node.Struct.fields_get struct_def in
     let rec loop_fields acc i =
@@ -392,7 +392,9 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules struct_def =
     | _  -> generate_non_union_accessors nodes_table scope struct_def non_union_fields
   in
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
+  let unique_typename = GenCommon.make_unique_typename ~nodes_table node in
   (Printf.sprintf "%stype t = ro StructStorage.t option\n" indent) ^
+  (Printf.sprintf "%stype %s = t\n" indent unique_typename) ^
   (Printf.sprintf "%stype array_t = ro ListStorage.t\n\n" indent) ^
     nested_modules ^ union_accessors ^ non_union_acccessors ^
     (Printf.sprintf "%slet of_message x = get_root_struct x\n" indent)
@@ -439,7 +441,7 @@ and generate_node
     | PS.Node.File ->
         nested_modules
     | PS.Node.Struct struct_def ->
-        generate_struct_node ~nodes_table ~scope ~nested_modules struct_def
+        generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_def
     | PS.Node.Enum enum_def ->
         GenCommon.generate_enum_sig ~nodes_table ~scope ~nested_modules enum_def
     |_ ->

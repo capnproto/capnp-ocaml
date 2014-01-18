@@ -115,6 +115,40 @@ let get_scope_relative_name nodes_table (scope_stack : Uint64.t list) node : str
   String.concat ~sep:"." (List.map rel_name ~f:fst)
 
 
+let make_unique_typename ~nodes_table node =
+  let uq_name = get_unqualified_name
+    ~parent:(Hashtbl.find_exn nodes_table (PS.Node.scopeId_get node)) ~child:node
+  in
+  Printf.sprintf "t_%s_%s" uq_name (Uint64.to_string (PS.Node.id_get node))
+
+
+(* When modules refer to types defined in other modules, readability dictates that we use
+ * OtherModule.t as the preferred type name.  However, consider the case of nested modules:
+ *
+ * module Foo = struct
+ *   type t
+ *   type t_FOO_UID = t
+ *
+ *   module Bar = struct
+ *     type t
+ *     type t_BAR_UID = t
+ *
+ *     val foo_get : t -> t_FOO_UID
+ *   end
+ * end
+ *
+ * In this case, module Foo does not have a complete declaration at the time foo_get is
+ * declared.  So for this case instead of using Foo.t we emit an unambiguous type identifier
+ * based on the 64-bit unique ID for Foo. *)
+let make_disambiguated_type_name ~nodes_table ~scope node =
+  let node_id = PS.Node.id_get node in
+  if List.mem scope node_id then
+    make_unique_typename ~nodes_table node
+  else
+    let module_name = get_scope_relative_name nodes_table scope node in
+    module_name ^ ".t"
+
+
 (* Construct an ocaml name for the given schema-defined type. *)
 let rec type_name nodes_table scope tp : string =
   match PS.Type.unnamed_union_get tp with
@@ -138,18 +172,15 @@ let rec type_name nodes_table scope tp : string =
   | PS.Type.Enum enum_descr ->
       let enum_id = PS.Type.Enum.typeId_get enum_descr in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
-      let enum_module_name = get_scope_relative_name nodes_table scope enum_node in
-      enum_module_name ^ ".t"
+      make_disambiguated_type_name ~nodes_table ~scope enum_node
   | PS.Type.Struct struct_descr ->
       let struct_id = PS.Type.Struct.typeId_get struct_descr in
       let struct_node = Hashtbl.find_exn nodes_table struct_id in
-      let struct_module_name = get_scope_relative_name nodes_table scope struct_node in
-      struct_module_name ^ ".t"
+      make_disambiguated_type_name ~nodes_table ~scope struct_node
   | PS.Type.Interface iface_descr ->
       let iface_id = PS.Type.Interface.typeId_get iface_descr in
       let iface_node = Hashtbl.find_exn nodes_table iface_id in
-      let iface_module_name = get_scope_relative_name nodes_table scope iface_node in
-      iface_module_name ^ ".t"
+      make_disambiguated_type_name ~nodes_table ~scope iface_node
   | PS.Type.Object ->
       "AnyPointer.t"
   | PS.Type.Undefined_ x ->

@@ -20,10 +20,12 @@ module type S = sig
 
   module Type : sig
     type t
+    type t_Type_15020482145304562784 = t
     type array_t
 
     module Enum : sig
       type t
+      type t_Enum_11389172934837766057 = t
       type array_t
 
       val typeId_get : t -> Uint64.t
@@ -33,6 +35,7 @@ module type S = sig
 
     module Interface : sig
       type t
+      type t_Interface_17116997365232503999 = t
       type array_t
 
       val typeId_get : t -> Uint64.t
@@ -41,16 +44,17 @@ module type S = sig
     end
 
     module List : sig
-      type type_t = t
       type t
+      type t_List_9792858745991129751 = t
       type array_t
 
-      val elementType_get : t -> type_t
+      val elementType_get : t -> t_Type_15020482145304562784
       val of_message : message_t -> t
     end
 
     module Struct : sig
       type t
+      type t_Struct_12410354185295152851 = t
       type array_t
 
       val typeId_get : t -> Uint64.t
@@ -86,6 +90,7 @@ module type S = sig
 
   module Value : sig
     type t
+    type t_Value_14853958794117909659 = t
     type array_t
 
     type unnamed_union_t =
@@ -116,6 +121,7 @@ module type S = sig
 
   module Annotation : sig
     type t
+    type t_Annotation_17422339044421236034 = t
     type array_t
 
     val id_get : t -> Uint64.t
@@ -126,6 +132,7 @@ module type S = sig
 
   module Method : sig
     type t
+    type t_Method_10736806783679155584 = t
     type array_t
 
     val name_get : t -> string
@@ -140,6 +147,7 @@ module type S = sig
 
   module Enumerant : sig
     type t
+    type t_Enumerant_10919677598968879693 = t
     type array_t
 
     val name_get : t -> string
@@ -150,10 +158,12 @@ module type S = sig
 
   module Field : sig
     type t
+    type t_Field_11145653318641710175 = t
     type array_t
 
     module Ordinal : sig
       type t
+      type t_Ordinal_13515537513213004774 = t
       type array_t
 
       type unnamed_union_t =
@@ -167,6 +177,7 @@ module type S = sig
 
     module Group : sig
       type t
+      type t_Group_14626792032033250577 = t
       type array_t
 
       val typeId_get : t -> Uint64.t
@@ -176,6 +187,7 @@ module type S = sig
 
     module Slot : sig
       type t
+      type t_Slot_14133145859926553711 = t
       type array_t
 
       val offset_get : t -> Uint32.t
@@ -202,10 +214,12 @@ module type S = sig
 
   module Node : sig
     type t
+    type t_Node_16610026722781537303 = t
     type array_t
 
     module Struct : sig
       type t
+      type t_Struct_11430331134483579957 = t
       type array_t
 
       val dataWordCount_get : t -> int
@@ -221,6 +235,7 @@ module type S = sig
 
     module Enum : sig
       type t
+      type t_Enum_13063450714778629528 = t
       type array_t
 
       val enumerants_get : t -> (Enumerant.t, array_t) Runtime.Array.t
@@ -229,6 +244,7 @@ module type S = sig
 
     module Annotation : sig
       type t
+      type t_Annotation_17011813041836786320 = t
       type array_t
 
       val type_get : t -> Type.t
@@ -249,6 +265,7 @@ module type S = sig
 
     module Const : sig
       type t
+      type t_Const_12793219851699983392 = t
       type array_t
 
       val type_get : t -> Type.t
@@ -258,6 +275,7 @@ module type S = sig
 
     module Interface : sig
       type t
+      type t_Interface_16728431493453586831 = t
       type array_t
 
       val methods_get : t -> (Method.t, array_t) Runtime.Array.t
@@ -267,6 +285,7 @@ module type S = sig
 
     module NestedNode : sig
       type t
+      type t_NestedNode_16050641862814319170 = t
       type array_t
 
       val name_get : t -> string
@@ -299,14 +318,17 @@ module type S = sig
 
   module CodeGeneratorRequest : sig
     type t
+    type t_CodeGeneratorRequest_13818529054586492878 = t
     type array_t
 
     module RequestedFile : sig
       type t
+      type t_RequestedFile_14981803260258615394 = t
       type array_t
 
       module Import : sig
         type t
+        type t_Import_12560611460656617445 = t
         type array_t
 
         val id_get : t -> Uint64.t
@@ -356,10 +378,12 @@ module Make (MessageWrapper : Message.S) = struct
 
   module Type = struct
     type t = ro StructStorage.t option
+    type t_Type_15020482145304562784 = t
     type array_t = ro ListStorage.t
 
     module Enum = struct
       type t = ro StructStorage.t option
+      type t_Enum_11389172934837766057 = t
       type array_t = ro ListStorage.t
 
       let typeId_get x = get_struct_field_uint64 x 8
@@ -369,6 +393,7 @@ module Make (MessageWrapper : Message.S) = struct
 
     module Interface = struct
       type t = ro StructStorage.t option
+      type t_Interface_17116997365232503999 = t
       type array_t = ro ListStorage.t
 
       let typeId_get x = get_struct_field_uint64 x 8
@@ -377,8 +402,8 @@ module Make (MessageWrapper : Message.S) = struct
     end
 
     module List = struct
-      type type_t = t
       type t = ro StructStorage.t option
+      type t_List_9792858745991129751 = t
       type array_t = ro ListStorage.t
 
       let elementType_get x = get_struct_field_struct x 0
@@ -387,6 +412,7 @@ module Make (MessageWrapper : Message.S) = struct
 
     module Struct = struct
       type t = ro StructStorage.t option
+      type t_Struct_12410354185295152851 = t
       type array_t = ro ListStorage.t
 
       let typeId_get x = get_struct_field_uint64 x 8
@@ -443,6 +469,7 @@ module Make (MessageWrapper : Message.S) = struct
 
   module Value = struct
     type t = ro StructStorage.t option
+    type t_Value_14853958794117909659 = t
     type array_t = ro ListStorage.t
 
     type unnamed_union_t =
@@ -494,6 +521,7 @@ module Make (MessageWrapper : Message.S) = struct
 
   module Annotation = struct
     type t = ro StructStorage.t option
+    type t_Annotation_17422339044421236034 = t
     type array_t = ro ListStorage.t
 
     let id_get x = get_struct_field_uint64 x 0
@@ -504,6 +532,7 @@ module Make (MessageWrapper : Message.S) = struct
 
   module Method = struct
     type t = ro StructStorage.t option
+    type t_Method_10736806783679155584 = t
     type array_t = ro ListStorage.t
 
     let name_get x = get_struct_field_text x 0
@@ -518,6 +547,7 @@ module Make (MessageWrapper : Message.S) = struct
 
   module Enumerant = struct
     type t = ro StructStorage.t option
+    type t_Enumerant_10919677598968879693 = t
     type array_t = ro ListStorage.t
 
     let name_get x = get_struct_field_text x 0
@@ -528,10 +558,12 @@ module Make (MessageWrapper : Message.S) = struct
 
   module Field = struct
     type t = ro StructStorage.t option
+    type t_Field_11145653318641710175 = t
     type array_t = ro ListStorage.t
 
     module Ordinal = struct
       type t = ro StructStorage.t option
+      type t_Ordinal_13515537513213004774 = t
       type array_t = ro ListStorage.t
 
       type unnamed_union_t =
@@ -549,6 +581,7 @@ module Make (MessageWrapper : Message.S) = struct
 
     module Group = struct
       type t = ro StructStorage.t option
+      type t_Group_14626792032033250577 = t
       type array_t = ro ListStorage.t
 
       let typeId_get x = get_struct_field_uint64 x 16
@@ -558,6 +591,7 @@ module Make (MessageWrapper : Message.S) = struct
 
     module Slot = struct
       type t = ro StructStorage.t option
+      type t_Slot_14133145859926553711 = t
       type array_t = ro ListStorage.t
 
       let offset_get x = get_struct_field_uint32 x 4
@@ -588,10 +622,12 @@ module Make (MessageWrapper : Message.S) = struct
 
   module Node = struct
     type t = ro StructStorage.t option
+    type t_Node_16610026722781537303 = t
     type array_t = ro ListStorage.t
 
     module Struct = struct
       type t = ro StructStorage.t option
+      type t_Struct_11430331134483579957 = t
       type array_t = ro ListStorage.t
 
       let dataWordCount_get x = get_struct_field_uint16 x 14
@@ -617,6 +653,7 @@ module Make (MessageWrapper : Message.S) = struct
 
     module Enum = struct
       type t = ro StructStorage.t option
+      type t_Enum_13063450714778629528 = t
       type array_t = ro ListStorage.t
 
       let enumerants_get x = get_struct_field_struct_list x 3
@@ -625,6 +662,7 @@ module Make (MessageWrapper : Message.S) = struct
 
     module Annotation = struct
       type t = ro StructStorage.t option
+      type t_Annotation_17011813041836786320 = t
       type array_t = ro ListStorage.t
 
       let type_get x = get_struct_field_struct x 3
@@ -645,6 +683,7 @@ module Make (MessageWrapper : Message.S) = struct
 
     module Const = struct
       type t = ro StructStorage.t option
+      type t_Const_12793219851699983392 = t
       type array_t = ro ListStorage.t
 
       let type_get x = get_struct_field_struct x 3
@@ -654,6 +693,7 @@ module Make (MessageWrapper : Message.S) = struct
 
     module Interface = struct
       type t = ro StructStorage.t option
+      type t_Interface_16728431493453586831 = t
       type array_t = ro ListStorage.t
 
       let methods_get x = get_struct_field_struct_list x 3
@@ -663,6 +703,7 @@ module Make (MessageWrapper : Message.S) = struct
 
     module NestedNode = struct
       type t = ro StructStorage.t option
+      type t_NestedNode_16050641862814319170 = t
       type array_t = ro ListStorage.t
 
       let name_get x = get_struct_field_text x 0
@@ -703,14 +744,17 @@ module Make (MessageWrapper : Message.S) = struct
 
   module CodeGeneratorRequest = struct
     type t = ro StructStorage.t option
+    type t_CodeGeneratorRequest_13818529054586492878 = t
     type array_t = ro ListStorage.t
 
     module RequestedFile = struct
       type t = ro StructStorage.t option
+      type t_RequestedFile_14981803260258615394 = t
       type array_t = ro ListStorage.t
 
       module Import = struct
         type t = ro StructStorage.t option
+        type t_Import_12560611460656617445 = t
         type array_t = ro ListStorage.t
 
         let id_get x = get_struct_field_uint64 x 0
