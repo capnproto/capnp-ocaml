@@ -1,5 +1,6 @@
-*.cmi
 *.swp
+*.swo
+*.cmi
 *.cmo
 *.byte
 *.native
