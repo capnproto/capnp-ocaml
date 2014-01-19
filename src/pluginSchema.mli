@@ -352,5 +352,6 @@ module type S = sig
 end
 
 module Make (MessageWrapper : Message.S) :
-  (S with type message_t = Message.ro MessageWrapper.Message.t)
+  (S with type message_t = Message.ro MessageWrapper.Message.t
+    and type AnyPointer.t = Message.ro MessageWrapper.Slice.t option)
 

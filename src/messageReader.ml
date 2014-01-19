@@ -497,6 +497,7 @@ module Make (MessageWrapper : Message.S) = struct
 
 
   let get_struct_field_blob
+      ?(default="")
       (struct_storage : 'cap StructStorage.t option)
       (pointer_word : int)
   : string =
@@ -508,16 +509,17 @@ module Make (MessageWrapper : Message.S) = struct
           | Some list_storage ->
               string_of_uint8_list ~null_terminated:false list_storage
           | None ->
-              ""
+              default
           end
         | None ->
-            ""
+            default
         end
     | None ->
-        ""
+        default
 
 
   let get_struct_field_text
+      ?(default="")
       (struct_storage : 'cap StructStorage.t option)
       (pointer_word : int)
   : string =
@@ -529,13 +531,13 @@ module Make (MessageWrapper : Message.S) = struct
           | Some list_storage ->
               string_of_uint8_list ~null_terminated:true list_storage
           | None ->
-              ""
+              default
           end
         | None ->
-            ""
+            default
         end
     | None ->
-        ""
+        default
 
 
   let get_struct_field_bit_list
@@ -633,6 +635,22 @@ module Make (MessageWrapper : Message.S) = struct
     get_struct_field_bytes_list struct_storage pointer_word (fun slice -> Slice.get_uint64 slice 0)
 
 
+  let get_struct_field_float32_list
+    (struct_storage : ro StructStorage.t option)
+    (pointer_word : int)
+  : (float, 'b) Runtime.Array.t =
+    get_struct_field_bytes_list struct_storage pointer_word
+      (fun slice -> Int32.float_of_bits (Slice.get_int32 slice 0))
+
+
+  let get_struct_field_float64_list
+    (struct_storage : ro StructStorage.t option)
+    (pointer_word : int)
+  : (float, 'b) Runtime.Array.t =
+    get_struct_field_bytes_list struct_storage pointer_word
+      (fun slice -> Int64.float_of_bits (Slice.get_int64 slice 0))
+
+
   let get_struct_field_text_list
       (struct_storage : ro StructStorage.t option)
       (pointer_word : int)
@@ -681,6 +699,15 @@ module Make (MessageWrapper : Message.S) = struct
     (pointer_word : int)
   : (ro ListStorage.t option, 'b) Runtime.Array.t =
     get_struct_field_bytes_list struct_storage pointer_word (fun slice -> deref_list_pointer slice)
+
+
+  let get_struct_field_enum_list
+    (struct_storage : ro StructStorage.t option)
+    (pointer_word : int)
+    (convert : int -> 'a)
+  : ('a, 'b) Runtime.Array.t =
+    get_struct_field_bytes_list struct_storage pointer_word
+      (fun slice -> convert (Slice.get_uint16 slice 0))
 
 
   let get_struct_field_struct

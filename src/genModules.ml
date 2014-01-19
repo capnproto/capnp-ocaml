@@ -3,91 +3,64 @@ open Core.Std
 
 module PS = GenCommon.PS
 module R  = Runtime
+module Reader = MessageReader.Make(GenCommon.M)
 
 
 let no_discriminant = 0xffff
 
 
-(* Generate a function for unpacking a capnp union type as an OCaml variant. *)
-let generate_union_accessors nodes_table scope struct_def fields =
-  let indent = String.make (2 * (List.length scope + 1)) ' ' in
-  let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
-    let field_name = String.capitalize (PS.Field.name_get field) in
-    let field_decoder =
-      (* FIXME: decode default values here *)
-      match PS.Field.unnamed_union_get field with
-      | PS.Field.Slot slot ->
-          let ofs = Uint32.to_int (PS.Field.Slot.offset_get slot) in
-          let tp  = PS.Field.Slot.type_get slot in
-          begin match PS.Type.unnamed_union_get tp with
-          | PS.Type.Void ->
-              ""
-          | PS.Type.Bool ->
-              Printf.sprintf " (get_struct_field_bit x %u %u)" (ofs / 8) (ofs mod 8)
-          | PS.Type.Int8 ->
-              Printf.sprintf " (get_struct_field_int8 x %u)" ofs
-          | PS.Type.Int16 ->
-              Printf.sprintf " (get_struct_field_int16 x %u)" (ofs * 2)
-          | PS.Type.Int32 ->
-              Printf.sprintf " (get_struct_field_int32 x %u)" (ofs * 4)
-          | PS.Type.Int64 ->
-              Printf.sprintf " (get_struct_field_int64 x %u)" (ofs * 8)
-          | PS.Type.Uint8 ->
-              Printf.sprintf " (get_struct_field_uint8 x %u)" ofs
-          | PS.Type.Uint16 ->
-              Printf.sprintf " (get_struct_field_uint16 x %u)" (ofs * 2)
-          | PS.Type.Uint32 ->
-              Printf.sprintf " (get_struct_field_uint32 x %u)" (ofs * 4)
-          | PS.Type.Uint64 ->
-              Printf.sprintf " (get_struct_field_uint64 x %u)" (ofs * 8)
-          | PS.Type.Float32 ->
-              Printf.sprintf " (Int32.float_of_bits (get_struct_field_int32 x %u))" (ofs * 4)
-          | PS.Type.Float64 ->
-              Printf.sprintf " (Int64.float_of_bits (get_struct_field_int64 x %u))" (ofs * 8)
-          | PS.Type.Text ->
-              Printf.sprintf " (get_struct_field_text x %u)" (ofs * 8)
-          | PS.Type.Data ->
-              Printf.sprintf " (get_struct_field_blob x %u)" (ofs * 8)
-          | PS.Type.List _ ->
-              failwith "list type unexpected in union field"
-          | PS.Type.Enum _ ->
-              failwith "enum type unexpected in union field"
-          | PS.Type.Struct _ ->
-              failwith "struct type unexpected in union field"
-          | PS.Type.Interface _ ->
-              failwith "interface type unexpected in union field"
-          | PS.Type.Object ->
-              Printf.sprintf " (get_struct_pointer x %u)" (ofs * 8)
-          | PS.Type.Undefined_ x ->
-              failwith (Printf.sprintf "Unknown Type union discriminant %d" x)
-          end
-      | PS.Field.Group group ->
-          (* Groups are just a different view of the storage associated with the parent node *)
-          " x"
-      | PS.Field.Undefined_ x ->
-          failwith (Printf.sprintf "Unknown Field union discriminant %d" x)
+(* Generate a decoder lambda for converting from a uint16 to the associated enum value. *)
+let generate_enum_decoder ~nodes_table ~scope ~enum_node ~indent ~field_ofs =
+  let header = Printf.sprintf "%s(fun u16 -> match u16 with\n" indent in
+  let match_cases =
+    let scope_relative_name = GenCommon.get_scope_relative_name nodes_table scope enum_node in
+    let enumerants =
+      match PS.Node.unnamed_union_get enum_node with
+      | PS.Node.Enum enum_group ->
+          PS.Node.Enum.enumerants_get enum_group
+      | _ ->
+          failwith "Decoded non-enum node where enum node was expected."
     in
-    let field_value = PS.Field.discriminantValue_get field in
-    (Printf.sprintf "%s  | %u -> %s%s"
-      indent
-      field_value
-      field_name
-      field_decoder) :: acc)
+    let buf = Buffer.create 512 in
+    for i = 0 to R.Array.length enumerants - 1 do
+      let enumerant = R.Array.get enumerants i in
+      let match_case =
+        Printf.sprintf "%s  | %u -> %s.%s\n"
+          indent
+          i
+          scope_relative_name
+          (String.capitalize (PS.Enumerant.name_get enumerant))
+      in
+      Buffer.add_string buf match_case
+    done;
+    let footer = Printf.sprintf "%s  | v -> %s.Undefined_ v)\n" indent scope_relative_name in
+    let () = Buffer.add_string buf footer in
+    Buffer.contents buf
   in
-  let header = [
-    Printf.sprintf "%slet unnamed_union_get x =" indent;
-    Printf.sprintf "%s  match get_struct_field_uint16 x %u with"
-      indent ((Uint32.to_int (PS.Node.Struct.discriminantOffset_get struct_def)) * 2);
-  ] in
-  let footer = [
-    Printf.sprintf "%s  | v -> Undefined_ v\n" indent
-  ] in
-  (GenCommon.generate_union_type nodes_table scope struct_def fields) ^ "\n" ^
-  String.concat ~sep:"\n" (header @ cases @ footer)
+  header ^ match_cases
+
+
+(* Generate an accessor for decoding an enum type. *)
+let generate_enum_accessor ~nodes_table ~scope ~enum_node ~indent ~field_name ~field_ofs
+    ~default =
+  let decoder_declaration =
+    Printf.sprintf "%s  let decode =\n%s%s  in\n"
+      indent
+      (generate_enum_decoder ~nodes_table ~scope ~enum_node ~indent:(indent ^ "    ") ~field_ofs)
+      indent
+  in
+  Printf.sprintf "%slet %s_get x =\n%s%sdecode (get_struct_field_uint16 ~default:%u x %u)\n"
+    indent
+    field_name
+    decoder_declaration
+    indent
+    default
+    (2 * field_ofs)
+
 
 
 (* Generate an accessor for retrieving a list of the given type. *)
-let generate_list_accessor ~list_type ~indent ~field_name ~field_ofs =
+let generate_list_accessor ~nodes_table ~scope ~list_type ~indent ~field_name ~field_ofs =
   match PS.Type.unnamed_union_get list_type with
   | PS.Type.Void ->
       Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
@@ -138,11 +111,16 @@ let generate_list_accessor ~list_type ~indent ~field_name ~field_ofs =
         indent
         field_name
         field_ofs
-  | PS.Type.Float32
-  | PS.Type.Float64 ->
-      Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
+  | PS.Type.Float32 ->
+      Printf.sprintf "%slet %s_get x = get_struct_field_float32_list x %u\n"
         indent
         field_name
+        field_ofs
+  | PS.Type.Float64 ->
+      Printf.sprintf "%slet %s_get x = get_struct_field_float64_list x %u\n"
+        indent
+        field_name
+        field_ofs
   | PS.Type.Text ->
       Printf.sprintf "%slet %s_get x = get_struct_field_text_list x %u\n"
         indent
@@ -158,10 +136,22 @@ let generate_list_accessor ~list_type ~indent ~field_name ~field_ofs =
         indent
         field_name
         field_ofs
-  | PS.Type.Enum _ ->
-      Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
+  | PS.Type.Enum enum_def ->
+      let enum_id = PS.Type.Enum.typeId_get enum_def in
+      let enum_node = Hashtbl.find_exn nodes_table enum_id in
+      let decoder_declaration =
+        Printf.sprintf "%s  let decode =\n%s%s  in\n"
+          indent
+          (generate_enum_decoder ~nodes_table ~scope ~enum_node
+            ~indent:(indent ^ "    ") ~field_ofs)
+          indent
+      in
+      Printf.sprintf "%slet %s_get x =\n%s%s  get_struct_field_enum_list x %u decode\n"
         indent
         field_name
+        decoder_declaration
+        indent
+        (field_ofs * 2)
   | PS.Type.Struct _ ->
       Printf.sprintf "%slet %s_get x = get_struct_field_struct_list x %u\n"
         indent
@@ -179,180 +169,263 @@ let generate_list_accessor ~list_type ~indent ~field_name ~field_ofs =
        failwith (Printf.sprintf "Unknown Type union discriminant %d" x)
 
 
-(* Generate an accessor for decoding an enum type. *)
-let generate_enum_accessor ~nodes_table ~scope ~enum_node ~enum_type ~indent ~field_name ~field_ofs =
-  let header =
-    Printf.sprintf "%slet %s_get x = \n%s  match get_struct_field_uint16 x %u with\n"
-      indent
-      field_name
-      indent
-      (2 * field_ofs)
-  in
-  let match_cases =
-    let scope_relative_name = GenCommon.get_scope_relative_name nodes_table scope enum_node in
-    let enumerants =
-      match PS.Node.unnamed_union_get enum_node with
-      | PS.Node.Enum enum_group ->
-          PS.Node.Enum.enumerants_get enum_group
-      | _ ->
-          failwith "decoded non-enum node where enum node was expected"
-    in
-    let buf = Buffer.create 512 in
-    for i = 0 to R.Array.length enumerants - 1 do
-      let enumerant = R.Array.get enumerants i in
-      let match_case =
-        Printf.sprintf "%s  | %u -> %s.%s\n"
-          indent
-          i
-          scope_relative_name
-          (String.capitalize (PS.Enumerant.name_get enumerant))
-      in
-      Buffer.add_string buf match_case
-    done;
-    let footer = Printf.sprintf "%s  | v -> %s.Undefined_ v\n" indent scope_relative_name in
-    let () = Buffer.add_string buf footer in
-    Buffer.contents buf
-  in
-  header ^ match_cases
-
-
-(* Generate accessors for retrieving all non-union fields of a struct. *)
-let generate_non_union_accessors nodes_table scope struct_def fields =
-  let indent = String.make (2 * (List.length scope + 1)) ' ' in
-  let accessors = List.fold_left fields ~init:[] ~f:(fun acc field ->
-    let field_accessors : string =
-      let field_name = String.uncapitalize (PS.Field.name_get field) in
-      match PS.Field.unnamed_union_get field with
-      | PS.Field.Group group ->
-          Printf.sprintf "%slet %s_get x = x\n"
+let generate_field_accessor ~nodes_table ~scope ~indent field =
+  let field_name = String.uncapitalize (PS.Field.name_get field) in
+  match PS.Field.unnamed_union_get field with
+  | PS.Field.Group group ->
+      Printf.sprintf "%slet %s_get x = x\n"
+        indent
+        field_name
+  | PS.Field.Slot slot ->
+      let field_ofs = Uint32.to_int (PS.Field.Slot.offset_get slot) in
+      let tp = PS.Field.Slot.type_get slot in
+      let default = PS.Field.Slot.defaultValue_get slot in
+      begin match (PS.Type.unnamed_union_get tp, PS.Value.unnamed_union_get default) with
+      | (PS.Type.Void, PS.Value.Void) ->
+          Printf.sprintf "%slet %s_get x = ()\n" indent field_name
+      | (PS.Type.Bool, PS.Value.Bool a) ->
+          Printf.sprintf "%slet %s_get x = get_struct_field_bit ~default_bit:%s x %u %u\n"
             indent
             field_name
-      | PS.Field.Slot slot ->
-          let field_ofs  = Uint32.to_int (PS.Field.Slot.offset_get slot) in
-          let tp = PS.Field.Slot.type_get slot in
-          begin match PS.Type.unnamed_union_get tp with
-          | PS.Type.Void ->
-              Printf.sprintf "%slet %s_get x = ()\n"
-                indent
-                field_name
-          | PS.Type.Bool ->
-              let byte_ofs    = field_ofs / 8 in
-              let bit_in_byte = field_ofs mod 8 in
-              Printf.sprintf "%slet %s_get x = get_struct_field_bit x %u %u\n"
-                indent
-                field_name
-                byte_ofs
-                bit_in_byte
-          | PS.Type.Int8 ->
-              Printf.sprintf "%slet %s_get x = get_struct_field_int8 x %u\n"
-                indent
-                field_name
-                field_ofs
-          | PS.Type.Int16 ->
-              Printf.sprintf "%slet %s_get x = get_struct_field_int16 x %u\n"
-                indent
-                field_name
-                (2 * field_ofs)
-          | PS.Type.Int32 ->
-              String.concat ~sep:"" [
-                Printf.sprintf "%slet %s_get x = get_struct_field_int32 x %u\n"
-                  indent
-                  field_name
-                  (4 * field_ofs);
-                Printf.sprintf "%slet %s_get_int_exn x = Int32.to_int (%s_get x)\n"
-                  indent
-                  field_name
-                  field_name
-              ]
-          | PS.Type.Int64 ->
-              String.concat ~sep:"" [
-                Printf.sprintf "%slet %s_get x = get_struct_field_int64 x %u\n"
-                  indent
-                  field_name
-                  (8 * field_ofs);
-                Printf.sprintf "%slet %s_get_int_exn x = Int64.to_int (%s_get x)\n"
-                  indent
-                  field_name
-                  field_name
-              ]
-          | PS.Type.Uint8 ->
-              Printf.sprintf "%slet %s_get x = get_struct_field_uint8 x %u\n"
-                indent
-                field_name
-                field_ofs
-          | PS.Type.Uint16 ->
-              Printf.sprintf "%slet %s_get x = get_struct_field_uint16 x %u\n"
-                indent
-                field_name
-                (2 * field_ofs)
-          | PS.Type.Uint32 ->
-              String.concat ~sep:"" [
-                Printf.sprintf "%slet %s_get x = get_struct_field_uint32 x %u\n"
-                  indent
-                  field_name
-                  (4 * field_ofs);
-                Printf.sprintf "%slet %s_get_int_exn x = Uint32.to_int (%s_get x)\n"
-                  indent
-                  field_name
-                  field_name
-              ]
-          | PS.Type.Uint64 ->
-              String.concat ~sep:"" [
-                Printf.sprintf "%slet %s_get x = get_struct_field_uint64 x %u\n"
-                  indent
-                  field_name
-                  (8 * field_ofs);
-                Printf.sprintf "%slet %s_get_int_exn x = Uint64.to_int (%s_get x)\n"
-                  indent
-                  field_name
-                  field_name
-              ]
-          | PS.Type.Float32 ->
-              Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
-                indent
-                field_name
-          | PS.Type.Float64 ->
-              Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
-                indent
-                field_name
-          | PS.Type.Text ->
-              Printf.sprintf "%slet %s_get x = get_struct_field_text x %u\n"
-                indent
-                field_name
-                field_ofs
-          | PS.Type.Data ->
-              Printf.sprintf "%slet %s_get x = get_struct_field_blob x %u\n"
-                indent
-                field_name
-                field_ofs
-          | PS.Type.List list ->
-              let list_type = PS.Type.List.elementType_get list in
-              generate_list_accessor ~list_type ~indent ~field_name ~field_ofs
-          | PS.Type.Enum enum ->
-              let enum_id = PS.Type.Enum.typeId_get enum in
-              let enum_node = Hashtbl.find_exn nodes_table enum_id in
-              generate_enum_accessor ~nodes_table ~scope ~enum_node
-                ~enum_type:tp ~indent ~field_name ~field_ofs
-          | PS.Type.Struct struct_def ->
+            (if a then "true" else "false")
+            (field_ofs / 8)
+            (field_ofs mod 8)
+      | (PS.Type.Int8, PS.Value.Int8 a) ->
+          Printf.sprintf "%slet %s_get x = get_struct_field_int8 ~default:%d x %u\n"
+            indent
+            field_name
+            a
+            field_ofs
+      | (PS.Type.Int16, PS.Value.Int16 a) ->
+          Printf.sprintf "%slet %s_get x = get_struct_field_int16 ~default:%d x %u\n"
+            indent
+            field_name
+            a
+            (field_ofs * 2)
+      | (PS.Type.Int32, PS.Value.Int32 a) ->
+          (Printf.sprintf "%slet %s_get x = get_struct_field_int32 ~default:%sl x %u\n"
+            indent
+            field_name
+            (Int32.to_string a)
+            (field_ofs * 4)) ^
+          (Printf.sprintf "%slet %s_get_int_exn x = Int32.to_int (%s_get x)\n"
+            indent
+            field_name
+            field_name)
+      | (PS.Type.Int64, PS.Value.Int64 a) ->
+          (Printf.sprintf "%slet %s_get x = get_struct_field_int64 ~default:%sL x %u\n"
+            indent
+            field_name
+            (Int64.to_string a)
+            (field_ofs * 8)) ^
+          (Printf.sprintf "%slet %s_get_int_exn x = Int64.to_int (%s_get x)\n"
+            indent
+            field_name
+            field_name)
+      | (PS.Type.Uint8, PS.Value.Uint8 a) ->
+          Printf.sprintf "%slet %s_get x = get_struct_field_uint8 ~default:%d x %u\n"
+            indent
+            field_name
+            a
+            field_ofs
+      | (PS.Type.Uint16, PS.Value.Uint16 a) ->
+          Printf.sprintf "%slet %s_get x = get_struct_field_uint16 ~default:%d x %u\n"
+            indent
+            field_name
+            a
+            (field_ofs * 2)
+      | (PS.Type.Uint32, PS.Value.Uint32 a) ->
+          let default =
+            if Uint32.compare a Uint32.zero = 0 then
+              "Uint32.zero"
+            else
+              Printf.sprintf "(Uint32.of_string \"%s\")" (Uint32.to_string a)
+          in
+          (Printf.sprintf "%slet %s_get x = get_struct_field_uint32 ~default:%s x %u\n"
+            indent
+            field_name
+            default
+            (field_ofs * 4)) ^
+          (Printf.sprintf "%slet %s_get_int_exn x = Uint32.to_int (%s_get x)\n"
+            indent
+            field_name
+            field_name)
+      | (PS.Type.Uint64, PS.Value.Uint64 a) ->
+          let default =
+            if Uint64.compare a Uint64.zero = 0 then
+              "Uint64.zero"
+            else
+              Printf.sprintf "(Uint64.of_string \"%s\")" (Uint64.to_string a)
+          in
+          (Printf.sprintf "%slet %s_get x = get_struct_field_uint64 ~default:%s x %u\n"
+            indent
+            field_name
+            default
+            (field_ofs * 8)) ^
+          (Printf.sprintf "%slet %s_get_int_exn x = Uint64.to_int (%s_get x)\n"
+            indent
+            field_name
+            field_name)
+      | (PS.Type.Float32, PS.Value.Float32 a) ->
+          let default_int32 = Int32.bits_of_float a in
+          Printf.sprintf
+            "%slet %s_get x = Int32.float_of_bits (get_struct_field_int32 ~default:%sl x %u)\n"
+              indent
+              field_name
+              (Int32.to_string default_int32)
+              (field_ofs * 4)
+      | (PS.Type.Float64, PS.Value.Float64 a) ->
+          let default_int64 = Int64.bits_of_float a in
+          Printf.sprintf
+            "%slet %s_get x = Int64.float_of_bits (get_struct_field_int64 ~default:%sL x %u)\n"
+              indent
+              field_name
+              (Int64.to_string default_int64)
+              (field_ofs * 8)
+      | (PS.Type.Text, PS.Value.Text a) ->
+          Printf.sprintf "%slet %s_get x = get_struct_field_text ~default:\"%s\" x %u\n"
+            indent
+            field_name
+            (String.escaped a)
+            (field_ofs * 8)
+      | (PS.Type.Data, PS.Value.Data a) ->
+          Printf.sprintf "%slet %s_get x = get_struct_field_blob ~default:\"%s\" x %u\n"
+            indent
+            field_name
+            (String.escaped a)
+            (field_ofs * 8)
+      | (PS.Type.List list_def, PS.Value.List pointer_slice_opt) ->
+          let has_trivial_default =
+            begin match pointer_slice_opt with
+            | Some pointer_slice ->
+                begin match Reader.decode_pointer pointer_slice with
+                | Pointer.Null -> true
+                | _ -> false
+                end
+            | None ->
+                true
+            end
+          in
+          if has_trivial_default then
+            let list_type = PS.Type.List.elementType_get list_def in
+            generate_list_accessor ~nodes_table ~scope ~list_type ~indent ~field_name ~field_ofs
+          else
+            failwith "Default values for lists are not implemented."
+      | (PS.Type.Enum enum_def, PS.Value.Enum val_uint16) ->
+          let enum_id = PS.Type.Enum.typeId_get enum_def in
+          let enum_node = Hashtbl.find_exn nodes_table enum_id in
+          generate_enum_accessor
+            ~nodes_table ~scope ~enum_node ~indent ~field_name ~field_ofs
+            ~default:val_uint16
+      | (PS.Type.Struct struct_def, PS.Value.Struct pointer_slice_opt) ->
+          let has_trivial_default =
+            begin match pointer_slice_opt with
+            | Some pointer_slice ->
+                begin match Reader.decode_pointer pointer_slice with
+                | Pointer.Null -> true
+                | _ -> false
+                end
+            | None ->
+                true
+            end
+          in
+          if has_trivial_default then
               Printf.sprintf "%slet %s_get x = get_struct_field_struct x %u\n"
                 indent
                 field_name
                 field_ofs
-          | PS.Type.Interface iface ->
-              Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
-                indent
-                field_name
-          | PS.Type.Object ->
-              Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
-                indent
-                field_name
-          | PS.Type.Undefined_ x ->
-              failwith (Printf.sprintf "Unknown Type union discriminant %d" x)
+          else
+              failwith "Default values for structs are not implemented."
+      | (PS.Type.Interface iface_def, PS.Value.Interface) ->
+          Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
+            indent
+            field_name
+      | (PS.Type.Object, PS.Value.Object pointer) ->
+          Printf.sprintf "%slet %s_get x = get_struct_pointer x %u\n"
+            indent
+            field_name
+            field_ofs
+      | (PS.Type.Undefined_ x, _) ->
+          failwith (Printf.sprintf "Unknown Field union discriminant %u." x)
+
+      (* All other cases represent an ill-formed default value in the plugin request *)
+      | (PS.Type.Void, _)
+      | (PS.Type.Bool, _)
+      | (PS.Type.Int8, _)
+      | (PS.Type.Int16, _)
+      | (PS.Type.Int32, _)
+      | (PS.Type.Int64, _)
+      | (PS.Type.Uint8, _)
+      | (PS.Type.Uint16, _)
+      | (PS.Type.Uint32, _)
+      | (PS.Type.Uint64, _)
+      | (PS.Type.Float32, _)
+      | (PS.Type.Float64, _)
+      | (PS.Type.Text, _)
+      | (PS.Type.Data, _)
+      | (PS.Type.List _, _)
+      | (PS.Type.Enum _, _)
+      | (PS.Type.Struct _, _)
+      | (PS.Type.Interface _, _)
+      | (PS.Type.Object, _) ->
+          let err_msg =
+            Printf.sprintf "The default value for field \"%s\" has an unexpected type." field_name
+          in
+          failwith err_msg
+      end
+  | PS.Field.Undefined_ x ->
+      failwith (Printf.sprintf "Unknown Field union discriminant %u." x)
+
+
+(* Generate a function for unpacking a capnp union type as an OCaml variant. *)
+let generate_union_accessors ~nodes_table ~scope struct_def fields =
+  let indent = String.make (2 * (List.length scope + 1)) ' ' in
+  let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
+    let field_name = String.uncapitalize (PS.Field.name_get field) in
+    let ctor_name = String.capitalize field_name in
+    let field_value = PS.Field.discriminantValue_get field in
+    let field_has_void_type =
+      match PS.Field.unnamed_union_get field with
+      | PS.Field.Slot slot ->
+          begin match PS.Type.unnamed_union_get (PS.Field.Slot.type_get slot) with
+          | PS.Type.Void -> true
+          | _ -> false
           end
-      | PS.Field.Undefined_ x ->
-          failwith (Printf.sprintf "Unknown Field union discriminant %d" x)
+      | _ -> false
     in
-    (field_accessors :: acc))
+    if field_has_void_type then
+      (Printf.sprintf "%s  | %u -> %s"
+        indent
+        field_value
+        ctor_name) :: acc
+    else
+      (Printf.sprintf "%s  | %u -> %s (%s_get x)"
+        indent
+        field_value
+        ctor_name
+        field_name) :: acc)
+  in
+  let header = [
+    Printf.sprintf "%slet unnamed_union_get x =" indent;
+    Printf.sprintf "%s  match get_struct_field_uint16 x %u with"
+      indent ((Uint32.to_int (PS.Node.Struct.discriminantOffset_get struct_def)) * 2);
+  ] in
+  let footer = [
+    Printf.sprintf "%s  | v -> Undefined_ v\n" indent
+  ] in
+  (GenCommon.generate_union_type nodes_table scope struct_def fields) ^ "\n" ^
+  String.concat ~sep:"\n" (header @ cases @ footer)
+
+
+
+(* Generate accessors for retrieving all fields of a struct, regardless of whether
+ * or not the fields are packed into a union.  (Fields packed inside a union are
+ * not exposed in the module signature. *)
+let generate_accessors ~nodes_table ~scope struct_def fields =
+  let indent = String.make (2 * (List.length scope + 1)) ' ' in
+  let accessors = List.fold_left fields ~init:[] ~f:(fun acc field ->
+    let x = generate_field_accessor ~nodes_table ~scope ~indent field in
+    x :: acc)
   in
   String.concat ~sep:"" accessors
 
@@ -378,25 +451,21 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
   let all_fields = List.sort unsorted_fields ~cmp:(fun x y ->
     - (Int.compare (PS.Field.codeOrder_get x) (PS.Field.codeOrder_get y)))
   in
-  let union_fields, non_union_fields = List.partition_tf all_fields ~f:(fun field ->
+  let union_fields = List.filter all_fields ~f:(fun field ->
     (PS.Field.discriminantValue_get field) <> no_discriminant)
   in
+  let accessors = generate_accessors ~nodes_table ~scope struct_def all_fields in
   let union_accessors =
     match union_fields with
     | [] -> ""
-    | _  -> generate_union_accessors nodes_table scope struct_def union_fields
-  in
-  let non_union_acccessors =
-    match non_union_fields with
-    | [] -> ""
-    | _  -> generate_non_union_accessors nodes_table scope struct_def non_union_fields
+    | _  -> generate_union_accessors ~nodes_table ~scope struct_def union_fields
   in
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let unique_typename = GenCommon.make_unique_typename ~nodes_table node in
   (Printf.sprintf "%stype t = ro StructStorage.t option\n" indent) ^
   (Printf.sprintf "%stype %s = t\n" indent unique_typename) ^
   (Printf.sprintf "%stype array_t = ro ListStorage.t\n\n" indent) ^
-    nested_modules ^ union_accessors ^ non_union_acccessors ^
+    nested_modules ^ accessors ^ union_accessors ^
     (Printf.sprintf "%slet of_message x = get_root_struct x\n" indent)
 
 

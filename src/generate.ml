@@ -17,7 +17,8 @@ let sig_s_footer =
 
 let functor_sig =
   "module Make (MessageWrapper : Message.S) :\n" ^
-  "  (S with type message_t = Message.ro MessageWrapper.Message.t)\n\n"
+  "  (S with type message_t = Message.ro MessageWrapper.Message.t\n" ^
+  "    and type AnyPointer.t = Message.ro MessageWrapper.Slice.t option)\n\n"
 
 
 let mod_header =

@@ -386,7 +386,7 @@ module Make (MessageWrapper : Message.S) = struct
       type t_Enum_11389172934837766057 = t
       type array_t = ro ListStorage.t
 
-      let typeId_get x = get_struct_field_uint64 x 8
+      let typeId_get x = get_struct_field_uint64 ~default:Uint64.zero x 8
       let typeId_get_int_exn x = Uint64.to_int (typeId_get x)
       let of_message x = get_root_struct x
     end
@@ -396,7 +396,7 @@ module Make (MessageWrapper : Message.S) = struct
       type t_Interface_17116997365232503999 = t
       type array_t = ro ListStorage.t
 
-      let typeId_get x = get_struct_field_uint64 x 8
+      let typeId_get x = get_struct_field_uint64 ~default:Uint64.zero x 8
       let typeId_get_int_exn x = Uint64.to_int (typeId_get x)
       let of_message x = get_root_struct x
     end
@@ -415,11 +415,30 @@ module Make (MessageWrapper : Message.S) = struct
       type t_Struct_12410354185295152851 = t
       type array_t = ro ListStorage.t
 
-      let typeId_get x = get_struct_field_uint64 x 8
+      let typeId_get x = get_struct_field_uint64 ~default:Uint64.zero x 8
       let typeId_get_int_exn x = Uint64.to_int (typeId_get x)
       let of_message x = get_root_struct x
     end
 
+    let void_get x = ()
+    let bool_get x = ()
+    let int8_get x = ()
+    let int16_get x = ()
+    let int32_get x = ()
+    let int64_get x = ()
+    let uint8_get x = ()
+    let uint16_get x = ()
+    let uint32_get x = ()
+    let uint64_get x = ()
+    let float32_get x = ()
+    let float64_get x = ()
+    let text_get x = ()
+    let data_get x = ()
+    let list_get x = x
+    let enum_get x = x
+    let struct_get x = x
+    let interface_get x = x
+    let object_get x = ()
     type unnamed_union_t =
       | Void
       | Bool
@@ -458,10 +477,10 @@ module Make (MessageWrapper : Message.S) = struct
       | 11 -> Float64
       | 12 -> Text
       | 13 -> Data
-      | 14 -> List x
-      | 15 -> Enum x
-      | 16 -> Struct x
-      | 17 -> Interface x
+      | 14 -> List (list_get x)
+      | 15 -> Enum (enum_get x)
+      | 16 -> Struct (struct_get x)
+      | 17 -> Interface (interface_get x)
       | 18 -> Object
       | v -> Undefined_ v
     let of_message x = get_root_struct x
@@ -472,6 +491,29 @@ module Make (MessageWrapper : Message.S) = struct
     type t_Value_14853958794117909659 = t
     type array_t = ro ListStorage.t
 
+    let void_get x = ()
+    let bool_get x = get_struct_field_bit ~default_bit:false x 2 0
+    let int8_get x = get_struct_field_int8 ~default:0 x 2
+    let int16_get x = get_struct_field_int16 ~default:0 x 2
+    let int32_get x = get_struct_field_int32 ~default:0l x 4
+    let int32_get_int_exn x = Int32.to_int (int32_get x)
+    let int64_get x = get_struct_field_int64 ~default:0L x 8
+    let int64_get_int_exn x = Int64.to_int (int64_get x)
+    let uint8_get x = get_struct_field_uint8 ~default:0 x 2
+    let uint16_get x = get_struct_field_uint16 ~default:0 x 2
+    let uint32_get x = get_struct_field_uint32 ~default:Uint32.zero x 4
+    let uint32_get_int_exn x = Uint32.to_int (uint32_get x)
+    let uint64_get x = get_struct_field_uint64 ~default:Uint64.zero x 8
+    let uint64_get_int_exn x = Uint64.to_int (uint64_get x)
+    let float32_get x = Int32.float_of_bits (get_struct_field_int32 ~default:0l x 4)
+    let float64_get x = Int64.float_of_bits (get_struct_field_int64 ~default:0L x 8)
+    let text_get x = get_struct_field_text ~default:"" x 0
+    let data_get x = get_struct_field_blob ~default:"" x 0
+    let list_get x = get_struct_pointer x 0
+    let enum_get x = get_struct_field_uint16 ~default:0 x 2
+    let struct_get x = get_struct_pointer x 0
+    let interface_get x = ()
+    let object_get x = get_struct_pointer x 0
     type unnamed_union_t =
       | Void
       | Bool of bool
@@ -497,24 +539,24 @@ module Make (MessageWrapper : Message.S) = struct
     let unnamed_union_get x =
       match get_struct_field_uint16 x 0 with
       | 0 -> Void
-      | 1 -> Bool (get_struct_field_bit x 2 0)
-      | 2 -> Int8 (get_struct_field_int8 x 2)
-      | 3 -> Int16 (get_struct_field_int16 x 2)
-      | 4 -> Int32 (get_struct_field_int32 x 4)
-      | 5 -> Int64 (get_struct_field_int64 x 8)
-      | 6 -> Uint8 (get_struct_field_uint8 x 2)
-      | 7 -> Uint16 (get_struct_field_uint16 x 2)
-      | 8 -> Uint32 (get_struct_field_uint32 x 4)
-      | 9 -> Uint64 (get_struct_field_uint64 x 8)
-      | 10 -> Float32 (Int32.float_of_bits (get_struct_field_int32 x 4))
-      | 11 -> Float64 (Int64.float_of_bits (get_struct_field_int64 x 8))
-      | 12 -> Text (get_struct_field_text x 0)
-      | 13 -> Data (get_struct_field_blob x 0)
-      | 14 -> List (get_struct_pointer x 0)
-      | 15 -> Enum (get_struct_field_uint16 x 2)
-      | 16 -> Struct (get_struct_pointer x 0)
+      | 1 -> Bool (bool_get x)
+      | 2 -> Int8 (int8_get x)
+      | 3 -> Int16 (int16_get x)
+      | 4 -> Int32 (int32_get x)
+      | 5 -> Int64 (int64_get x)
+      | 6 -> Uint8 (uint8_get x)
+      | 7 -> Uint16 (uint16_get x)
+      | 8 -> Uint32 (uint32_get x)
+      | 9 -> Uint64 (uint64_get x)
+      | 10 -> Float32 (float32_get x)
+      | 11 -> Float64 (float64_get x)
+      | 12 -> Text (text_get x)
+      | 13 -> Data (data_get x)
+      | 14 -> List (list_get x)
+      | 15 -> Enum (enum_get x)
+      | 16 -> Struct (struct_get x)
       | 17 -> Interface
-      | 18 -> Object (get_struct_pointer x 0)
+      | 18 -> Object (object_get x)
       | v -> Undefined_ v
     let of_message x = get_root_struct x
   end
@@ -524,7 +566,7 @@ module Make (MessageWrapper : Message.S) = struct
     type t_Annotation_17422339044421236034 = t
     type array_t = ro ListStorage.t
 
-    let id_get x = get_struct_field_uint64 x 0
+    let id_get x = get_struct_field_uint64 ~default:Uint64.zero x 0
     let id_get_int_exn x = Uint64.to_int (id_get x)
     let value_get x = get_struct_field_struct x 0
     let of_message x = get_root_struct x
@@ -535,11 +577,11 @@ module Make (MessageWrapper : Message.S) = struct
     type t_Method_10736806783679155584 = t
     type array_t = ro ListStorage.t
 
-    let name_get x = get_struct_field_text x 0
-    let codeOrder_get x = get_struct_field_uint16 x 0
-    let paramStructType_get x = get_struct_field_uint64 x 8
+    let name_get x = get_struct_field_text ~default:"" x 0
+    let codeOrder_get x = get_struct_field_uint16 ~default:0 x 0
+    let paramStructType_get x = get_struct_field_uint64 ~default:Uint64.zero x 8
     let paramStructType_get_int_exn x = Uint64.to_int (paramStructType_get x)
-    let resultStructType_get x = get_struct_field_uint64 x 16
+    let resultStructType_get x = get_struct_field_uint64 ~default:Uint64.zero x 16
     let resultStructType_get_int_exn x = Uint64.to_int (resultStructType_get x)
     let annotations_get x = get_struct_field_struct_list x 1
     let of_message x = get_root_struct x
@@ -550,8 +592,8 @@ module Make (MessageWrapper : Message.S) = struct
     type t_Enumerant_10919677598968879693 = t
     type array_t = ro ListStorage.t
 
-    let name_get x = get_struct_field_text x 0
-    let codeOrder_get x = get_struct_field_uint16 x 0
+    let name_get x = get_struct_field_text ~default:"" x 0
+    let codeOrder_get x = get_struct_field_uint16 ~default:0 x 0
     let annotations_get x = get_struct_field_struct_list x 1
     let of_message x = get_root_struct x
   end
@@ -566,6 +608,8 @@ module Make (MessageWrapper : Message.S) = struct
       type t_Ordinal_13515537513213004774 = t
       type array_t = ro ListStorage.t
 
+      let implicit_get x = ()
+      let explicit_get x = get_struct_field_uint16 ~default:0 x 12
       type unnamed_union_t =
         | Implicit
         | Explicit of int
@@ -574,7 +618,7 @@ module Make (MessageWrapper : Message.S) = struct
       let unnamed_union_get x =
         match get_struct_field_uint16 x 10 with
         | 0 -> Implicit
-        | 1 -> Explicit (get_struct_field_uint16 x 12)
+        | 1 -> Explicit (explicit_get x)
         | v -> Undefined_ v
       let of_message x = get_root_struct x
     end
@@ -584,7 +628,7 @@ module Make (MessageWrapper : Message.S) = struct
       type t_Group_14626792032033250577 = t
       type array_t = ro ListStorage.t
 
-      let typeId_get x = get_struct_field_uint64 x 16
+      let typeId_get x = get_struct_field_uint64 ~default:Uint64.zero x 16
       let typeId_get_int_exn x = Uint64.to_int (typeId_get x)
       let of_message x = get_root_struct x
     end
@@ -594,14 +638,21 @@ module Make (MessageWrapper : Message.S) = struct
       type t_Slot_14133145859926553711 = t
       type array_t = ro ListStorage.t
 
-      let offset_get x = get_struct_field_uint32 x 4
+      let offset_get x = get_struct_field_uint32 ~default:Uint32.zero x 4
       let offset_get_int_exn x = Uint32.to_int (offset_get x)
       let type_get x = get_struct_field_struct x 2
       let defaultValue_get x = get_struct_field_struct x 3
-      let hadExplicitDefault_get x = get_struct_field_bit x 16 0
+      let hadExplicitDefault_get x = get_struct_field_bit ~default_bit:false x 16 0
       let of_message x = get_root_struct x
     end
 
+    let name_get x = get_struct_field_text ~default:"" x 0
+    let codeOrder_get x = get_struct_field_uint16 ~default:0 x 0
+    let annotations_get x = get_struct_field_struct_list x 1
+    let discriminantValue_get x = get_struct_field_uint16 ~default:65535 x 2
+    let slot_get x = x
+    let group_get x = x
+    let ordinal_get x = x
     type unnamed_union_t =
       | Slot of Slot.t
       | Group of Group.t
@@ -609,14 +660,9 @@ module Make (MessageWrapper : Message.S) = struct
 
     let unnamed_union_get x =
       match get_struct_field_uint16 x 8 with
-      | 0 -> Slot x
-      | 1 -> Group x
+      | 0 -> Slot (slot_get x)
+      | 1 -> Group (group_get x)
       | v -> Undefined_ v
-    let name_get x = get_struct_field_text x 0
-    let codeOrder_get x = get_struct_field_uint16 x 0
-    let annotations_get x = get_struct_field_struct_list x 1
-    let discriminantValue_get x = get_struct_field_uint16 ~default:0xffff x 2
-    let ordinal_get x = x
     let of_message x = get_root_struct x
   end
 
@@ -630,22 +676,25 @@ module Make (MessageWrapper : Message.S) = struct
       type t_Struct_11430331134483579957 = t
       type array_t = ro ListStorage.t
 
-      let dataWordCount_get x = get_struct_field_uint16 x 14
-      let pointerCount_get x = get_struct_field_uint16 x 24
-      let preferredListEncoding_get x = 
-        match get_struct_field_uint16 x 26 with
-        | 0 -> ElementSize.Empty
-        | 1 -> ElementSize.Bit
-        | 2 -> ElementSize.Byte
-        | 3 -> ElementSize.TwoBytes
-        | 4 -> ElementSize.FourBytes
-        | 5 -> ElementSize.EightBytes
-        | 6 -> ElementSize.Pointer
-        | 7 -> ElementSize.InlineComposite
-        | v -> ElementSize.Undefined_ v
-      let isGroup_get x = get_struct_field_bit x 28 0
-      let discriminantCount_get x = get_struct_field_uint16 x 30
-      let discriminantOffset_get x = get_struct_field_uint32 x 32
+      let dataWordCount_get x = get_struct_field_uint16 ~default:0 x 14
+      let pointerCount_get x = get_struct_field_uint16 ~default:0 x 24
+      let preferredListEncoding_get x =
+        let decode =
+          (fun u16 -> match u16 with
+            | 0 -> ElementSize.Empty
+            | 1 -> ElementSize.Bit
+            | 2 -> ElementSize.Byte
+            | 3 -> ElementSize.TwoBytes
+            | 4 -> ElementSize.FourBytes
+            | 5 -> ElementSize.EightBytes
+            | 6 -> ElementSize.Pointer
+            | 7 -> ElementSize.InlineComposite
+            | v -> ElementSize.Undefined_ v)
+        in
+      decode (get_struct_field_uint16 ~default:0 x 26)
+      let isGroup_get x = get_struct_field_bit ~default_bit:false x 28 0
+      let discriminantCount_get x = get_struct_field_uint16 ~default:0 x 30
+      let discriminantOffset_get x = get_struct_field_uint32 ~default:Uint32.zero x 32
       let discriminantOffset_get_int_exn x = Uint32.to_int (discriminantOffset_get x)
       let fields_get x = get_struct_field_struct_list x 3
       let of_message x = get_root_struct x
@@ -666,18 +715,18 @@ module Make (MessageWrapper : Message.S) = struct
       type array_t = ro ListStorage.t
 
       let type_get x = get_struct_field_struct x 3
-      let targetsFile_get x = get_struct_field_bit x 14 0
-      let targetsConst_get x = get_struct_field_bit x 14 1
-      let targetsEnum_get x = get_struct_field_bit x 14 2
-      let targetsEnumerant_get x = get_struct_field_bit x 14 3
-      let targetsStruct_get x = get_struct_field_bit x 14 4
-      let targetsField_get x = get_struct_field_bit x 14 5
-      let targetsUnion_get x = get_struct_field_bit x 14 6
-      let targetsGroup_get x = get_struct_field_bit x 14 7
-      let targetsInterface_get x = get_struct_field_bit x 15 0
-      let targetsMethod_get x = get_struct_field_bit x 15 1
-      let targetsParam_get x = get_struct_field_bit x 15 2
-      let targetsAnnotation_get x = get_struct_field_bit x 15 3
+      let targetsFile_get x = get_struct_field_bit ~default_bit:false x 14 0
+      let targetsConst_get x = get_struct_field_bit ~default_bit:false x 14 1
+      let targetsEnum_get x = get_struct_field_bit ~default_bit:false x 14 2
+      let targetsEnumerant_get x = get_struct_field_bit ~default_bit:false x 14 3
+      let targetsStruct_get x = get_struct_field_bit ~default_bit:false x 14 4
+      let targetsField_get x = get_struct_field_bit ~default_bit:false x 14 5
+      let targetsUnion_get x = get_struct_field_bit ~default_bit:false x 14 6
+      let targetsGroup_get x = get_struct_field_bit ~default_bit:false x 14 7
+      let targetsInterface_get x = get_struct_field_bit ~default_bit:false x 15 0
+      let targetsMethod_get x = get_struct_field_bit ~default_bit:false x 15 1
+      let targetsParam_get x = get_struct_field_bit ~default_bit:false x 15 2
+      let targetsAnnotation_get x = get_struct_field_bit ~default_bit:false x 15 3
       let of_message x = get_root_struct x
     end
 
@@ -706,12 +755,27 @@ module Make (MessageWrapper : Message.S) = struct
       type t_NestedNode_16050641862814319170 = t
       type array_t = ro ListStorage.t
 
-      let name_get x = get_struct_field_text x 0
-      let id_get x = get_struct_field_uint64 x 0
+      let name_get x = get_struct_field_text ~default:"" x 0
+      let id_get x = get_struct_field_uint64 ~default:Uint64.zero x 0
       let id_get_int_exn x = Uint64.to_int (id_get x)
       let of_message x = get_root_struct x
     end
 
+    let id_get x = get_struct_field_uint64 ~default:Uint64.zero x 0
+    let id_get_int_exn x = Uint64.to_int (id_get x)
+    let displayName_get x = get_struct_field_text ~default:"" x 0
+    let displayNamePrefixLength_get x = get_struct_field_uint32 ~default:Uint32.zero x 8
+    let displayNamePrefixLength_get_int_exn x = Uint32.to_int (displayNamePrefixLength_get x)
+    let scopeId_get x = get_struct_field_uint64 ~default:Uint64.zero x 16
+    let scopeId_get_int_exn x = Uint64.to_int (scopeId_get x)
+    let nestedNodes_get x = get_struct_field_struct_list x 1
+    let annotations_get x = get_struct_field_struct_list x 2
+    let file_get x = ()
+    let struct_get x = x
+    let enum_get x = x
+    let interface_get x = x
+    let const_get x = x
+    let annotation_get x = x
     type unnamed_union_t =
       | File
       | Struct of Struct.t
@@ -724,21 +788,12 @@ module Make (MessageWrapper : Message.S) = struct
     let unnamed_union_get x =
       match get_struct_field_uint16 x 12 with
       | 0 -> File
-      | 1 -> Struct x
-      | 2 -> Enum x
-      | 3 -> Interface x
-      | 4 -> Const x
-      | 5 -> Annotation x
+      | 1 -> Struct (struct_get x)
+      | 2 -> Enum (enum_get x)
+      | 3 -> Interface (interface_get x)
+      | 4 -> Const (const_get x)
+      | 5 -> Annotation (annotation_get x)
       | v -> Undefined_ v
-    let id_get x = get_struct_field_uint64 x 0
-    let id_get_int_exn x = Uint64.to_int (id_get x)
-    let displayName_get x = get_struct_field_text x 0
-    let displayNamePrefixLength_get x = get_struct_field_uint32 x 8
-    let displayNamePrefixLength_get_int_exn x = Uint32.to_int (displayNamePrefixLength_get x)
-    let scopeId_get x = get_struct_field_uint64 x 16
-    let scopeId_get_int_exn x = Uint64.to_int (scopeId_get x)
-    let nestedNodes_get x = get_struct_field_struct_list x 1
-    let annotations_get x = get_struct_field_struct_list x 2
     let of_message x = get_root_struct x
   end
 
@@ -757,15 +812,15 @@ module Make (MessageWrapper : Message.S) = struct
         type t_Import_12560611460656617445 = t
         type array_t = ro ListStorage.t
 
-        let id_get x = get_struct_field_uint64 x 0
+        let id_get x = get_struct_field_uint64 ~default:Uint64.zero x 0
         let id_get_int_exn x = Uint64.to_int (id_get x)
-        let name_get x = get_struct_field_text x 0
+        let name_get x = get_struct_field_text ~default:"" x 0
         let of_message x = get_root_struct x
       end
 
-      let id_get x = get_struct_field_uint64 x 0
+      let id_get x = get_struct_field_uint64 ~default:Uint64.zero x 0
       let id_get_int_exn x = Uint64.to_int (id_get x)
-      let filename_get x = get_struct_field_text x 0
+      let filename_get x = get_struct_field_text ~default:"" x 0
       let imports_get x = get_struct_field_struct_list x 1
       let of_message x = get_root_struct x
     end
