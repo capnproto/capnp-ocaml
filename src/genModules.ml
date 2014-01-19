@@ -407,7 +407,7 @@ let generate_union_accessors ~nodes_table ~scope struct_def fields =
   in
   let header = [
     Printf.sprintf "%slet unnamed_union_get x =" indent;
-    Printf.sprintf "%s  match get_struct_field_uint16 x %u with"
+    Printf.sprintf "%s  match get_struct_field_uint16 ~default:0 x %u with"
       indent ((Uint32.to_int (PS.Node.Struct.discriminantOffset_get struct_def)) * 2);
   ] in
   let footer = [

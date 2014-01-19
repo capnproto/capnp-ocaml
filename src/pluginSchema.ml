@@ -462,7 +462,7 @@ module Make (MessageWrapper : Message.S) = struct
       | Undefined_ of int
 
     let unnamed_union_get x =
-      match get_struct_field_uint16 x 0 with
+      match get_struct_field_uint16 ~default:0 x 0 with
       | 0 -> Void
       | 1 -> Bool
       | 2 -> Int8
@@ -537,7 +537,7 @@ module Make (MessageWrapper : Message.S) = struct
       | Undefined_ of int
 
     let unnamed_union_get x =
-      match get_struct_field_uint16 x 0 with
+      match get_struct_field_uint16 ~default:0 x 0 with
       | 0 -> Void
       | 1 -> Bool (bool_get x)
       | 2 -> Int8 (int8_get x)
@@ -616,7 +616,7 @@ module Make (MessageWrapper : Message.S) = struct
         | Undefined_ of int
 
       let unnamed_union_get x =
-        match get_struct_field_uint16 x 10 with
+        match get_struct_field_uint16 ~default:0 x 10 with
         | 0 -> Implicit
         | 1 -> Explicit (explicit_get x)
         | v -> Undefined_ v
@@ -659,7 +659,7 @@ module Make (MessageWrapper : Message.S) = struct
       | Undefined_ of int
 
     let unnamed_union_get x =
-      match get_struct_field_uint16 x 8 with
+      match get_struct_field_uint16 ~default:0 x 8 with
       | 0 -> Slot (slot_get x)
       | 1 -> Group (group_get x)
       | v -> Undefined_ v
@@ -786,7 +786,7 @@ module Make (MessageWrapper : Message.S) = struct
       | Undefined_ of int
 
     let unnamed_union_get x =
-      match get_struct_field_uint16 x 12 with
+      match get_struct_field_uint16 ~default:0 x 12 with
       | 0 -> File
       | 1 -> Struct (struct_get x)
       | 2 -> Enum (enum_get x)

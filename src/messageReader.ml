@@ -497,9 +497,9 @@ module Make (MessageWrapper : Message.S) = struct
 
 
   let get_struct_field_blob
-      ?(default="")
       (struct_storage : 'cap StructStorage.t option)
       (pointer_word : int)
+      ~(default : string)
   : string =
     match struct_storage with
     | Some storage ->
@@ -519,9 +519,9 @@ module Make (MessageWrapper : Message.S) = struct
 
 
   let get_struct_field_text
-      ?(default="")
       (struct_storage : 'cap StructStorage.t option)
       (pointer_word : int)
+      ~(default : string)
   : string =
     match struct_storage with
     | Some storage ->
@@ -721,7 +721,7 @@ module Make (MessageWrapper : Message.S) = struct
 
   let get_struct_field_bit
       (struct_storage : 'cap StructStorage.t option)
-      ?(default_bit = false)
+      ~(default_bit : bool)
       (byte_ofs : int) (bit_ofs : int)
   : bool =
     let byte_val =
@@ -737,7 +737,7 @@ module Make (MessageWrapper : Message.S) = struct
 
   let get_struct_field_uint8
       (struct_storage : 'cap StructStorage.t option)
-      ?(default = 0) (i : int)
+      ~(default : int) (i : int)
   : int =
     let numeric =
       match struct_storage with
@@ -751,7 +751,7 @@ module Make (MessageWrapper : Message.S) = struct
 
   let get_struct_field_uint16
       (struct_storage : 'cap StructStorage.t option)
-      ?(default = 0) (i : int)
+      ~(default : int) (i : int)
   : int =
     let numeric =
       match struct_storage with
@@ -765,7 +765,7 @@ module Make (MessageWrapper : Message.S) = struct
 
   let get_struct_field_uint32
       (struct_storage : 'cap StructStorage.t option)
-      ?(default = Uint32.zero) (i : int)
+      ~(default : Uint32.t) (i : int)
   : Uint32.t =
     let numeric =
       match struct_storage with
@@ -779,7 +779,7 @@ module Make (MessageWrapper : Message.S) = struct
 
   let get_struct_field_uint64
       (struct_storage : 'cap StructStorage.t option)
-      ?(default = Uint64.zero) (i : int)
+      ~(default : Uint64.t) (i : int)
   : Uint64.t =
     let numeric =
       match struct_storage with
@@ -793,7 +793,7 @@ module Make (MessageWrapper : Message.S) = struct
 
   let get_struct_field_int8
       (struct_storage : 'cap StructStorage.t option)
-      ?(default = 0) (i : int)
+      ~(default : int) (i : int)
   : int =
     let numeric =
       match struct_storage with
@@ -807,7 +807,7 @@ module Make (MessageWrapper : Message.S) = struct
 
   let get_struct_field_int16
       (struct_storage : 'cap StructStorage.t option)
-      ?(default = 0) (i : int)
+      ~(default : int) (i : int)
   : int =
     let numeric =
       match struct_storage with
@@ -821,7 +821,7 @@ module Make (MessageWrapper : Message.S) = struct
 
   let get_struct_field_int32
       (struct_storage : 'cap StructStorage.t option)
-      ?(default = Int32.zero) (i : int)
+      ~(default : int32) (i : int)
   : Int32.t =
     let numeric =
       match struct_storage with
@@ -835,7 +835,7 @@ module Make (MessageWrapper : Message.S) = struct
 
   let get_struct_field_int64
       (struct_storage : 'cap StructStorage.t option)
-      ?(default = Int64.zero) (i : int)
+      ~(default : int64) (i : int)
   : Int64.t =
     let numeric =
       match struct_storage with
