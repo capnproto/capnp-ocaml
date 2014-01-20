@@ -6,14 +6,14 @@ module R  = Runtime
 
 
 (* Generate a function for unpacking a capnp union type as an OCaml variant. *)
-let generate_union_accessors nodes_table scope struct_def fields =
+let generate_union_accessors ~nodes_table ~scope struct_def fields =
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
   (GenCommon.generate_union_type nodes_table scope struct_def fields) ^ "\n" ^
   (Printf.sprintf "%sval unnamed_union_get : t -> unnamed_union_t\n" indent)
 
 
 (* Generate accessors for retrieving all non-union fields of a struct. *)
-let generate_non_union_accessors nodes_table scope struct_def fields =
+let generate_non_union_accessors ~nodes_table ~scope struct_def fields =
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let accessors = List.fold_left fields ~init:[] ~f:(fun acc field ->
     let field_accessors : string =
@@ -104,12 +104,12 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
   let union_accessors =
     match union_fields with
     | [] -> ""
-    | _  -> generate_union_accessors nodes_table scope struct_def union_fields
+    | _  -> generate_union_accessors ~nodes_table ~scope struct_def union_fields
   in
   let non_union_acccessors =
     match non_union_fields with
     | [] -> ""
-    | _  -> generate_non_union_accessors nodes_table scope struct_def non_union_fields
+    | _  -> generate_non_union_accessors ~nodes_table ~scope struct_def non_union_fields
   in
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let unique_typename = GenCommon.make_unique_typename ~nodes_table node in
