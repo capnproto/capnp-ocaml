@@ -161,6 +161,8 @@ module type S = sig
     type t_Field_11145653318641710175 = t
     type array_t
 
+    val noDiscriminant : int
+
     module Ordinal : sig
       type t
       type t_Ordinal_13515537513213004774 = t

@@ -5,9 +5,6 @@ module PS = GenCommon.PS
 module R  = Runtime
 
 
-let no_discriminant = 0xffff
-
-
 (* Generate a function for unpacking a capnp union type as an OCaml variant. *)
 let generate_union_accessors nodes_table scope struct_def fields =
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
@@ -102,7 +99,7 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
     - (Int.compare (PS.Field.codeOrder_get x) (PS.Field.codeOrder_get y)))
   in
   let union_fields, non_union_fields = List.partition_tf all_fields ~f:(fun field ->
-    (PS.Field.discriminantValue_get field) <> no_discriminant)
+    (PS.Field.discriminantValue_get field) <> PS.Field.noDiscriminant)
   in
   let union_accessors =
     match union_fields with
@@ -130,21 +127,20 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
  * Raises: Failure if the children of this node contain a cycle. *)
 and generate_node
     ~(suppress_module_wrapper : bool)
-    (nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
-    (scope : Uint64.t list)
+    ~(nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
+    ~(scope : Uint64.t list)
+    ~(node_name : string)
     (node : PS.Node.t)
-    (node_name : string)
 : string =
   let node_id = PS.Node.id_get node in
   let indent = String.make (2 * (List.length scope)) ' ' in
-  let header = Printf.sprintf "%smodule %s : sig\n" indent node_name in
-  let footer = indent ^ "end\n" in
-  let nested_modules =
+  let generate_nested_modules () =
     match Topsort.topological_sort nodes_table (GenCommon.children_of nodes_table node) with
     | Some child_nodes ->
         let child_modules = List.map child_nodes ~f:(fun child ->
           let child_name = GenCommon.get_unqualified_name ~parent:node ~child in
-          generate_node ~suppress_module_wrapper:false nodes_table (node_id :: scope) child child_name)
+          generate_node ~suppress_module_wrapper:false ~nodes_table
+            ~scope:(node_id :: scope) ~node_name:child_name child)
         in
         begin match child_modules with
         | [] -> ""
@@ -158,20 +154,42 @@ and generate_node
         in
         failwith error_msg
   in
-  let body =
-    match PS.Node.unnamed_union_get node with
-    | PS.Node.File ->
-        nested_modules
-    | PS.Node.Struct struct_def ->
+  match PS.Node.unnamed_union_get node with
+  | PS.Node.File ->
+      generate_nested_modules ()
+  | PS.Node.Struct struct_def ->
+      let nested_modules = generate_nested_modules () in
+      let body =
         generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_def
-    | PS.Node.Enum enum_def ->
+      in
+      if suppress_module_wrapper then
+        body
+      else
+        (Printf.sprintf "%smodule %s : sig\n" indent node_name) ^
+        body ^
+        (Printf.sprintf "%send\n" indent)
+  | PS.Node.Enum enum_def ->
+      let nested_modules = generate_nested_modules () in
+      let body =
         GenCommon.generate_enum_sig ~nodes_table ~scope ~nested_modules enum_def
-    |_ ->
-        nested_modules
-  in
-  if suppress_module_wrapper then
-    body
-  else
-    header ^ body ^ footer
+      in
+      if suppress_module_wrapper then
+        body
+      else
+        (Printf.sprintf "%smodule %s : sig\n" indent node_name) ^
+        body ^
+        (Printf.sprintf "%send\n" indent)
+  | PS.Node.Interface iface_def ->
+      generate_nested_modules ()
+  | PS.Node.Const const_def ->
+      Printf.sprintf "%sval %s : %s\n"
+        indent
+        (String.uncapitalize node_name)
+        (GenCommon.type_name nodes_table scope (PS.Node.Const.type_get const_def))
+  | PS.Node.Annotation annot_def ->
+      generate_nested_modules ()
+  | PS.Node.Undefined_ x ->
+      failwith (Printf.sprintf "Unknown Node union discriminant %u" x)
+
 
 

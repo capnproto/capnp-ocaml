@@ -63,16 +63,16 @@ let compile (request : PS.CodeGeneratorRequest.t) (dest_dir : string) : unit =
     let requested_filename = RequestedFile.filename_get requested_file in
     let sig_s =
       sig_s_header ^
-      (GenSignatures.generate_node ~suppress_module_wrapper:true nodes_table []
-        requested_file_node requested_filename) ^
+      (GenSignatures.generate_node ~suppress_module_wrapper:true ~nodes_table
+        ~scope:[] ~node_name:requested_filename requested_file_node) ^
       sig_s_footer
     in
     let sig_file_content = sig_s ^ functor_sig in
     let mod_file_content =
       sig_s ^
       mod_header ^
-      (GenModules.generate_node ~suppress_module_wrapper:true nodes_table []
-        requested_file_node requested_filename) ^
+      (GenModules.generate_node ~suppress_module_wrapper:true ~nodes_table
+        ~scope:[] ~node_name:requested_filename requested_file_node) ^
       mod_footer
     in
     let () = Out_channel.with_file (mli_filename requested_filename) ~f:(fun chan ->

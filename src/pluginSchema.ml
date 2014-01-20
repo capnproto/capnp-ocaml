@@ -161,6 +161,8 @@ module type S = sig
     type t_Field_11145653318641710175 = t
     type array_t
 
+    val noDiscriminant : int
+
     module Ordinal : sig
       type t
       type t_Ordinal_13515537513213004774 = t
@@ -602,6 +604,8 @@ module Make (MessageWrapper : Message.S) = struct
     type t = ro StructStorage.t option
     type t_Field_11145653318641710175 = t
     type array_t = ro ListStorage.t
+
+    let noDiscriminant = 65535
 
     module Ordinal = struct
       type t = ro StructStorage.t option

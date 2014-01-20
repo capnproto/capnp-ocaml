@@ -6,9 +6,6 @@ module R  = Runtime
 module Reader = MessageReader.Make(GenCommon.M)
 
 
-let no_discriminant = 0xffff
-
-
 (* Generate a decoder lambda for converting from a uint16 to the associated enum value. *)
 let generate_enum_decoder ~nodes_table ~scope ~enum_node ~indent ~field_ofs =
   let header = Printf.sprintf "%s(fun u16 -> match u16 with\n" indent in
@@ -169,6 +166,7 @@ let generate_list_accessor ~nodes_table ~scope ~list_type ~indent ~field_name ~f
        failwith (Printf.sprintf "Unknown Type union discriminant %d" x)
 
 
+(* FIXME: would be nice to unify default value logic with [generate_constant]... *)
 let generate_field_accessor ~nodes_table ~scope ~indent field =
   let field_name = String.uncapitalize (PS.Field.name_get field) in
   match PS.Field.unnamed_union_get field with
@@ -430,6 +428,71 @@ let generate_accessors ~nodes_table ~scope struct_def fields =
   String.concat ~sep:"" accessors
 
 
+let generate_constant ~nodes_table ~scope const_def =
+  let const_val = PS.Node.Const.value_get const_def in
+  match PS.Value.unnamed_union_get const_val with
+  | PS.Value.Void ->
+      "()"
+  | PS.Value.Bool a ->
+      if a then "true" else "false"
+  | PS.Value.Int8 a
+  | PS.Value.Int16 a
+  | PS.Value.Uint8 a
+  | PS.Value.Uint16 a ->
+      Int.to_string a
+  | PS.Value.Int32 a ->
+      (Int32.to_string a) ^ "l"
+  | PS.Value.Int64 a ->
+      (Int64.to_string a) ^ "L"
+  | PS.Value.Uint32 a ->
+      Printf.sprintf "(Uint32.of_string %s)" (Uint32.to_string a)
+  | PS.Value.Uint64 a ->
+      Printf.sprintf "(Uint64.of_string %s)" (Uint64.to_string a)
+  | PS.Value.Float32 a ->
+      Printf.sprintf "(Int32.float_of_bits %sl)"
+        (Int32.to_string (Int32.bits_of_float a))
+  | PS.Value.Float64 a ->
+      Printf.sprintf "(Int64.float_of_bits %sL)"
+        (Int64.to_string (Int64.bits_of_float a))
+  | PS.Value.Text a
+  | PS.Value.Data a ->
+      "\"" ^ (String.escaped a) ^ "\""
+  | PS.Value.List _ ->
+      failwith "List constants are not yet implemented."
+  | PS.Value.Enum enum_val ->
+      let const_type = PS.Node.Const.type_get const_def in
+      let enum_node =
+        match PS.Type.unnamed_union_get const_type with
+        | PS.Type.Enum enum_def ->
+            let enum_id = PS.Type.Enum.typeId_get enum_def in
+            Hashtbl.find_exn nodes_table enum_id
+        | _ ->
+            failwith "Decoded non-enum node where enum node was expected."
+      in
+      let enumerants =
+        match PS.Node.unnamed_union_get enum_node with
+        | PS.Node.Enum enum_group -> PS.Node.Enum.enumerants_get enum_group
+        | _ -> failwith "Decoded non-enum node where enum node was expected."
+      in
+      let scope_relative_name =
+        GenCommon.get_scope_relative_name nodes_table scope enum_node in
+      if enum_val >= R.Array.length enumerants then
+        Printf.sprintf "%s.Undefined_ %u" scope_relative_name enum_val
+      else
+        let enumerant = R.Array.get enumerants enum_val in
+        Printf.sprintf "%s.%s"
+          scope_relative_name
+          (String.capitalize (PS.Enumerant.name_get enumerant))
+  | PS.Value.Struct _ ->
+      failwith "Struct constants are not yet implemented."
+  | PS.Value.Interface ->
+      failwith "Interface constants are not yet implemented."
+  | PS.Value.Object _ ->
+      failwith "AnyPointer constants are not yet implemented."
+  | PS.Value.Undefined_ x ->
+      failwith (Printf.sprintf "Unknown Value union discriminant %u." x)
+
+
 (* Generate the OCaml module corresponding to a struct definition.  [scope] is a
  * stack of scope IDs corresponding to this lexical context, and is used to figure
  * out what module prefixes are required to properly qualify a type.
@@ -452,7 +515,7 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
     - (Int.compare (PS.Field.codeOrder_get x) (PS.Field.codeOrder_get y)))
   in
   let union_fields = List.filter all_fields ~f:(fun field ->
-    (PS.Field.discriminantValue_get field) <> no_discriminant)
+    (PS.Field.discriminantValue_get field) <> PS.Field.noDiscriminant)
   in
   let accessors = generate_accessors ~nodes_table ~scope struct_def all_fields in
   let union_accessors =
@@ -469,7 +532,6 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
     (Printf.sprintf "%slet of_message x = get_root_struct x\n" indent)
 
 
-
 (* Generate the OCaml module and type signature corresponding to a node.  [scope] is
  * a stack of scope IDs corresponding to this lexical context, and is used to figure out
  * what module prefixes are required to properly qualify a type.
@@ -477,21 +539,20 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
  * Raises: Failure if the children of this node contain a cycle. *)
 and generate_node
     ~(suppress_module_wrapper : bool)
-    (nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
-    (scope : Uint64.t list)
+    ~(nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
+    ~(scope : Uint64.t list)
+    ~(node_name : string)
     (node : PS.Node.t)
-    (node_name : string)
 : string =
   let node_id = PS.Node.id_get node in
   let indent = String.make (2 * (List.length scope)) ' ' in
-  let header = Printf.sprintf "%smodule %s = struct\n" indent node_name in
-  let footer = indent ^ "end\n" in
-  let nested_modules =
+  let generate_nested_modules () =
     match Topsort.topological_sort nodes_table (GenCommon.children_of nodes_table node) with
     | Some child_nodes ->
         let child_modules = List.map child_nodes ~f:(fun child ->
           let child_name = GenCommon.get_unqualified_name ~parent:node ~child in
-          generate_node ~suppress_module_wrapper:false nodes_table (node_id :: scope) child child_name)
+          generate_node ~suppress_module_wrapper:false ~nodes_table
+            ~scope:(node_id :: scope) ~node_name:child_name child)
         in
         begin match child_modules with
         | [] -> ""
@@ -505,20 +566,40 @@ and generate_node
         in
         failwith error_msg
   in
-  let body =
-    match PS.Node.unnamed_union_get node with
-    | PS.Node.File ->
-        nested_modules
-    | PS.Node.Struct struct_def ->
+  match PS.Node.unnamed_union_get node with
+  | PS.Node.File ->
+      generate_nested_modules ()
+  | PS.Node.Struct struct_def ->
+      let nested_modules = generate_nested_modules () in
+      let body =
         generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_def
-    | PS.Node.Enum enum_def ->
+      in
+      if suppress_module_wrapper then
+        body
+      else
+        (Printf.sprintf "%smodule %s = struct\n" indent node_name) ^
+        body ^
+        (Printf.sprintf "%send\n" indent)
+  | PS.Node.Enum enum_def ->
+      let nested_modules = generate_nested_modules () in
+      let body =
         GenCommon.generate_enum_sig ~nodes_table ~scope ~nested_modules enum_def
-    |_ ->
-        nested_modules
-  in
-  if suppress_module_wrapper then
-    body
-  else
-    header ^ body ^ footer
-
+      in
+      if suppress_module_wrapper then
+        body
+      else
+        (Printf.sprintf "%smodule %s = struct\n" indent node_name) ^
+        body ^
+        (Printf.sprintf "%send\n" indent)
+  | PS.Node.Interface iface_def ->
+      generate_nested_modules ()
+  | PS.Node.Const const_def ->
+      Printf.sprintf "%slet %s = %s\n"
+        indent
+        (String.uncapitalize node_name)
+        (generate_constant ~nodes_table ~scope const_def)
+  | PS.Node.Annotation annot_def ->
+      generate_nested_modules ()
+  | PS.Node.Undefined_ x ->
+      failwith (Printf.sprintf "Unknown Node union discriminant %u" x)
 
