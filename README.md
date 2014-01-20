@@ -39,7 +39,7 @@ The Cap'n Proto types are mapped to OCaml types as follows:
 
 The `Runtime.Array` module is a work-in-progress which will be roughly API-compatible with OCaml arrays and will provide similar performance characteristics.
 
-A Cap'n Proto enum maps to an OCaml variant.  To enable forward compatibility, deserialized enums with an undefined value map to the variant constructor `Undefined\_ of int`.
+A Cap'n Proto enum maps to an OCaml variant.  To enable forward compatibility, deserialized enums with an undefined value map to the variant constructor `Undefined_ of int`.
 
 A Cap'n Proto struct maps to an OCaml module.  Accessor functions for the struct fields are emitted within the associated module.  Due to the mismatch between OCaml types and Cap'n Proto types, additional accessors are emitted in order to automate type conversion:
 
@@ -74,7 +74,7 @@ module Foo : sig
 end
 ```
 
-A Cap'n Proto union maps to an OCaml variant in the way one would expect.  Once again, deserialized union discriminants with an undefined value map to the variant constructor `Undefined\_ of int`.
+A Cap'n Proto union maps to an OCaml variant in the way one would expect.  Once again, deserialized union discriminants with an undefined value map to the variant constructor `Undefined_ of int`.
 
 ## Compiling
 
@@ -92,7 +92,7 @@ pelzlpj at gmail dot com
 
 ## License
 
-Copyright (c) 2013-2014, Paul Pelzl
+Copyright (c) 2013-2014, Paul Pelzl  
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
