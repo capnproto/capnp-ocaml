@@ -181,7 +181,7 @@ let rec type_name nodes_table scope tp : string =
       let iface_id = PS.Type.Interface.typeId_get iface_descr in
       let iface_node = Hashtbl.find_exn nodes_table iface_id in
       make_disambiguated_type_name ~nodes_table ~scope iface_node
-  | PS.Type.Object ->
+  | PS.Type.AnyPointer ->
       "AnyPointer.t"
   | PS.Type.Undefined_ x ->
       failwith (Printf.sprintf "Unknown Type union discriminant %d" x)

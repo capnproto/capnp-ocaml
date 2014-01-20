@@ -61,7 +61,7 @@ let generate_non_union_accessors nodes_table scope struct_def fields =
           | PS.Type.Enum _
           | PS.Type.Struct _
           | PS.Type.Interface _
-          | PS.Type.Object ->
+          | PS.Type.AnyPointer ->
               Printf.sprintf "%sval %s_get : t -> %s\n"
               indent
               field_name

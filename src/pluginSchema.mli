@@ -81,7 +81,7 @@ module type S = sig
       | Enum of Enum.t
       | Struct of Struct.t
       | Interface of Interface.t
-      | Object
+      | AnyPointer
       | Undefined_ of int
 
     val unnamed_union_get : t -> unnamed_union_t
@@ -112,7 +112,7 @@ module type S = sig
       | Enum of int
       | Struct of AnyPointer.t
       | Interface
-      | Object of AnyPointer.t
+      | AnyPointer of AnyPointer.t
       | Undefined_ of int
 
     val unnamed_union_get : t -> unnamed_union_t

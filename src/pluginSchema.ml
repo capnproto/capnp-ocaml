@@ -81,7 +81,7 @@ module type S = sig
       | Enum of Enum.t
       | Struct of Struct.t
       | Interface of Interface.t
-      | Object
+      | AnyPointer
       | Undefined_ of int
 
     val unnamed_union_get : t -> unnamed_union_t
@@ -112,7 +112,7 @@ module type S = sig
       | Enum of int
       | Struct of AnyPointer.t
       | Interface
-      | Object of AnyPointer.t
+      | AnyPointer of AnyPointer.t
       | Undefined_ of int
 
     val unnamed_union_get : t -> unnamed_union_t
@@ -440,7 +440,7 @@ module Make (MessageWrapper : Message.S) = struct
     let enum_get x = x
     let struct_get x = x
     let interface_get x = x
-    let object_get x = ()
+    let anyPointer_get x = ()
     type unnamed_union_t =
       | Void
       | Bool
@@ -460,7 +460,7 @@ module Make (MessageWrapper : Message.S) = struct
       | Enum of Enum.t
       | Struct of Struct.t
       | Interface of Interface.t
-      | Object
+      | AnyPointer
       | Undefined_ of int
 
     let unnamed_union_get x =
@@ -483,7 +483,7 @@ module Make (MessageWrapper : Message.S) = struct
       | 15 -> Enum (enum_get x)
       | 16 -> Struct (struct_get x)
       | 17 -> Interface (interface_get x)
-      | 18 -> Object
+      | 18 -> AnyPointer
       | v -> Undefined_ v
     let of_message x = get_root_struct x
   end
@@ -515,7 +515,7 @@ module Make (MessageWrapper : Message.S) = struct
     let enum_get x = get_struct_field_uint16 ~default:0 x 2
     let struct_get x = get_struct_pointer x 0
     let interface_get x = ()
-    let object_get x = get_struct_pointer x 0
+    let anyPointer_get x = get_struct_pointer x 0
     type unnamed_union_t =
       | Void
       | Bool of bool
@@ -535,7 +535,7 @@ module Make (MessageWrapper : Message.S) = struct
       | Enum of int
       | Struct of AnyPointer.t
       | Interface
-      | Object of AnyPointer.t
+      | AnyPointer of AnyPointer.t
       | Undefined_ of int
 
     let unnamed_union_get x =
@@ -558,7 +558,7 @@ module Make (MessageWrapper : Message.S) = struct
       | 15 -> Enum (enum_get x)
       | 16 -> Struct (struct_get x)
       | 17 -> Interface
-      | 18 -> Object (object_get x)
+      | 18 -> AnyPointer (anyPointer_get x)
       | v -> Undefined_ v
     let of_message x = get_root_struct x
   end

@@ -158,7 +158,7 @@ let generate_list_accessor ~nodes_table ~scope ~list_type ~indent ~field_name ~f
       Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
         indent
         field_name
-  | PS.Type.Object ->
+  | PS.Type.AnyPointer ->
       Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
         indent
         field_name
@@ -338,7 +338,7 @@ let generate_field_accessor ~nodes_table ~scope ~indent field =
           Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
             indent
             field_name
-      | (PS.Type.Object, PS.Value.Object pointer) ->
+      | (PS.Type.AnyPointer, PS.Value.AnyPointer pointer) ->
           Printf.sprintf "%slet %s_get x = get_struct_pointer x %u\n"
             indent
             field_name
@@ -365,7 +365,7 @@ let generate_field_accessor ~nodes_table ~scope ~indent field =
       | (PS.Type.Enum _, _)
       | (PS.Type.Struct _, _)
       | (PS.Type.Interface _, _)
-      | (PS.Type.Object, _) ->
+      | (PS.Type.AnyPointer, _) ->
           let err_msg =
             Printf.sprintf "The default value for field \"%s\" has an unexpected type." field_name
           in
@@ -487,7 +487,7 @@ let generate_constant ~nodes_table ~scope const_def =
       failwith "Struct constants are not yet implemented."
   | PS.Value.Interface ->
       failwith "Interface constants are not yet implemented."
-  | PS.Value.Object _ ->
+  | PS.Value.AnyPointer _ ->
       failwith "AnyPointer constants are not yet implemented."
   | PS.Value.Undefined_ x ->
       failwith (Printf.sprintf "Unknown Value union discriminant %u." x)
