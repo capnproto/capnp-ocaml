@@ -22,12 +22,12 @@ The Cap'n Proto types are mapped to OCaml types as follows:
   <tr><td><code>Int16</code></td><td><code>int</code></td></tr>
   <tr><td><code>Int32</code></td><td><code>int32</code></td></tr>
   <tr><td><code>Int64</code></td><td><code>int64</code></td></tr>
-  <tr><td><code>Uint8</code></td><td><code>int</code></td></tr>
-  <tr><td><code>Uint16</code></td><td><code>int</code></td></tr>
-  <tr><td><code>Uint32</code></td><td><code>Uint32.t</code>
+  <tr><td><code>UInt8</code></td><td><code>int</code></td></tr>
+  <tr><td><code>UInt16</code></td><td><code>int</code></td></tr>
+  <tr><td><code>UInt32</code></td><td><code>Uint32.t</code>
     (from <a href="https://github.com/andrenth/ocaml-uint"><code>uint</code></a>
     library)</td></tr>
-  <tr><td><code>Uint64</code></td><td><code>Uint64.t</code>
+  <tr><td><code>UInt64</code></td><td><code>Uint64.t</code>
     (from <a href="https://github.com/andrenth/ocaml-uint"><code>uint</code></a>
     library)</td></tr>
   <tr><td><code>Float32</code></td><td><code>float</code></td></tr>
@@ -47,7 +47,7 @@ A Cap'n Proto struct maps to an OCaml module.  Accessor functions for the struct
 module Foo : sig
   type t
 
-  (* Accessors for struct field "bar" with type Uint32 *)
+  (* Accessors for struct field "bar" with type UInt32 *)
 
   val bar_get : t -> Uint32.t
   (** [bar_get foo] retrieves the value of field "bar" stored within struct [foo]. *)
