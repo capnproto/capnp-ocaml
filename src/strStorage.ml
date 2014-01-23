@@ -33,7 +33,9 @@ open EndianString
 
 type t = string
 
-let create = String.create
+let alloc = String.create
+let release x = ()
+
 let length = String.length
 
 let get_uint8      = LittleEndian.get_uint8

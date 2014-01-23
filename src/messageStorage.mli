@@ -29,25 +29,49 @@
 
 
 module type S = sig
+  (** [t] is the type of the underlying storage used for message segments. *)
   type t
 
-  val create : int -> t
+  (** [alloc size] allocates storage for [size] bytes, raising an exception
+      if storage cannot be allocated. *)
+  val alloc : int -> t
+
+  (** [release s] immediately releases storage [s], potentially making the
+      storage available for future allocations.  After releasing a
+      storage segment, the behavior of the accessor functions is undefined. *)
+  val release : t -> unit
+
+  (** [length s] determines the length of this storage. *)
   val length : t -> int
+
+  (** [get_uintXX s ofs] reads an unsigned integer of the specified width,
+      starting at byte offset [ofs] within the message segment. *)
 
   val get_uint8  : t -> int -> int
   val get_uint16 : t -> int -> int
   val get_uint32 : t -> int -> Uint32.t
   val get_uint64 : t -> int -> Uint64.t
 
+  (** [get_intXX s ofs] reads a signed integer of the specified width,
+      starting at byte offset [ofs] within the message segment. *)
+
   val get_int8   : t -> int -> int
   val get_int16  : t -> int -> int
   val get_int32  : t -> int -> Int32.t
   val get_int64  : t -> int -> Int64.t
 
+  (** [set_uintXX s ofs val] writes the value of the width-restricted
+      unsigned integer [val] into the message segment, starting at
+      byte offset [ofs]. *)
+
   val set_uint8  : t -> int -> int -> unit
   val set_uint16 : t -> int -> int -> unit
   val set_uint32 : t -> int -> Uint32.t -> unit
   val set_uint64 : t -> int -> Uint64.t -> unit
+
+  (** [set_intXX s ofs val] writes the value of the width-restricted
+      signed integer [val] into the message segment, starting at
+      byte offset [ofs]. *)
 
   val set_int8   : t -> int -> int -> unit
   val set_int16  : t -> int -> int -> unit
