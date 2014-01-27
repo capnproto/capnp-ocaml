@@ -33,7 +33,7 @@ open EndianString
 
 type t = string
 
-let alloc = String.create
+let alloc size = String.make size '\x00'
 let release x = ()
 
 let length = String.length

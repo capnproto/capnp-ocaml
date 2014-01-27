@@ -41,7 +41,7 @@ module type SEGMENT = sig
       segments. *)
   type -'cap t
 
-  (** [alloc size] allocates a new message segment of [size] bytes,
+  (** [alloc size] allocates a new zero-filled message segment of [size] bytes,
       raising an exception if storage cannot be allocated. *)
   val alloc : int -> rw t
 
@@ -111,13 +111,9 @@ module type MESSAGE = sig
       for read-only segments, and type [rw] for read/write segments. *)
   type -'cap t
 
-  (** [create size] allocates a new single-segment message of [size] bytes,
-      raising an exception if storage cannot be allocated. *)
+  (** [create size] allocates a new zero-filled single-segment message of [size]
+      bytes, raising an exception if storage cannot be allocated. *)
   val create : int -> rw t
-
-  (** [add_segment m size] allocates a new segment of [size] bytes and appends
-      it to the message, raising an exception if storage cannot be allocated. *)
-  val add_segment : rw t -> int -> unit
 
   (** [release m] immediately releases the storage for all segments of message
       [m], potentially making the storage available for future allocations.
@@ -161,6 +157,11 @@ module type SLICE = sig
     start      : int;             (** Starting byte of the slice *)
     len        : int;             (** Length of the slice, in bytes *)
   }
+
+  (** [alloc m size] reserves [size] bytes of space within message [m].  This
+      may result in extending the message with an additional segment; if
+      storage cannot be allocated for a new segment, an exception is raised. *)
+  val alloc : rw message_t -> int -> rw t
 
   (** [get_segment slice] gets the message segment associated with the [slice]. *)
   val get_segment : 'cap t -> 'cap segment_t
@@ -213,12 +214,14 @@ module type S = sig
   end
 
   module Slice : sig
-    include SLICE with type 'a segment_t := 'a Segment.t and type 'a message_t := 'a Message.t
+    include SLICE with type 'a segment_t := 'a Segment.t
+                   and type 'a message_t := 'a Message.t
   end
 end
 
 module Make (Storage : MessageStorage.S) :
-  (S with type Segment.storage_t = Storage.t and type Message.storage_t = Storage.t)
+  (S with type Segment.storage_t = Storage.t
+      and type Message.storage_t = Storage.t)
 
 (** [Invalid_message] is raised by accessor functions whenever the access cannot
     be completed because the message appears to be ill-formed. *)
