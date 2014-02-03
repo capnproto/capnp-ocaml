@@ -31,7 +31,7 @@
 open Core.Std
 
 (* Decode [num] as a signed integer of width [n] bits, using two's complement
- * representation of negative numbers. *)
+   representation of negative numbers. *)
 let decode_signed n num =
   let power_of_two = 1 lsl (n - 1) in
   let is_signed = (num land power_of_two) <> 0 in
@@ -39,6 +39,15 @@ let decode_signed n num =
     (num land (power_of_two - 1)) - power_of_two
   else
     num
+
+
+(* Encode signed integer [num] into [n] bits, using two's complement
+   representation of negative numbers. *)
+let encode_signed n num =
+	if num >= 0 then
+		num
+	else
+		(1 lsl (n - 1)) + num
 
 
 let ceil_int num denom = (num + denom - 1) / denom

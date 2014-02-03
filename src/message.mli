@@ -41,8 +41,8 @@ module type SEGMENT = sig
       segments. *)
   type -'cap t
 
-  (** [alloc size] allocates a new zero-filled message segment of [size] bytes,
-      raising an exception if storage cannot be allocated. *)
+  (** [alloc size] allocates a new zero-filled message segment of at least
+      [size] bytes, raising an exception if storage cannot be allocated. *)
   val alloc : int -> rw t
 
   (** [release s] immediately releases the storage associated with message
@@ -111,8 +111,8 @@ module type MESSAGE = sig
       for read-only segments, and type [rw] for read/write segments. *)
   type -'cap t
 
-  (** [create size] allocates a new zero-filled single-segment message of [size]
-      bytes, raising an exception if storage cannot be allocated. *)
+  (** [create size] allocates a new zero-filled single-segment message of at
+      least [size] bytes, raising an exception if storage cannot be allocated. *)
   val create : int -> rw t
 
   (** [release m] immediately releases the storage for all segments of message
@@ -160,8 +160,14 @@ module type SLICE = sig
 
   (** [alloc m size] reserves [size] bytes of space within message [m].  This
       may result in extending the message with an additional segment; if
-      storage cannot be allocated for a new segment, an exception is raised. *)
+      storage cannot be allocated for a new segment, an exception is raised.
+      Note that the allocated slices always begin on an eight-byte boundary. *)
   val alloc : rw message_t -> int -> rw t
+
+  (** [alloc_in_segment m seg_id size] attempts to reserve [size] bytes of space
+      within segment [seg_id] of message [m].  Allocation will fail if the
+      segment is full. *)
+  val alloc_in_segment : rw message_t -> int -> int -> rw t option
 
   (** [get_segment slice] gets the message segment associated with the [slice]. *)
   val get_segment : 'cap t -> 'cap segment_t

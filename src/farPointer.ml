@@ -35,10 +35,19 @@ type landing_pad_t =
   | TaggedFarPointer
 
 type t = {
+  (** Type of landing pad which this far pointer points to. *)
   landing_pad : landing_pad_t;
-  offset      : int;
-  segment_id  : int
+
+  (** Unsigned offset in words from start of the segment to start of
+      the landing pad. *)
+  offset : int;
+
+  (** Segment ID where the landing pad is located. *)
+  segment_id : int
 }
+
+
+let tag_val_far = Int64.of_int 0x2
 
 let landing_pad_type_shift = 2
 let landing_pad_type_mask  = Int64.shift_left Int64.one landing_pad_type_shift
@@ -76,4 +85,21 @@ let decode (pointer64 : Int64.t) : t =
     offset;
     segment_id;
   }
+
+
+let encode (storage_descr : t) : Int64.t =
+  let type64 =
+    match storage_descr.landing_pad with
+    | NormalPointer ->
+        Int64.zero
+    | TaggedFarPointer ->
+        Int64.one
+  in
+  let offset64 = Int64.of_int storage_descr.offset in
+  let segment64 = Int64.of_int storage_descr.segment_id in
+  tag_val_far |>
+  Int64.bit_or (Int64.shift_left type64 landing_pad_type_shift) |>
+  Int64.bit_or (Int64.shift_left offset64 offset_shift) |>
+  Int64.bit_or (Int64.shift_left segment64 segment_shift)
+
 

@@ -11,11 +11,22 @@ type element_type_t =
   | EightBytePointer
   | Composite
 
+
 type t = {
-  offset       : int;
+  (** Signed offset in words from end of the pointer to start of the first
+      list element. *)
+  offset : int;
+
+  (** Type of data stored for each list element. *)
   element_type : element_type_t;
+
+  (** Number of elements in the list.  For Composite list data, this is the number
+      of words in the list. *)
   num_elements : int;
 }
+
+
+let tag_val_list = Int64.one
 
 let offset_shift = 2
 let offset_mask  = Int64.shift_left (Int64.of_int 0x3fffffff) offset_shift
@@ -56,4 +67,26 @@ let decode (pointer64 : Int64.t) : t =
     element_type;
     num_elements;
   }
+
+
+let encode (storage_descr : t) : Int64.t =
+  let offset64 = Int64.of_int (Util.encode_signed 30 storage_descr.offset) in
+  let type64 =
+    let type_id = match storage_descr.element_type with
+      | Void             -> 0
+      | OneBitValue      -> 1
+      | OneByteValue     -> 2
+      | TwoByteValue     -> 3
+      | FourByteValue    -> 4
+      | EightByteValue   -> 5
+      | EightBytePointer -> 6
+      | Composite        -> 7
+    in
+    Int64.of_int type_id
+  in
+  tag_val_list |>
+  Int64.bit_or (Int64.shift_left offset64 offset_shift) |>
+  Int64.bit_or (Int64.shift_left type64 type_shift) |>
+  Int64.bit_or (Int64.shift_left (Int64.of_int storage_descr.num_elements) count_shift)
+
 

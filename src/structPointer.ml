@@ -31,10 +31,19 @@
 module Int64 = Core.Core_int64
 
 type t = {
-  offset        : int;
-  data_size     : int;
+  (** Signed offset in words from end of the pointer to start of struct
+      data region. *)
+  offset : int;
+
+  (** Size of struct data region, in words. *)
+  data_size : int;
+
+  (** Size of struct pointers region, in words. *)
   pointers_size : int;
 }
+
+
+let tag_val_struct = Int64.zero
 
 let offset_shift = 2
 let offset_mask  = Int64.shift_left (Int64.of_int 0x3fffffff) offset_shift
@@ -66,3 +75,15 @@ let decode (pointer64 : Int64.t) : t =
     data_size;
     pointers_size;
   }
+
+
+let encode (storage_descr : t) : Int64.t =
+  let offset64 = Int64.of_int (Util.encode_signed 30 storage_descr.offset) in
+  let data_size64 = Int64.of_int storage_descr.data_size in
+  let ptr_size64 = Int64.of_int storage_descr.pointers_size in
+  tag_val_struct |>
+  Int64.bit_or (Int64.shift_left offset64 offset_shift) |>
+  Int64.bit_or (Int64.shift_left data_size64 data_size_shift) |>
+  Int64.bit_or (Int64.shift_left ptr_size64 pointers_size_shift)
+
+

@@ -43,8 +43,8 @@ module type SEGMENT = sig
       segments. *)
   type -'cap t
 
-  (** [alloc size] allocates a new zero-filled message segment of [size] bytes,
-      raising an exception if storage cannot be allocated. *)
+  (** [alloc size] allocates a new zero-filled message segment of at least
+      [size] bytes, raising an exception if storage cannot be allocated. *)
   val alloc : int -> rw t
 
   (** [release s] immediately releases the storage associated with message
@@ -113,8 +113,8 @@ module type MESSAGE = sig
       for read-only segments, and type [rw] for read/write segments. *)
   type -'cap t
 
-  (** [create size] allocates a new zero-filled single-segment message of [size]
-      bytes, raising an exception if storage cannot be allocated. *)
+  (** [create size] allocates a new zero-filled single-segment message of at
+      least [size] bytes, raising an exception if storage cannot be allocated. *)
   val create : int -> rw t
 
   (** [release m] immediately releases the storage for all segments of message
@@ -162,8 +162,14 @@ module type SLICE = sig
 
   (** [alloc m size] reserves [size] bytes of space within message [m].  This
       may result in extending the message with an additional segment; if
-      storage cannot be allocated for a new segment, an exception is raised. *)
+      storage cannot be allocated for a new segment, an exception is raised.
+      Note that the allocated slices always begin on an eight-byte boundary. *)
   val alloc : rw message_t -> int -> rw t
+
+  (** [alloc_in_segment m seg_id size] attempts to reserve [size] bytes of space
+      within segment [seg_id] of message [m].  Allocation will fail if the
+      segment is full. *)
+  val alloc_in_segment : rw message_t -> int -> int -> rw t option
 
   (** [get_segment slice] gets the message segment associated with the [slice]. *)
   val get_segment : 'cap t -> 'cap segment_t
@@ -224,11 +230,14 @@ end
 
 module Make (Storage : MessageStorage.S) = struct
 
+  let round_up_mult_8 (x : int) : int =
+    (x + 7) land (lnot 7)
+
   module Segment = struct
     type storage_t = Storage.t
     type -'cap t = Storage.t
 
-    let alloc        = Storage.alloc
+    let alloc size   = Storage.alloc (round_up_mult_8 size)
     let release      = Storage.release
     let length       = Storage.length
     let readonly s   = s
@@ -265,13 +274,13 @@ module Make (Storage : MessageStorage.S) = struct
     type -'cap t = segment_descr_t Res.Array.t
 
     let create size =
-      let segment = Storage.alloc size in
+      let segment = Storage.alloc (round_up_mult_8 size) in
       Res.Array.create 1 {segment; free_start = 0}
 
     (** [add_segment m size] allocates a new segment of [size] bytes and appends
         it to the message, raising an exception if storage cannot be allocated. *)
     let add_segment m size =
-      let new_segment = Storage.alloc size in
+      let new_segment = Storage.alloc (round_up_mult_8 size) in
       Res.Array.add_one m {segment = new_segment; free_start = 0}
 
     let release m =
@@ -327,7 +336,7 @@ module Make (Storage : MessageStorage.S) = struct
           last_seg_id, last_seg_descr
         else
           (* Doubling message size on each allocation, under the assumption
-             that message sizes will exponentially distributed. *)
+             that message sizes will be exponentially distributed. *)
           let min_alloc_size = Message.get_size m in
           let new_seg = Storage.alloc (max min_alloc_size size) in
           let new_seg_descr = {Message.segment = new_seg; Message.free_start = 0} in
@@ -341,9 +350,34 @@ module Make (Storage : MessageStorage.S) = struct
         len = size;
       } in
       let () = Res.Array.set m segment_id
-        {segment_descr with Message.free_start = slice.start + slice.len}
+        { segment_descr with
+          Message.free_start = round_up_mult_8 (slice.start + slice.len) }
       in
+      (* Allocations should be eight-byte aligned *)
+      let () = assert ((slice.start land 7) = 0) in
       slice
+
+    let alloc_in_segment m segment_id size =
+      let seg_descr = Res.Array.get m segment_id in
+      let bytes_avail = Storage.length seg_descr.Message.segment -
+          seg_descr.Message.free_start
+      in
+      if size <= bytes_avail then
+        let slice = {
+          msg = m;
+          segment_id;
+          start = seg_descr.Message.free_start;
+          len = size;
+        } in
+        let () = Res.Array.set m segment_id
+          { seg_descr with
+            Message.free_start = round_up_mult_8 (slice.start + slice.len) }
+        in
+        (* Allocations should be eight-byte aligned *)
+        let () = assert ((slice.start land 7) = 0) in
+        Some slice
+      else
+        None
 
     let get_segment slice = Message.get_segment slice.msg slice.segment_id
 
