@@ -54,3 +54,9 @@ let ceil_int num denom = (num + denom - 1) / denom
 
 
 let uint64_equal a b : bool = Uint64.compare a b = 0
+
+
+let round_up_mult_8 (x : int) : int =
+  (x + 7) land (lnot 7)
+
+

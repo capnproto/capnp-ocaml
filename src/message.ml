@@ -230,14 +230,11 @@ end
 
 module Make (Storage : MessageStorage.S) = struct
 
-  let round_up_mult_8 (x : int) : int =
-    (x + 7) land (lnot 7)
-
   module Segment = struct
     type storage_t = Storage.t
     type -'cap t = Storage.t
 
-    let alloc size   = Storage.alloc (round_up_mult_8 size)
+    let alloc size   = Storage.alloc (Util.round_up_mult_8 size)
     let release      = Storage.release
     let length       = Storage.length
     let readonly s   = s
@@ -274,13 +271,13 @@ module Make (Storage : MessageStorage.S) = struct
     type -'cap t = segment_descr_t Res.Array.t
 
     let create size =
-      let segment = Storage.alloc (round_up_mult_8 size) in
+      let segment = Storage.alloc (Util.round_up_mult_8 size) in
       Res.Array.create 1 {segment; free_start = 0}
 
     (** [add_segment m size] allocates a new segment of [size] bytes and appends
         it to the message, raising an exception if storage cannot be allocated. *)
     let add_segment m size =
-      let new_segment = Storage.alloc (round_up_mult_8 size) in
+      let new_segment = Storage.alloc (Util.round_up_mult_8 size) in
       Res.Array.add_one m {segment = new_segment; free_start = 0}
 
     let release m =
@@ -351,7 +348,7 @@ module Make (Storage : MessageStorage.S) = struct
       } in
       let () = Res.Array.set m segment_id
         { segment_descr with
-          Message.free_start = round_up_mult_8 (slice.start + slice.len) }
+          Message.free_start = Util.round_up_mult_8 (slice.start + slice.len) }
       in
       (* Allocations should be eight-byte aligned *)
       let () = assert ((slice.start land 7) = 0) in
@@ -371,7 +368,7 @@ module Make (Storage : MessageStorage.S) = struct
         } in
         let () = Res.Array.set m segment_id
           { seg_descr with
-            Message.free_start = round_up_mult_8 (slice.start + slice.len) }
+            Message.free_start = Util.round_up_mult_8 (slice.start + slice.len) }
         in
         (* Allocations should be eight-byte aligned *)
         let () = assert ((slice.start land 7) = 0) in
