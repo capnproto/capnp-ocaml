@@ -34,6 +34,13 @@ module M  = Message.Make(StrStorage)
 module PS = PluginSchema.Make(M)
 module R  = Runtime
 
+(* Modes in which code generation can be run *)
+module Mode = struct
+  type t =
+    | Reader
+    | Builder
+end
+
 
 let children_of
     (nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
@@ -252,9 +259,18 @@ let generate_union_type nodes_table scope struct_def fields =
 
 
 (* Generate the signature for an enum type. *)
-let generate_enum_sig ~nodes_table ~scope ~nested_modules enum_def =
+let generate_enum_sig ~nodes_table ~scope ~nested_modules ~mode ~node enum_def =
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
-  let header = Printf.sprintf "%stype t =\n" indent in
+  let is_builder = mode = Mode.Builder in
+  let header =
+    if is_builder then
+      let reader_type = get_fully_qualified_name nodes_table node in
+      let reader_type_string =
+        "Reader." ^ (reader_type |> List.map ~f:fst |> String.concat ~sep:".") ^ ".t"
+      in
+      Printf.sprintf "%stype t = %s =\n" indent reader_type_string
+    else
+      Printf.sprintf "%stype t =\n" indent in
   let variants =
     let enumerants = PS.Node.Enum.enumerants_get enum_def in
     let buf = Buffer.create 512 in

@@ -39,7 +39,12 @@ let sig_s_header =
   "  type message_t\n\n" ^
   "  module AnyPointer : sig\n" ^
   "    type t\n" ^
-  "  end\n\n"
+  "  end\n\n" ^
+  "  module Reader : sig\n"
+
+let sig_s_divide_reader_builder =
+  "  end\n\n" ^
+  "  module Builder : sig\n"
 
 let sig_s_footer =
   "end\n\n"
@@ -93,7 +98,12 @@ let compile (request : PS.CodeGeneratorRequest.t) (dest_dir : string) : unit =
     let sig_s =
       sig_s_header ^
       (GenSignatures.generate_node ~suppress_module_wrapper:true ~nodes_table
-        ~scope:[] ~node_name:requested_filename requested_file_node) ^
+         ~scope:[] ~node_name:requested_filename ~mode:GenCommon.Mode.Reader
+         requested_file_node) ^
+      sig_s_divide_reader_builder ^
+      (GenSignatures.generate_node ~suppress_module_wrapper:true ~nodes_table
+         ~scope:[] ~node_name:requested_filename ~mode:GenCommon.Mode.Builder
+         requested_file_node) ^
       sig_s_footer
     in
     let sig_file_content = sig_s ^ functor_sig in

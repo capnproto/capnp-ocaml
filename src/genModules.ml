@@ -612,7 +612,10 @@ and generate_node
   | PS.Node.Enum enum_def ->
       let nested_modules = generate_nested_modules () in
       let body =
-        GenCommon.generate_enum_sig ~nodes_table ~scope ~nested_modules enum_def
+        GenCommon.generate_enum_sig ~nodes_table ~scope ~nested_modules
+          (* FIXME *)
+          ~mode:GenCommon.Mode.Reader
+          ~node enum_def
       in
       if suppress_module_wrapper then
         body
