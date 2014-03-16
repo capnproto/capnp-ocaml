@@ -32,23 +32,111 @@ open Core.Std
 
 module PS = GenCommon.PS
 module R  = Runtime
-module Reader = MessageReader.Make(GenCommon.M)
+module Builder = MessageBuilder.Make(GenCommon.M)
+
+
+(* Generate an encoder lambda for converting from an enum value to the associated
+   uint16.  [allow_undefined] indicates whether or not to permit enum values which
+   use the [Undefined_] constructor. *)
+let generate_enum_encoder ~(allow_undefined : bool) ~nodes_table ~scope ~enum_node
+    ~indent ~field_ofs =
+  let header = Printf.sprintf "%s(fun enum -> match enum with\n" indent in
+  let match_cases =
+    let scope_relative_name =
+      GenCommon.get_scope_relative_name nodes_table scope enum_node
+    in
+    let enumerants =
+      match PS.Node.unnamed_union_get enum_node with
+      | PS.Node.Enum enum_group ->
+          PS.Node.Enum.enumerants_get enum_group
+      | _ ->
+          failwith "Decoded non-enum node where enum node was expected."
+    in
+    let buf = Buffer.create 512 in
+    for i = 0 to R.Array.length enumerants - 1 do
+      let enumerant = R.Array.get enumerants i in
+      let match_case =
+        Printf.sprintf "%s  | %s.%s -> %u\n"
+          indent
+          scope_relative_name
+          (String.capitalize (PS.Enumerant.name_get enumerant))
+          i
+      in
+      Buffer.add_string buf match_case
+    done;
+    let footer =
+      if allow_undefined then
+        Printf.sprintf "%s  | %s.Undefined_ x -> x\n)" indent scope_relative_name
+      else
+        String.concat ~sep:"" [
+          Printf.sprintf "%s  | %s.Undefined_ _ ->\n" indent scope_relative_name;
+          Printf.sprintf
+            "%s      raise (Invalid_message \"Cannot encode undefined enum value.\"))\n"
+            indent;
+        ]
+    in
+    let () = Buffer.add_string buf footer in
+    Buffer.contents buf
+  in
+  header ^ match_cases
 
 
 (* Generate an accessor for decoding an enum type. *)
-let generate_enum_accessor ~nodes_table ~scope ~enum_node ~indent ~field_name ~field_ofs
+let generate_enum_getter ~nodes_table ~scope ~enum_node ~indent ~field_name ~field_ofs
     ~default =
   let decoder_declaration =
     Printf.sprintf "%s  let decode =\n%s%s  in\n"
       indent
-      (GenCommon.generate_enum_decoder ~nodes_table ~scope ~enum_node
+      (GenReader.generate_enum_decoder ~nodes_table ~scope ~enum_node
          ~indent:(indent ^ "    ") ~field_ofs)
       indent
   in
-  Printf.sprintf "%slet %s_get x =\n%s%sdecode (get_struct_field_uint16 ~default:%u x %u)\n"
+  Printf.sprintf
+    "%slet %s_get x =\n%s%s  decode (get_struct_field_uint16 ~default:%u x %u)\n"
     indent
     field_name
     decoder_declaration
+    indent
+    default
+    (2 * field_ofs)
+
+
+(* Generate an accessor for setting the value of an enum. *)
+let generate_enum_safe_setter ~nodes_table ~scope ~enum_node ~indent ~field_name ~field_ofs
+    ~default =
+  let encoder_declaration =
+    Printf.sprintf "%s  let encode =\n%s%s  in\n"
+      indent
+      (generate_enum_encoder ~allow_undefined:false ~nodes_table ~scope ~enum_node
+         ~indent:(indent ^ "    ") ~field_ofs)
+      indent
+  in
+  Printf.sprintf
+    "%slet %s_set x e =\n%s%s  set_struct_field_uint16 ~default:%u x %u (encode e)\n"
+    indent
+    field_name
+    encoder_declaration
+    indent
+    default
+    (2 * field_ofs)
+
+
+(* Generate an accessor for setting the value of an enum, permitting values which
+   are not defined in the schema. *)
+let generate_enum_unsafe_setter ~nodes_table ~scope ~enum_node ~indent ~field_name
+    ~field_ofs ~default =
+  let encoder_declaration =
+    Printf.sprintf "%s  let encode =\n%s%s  in\n"
+      indent
+      (generate_enum_encoder ~allow_undefined:true ~nodes_table ~scope ~enum_node
+         ~indent:(indent ^ "    ") ~field_ofs)
+      indent
+  in
+  Printf.sprintf
+    "%slet %s_set_unsafe x e =\n%s%s  set_struct_field_uint16 ~default:%u x %u (encode e)\n"
+    indent
+    field_name
+    encoder_declaration
     indent
     default
     (2 * field_ofs)
@@ -137,7 +225,7 @@ let generate_list_accessor ~nodes_table ~scope ~list_type ~indent ~field_name ~f
       let decoder_declaration =
         Printf.sprintf "%s  let decode =\n%s%s  in\n"
           indent
-          (GenCommon.generate_enum_decoder ~nodes_table ~scope ~enum_node
+          (GenReader.generate_enum_decoder ~nodes_table ~scope ~enum_node
             ~indent:(indent ^ "    ") ~field_ofs)
           indent
       in
@@ -294,7 +382,7 @@ let generate_field_accessor ~nodes_table ~scope ~indent field =
           let has_trivial_default =
             begin match pointer_slice_opt with
             | Some pointer_slice ->
-                begin match Reader.decode_pointer pointer_slice with
+                begin match Builder.decode_pointer pointer_slice with
                 | Pointer.Null -> true
                 | _ -> false
                 end
@@ -310,14 +398,20 @@ let generate_field_accessor ~nodes_table ~scope ~indent field =
       | (PS.Type.Enum enum_def, PS.Value.Enum val_uint16) ->
           let enum_id = PS.Type.Enum.typeId_get enum_def in
           let enum_node = Hashtbl.find_exn nodes_table enum_id in
-          generate_enum_accessor
+          (generate_enum_getter
             ~nodes_table ~scope ~enum_node ~indent ~field_name ~field_ofs
-            ~default:val_uint16
+            ~default:val_uint16) ^
+          (generate_enum_safe_setter
+            ~nodes_table ~scope ~enum_node ~indent ~field_name ~field_ofs
+            ~default:val_uint16) ^
+          (generate_enum_unsafe_setter
+            ~nodes_table ~scope ~enum_node ~indent ~field_name ~field_ofs
+            ~default:val_uint16)
       | (PS.Type.Struct struct_def, PS.Value.Struct pointer_slice_opt) ->
           let has_trivial_default =
             begin match pointer_slice_opt with
             | Some pointer_slice ->
-                begin match Reader.decode_pointer pointer_slice with
+                begin match Builder.decode_pointer pointer_slice with
                 | Pointer.Null -> true
                 | _ -> false
                 end
@@ -582,9 +676,7 @@ and generate_node
       let nested_modules = generate_nested_modules () in
       let body =
         GenCommon.generate_enum_sig ~nodes_table ~scope ~nested_modules
-          (* FIXME *)
-          ~mode:GenCommon.Mode.Reader
-          ~node enum_def
+          ~mode:GenCommon.Mode.Builder ~node enum_def
       in
       if suppress_module_wrapper then
         body

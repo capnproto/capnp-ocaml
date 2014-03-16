@@ -54,16 +54,26 @@ let functor_sig =
   "  (S with type message_t = Message.ro MessageWrapper.Message.t\n" ^
   "    and type AnyPointer.t = Message.ro MessageWrapper.Slice.t option)\n\n"
 
-
 let mod_header =
   "module Make (MessageWrapper : Message.S) = struct\n" ^
   "  let invalid_msg = Message.invalid_msg\n\n" ^
-  "  module Reader_ = MessageReader.Make(MessageWrapper)\n" ^
-  "  open Reader_\n\n" ^
-  "  type message_t = ro Reader_.Message.t\n\n" ^
-  "  module AnyPointer = struct\n" ^
-  "    type t = ro Slice.t option\n" ^
-  "  end\n\n"
+  "  module Reader = struct\n" ^
+  "    module RuntimeReader_ = MessageReader.Make(MessageWrapper)\n" ^
+  "    open RuntimeReader_\n\n" ^
+  "    type message_t = ro RuntimeReader_.Message.t\n\n" ^
+  "    module AnyPointer = struct\n" ^
+  "      type t = ro Slice.t option\n" ^
+  "    end\n\n"
+
+let mod_divide_reader_builder =
+  "  end\n\n" ^
+  "  module Builder = struct\n" ^
+  "    module RuntimeBuilder_ = MessageBuilder.Make(MessageWrapper)\n" ^
+  "    open RuntimeBuilder_\n\n" ^
+  "    type message_t = ro RuntimeBuilder_.Message.t\n\n" ^
+  "    module AnyPointer = struct\n" ^
+  "      type t = ro Slice.t option\n" ^
+  "    end\n\n"
 
 let mod_footer =
   "end\n\n"
@@ -111,6 +121,9 @@ let compile (request : PS.CodeGeneratorRequest.t) (dest_dir : string) : unit =
       sig_s ^
       mod_header ^
       (GenReader.generate_node ~suppress_module_wrapper:true ~nodes_table
+        ~scope:[] ~node_name:requested_filename requested_file_node) ^
+      mod_divide_reader_builder ^
+      (GenBuilder.generate_node ~suppress_module_wrapper:true ~nodes_table
         ~scope:[] ~node_name:requested_filename requested_file_node) ^
       mod_footer
     in

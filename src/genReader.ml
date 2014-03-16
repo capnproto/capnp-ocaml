@@ -39,7 +39,9 @@ module Reader = MessageReader.Make(GenCommon.M)
 let generate_enum_decoder ~nodes_table ~scope ~enum_node ~indent ~field_ofs =
   let header = Printf.sprintf "%s(fun u16 -> match u16 with\n" indent in
   let match_cases =
-    let scope_relative_name = GenCommon.get_scope_relative_name nodes_table scope enum_node in
+    let scope_relative_name =
+      GenCommon.get_scope_relative_name nodes_table scope enum_node
+    in
     let enumerants =
       match PS.Node.unnamed_union_get enum_node with
       | PS.Node.Enum enum_group ->
@@ -72,17 +74,17 @@ let generate_enum_accessor ~nodes_table ~scope ~enum_node ~indent ~field_name ~f
   let decoder_declaration =
     Printf.sprintf "%s  let decode =\n%s%s  in\n"
       indent
-      (generate_enum_decoder ~nodes_table ~scope ~enum_node ~indent:(indent ^ "    ") ~field_ofs)
+      (generate_enum_decoder ~nodes_table ~scope ~enum_node
+         ~indent:(indent ^ "    ") ~field_ofs)
       indent
   in
-  Printf.sprintf "%slet %s_get x =\n%s%sdecode (get_struct_field_uint16 ~default:%u x %u)\n"
+  Printf.sprintf "%slet %s_get x =\n%s%s  decode (get_struct_field_uint16 ~default:%u x %u)\n"
     indent
     field_name
     decoder_declaration
     indent
     default
     (2 * field_ofs)
-
 
 
 (* Generate an accessor for retrieving a list of the given type. *)
