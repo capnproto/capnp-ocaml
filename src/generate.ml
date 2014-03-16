@@ -110,7 +110,7 @@ let compile (request : PS.CodeGeneratorRequest.t) (dest_dir : string) : unit =
     let mod_file_content =
       sig_s ^
       mod_header ^
-      (GenModules.generate_node ~suppress_module_wrapper:true ~nodes_table
+      (GenReader.generate_node ~suppress_module_wrapper:true ~nodes_table
         ~scope:[] ~node_name:requested_filename requested_file_node) ^
       mod_footer
     in
