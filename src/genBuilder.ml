@@ -253,7 +253,7 @@ let generate_list_accessor ~nodes_table ~scope ~list_type ~indent ~field_name ~f
 
 
 (* FIXME: would be nice to unify default value logic with [generate_constant]... *)
-let generate_field_accessor ~nodes_table ~scope ~indent field =
+let generate_field_accessors ~nodes_table ~scope ~indent field =
   let field_name = String.uncapitalize (PS.Field.name_get field) in
   match PS.Field.unnamed_union_get field with
   | PS.Field.Group group ->
@@ -268,24 +268,43 @@ let generate_field_accessor ~nodes_table ~scope ~indent field =
       | (PS.Type.Void, PS.Value.Void) ->
           Printf.sprintf "%slet %s_get x = ()\n" indent field_name
       | (PS.Type.Bool, PS.Value.Bool a) ->
-          Printf.sprintf "%slet %s_get x = get_struct_field_bit ~default_bit:%s x %u %u\n"
+          (Printf.sprintf "%slet %s_get x = get_struct_field_bit ~default_bit:%s x %u %u\n"
             indent
             field_name
             (if a then "true" else "false")
             (field_ofs / 8)
-            (field_ofs mod 8)
+            (field_ofs mod 8)) ^
+          (Printf.sprintf
+            "%slet %s_set x v = set_struct_field_bit ~default_bit:%s x %u %u v\n"
+            indent
+            field_name
+            (if a then "true" else "false")
+            (field_ofs / 8)
+            (field_ofs mod 8))
       | (PS.Type.Int8, PS.Value.Int8 a) ->
-          Printf.sprintf "%slet %s_get x = get_struct_field_int8 ~default:%d x %u\n"
+          (Printf.sprintf "%slet %s_get x = get_struct_field_int8 ~default:%d x %u\n"
             indent
             field_name
             a
-            field_ofs
+            field_ofs) ^
+          (Printf.sprintf
+            "%slet %s_set x v = set_struct_field_int8 ~default:%d x %u v\n"
+            indent
+            field_name
+            a
+            field_ofs)
       | (PS.Type.Int16, PS.Value.Int16 a) ->
-          Printf.sprintf "%slet %s_get x = get_struct_field_int16 ~default:%d x %u\n"
+          (Printf.sprintf "%slet %s_get x = get_struct_field_int16 ~default:%d x %u\n"
             indent
             field_name
             a
-            (field_ofs * 2)
+            (field_ofs * 2)) ^
+          (Printf.sprintf
+            "%slet %s_set x v = set_struct_field_int16 ~default:%d x %u v\n"
+            indent
+            field_name
+            a
+            (field_ofs * 2))
       | (PS.Type.Int32, PS.Value.Int32 a) ->
           (Printf.sprintf "%slet %s_get x = get_struct_field_int32 ~default:%sl x %u\n"
             indent
@@ -293,6 +312,15 @@ let generate_field_accessor ~nodes_table ~scope ~indent field =
             (Int32.to_string a)
             (field_ofs * 4)) ^
           (Printf.sprintf "%slet %s_get_int_exn x = Int32.to_int (%s_get x)\n"
+            indent
+            field_name
+            field_name) ^
+          (Printf.sprintf "%slet %s_set x v = set_struct_field_int32 ~default:%sl x %u v\n"
+            indent
+            field_name
+            (Int32.to_string a)
+            (field_ofs * 4)) ^
+          (Printf.sprintf "%slet %s_set_int_exn x = %s_set x (Int32.of_int v)\n"
             indent
             field_name
             field_name)
@@ -305,19 +333,38 @@ let generate_field_accessor ~nodes_table ~scope ~indent field =
           (Printf.sprintf "%slet %s_get_int_exn x = Int64.to_int (%s_get x)\n"
             indent
             field_name
+            field_name) ^
+          (Printf.sprintf "%slet %s_set x v = set_struct_field_int64 ~default:%sL x %u v\n"
+            indent
+            field_name
+            (Int64.to_string a)
+            (field_ofs * 8)) ^
+          (Printf.sprintf "%slet %s_set_int_exn x v = %s_set x (Int64.of_int v)\n"
+            indent
+            field_name
             field_name)
       | (PS.Type.Uint8, PS.Value.Uint8 a) ->
-          Printf.sprintf "%slet %s_get x = get_struct_field_uint8 ~default:%d x %u\n"
+          (Printf.sprintf "%slet %s_get x = get_struct_field_uint8 ~default:%d x %u\n"
             indent
             field_name
             a
-            field_ofs
+            field_ofs) ^
+          (Printf.sprintf "%slet %s_set x v = set_struct_field_uint8 ~default:%d x %u v\n"
+            indent
+            field_name
+            a
+            field_ofs)
       | (PS.Type.Uint16, PS.Value.Uint16 a) ->
-          Printf.sprintf "%slet %s_get x = get_struct_field_uint16 ~default:%d x %u\n"
+          (Printf.sprintf "%slet %s_get x = get_struct_field_uint16 ~default:%d x %u\n"
             indent
             field_name
             a
-            (field_ofs * 2)
+            (field_ofs * 2)) ^
+          (Printf.sprintf "%slet %s_set x v = set_struct_field_uint16 ~default:%d x %u v\n"
+            indent
+            field_name
+            a
+            (field_ofs * 2))
       | (PS.Type.Uint32, PS.Value.Uint32 a) ->
           let default =
             if Uint32.compare a Uint32.zero = 0 then
@@ -331,6 +378,15 @@ let generate_field_accessor ~nodes_table ~scope ~indent field =
             default
             (field_ofs * 4)) ^
           (Printf.sprintf "%slet %s_get_int_exn x = Uint32.to_int (%s_get x)\n"
+            indent
+            field_name
+            field_name) ^
+          (Printf.sprintf "%slet %s_set x v = set_struct_field_uint32 ~default:%s x %u v\n"
+            indent
+            field_name
+            default
+            (field_ofs * 4)) ^
+          (Printf.sprintf "%slet %s_set_int_exn x v = %s_set x (Uint32.of_int v)\n"
             indent
             field_name
             field_name)
@@ -349,35 +405,66 @@ let generate_field_accessor ~nodes_table ~scope ~indent field =
           (Printf.sprintf "%slet %s_get_int_exn x = Uint64.to_int (%s_get x)\n"
             indent
             field_name
+            field_name) ^
+          (Printf.sprintf "%slet %s_set x v = set_struct_field_uint64 ~default:%s x %u v\n"
+            indent
+            field_name
+            default
+            (field_ofs * 8)) ^
+          (Printf.sprintf "%slet %s_set_int_exn x v = %s_set x (Uint64.of_int v)\n"
+            indent
+            field_name
             field_name)
       | (PS.Type.Float32, PS.Value.Float32 a) ->
           let default_int32 = Int32.bits_of_float a in
-          Printf.sprintf
+          (Printf.sprintf
             "%slet %s_get x = Int32.float_of_bits (get_struct_field_int32 ~default:%sl x %u)\n"
-              indent
-              field_name
-              (Int32.to_string default_int32)
-              (field_ofs * 4)
+            indent
+            field_name
+            (Int32.to_string default_int32)
+            (field_ofs * 4)) ^
+          (Printf.sprintf
+            "%slet %s_set x v = set_struct_field_int32 ~default:%sl x %u (Int32.bits_of_float v)\n"
+            indent
+            field_name
+            (Int32.to_string default_int32)
+            (field_ofs * 4))
       | (PS.Type.Float64, PS.Value.Float64 a) ->
           let default_int64 = Int64.bits_of_float a in
-          Printf.sprintf
+          (Printf.sprintf
             "%slet %s_get x = Int64.float_of_bits (get_struct_field_int64 ~default:%sL x %u)\n"
-              indent
-              field_name
-              (Int64.to_string default_int64)
-              (field_ofs * 8)
+            indent
+            field_name
+            (Int64.to_string default_int64)
+            (field_ofs * 8)) ^
+          (Printf.sprintf
+            "%slet %s_set x = set_struct_field_int64 ~default:%sL x %u (Int64.bits_of_float v)\n"
+            indent
+            field_name
+            (Int64.to_string default_int64)
+            (field_ofs * 8))
       | (PS.Type.Text, PS.Value.Text a) ->
-          Printf.sprintf "%slet %s_get x = get_struct_field_text ~default:\"%s\" x %u\n"
+          (Printf.sprintf "%slet %s_get x = get_struct_field_text ~default:\"%s\" x %u\n"
             indent
             field_name
             (String.escaped a)
-            (field_ofs * 8)
+            (field_ofs * 8)) ^
+          (Printf.sprintf "%slet %s_set x v = set_struct_field_text ~default:\"%s\" x %u v\n"
+            indent
+            field_name
+            (String.escaped a)
+            (field_ofs * 8))
       | (PS.Type.Data, PS.Value.Data a) ->
-          Printf.sprintf "%slet %s_get x = get_struct_field_blob ~default:\"%s\" x %u\n"
+          (Printf.sprintf "%slet %s_get x = get_struct_field_blob ~default:\"%s\" x %u\n"
             indent
             field_name
             (String.escaped a)
-            (field_ofs * 8)
+            (field_ofs * 8)) ^
+          (Printf.sprintf "%slet %s_set x v = set_struct_field_blob ~default:\"%s\" x %u v\n"
+            indent
+            field_name
+            (String.escaped a)
+            (field_ofs * 8))
       | (PS.Type.List list_def, PS.Value.List pointer_slice_opt) ->
           let has_trivial_default =
             begin match pointer_slice_opt with
@@ -420,12 +507,12 @@ let generate_field_accessor ~nodes_table ~scope ~indent field =
             end
           in
           if has_trivial_default then
-              Printf.sprintf "%slet %s_get x = get_struct_field_struct x %u\n"
-                indent
-                field_name
-                field_ofs
+            Printf.sprintf "%slet %s_get x = get_struct_field_struct x %u\n"
+              indent
+              field_name
+              field_ofs
           else
-              failwith "Default values for structs are not implemented."
+            failwith "Default values for structs are not implemented."
       | (PS.Type.Interface iface_def, PS.Value.Interface) ->
           Printf.sprintf "%slet %s_get x = failwith \"not implemented\"\n"
             indent
@@ -514,7 +601,7 @@ let generate_union_accessors ~nodes_table ~scope struct_def fields =
 let generate_accessors ~nodes_table ~scope struct_def fields =
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let accessors = List.fold_left fields ~init:[] ~f:(fun acc field ->
-    let x = generate_field_accessor ~nodes_table ~scope ~indent field in
+    let x = generate_field_accessors ~nodes_table ~scope ~indent field in
     x :: acc)
   in
   String.concat ~sep:"" accessors
