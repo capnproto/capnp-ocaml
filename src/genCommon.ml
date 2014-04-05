@@ -34,6 +34,8 @@ module M  = Message.Make(StrStorage)
 module PS = PluginSchema.Make(M)
 module R  = Runtime
 
+let sprintf = Printf.sprintf
+
 (* Modes in which code generation can be run *)
 module Mode = struct
   type t =
@@ -80,7 +82,7 @@ let get_unqualified_name
   | Some s ->
       String.capitalize s
   | None ->
-      let error_msg = Printf.sprintf
+      let error_msg = sprintf
         "Unable to find unqualified name of child node %s (%s) within parent node %s (%s)."
         (Uint64.to_string child_id)
         (PS.Node.displayName_get child)
@@ -110,11 +112,11 @@ let get_unqualified_name
                   else
                     loop_fields (i + 1)
               | PS.Field.Undefined_ x ->
-                  failwith (Printf.sprintf "Unknown Field union discriminant %d" x)
+                  failwith (sprintf "Unknown Field union discriminant %d" x)
           in
           loop_fields 0
       | PS.Node.Undefined_ x ->
-          failwith (Printf.sprintf "Unknown Node union discriminant %d" x)
+          failwith (sprintf "Unknown Node union discriminant %d" x)
       end
 
 
@@ -155,7 +157,7 @@ let make_unique_typename ~nodes_table node =
   let uq_name = get_unqualified_name
     ~parent:(Hashtbl.find_exn nodes_table (PS.Node.scopeId_get node)) ~child:node
   in
-  Printf.sprintf "t_%s_%s" uq_name (Uint64.to_string (PS.Node.id_get node))
+  sprintf "t_%s_%s" uq_name (Uint64.to_string (PS.Node.id_get node))
 
 
 (* When modules refer to types defined in other modules, readability dictates that we use
@@ -204,7 +206,7 @@ let rec type_name nodes_table scope tp : string =
   | PS.Type.Data    -> "string"
   | PS.Type.List list_descr ->
       let list_type = PS.Type.List.elementType_get list_descr in
-      Printf.sprintf "(%s, array_t) Runtime.Array.t" (type_name nodes_table scope list_type)
+      sprintf "(%s, array_t) Runtime.Array.t" (type_name nodes_table scope list_type)
   | PS.Type.Enum enum_descr ->
       let enum_id = PS.Type.Enum.typeId_get enum_descr in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
@@ -220,7 +222,7 @@ let rec type_name nodes_table scope tp : string =
   | PS.Type.AnyPointer ->
       "AnyPointer.t"
   | PS.Type.Undefined_ x ->
-      failwith (Printf.sprintf "Unknown Type union discriminant %d" x)
+      failwith (sprintf "Unknown Type union discriminant %d" x)
 
 
 (* Generate a variant type declaration for a capnp union type. *)
@@ -233,9 +235,9 @@ let generate_union_type nodes_table scope struct_def fields =
         let field_type = PS.Field.Slot.type_get slot in
         begin match PS.Type.unnamed_union_get field_type with
         | PS.Type.Void ->
-            (Printf.sprintf "%s  | %s" indent field_name) :: acc
+            (sprintf "%s  | %s" indent field_name) :: acc
         | _ ->
-            (Printf.sprintf "%s  | %s of %s" indent field_name
+            (sprintf "%s  | %s of %s" indent field_name
               (type_name nodes_table scope field_type)) :: acc
         end
     | PS.Field.Group group ->
@@ -245,15 +247,15 @@ let generate_union_type nodes_table scope struct_def fields =
           let group_module_name = get_scope_relative_name nodes_table scope group_node in
           group_module_name ^ ".t"
         in
-        (Printf.sprintf "%s  | %s of %s" indent field_name group_type_name) :: acc
+        (sprintf "%s  | %s of %s" indent field_name group_type_name) :: acc
     | PS.Field.Undefined_ x ->
-        failwith (Printf.sprintf "Unknown Field union discriminant %d" x))
+        failwith (sprintf "Unknown Field union discriminant %d" x))
   in
   let header = [
-    Printf.sprintf "%stype unnamed_union_t =" indent;
+    sprintf "%stype unnamed_union_t =" indent;
   ] in
   let footer = [
-    Printf.sprintf "%s  | Undefined_ of int\n" indent
+    sprintf "%s  | Undefined_ of int\n" indent
   ] in
   String.concat ~sep:"\n" (header @ cases @ footer)
 
@@ -268,22 +270,22 @@ let generate_enum_sig ~nodes_table ~scope ~nested_modules ~mode ~node enum_def =
       let reader_type_string =
         "Reader." ^ (reader_type |> List.map ~f:fst |> String.concat ~sep:".") ^ ".t"
       in
-      Printf.sprintf "%stype t = %s =\n" indent reader_type_string
+      sprintf "%stype t = %s =\n" indent reader_type_string
     else
-      Printf.sprintf "%stype t =\n" indent in
+      sprintf "%stype t =\n" indent in
   let variants =
     let enumerants = PS.Node.Enum.enumerants_get enum_def in
     let buf = Buffer.create 512 in
     for i = 0 to R.Array.length enumerants - 1 do
       let enumerant = R.Array.get enumerants i in
       let match_case =
-        Printf.sprintf "%s  | %s\n"
+        sprintf "%s  | %s\n"
           indent
           (String.capitalize (PS.Enumerant.name_get enumerant))
       in
       Buffer.add_string buf match_case
     done;
-    let footer = Printf.sprintf "%s  | Undefined_ of int\n" indent in
+    let footer = sprintf "%s  | Undefined_ of int\n" indent in
     let () = Buffer.add_string buf footer in
     Buffer.contents buf
   in
@@ -307,14 +309,14 @@ let generate_constant ~nodes_table ~scope const_def =
   | PS.Value.Int64 a ->
       (Int64.to_string a) ^ "L"
   | PS.Value.Uint32 a ->
-      Printf.sprintf "(Uint32.of_string %s)" (Uint32.to_string a)
+      sprintf "(Uint32.of_string %s)" (Uint32.to_string a)
   | PS.Value.Uint64 a ->
-      Printf.sprintf "(Uint64.of_string %s)" (Uint64.to_string a)
+      sprintf "(Uint64.of_string %s)" (Uint64.to_string a)
   | PS.Value.Float32 a ->
-      Printf.sprintf "(Int32.float_of_bits %sl)"
+      sprintf "(Int32.float_of_bits %sl)"
         (Int32.to_string (Int32.bits_of_float a))
   | PS.Value.Float64 a ->
-      Printf.sprintf "(Int64.float_of_bits %sL)"
+      sprintf "(Int64.float_of_bits %sL)"
         (Int64.to_string (Int64.bits_of_float a))
   | PS.Value.Text a
   | PS.Value.Data a ->
@@ -339,10 +341,10 @@ let generate_constant ~nodes_table ~scope const_def =
       let scope_relative_name =
         get_scope_relative_name nodes_table scope enum_node in
       if enum_val >= R.Array.length enumerants then
-        Printf.sprintf "%s.Undefined_ %u" scope_relative_name enum_val
+        sprintf "%s.Undefined_ %u" scope_relative_name enum_val
       else
         let enumerant = R.Array.get enumerants enum_val in
-        Printf.sprintf "%s.%s"
+        sprintf "%s.%s"
           scope_relative_name
           (String.capitalize (PS.Enumerant.name_get enumerant))
   | PS.Value.Struct _ ->
@@ -352,5 +354,5 @@ let generate_constant ~nodes_table ~scope const_def =
   | PS.Value.AnyPointer _ ->
       failwith "AnyPointer constants are not yet implemented."
   | PS.Value.Undefined_ x ->
-      failwith (Printf.sprintf "Unknown Value union discriminant %u." x)
+      failwith (sprintf "Unknown Value union discriminant %u." x)
 
