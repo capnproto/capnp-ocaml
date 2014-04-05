@@ -290,3 +290,67 @@ let generate_enum_sig ~nodes_table ~scope ~nested_modules ~mode ~node enum_def =
   nested_modules ^ header ^ variants
 
 
+let generate_constant ~nodes_table ~scope const_def =
+  let const_val = PS.Node.Const.value_get const_def in
+  match PS.Value.unnamed_union_get const_val with
+  | PS.Value.Void ->
+      "()"
+  | PS.Value.Bool a ->
+      if a then "true" else "false"
+  | PS.Value.Int8 a
+  | PS.Value.Int16 a
+  | PS.Value.Uint8 a
+  | PS.Value.Uint16 a ->
+      Int.to_string a
+  | PS.Value.Int32 a ->
+      (Int32.to_string a) ^ "l"
+  | PS.Value.Int64 a ->
+      (Int64.to_string a) ^ "L"
+  | PS.Value.Uint32 a ->
+      Printf.sprintf "(Uint32.of_string %s)" (Uint32.to_string a)
+  | PS.Value.Uint64 a ->
+      Printf.sprintf "(Uint64.of_string %s)" (Uint64.to_string a)
+  | PS.Value.Float32 a ->
+      Printf.sprintf "(Int32.float_of_bits %sl)"
+        (Int32.to_string (Int32.bits_of_float a))
+  | PS.Value.Float64 a ->
+      Printf.sprintf "(Int64.float_of_bits %sL)"
+        (Int64.to_string (Int64.bits_of_float a))
+  | PS.Value.Text a
+  | PS.Value.Data a ->
+      "\"" ^ (String.escaped a) ^ "\""
+  | PS.Value.List _ ->
+      failwith "List constants are not yet implemented."
+  | PS.Value.Enum enum_val ->
+      let const_type = PS.Node.Const.type_get const_def in
+      let enum_node =
+        match PS.Type.unnamed_union_get const_type with
+        | PS.Type.Enum enum_def ->
+            let enum_id = PS.Type.Enum.typeId_get enum_def in
+            Hashtbl.find_exn nodes_table enum_id
+        | _ ->
+            failwith "Decoded non-enum node where enum node was expected."
+      in
+      let enumerants =
+        match PS.Node.unnamed_union_get enum_node with
+        | PS.Node.Enum enum_group -> PS.Node.Enum.enumerants_get enum_group
+        | _ -> failwith "Decoded non-enum node where enum node was expected."
+      in
+      let scope_relative_name =
+        get_scope_relative_name nodes_table scope enum_node in
+      if enum_val >= R.Array.length enumerants then
+        Printf.sprintf "%s.Undefined_ %u" scope_relative_name enum_val
+      else
+        let enumerant = R.Array.get enumerants enum_val in
+        Printf.sprintf "%s.%s"
+          scope_relative_name
+          (String.capitalize (PS.Enumerant.name_get enumerant))
+  | PS.Value.Struct _ ->
+      failwith "Struct constants are not yet implemented."
+  | PS.Value.Interface ->
+      failwith "Interface constants are not yet implemented."
+  | PS.Value.AnyPointer _ ->
+      failwith "AnyPointer constants are not yet implemented."
+  | PS.Value.Undefined_ x ->
+      failwith (Printf.sprintf "Unknown Value union discriminant %u." x)
+
