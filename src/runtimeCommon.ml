@@ -34,6 +34,7 @@ open Core.Std
 module Make (MessageWrapper : Message.S) = struct
   let invalid_msg = Message.invalid_msg
   type ro = Message.ro
+  type rw = Message.rw
   include MessageWrapper
 
 
@@ -238,7 +239,6 @@ module Make (MessageWrapper : Message.S) = struct
     loop init (list_storage.ListStorage.num_elements - 1)
 
 
-
   module BitList = struct
     let get (list_storage : 'cap ListStorage.t) (i : int) : bool =
       match list_storage.ListStorage.storage_type with
@@ -247,6 +247,23 @@ module Make (MessageWrapper : Message.S) = struct
           let bit_ofs  = i mod 8 in
           let byte_val = Slice.get_uint8 list_storage.ListStorage.storage byte_ofs in
           (byte_val land (1 lsl bit_ofs)) <> 0
+      | _ ->
+          invalid_msg "decoded non-bool list where bool list was expected"
+
+    let set (list_storage : rw ListStorage.t) (i : int) (v : bool) : unit =
+      match list_storage.ListStorage.storage_type with
+      | ListStorage.Bit ->
+          let byte_ofs = i / 8 in
+          let bit_ofs  = i mod 8 in
+          let bitmask  = 1 lsl bit_ofs in
+          let old_byte_val = Slice.get_uint8 list_storage.ListStorage.storage byte_ofs in
+          let new_byte_val =
+            if v then
+              old_byte_val lor bitmask
+            else
+              old_byte_val land (lnot bitmask)
+          in
+          Slice.set_uint8 list_storage.ListStorage.storage byte_ofs new_byte_val
       | _ ->
           invalid_msg "decoded non-bool list where bool list was expected"
 
@@ -299,6 +316,7 @@ module Make (MessageWrapper : Message.S) = struct
     let get (list_storage : 'cap ListStorage.t) (i : int) : 'cap StructStorage.t =
       match list_storage.ListStorage.storage_type with
       | ListStorage.Bytes byte_count ->
+          (* List storage contains inlined data-only structs *)
           let data = {
             list_storage.ListStorage.storage with
             Slice.start = list_storage.ListStorage.storage.Slice.start + (i * byte_count);
@@ -308,10 +326,10 @@ module Make (MessageWrapper : Message.S) = struct
             list_storage.ListStorage.storage with
             Slice.start = 0;
             Slice.len   = 0;
-          }
-          in
+          } in
           { StructStorage.data; StructStorage.pointers; }
       | ListStorage.Pointer ->
+          (* List storage contains inlined single-pointer-only structs *)
           let data = {
             list_storage.ListStorage.storage with
             Slice.start = 0;
@@ -321,10 +339,10 @@ module Make (MessageWrapper : Message.S) = struct
             list_storage.ListStorage.storage with
             Slice.start = list_storage.ListStorage.storage.Slice.start + (i * sizeof_uint64);
             Slice.len   = sizeof_uint64;
-          }
-          in
+          } in
           { StructStorage.data; StructStorage.pointers; }
       | ListStorage.Composite (data_words, pointers_words) ->
+          (* List storage contains generic inlined structs *)
           let data_size     = data_words * sizeof_uint64 in
           let pointers_size = pointers_words * sizeof_uint64 in
           let total_size    = data_size + pointers_size in
@@ -341,6 +359,11 @@ module Make (MessageWrapper : Message.S) = struct
           { StructStorage.data; StructStorage.pointers; }
       | ListStorage.Empty | ListStorage.Bit ->
           invalid_msg "decoded non-struct list where struct list was expected"
+
+
+    (* FIXME: This needs to make a deep copy *)
+    let set (list_storage : 'cap ListStorage.t) (i : int) (v : 'cap StructStorage.t) : unit =
+      failwith "not implemented"
 
 
     let fold_left

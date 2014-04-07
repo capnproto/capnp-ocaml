@@ -35,6 +35,9 @@ module Array = struct
     get     : 'arr -> int -> 'a;
   }
 
+  (** The storage type is optional because an RArray may be represented as
+      a null pointer within a read-only message.  The None case is simply
+      treated as an empty array. *)
   type ('a, 'arr) t = ('a, 'arr) storage_t option
 
   let length x =
@@ -56,3 +59,26 @@ module Array = struct
   let make_default () = None
 end
 
+
+module BArray = struct
+  type ('a, 'arr) storage_t = {
+    storage : 'arr;
+    length  : 'arr -> int;
+    get     : 'arr -> int -> 'a;
+    set     : 'arr -> int -> 'a -> unit;
+  }
+
+  (** A Builder will never use a null pointer for the backing storage of
+      a BArray--array storage is always allocated within the message as soon
+      as the array pointer is dereferenced.  Therefore the storage_t is not
+      optional. *)
+  type ('a, 'arr) t = ('a, 'arr) storage_t
+
+  let length x = x.length x.storage
+
+  let get x i = x.get x.storage i
+
+  let set x i v = x.set x.storage i v
+
+  let make ~length ~get ~set storage = { storage; length; get; set }
+end

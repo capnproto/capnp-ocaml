@@ -230,10 +230,18 @@ let generate_list_accessor ~nodes_table ~scope ~list_type ~indent ~field_name ~f
             ~indent:(indent ^ "    ") ~field_ofs)
           indent
       in
-      sprintf "%slet %s_get x =\n%s%s  get_struct_field_enum_list x %u decode\n"
+      let encoder_declaration =
+        sprintf "%s  let encode =\n%s%s  in\n"
+          indent
+          (generate_enum_encoder ~allow_undefined:false ~nodes_table ~scope ~enum_node
+             ~indent:(indent ^ "    ") ~field_ofs)
+          indent
+      in
+      sprintf "%slet %s_get x =\n%s%s%s  get_struct_field_enum_list x %u ~decode ~encode\n"
         indent
         field_name
         decoder_declaration
+        encoder_declaration
         indent
         (field_ofs * 2)
   | PS.Type.Struct _ ->
