@@ -208,6 +208,11 @@ module type SLICE = sig
   val set_int16  : rw t -> int -> int -> unit
   val set_int32  : rw t -> int -> Int32.t -> unit
   val set_int64  : rw t -> int -> Int64.t -> unit
+
+  (** [blit ~src ~src_ofs ~dest ~dest_ofs ~len] copies [len] bytes from the
+      source slice (beginning at [src_ofs] to the destination slice (beginning
+      at [dest_ofs]. *)
+  val blit : src:('cap t) -> src_ofs:int -> dest:(rw t) -> dest_ofs:int -> len:int -> unit
 end
 
 module type S = sig

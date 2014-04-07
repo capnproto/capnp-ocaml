@@ -210,6 +210,11 @@ module type SLICE = sig
   val set_int16  : rw t -> int -> int -> unit
   val set_int32  : rw t -> int -> Int32.t -> unit
   val set_int64  : rw t -> int -> Int64.t -> unit
+
+  (** [blit ~src ~src_ofs ~dest ~dest_ofs ~len] copies [len] bytes from the
+      source slice (beginning at [src_ofs] to the destination slice (beginning
+      at [dest_ofs]. *)
+  val blit : src:('cap t) -> src_ofs:int -> dest:(rw t) -> dest_ofs:int -> len:int -> unit
 end
 
 module type S = sig
@@ -257,7 +262,7 @@ module Make (Storage : MessageStorage.S) = struct
     let set_int16  = Storage.set_int16
     let set_int32  = Storage.set_int32
     let set_int64  = Storage.set_int64
-  end
+  end   (* module Segment *)
 
   module Message = struct
     type storage_t = Storage.t
@@ -305,7 +310,7 @@ module Make (Storage : MessageStorage.S) = struct
     let to_storage m = Res.Array.fold_right (fun x acc -> x.segment :: acc) m []
 
     let with_message m ~f = Exn.protectx m ~f ~finally:release
-  end
+  end   (* module Message *)
 
   module Slice = struct
     type -'cap segment_t = Storage.t
@@ -491,7 +496,16 @@ module Make (Storage : MessageStorage.S) = struct
       else
         let segment = get_segment slice in
         Segment.set_int64 segment (slice.start + i) v
-  end
+
+    (* TODO: this should delegate to a possibly-more-efficient [blit] provided by
+       the underlying message (e.g. [String.blit]). *)
+    let blit ~src ~src_ofs ~dest ~dest_ofs ~len =
+      for i = 0 to len - 1 do
+        let byte = get_uint8 src (src_ofs + i) in
+        set_uint8 dest (dest_ofs + i) byte
+      done
+
+  end   (* module Slice *)
 end
 
 
