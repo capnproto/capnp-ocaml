@@ -44,10 +44,10 @@ let decode_signed n num =
 (* Encode signed integer [num] into [n] bits, using two's complement
    representation of negative numbers. *)
 let encode_signed n num =
-	if num >= 0 then
-		num
-	else
-		(1 lsl (n - 1)) + num
+  if num >= 0 then
+    num
+  else
+    (1 lsl (n - 1)) + num
 
 
 let ceil_int num denom = (num + denom - 1) / denom
