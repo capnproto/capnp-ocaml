@@ -45,8 +45,8 @@ module Make (MessageWrapper : Message.S) = struct
   (* Allocate storage for a struct within the specified message. *)
   let alloc_struct_storage
       (message : rw Message.t)
-      (data_words : int)
-      (pointer_words : int)
+      ~(data_words : int)
+      ~(pointer_words : int)
     : rw StructStorage.t =
     let storage = Slice.alloc message
       ((data_words + pointer_words) * sizeof_uint64)
@@ -367,7 +367,7 @@ module Make (MessageWrapper : Message.S) = struct
      storage. *)
   let init_normal_struct_pointer
       (pointer_bytes : rw Slice.t)
-      (struct_storage : rw StructStorage.t)
+      (struct_storage : 'cap StructStorage.t)
     : unit =
     let () = assert (struct_storage.StructStorage.data.Slice.segment_id =
       pointer_bytes.Slice.segment_id)
@@ -385,7 +385,7 @@ module Make (MessageWrapper : Message.S) = struct
   (* Initialize a struct pointer so that it points to the specified struct storage. *)
   let init_struct_pointer
       (pointer_bytes : rw Slice.t)
-      (struct_storage : rw StructStorage.t)
+      (struct_storage : 'cap StructStorage.t)
     : unit =
     if struct_storage.StructStorage.data.Slice.segment_id =
         pointer_bytes.Slice.segment_id then
@@ -459,7 +459,7 @@ module Make (MessageWrapper : Message.S) = struct
     if orig.data.Slice.len < data_words * sizeof_uint64 ||
        orig.pointers.Slice.len < pointer_words * sizeof_uint64 then
       let new_storage =
-        alloc_struct_storage orig.data.Slice.msg data_words pointer_words
+        alloc_struct_storage orig.data.Slice.msg ~data_words ~pointer_words
       in
       (* This could be more efficient with a Slice.blit implementation... *)
       let () =
@@ -536,6 +536,201 @@ module Make (MessageWrapper : Message.S) = struct
           deref_normal_pointer deref_struct_tagged_far_pointer
     | Pointer.List _ ->
         invalid_msg "decoded list pointer where struct pointer was expected"
+
+
+  (* Given a [src] pointer to an arbitrary struct or list, first create a
+     deep copy of the pointed-to data then store a pointer to the data in
+     [dest]. *)
+  let rec deep_copy_pointer
+      ~(src : 'cap Slice.t)
+      ~(dest : rw Slice.t)
+    : unit =
+    match decode_pointer src with
+    | Pointer.Null ->
+        Slice.set_int64 dest 0 Int64.zero
+    | Pointer.List _ ->
+        begin match Reader.deref_list_pointer src with
+        | Some src_list_storage ->
+            let dest_list_storage =
+              deep_copy_list ~src:src_list_storage ~dest_message:dest.Slice.msg
+            in
+            init_list_pointer dest dest_list_storage
+        | None ->
+            (* Shouldn't happen for a non-null pointer *)
+            assert false
+        end
+    | Pointer.Struct _ ->
+        begin match Reader.deref_struct_pointer src with
+        | Some src_struct_storage ->
+            let dest_struct_storage =
+              deep_copy_struct ~src:src_struct_storage ~dest_message:dest.Slice.msg
+            in
+            init_struct_pointer dest dest_struct_storage
+        | None ->
+            (* Shouldn't happen for non-null pointer *)
+            assert false
+        end
+    | Pointer.Far far_pointer ->
+        let open FarPointer in
+        begin match far_pointer.landing_pad with
+        | NormalPointer ->
+            let next_pointer = {
+              Slice.msg        = src.Slice.msg;
+              Slice.segment_id = far_pointer.segment_id;
+              Slice.start      = far_pointer.offset * sizeof_uint64;
+              Slice.len        = sizeof_uint64;
+            } in
+            let () = bounds_check_slice_exn
+              ~err:"far pointer describes invalid landing pad" next_pointer
+            in
+            deep_copy_pointer ~src:next_pointer ~dest
+        | TaggedFarPointer ->
+            let tag_word = {
+              Slice.msg        = src.Slice.msg;
+              Slice.segment_id = far_pointer.segment_id;
+              Slice.start      = (far_pointer.offset + 1) * sizeof_uint64;
+              Slice.len        = sizeof_uint64;
+            } in
+            let () = bounds_check_slice_exn
+              ~err:"far pointer describes invalid tagged landing pad" tag_word
+            in
+            begin match decode_pointer tag_word with
+            | Pointer.List _ ->
+                begin match Reader.deref_list_pointer src with
+                | Some src_list_storage ->
+                    let dest_list_storage =
+                      deep_copy_list ~src:src_list_storage ~dest_message:dest.Slice.msg
+                    in
+                    init_list_pointer dest dest_list_storage
+                | None ->
+                    (* Shouldn't happen for a non-null pointer *)
+                    assert false
+                end
+            | Pointer.Struct _ ->
+                begin match Reader.deref_struct_pointer src with
+                | Some src_struct_storage ->
+                    let dest_struct_storage =
+                      deep_copy_struct ~src:src_struct_storage ~dest_message:dest.Slice.msg
+                    in
+                    init_struct_pointer dest dest_struct_storage
+                | None ->
+                    (* Shouldn't happen for non-null pointer *)
+                    assert false
+                end
+            | _ ->
+                invalid_msg "invalid type tags for tagged far pointer"
+            end
+        end
+
+  (* Given a [src] struct storage descriptor, first allocate storage in
+     [dest_message] for a copy of the struct and then fill the allocated
+     region with a deep copy. *)
+  and deep_copy_struct
+      ~(src : 'cap StructStorage.t)
+      ~(dest_message : rw Message.t)
+    : rw StructStorage.t =
+    let data_words    = src.StructStorage.data.Slice.len / sizeof_uint64 in
+    let pointer_words = src.StructStorage.pointers.Slice.len / sizeof_uint64 in
+    let dest = alloc_struct_storage dest_message ~data_words ~pointer_words in
+    let () = deep_copy_struct_to_dest ~src ~dest in
+    dest
+
+  (* As [deep_copy_struct], but the destination is already allocated. *)
+  and deep_copy_struct_to_dest
+      ~(src : 'cap StructStorage.t)
+      ~(dest : rw StructStorage.t)
+    : unit =
+    let () = Slice.blit
+      ~src:src.StructStorage.data ~src_ofs:0
+      ~dest:dest.StructStorage.data ~dest_ofs:0
+      ~len:dest.StructStorage.data.Slice.len
+    in
+    let pointer_words = dest.StructStorage.pointers.Slice.len / sizeof_uint64 in
+    for i = 0 to pointer_words - 1 do
+      let open StructStorage in
+      let src_pointer = {
+        src.pointers with
+        Slice.start = src.pointers.Slice.start + (i * sizeof_uint64);
+        Slice.len   = sizeof_uint64;
+      } in
+      let dest_pointer = {
+        dest.pointers with
+        Slice.start = dest.pointers.Slice.start + (i * sizeof_uint64);
+        Slice.len   = sizeof_uint64;
+      } in
+      deep_copy_pointer ~src:src_pointer ~dest:dest_pointer
+    done
+
+  (* Given a [src] list storage descriptor, first allocate storage in
+     [dest_message] for a copy of the list and then fill the allocated
+     region with deep copies of the list elements. *)
+  and deep_copy_list
+      ~(src : 'cap ListStorage.t)
+      ~(dest_message : rw Message.t)
+    : rw ListStorage.t =
+    let dest = alloc_list_storage dest_message src.ListStorage.storage_type
+      src.ListStorage.num_elements
+    in
+    let copy_by_value byte_count = Slice.blit
+      ~src:src.ListStorage.storage ~src_ofs:0
+      ~dest:dest.ListStorage.storage ~dest_ofs:0
+      ~len:byte_count
+    in
+    let () =
+      match src.ListStorage.storage_type with
+      | ListStorage.Empty ->
+          ()
+      | ListStorage.Bit ->
+          copy_by_value (Util.ceil_int src.ListStorage.num_elements 8)
+      | ListStorage.Bytes byte_count ->
+          copy_by_value (src.ListStorage.num_elements * byte_count)
+      | ListStorage.Pointer ->
+          let open ListStorage in
+          for i = 0 to src.num_elements - 1 do
+            let src_pointer = {
+              src.storage with
+              Slice.start = src.storage.Slice.start + (i * sizeof_uint64);
+              Slice.len   = sizeof_uint64;
+            } in
+            let dest_pointer = {
+              dest.storage with
+              Slice.start = dest.storage.Slice.start + (i * sizeof_uint64);
+              Slice.len   = sizeof_uint64;
+            } in
+            deep_copy_pointer ~src:src_pointer ~dest:dest_pointer
+          done
+      | ListStorage.Composite (data_words, pointer_words) ->
+          let words_per_element = data_words + pointer_words in
+          let open ListStorage in
+          for i = 0 to src.num_elements - 1 do
+            let src_struct = {
+              StructStorage.data = {
+                src.storage with
+                Slice.start = src.storage.Slice.start +
+                    (i * words_per_element * sizeof_uint64);
+                Slice.len = data_words * sizeof_uint64;};
+              StructStorage.pointers = {
+                src.storage with
+                Slice.start = src.storage.Slice.start +
+                    ((i * words_per_element) + data_words) * sizeof_uint64;
+                Slice.len = pointer_words * sizeof_uint64;};
+            } in
+            let dest_struct = {
+              StructStorage.data = {
+                dest.storage with
+                Slice.start = dest.storage.Slice.start +
+                    (i * words_per_element * sizeof_uint64);
+                Slice.len = data_words * sizeof_uint64;};
+              StructStorage.pointers = {
+                dest.storage with
+                Slice.start = dest.storage.Slice.start +
+                    ((i * words_per_element) + data_words) * sizeof_uint64;
+                Slice.len = pointer_words * sizeof_uint64;};
+            } in
+            deep_copy_struct_to_dest ~src:src_struct ~dest:dest_struct
+          done
+    in
+    dest
 
 
   (* Given storage for a struct, get the data for the specified
@@ -898,7 +1093,7 @@ module Make (MessageWrapper : Message.S) = struct
       Slice.len   = sizeof_uint64;
     } in
     let alloc_default_struct message =
-      alloc_struct_storage message data_words pointer_words
+      alloc_struct_storage message ~data_words ~pointer_words
     in
     deref_struct_pointer pointer_bytes alloc_default_struct
       ~data_words ~pointer_words
@@ -1014,7 +1209,7 @@ module Make (MessageWrapper : Message.S) = struct
         Slice.len        = sizeof_uint64
       } in
       let alloc_default_struct message =
-        alloc_struct_storage message data_words pointer_words
+        alloc_struct_storage message ~data_words ~pointer_words
       in
       deref_struct_pointer pointer_bytes alloc_default_struct
         ~data_words ~pointer_words
