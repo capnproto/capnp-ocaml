@@ -213,6 +213,10 @@ module type SLICE = sig
       source slice (beginning at [src_ofs] to the destination slice (beginning
       at [dest_ofs]. *)
   val blit : src:('cap t) -> src_ofs:int -> dest:(rw t) -> dest_ofs:int -> len:int -> unit
+
+  (** [zero_out ~ofs ~len slice] sets [len] bytes of the [slice] to zero, beginning
+      at byte offset [ofs]. *)
+  val zero_out : ofs:int -> len:int -> rw t -> unit
 end
 
 module type S = sig

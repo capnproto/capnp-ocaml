@@ -768,10 +768,26 @@ module Make (MessageWrapper : Message.S) = struct
             string_of_uint8_list ~null_terminated:true list_storage
         | None ->
             "")
-      (* FIXME: Need a generic list reallocation algorithm before this can be
-         implemented *)
-      ~encode:(fun v slice -> failwith "not implemented")
-
+      ~encode:(fun (src : string) pointer_bytes ->
+        (* Note: could avoid an allocation if the new string is not longer
+           than the old one.  This deep copy strategy has the advantage of
+           being correct in all cases. *)
+        let old_string_storage_opt = Reader.deref_list_pointer pointer_bytes in
+        let new_string_storage = alloc_list_storage pointer_bytes.Slice.msg
+            (ListStorage.Bytes 1) (String.length src + 1)   (* null terminated *)
+        in
+        let (_ : int) = String.fold src ~init:0 ~f:(fun ofs c ->
+            let byte = Char.to_int c in
+            let () = Slice.set_uint8 new_string_storage.ListStorage.storage ofs byte in
+            ofs + 1)
+        in
+        let () = init_list_pointer pointer_bytes new_string_storage in
+        match old_string_storage_opt with
+        | None ->
+            ()
+        | Some list_storage ->
+            let storage = list_storage.ListStorage.storage in
+            Slice.zero_out storage ~ofs:0 ~len:storage.Slice.len)
 
 
   (* Given storage for a struct, get the data for the specified
@@ -797,9 +813,26 @@ module Make (MessageWrapper : Message.S) = struct
             string_of_uint8_list ~null_terminated:false list_storage
         | None ->
             "")
-      (* FIXME: Need a generic list reallocation algorithm before this can be
-         implemented *)
-      ~encode:(fun v slice -> failwith "not implemented")
+      ~encode:(fun (src : string) pointer_bytes ->
+        (* Note: could avoid an allocation if the new string is not longer
+           than the old one.  This deep copy strategy has the advantage of
+           being correct in all cases. *)
+        let old_string_storage_opt = Reader.deref_list_pointer pointer_bytes in
+        let new_string_storage = alloc_list_storage pointer_bytes.Slice.msg
+            (ListStorage.Bytes 1) (String.length src)
+        in
+        let (_ : int) = String.fold src ~init:0 ~f:(fun ofs c ->
+            let byte = Char.to_int c in
+            let () = Slice.set_uint8 new_string_storage.ListStorage.storage ofs byte in
+            ofs + 1)
+        in
+        let () = init_list_pointer pointer_bytes new_string_storage in
+        match old_string_storage_opt with
+        | None ->
+            ()
+        | Some list_storage ->
+            let storage = list_storage.ListStorage.storage in
+            Slice.zero_out storage ~ofs:0 ~len:storage.Slice.len)
 
 
   (* Given storage for a struct, get the data for the specified
@@ -842,8 +875,18 @@ module Make (MessageWrapper : Message.S) = struct
           alloc_list_storage message ListStorage.Pointer 0
         in
         deref_list_pointer slice alloc_default_list)
-      (* FIXME: what goes here? Deep copy of the list? *)
-      ~encode:(fun v slice -> failwith "not implemented")
+      ~encode:(fun (src_list_storage : 'cap ListStorage.t) pointer_bytes ->
+        let old_list_storage_opt = Reader.deref_list_pointer pointer_bytes in
+        let new_list_storage = deep_copy_list ~src:src_list_storage
+            ~dest_message:pointer_bytes.Slice.msg
+        in
+        let () = init_list_pointer pointer_bytes new_list_storage in
+        match old_list_storage_opt with
+        | None ->
+            ()
+        | Some list_storage ->
+            let storage = list_storage.ListStorage.storage in
+            Slice.zero_out storage ~ofs:0 ~len:storage.Slice.len)
 
 
   (* Given storage for a struct, get the data for the specified

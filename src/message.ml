@@ -215,6 +215,10 @@ module type SLICE = sig
       source slice (beginning at [src_ofs] to the destination slice (beginning
       at [dest_ofs]. *)
   val blit : src:('cap t) -> src_ofs:int -> dest:(rw t) -> dest_ofs:int -> len:int -> unit
+
+  (** [zero_out ~ofs ~len slice] sets [len] bytes of the [slice] to zero, beginning
+      at byte offset [ofs]. *)
+  val zero_out : ofs:int -> len:int -> rw t -> unit
 end
 
 module type S = sig
@@ -503,6 +507,12 @@ module Make (Storage : MessageStorage.S) = struct
       for i = 0 to len - 1 do
         let byte = get_uint8 src (src_ofs + i) in
         set_uint8 dest (dest_ofs + i) byte
+      done
+
+    (* TODO: again, could possibly delegate to a more efficient implementation *)
+    let zero_out ~ofs ~len slice =
+      for i = 0 to len - 1 do
+        set_uint8 slice (ofs + i) 0
       done
 
   end   (* module Slice *)
