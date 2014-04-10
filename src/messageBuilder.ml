@@ -323,7 +323,7 @@ module Make (MessageWrapper : Message.S) = struct
      Otherwise a new struct is allocated, the data is copied over, and the [orig]
      is zeroed out.
 
-     FIXME: [orig] not currently zeroed out, will lead to packing inefficiency *)
+     Returns: new struct descriptor (possibly the same as the old one). *)
   let upgrade_struct
       ~(data_words : int)
       ~(pointer_words : int)
@@ -335,13 +335,13 @@ module Make (MessageWrapper : Message.S) = struct
       let new_storage =
         alloc_struct_storage orig.data.Slice.msg ~data_words ~pointer_words
       in
-      (* This could be more efficient with a Slice.blit implementation... *)
       let () =
-        let data_copy_words = min data_words (orig.data.Slice.len / sizeof_uint64) in
-        for i = 0 to data_copy_words - 1 do
-          let old_data = Slice.get_int64 orig.data (i * sizeof_uint64) in
-          Slice.set_int64 new_storage.data (i * sizeof_uint64) old_data
-        done;
+        let data_copy_size = min (data_words * sizeof_uint64) orig.data.Slice.len in
+        let () = Slice.blit
+            ~src:orig.data ~src_ofs:0
+            ~dest:new_storage.data ~dest_ofs:0
+            ~len:data_copy_size
+        in
         let pointer_copy_words =
           min pointer_words (orig.pointers.Slice.len / sizeof_uint64)
         in
@@ -359,6 +359,8 @@ module Make (MessageWrapper : Message.S) = struct
           copy_pointer ~src ~dest
         done
       in
+      let () = Slice.zero_out orig.data ~ofs:0 ~len:orig.data.Slice.len in
+      let () = Slice.zero_out orig.pointers ~ofs:0 ~len:orig.pointers.Slice.len in
       new_storage
     else
       orig
