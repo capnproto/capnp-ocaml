@@ -36,10 +36,10 @@ type t = {
   offset : int;
 
   (** Size of struct data region, in words. *)
-  data_size : int;
+  data_words : int;
 
   (** Size of struct pointers region, in words. *)
-  pointers_size : int;
+  pointer_words : int;
 }
 
 
@@ -72,15 +72,15 @@ let decode (pointer64 : Int64.t) : t =
     Int64.to_int_exn size64
   in {
     offset;
-    data_size;
-    pointers_size;
+    data_words    = data_size;
+    pointer_words = pointers_size;
   }
 
 
 let encode (storage_descr : t) : Int64.t =
   let offset64 = Int64.of_int (Util.encode_signed 30 storage_descr.offset) in
-  let data_size64 = Int64.of_int storage_descr.data_size in
-  let ptr_size64 = Int64.of_int storage_descr.pointers_size in
+  let data_size64 = Int64.of_int storage_descr.data_words in
+  let ptr_size64 = Int64.of_int storage_descr.pointer_words in
   tag_val_struct |>
   Int64.bit_or (Int64.shift_left offset64 offset_shift) |>
   Int64.bit_or (Int64.shift_left data_size64 data_size_shift) |>

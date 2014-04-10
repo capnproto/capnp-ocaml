@@ -86,8 +86,8 @@ module Make (MessageWrapper : Message.S) = struct
           let slice = Slice.alloc message (word_count * sizeof_uint64) in
           let tag_descr = {
             StructPointer.offset = num_elements;
-            StructPointer.data_size = data_words;
-            StructPointer.pointers_size = pointer_words;
+            StructPointer.data_words = data_words;
+            StructPointer.pointer_words = pointer_words;
           } in
           let tag_val = StructPointer.encode tag_descr in
           let () = Slice.set_int64 slice 0 tag_val in
@@ -98,66 +98,6 @@ module Make (MessageWrapper : Message.S) = struct
       storage_type;
       num_elements;
     }
-
-
-  (* Given a description of a cap'n proto far pointer, get the data associated with
-     the pointer.  A far pointer can either point to a normal pointer or to a
-     "landing pad" with a content pointer and a tag word; [deref_normal_pointer]
-     describes the method to use for dereferencing the pointer in the former case,
-     and [deref_tagged_far_pointer] describes the method to use in the latter
-     case. *)
-  let deref_far_pointer
-      (far_pointer : FarPointer.t)
-      (message : rw Message.t)
-      (deref_normal_pointer     : rw Slice.t -> 'a)
-      (deref_tagged_far_pointer : rw Slice.t -> 'a)
-    : 'a =
-    let open FarPointer in
-    match far_pointer.landing_pad with
-    | NormalPointer ->
-        let next_pointer_bytes = {
-          Slice.msg        = message;
-          Slice.segment_id = far_pointer.segment_id;
-          Slice.start      = far_pointer.offset * sizeof_uint64;
-          Slice.len        = sizeof_uint64;
-        } in
-        let () = bounds_check_slice_exn
-          ~err:"far pointer describes invalid landing pad" next_pointer_bytes
-        in
-        deref_normal_pointer next_pointer_bytes
-    | TaggedFarPointer ->
-        let landing_pad_bytes = {
-          Slice.msg        = message;
-          Slice.segment_id = far_pointer.segment_id;
-          Slice.start      = far_pointer.offset * sizeof_uint64;
-          Slice.len        = 2 * sizeof_uint64;
-        } in
-        let () = bounds_check_slice_exn
-          ~err:"far pointer describes invalid tagged landing pad" landing_pad_bytes
-        in
-        deref_tagged_far_pointer landing_pad_bytes
-
-
-  (* Given a far-pointer "landing pad" which is expected to point to list storage,
-     compute the corresponding list storage descriptor. *)
-  let deref_list_tagged_far_pointer
-      (landing_pad_bytes : rw Slice.t)
-    : rw ListStorage.t =
-    let far_pointer_bytes = { landing_pad_bytes with Slice.len = sizeof_uint64 } in
-    let list_tag_bytes = {
-      landing_pad_bytes with
-      Slice.start = Slice.get_end far_pointer_bytes;
-      Slice.len   = sizeof_uint64;
-    } in
-    match (decode_pointer far_pointer_bytes, decode_pointer list_tag_bytes) with
-    | (Pointer.Far far_pointer, Pointer.List list_pointer) ->
-        make_list_storage
-          ~message:landing_pad_bytes.Slice.msg
-          ~segment_id:far_pointer.FarPointer.segment_id
-          ~segment_offset:(far_pointer.FarPointer.offset * sizeof_uint64)
-          ~list_pointer
-    | _ ->
-        invalid_msg "invalid type tags for list-tagged far pointer"
 
 
   (* Initialize a far pointer so that it will point to the specified [content],
@@ -298,68 +238,17 @@ module Make (MessageWrapper : Message.S) = struct
   (* Given a pointer which is expected to be a list pointer, compute the corresponding
      list storage descriptor.  If the pointer is null, storage for a default list is
      immediately allocated using [alloc_default_list]. *)
-  let rec deref_list_pointer
+  let deref_list_pointer
       (pointer_bytes : rw Slice.t)
       (alloc_default_list : rw Message.t -> rw ListStorage.t)
     : rw ListStorage.t =
-    match decode_pointer pointer_bytes with
-    | Pointer.Null ->
+    match Reader.deref_list_pointer pointer_bytes with
+    | None ->
         let list_storage = alloc_default_list pointer_bytes.Slice.msg in
         let () = init_list_pointer pointer_bytes list_storage in
         list_storage
-    | Pointer.List list_pointer ->
-        make_list_storage
-          ~message:pointer_bytes.Slice.msg
-          ~segment_id:pointer_bytes.Slice.segment_id
-          ~segment_offset:((Slice.get_end pointer_bytes) +
-                             (list_pointer.ListPointer.offset * sizeof_uint64))
-          ~list_pointer
-    | Pointer.Far far_pointer ->
-        let deref_normal_pointer pointer_bytes' =
-          deref_list_pointer pointer_bytes' alloc_default_list
-        in
-        deref_far_pointer far_pointer pointer_bytes.Slice.msg
-          deref_normal_pointer deref_list_tagged_far_pointer
-    | Pointer.Struct _ ->
-        invalid_msg "decoded struct pointer where list pointer was expected"
-
-
-  (* Given a far-pointer "landing pad" which is expected to point to struct storage,
-     compute the corresponding struct storage descriptor. *)
-  let deref_struct_tagged_far_pointer
-      (landing_pad_bytes : rw Slice.t)
-    : rw StructStorage.t =
-    let far_pointer_bytes = {
-      landing_pad_bytes with
-      Slice.len = sizeof_uint64
-    } in
-    let struct_tag_bytes = {
-      landing_pad_bytes with
-      Slice.start = Slice.get_end far_pointer_bytes;
-      Slice.len   = sizeof_uint64;
-    } in
-    match (decode_pointer far_pointer_bytes, decode_pointer struct_tag_bytes) with
-    | (Pointer.Far far_pointer, Pointer.Struct struct_pointer) ->
-        let data = {
-          Slice.msg        = landing_pad_bytes.Slice.msg;
-          Slice.segment_id = far_pointer.FarPointer.segment_id;
-          Slice.start      = far_pointer.FarPointer.offset * sizeof_uint64;
-          Slice.len        = struct_pointer.StructPointer.data_size * sizeof_uint64;
-        } in
-        let pointers = {
-          data with
-          Slice.start = Slice.get_end data;
-          Slice.len   = struct_pointer.StructPointer.pointers_size * sizeof_uint64;
-        } in
-        let () = bounds_check_slice_exn
-          ~err:"struct-tagged far pointer describes invalid data region" data
-        in
-        let () = bounds_check_slice_exn
-          ~err:"struct-tagged far pointer describes invalid pointers region" pointers
-        in
-        { StructStorage.data; StructStorage.pointers; }
-    | _ ->
-        invalid_msg "invalid type tags for struct-tagged far pointer"
+    | Some list_storage ->
+        list_storage
 
 
   (* Given a pointer location and struct storage located within the same
@@ -375,8 +264,8 @@ module Make (MessageWrapper : Message.S) = struct
     let pointer_descr = {
       StructPointer.offset = struct_storage.StructStorage.data.Slice.start -
           Slice.get_end pointer_bytes;
-      StructPointer.data_size = struct_storage.StructStorage.data.Slice.len / 8;
-      StructPointer.pointers_size = struct_storage.StructStorage.pointers.Slice.len / 8;
+      StructPointer.data_words = struct_storage.StructStorage.data.Slice.len / 8;
+      StructPointer.pointer_words = struct_storage.StructStorage.pointers.Slice.len / 8;
     } in
     let pointer_val = StructPointer.encode pointer_descr in
     Slice.set_int64 pointer_bytes 0 pointer_val
@@ -395,8 +284,8 @@ module Make (MessageWrapper : Message.S) = struct
       let init_far_pointer_tag tag_slice =
         let tag_word_desc = {
           StructPointer.offset = 0;
-          StructPointer.data_size = struct_storage.StructStorage.data.Slice.len / 8;
-          StructPointer.pointers_size = struct_storage.StructStorage.pointers.Slice.len / 8;
+          StructPointer.data_words = struct_storage.StructStorage.data.Slice.len / 8;
+          StructPointer.pointer_words = struct_storage.StructStorage.pointers.Slice.len / 8;
         } in
         Slice.set_int64 pointer_bytes 0 (StructPointer.encode tag_word_desc)
       in
@@ -419,28 +308,13 @@ module Make (MessageWrapper : Message.S) = struct
       ~(src : 'cap Slice.t)
       ~(dest : rw Slice.t)
     : unit =
-    match decode_pointer src with
-    | Pointer.Null ->
+    match deref_pointer src with
+    | Object.None ->
         Slice.set_int64 dest 0 Int64.zero
-    | Pointer.List src_descr ->
-        begin match Reader.deref_list_pointer src with
-        | Some list_storage ->
-            init_list_pointer dest list_storage
-        | None ->
-            (* shouldn't happen for non-null pointer *)
-            assert false
-        end
-    | Pointer.Struct src_descr ->
-        begin match Reader.deref_struct_pointer src with
-        | Some struct_storage ->
-            init_struct_pointer dest struct_storage
-        | None ->
-            (* shouldn't happen for non-null pointer *)
-            assert false
-        end
-    | Pointer.Far _ ->
-        let pointer_val = Slice.get_int64 src 0 in
-        Slice.set_int64 dest 0 pointer_val
+    | Object.List list_storage ->
+        init_list_pointer dest list_storage
+    | Object.Struct struct_storage ->
+        init_struct_pointer dest struct_storage
 
 
   (* Upgrade a struct so that its data and pointer regions are at least as large
@@ -496,46 +370,19 @@ module Make (MessageWrapper : Message.S) = struct
      [pointer_words] indicate the expected structure layout; if the struct has a
      smaller layout (i.e. from an older protocol version), then a new struct is
      allocated and the data is copied over. *)
-  let rec deref_struct_pointer
+  let deref_struct_pointer
       (pointer_bytes : rw Slice.t)
       (alloc_default_struct : rw Message.t -> rw StructStorage.t)
       ~(data_words : int)
       ~(pointer_words : int)
     : rw StructStorage.t =
-    match decode_pointer pointer_bytes with
-    | Pointer.Null ->
+    match Reader.deref_struct_pointer pointer_bytes with
+    | None ->
         let struct_storage = alloc_default_struct pointer_bytes.Slice.msg in
         let () = init_struct_pointer pointer_bytes struct_storage in
         struct_storage
-    | Pointer.Struct struct_pointer ->
-        let open StructPointer in
-        let data = {
-          pointer_bytes with
-          Slice.start = (Slice.get_end pointer_bytes) +
-                          (struct_pointer.offset * sizeof_uint64);
-          Slice.len   = struct_pointer.data_size * sizeof_uint64;
-        } in
-        let pointers = {
-          data with
-          Slice.start = Slice.get_end data;
-          Slice.len   = struct_pointer.pointers_size * sizeof_uint64;
-        } in
-        let () = bounds_check_slice_exn
-          ~err:"struct pointer describes invalid data region" data
-        in
-        let () = bounds_check_slice_exn
-          ~err:"struct pointer describes invalid pointers region" data
-        in
-        let orig_storage = { StructStorage.data; StructStorage.pointers; } in
-        upgrade_struct ~data_words ~pointer_words orig_storage
-    | Pointer.Far far_pointer ->
-        let deref_normal_pointer pointer_bytes' = deref_struct_pointer
-            pointer_bytes' alloc_default_struct ~data_words ~pointer_words
-        in
-        deref_far_pointer far_pointer pointer_bytes.Slice.msg
-          deref_normal_pointer deref_struct_tagged_far_pointer
-    | Pointer.List _ ->
-        invalid_msg "decoded list pointer where struct pointer was expected"
+    | Some struct_storage ->
+        struct_storage
 
 
   (* Given a [src] pointer to an arbitrary struct or list, first create a
@@ -545,82 +392,19 @@ module Make (MessageWrapper : Message.S) = struct
       ~(src : 'cap Slice.t)
       ~(dest : rw Slice.t)
     : unit =
-    match decode_pointer src with
-    | Pointer.Null ->
+    match deref_pointer src with
+    | Object.None ->
         Slice.set_int64 dest 0 Int64.zero
-    | Pointer.List _ ->
-        begin match Reader.deref_list_pointer src with
-        | Some src_list_storage ->
-            let dest_list_storage =
-              deep_copy_list ~src:src_list_storage ~dest_message:dest.Slice.msg
-            in
-            init_list_pointer dest dest_list_storage
-        | None ->
-            (* Shouldn't happen for a non-null pointer *)
-            assert false
-        end
-    | Pointer.Struct _ ->
-        begin match Reader.deref_struct_pointer src with
-        | Some src_struct_storage ->
-            let dest_struct_storage =
-              deep_copy_struct ~src:src_struct_storage ~dest_message:dest.Slice.msg
-            in
-            init_struct_pointer dest dest_struct_storage
-        | None ->
-            (* Shouldn't happen for non-null pointer *)
-            assert false
-        end
-    | Pointer.Far far_pointer ->
-        let open FarPointer in
-        begin match far_pointer.landing_pad with
-        | NormalPointer ->
-            let next_pointer = {
-              Slice.msg        = src.Slice.msg;
-              Slice.segment_id = far_pointer.segment_id;
-              Slice.start      = far_pointer.offset * sizeof_uint64;
-              Slice.len        = sizeof_uint64;
-            } in
-            let () = bounds_check_slice_exn
-              ~err:"far pointer describes invalid landing pad" next_pointer
-            in
-            deep_copy_pointer ~src:next_pointer ~dest
-        | TaggedFarPointer ->
-            let tag_word = {
-              Slice.msg        = src.Slice.msg;
-              Slice.segment_id = far_pointer.segment_id;
-              Slice.start      = (far_pointer.offset + 1) * sizeof_uint64;
-              Slice.len        = sizeof_uint64;
-            } in
-            let () = bounds_check_slice_exn
-              ~err:"far pointer describes invalid tagged landing pad" tag_word
-            in
-            begin match decode_pointer tag_word with
-            | Pointer.List _ ->
-                begin match Reader.deref_list_pointer src with
-                | Some src_list_storage ->
-                    let dest_list_storage =
-                      deep_copy_list ~src:src_list_storage ~dest_message:dest.Slice.msg
-                    in
-                    init_list_pointer dest dest_list_storage
-                | None ->
-                    (* Shouldn't happen for a non-null pointer *)
-                    assert false
-                end
-            | Pointer.Struct _ ->
-                begin match Reader.deref_struct_pointer src with
-                | Some src_struct_storage ->
-                    let dest_struct_storage =
-                      deep_copy_struct ~src:src_struct_storage ~dest_message:dest.Slice.msg
-                    in
-                    init_struct_pointer dest dest_struct_storage
-                | None ->
-                    (* Shouldn't happen for non-null pointer *)
-                    assert false
-                end
-            | _ ->
-                invalid_msg "invalid type tags for tagged far pointer"
-            end
-        end
+    | Object.List src_list_storage ->
+        let dest_list_storage =
+          deep_copy_list ~src:src_list_storage ~dest_message:dest.Slice.msg
+        in
+        init_list_pointer dest dest_list_storage
+    | Object.Struct src_struct_storage ->
+        let dest_struct_storage =
+          deep_copy_struct ~src:src_struct_storage ~dest_message:dest.Slice.msg
+        in
+        init_struct_pointer dest dest_struct_storage
 
   (* Given a [src] struct storage descriptor, first allocate storage in
      [dest_message] for a copy of the struct and then fill the allocated

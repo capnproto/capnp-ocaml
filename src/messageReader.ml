@@ -38,153 +38,27 @@ module Make (MessageWrapper : Message.S) = struct
   include RC
 
 
-  (* Given a description of a cap'n proto far pointer, get the data associated with
-     the pointer.  A far pointer can either point to a normal pointer or to a
-     "landing pad" with a content pointer and a tag word; [deref_normal_pointer]
-     describes the method to use for dereferencing the pointer in the former case,
-     and [deref_tagged_far_pointer] describes the method to use in the latter
-     case.
-
-     Returns None in the case of a null pointer. *)
-  let deref_far_pointer
-      (far_pointer : FarPointer.t)
-      (message : 'cap Message.t)
-      (deref_normal_pointer     : 'cap Slice.t -> 'a option)
-      (deref_tagged_far_pointer : 'cap Slice.t -> 'a)
-    : 'a option =
-    let open FarPointer in
-    match far_pointer.landing_pad with
-    | NormalPointer ->
-        let next_pointer_bytes = {
-          Slice.msg        = message;
-          Slice.segment_id = far_pointer.segment_id;
-          Slice.start      = far_pointer.offset * sizeof_uint64;
-          Slice.len        = sizeof_uint64;
-        } in
-        let () = bounds_check_slice_exn
-          ~err:"far pointer describes invalid landing pad" next_pointer_bytes
-        in
-        deref_normal_pointer next_pointer_bytes
-    | TaggedFarPointer ->
-        let landing_pad_bytes = {
-          Slice.msg        = message;
-          Slice.segment_id = far_pointer.segment_id;
-          Slice.start      = far_pointer.offset * sizeof_uint64;
-          Slice.len        = 2 * sizeof_uint64;
-        } in
-        let () = bounds_check_slice_exn
-          ~err:"far pointer describes invalid tagged landing pad" landing_pad_bytes
-        in
-        Some (deref_tagged_far_pointer landing_pad_bytes)
-
-
-  (* Given a far-pointer "landing pad" which is expected to point to list storage,
-     compute the corresponding list storage descriptor. *)
-  let deref_list_tagged_far_pointer (landing_pad_bytes : 'cap Slice.t) : 'cap ListStorage.t =
-    let far_pointer_bytes = { landing_pad_bytes with Slice.len = sizeof_uint64 } in
-    let list_tag_bytes = {
-      landing_pad_bytes with
-      Slice.start = Slice.get_end far_pointer_bytes;
-      Slice.len   = sizeof_uint64;
-    } in
-    match (decode_pointer far_pointer_bytes, decode_pointer list_tag_bytes) with
-    | (Pointer.Far far_pointer, Pointer.List list_pointer) ->
-        make_list_storage
-          ~message:landing_pad_bytes.Slice.msg
-          ~segment_id:far_pointer.FarPointer.segment_id
-          ~segment_offset:(far_pointer.FarPointer.offset * sizeof_uint64)
-          ~list_pointer
-    | _ ->
-        invalid_msg "invalid type tags for list-tagged far pointer"
-
-
   (* Given a pointer which is expected to be a list pointer, compute the corresponding
      list storage descriptor.  Returns None if the pointer is null. *)
-  let rec deref_list_pointer (pointer_bytes : 'cap Slice.t) : 'cap ListStorage.t option =
-    match decode_pointer pointer_bytes with
-    | Pointer.Null ->
+  let deref_list_pointer (pointer_bytes : 'cap Slice.t) : 'cap ListStorage.t option =
+    match deref_pointer pointer_bytes with
+    | Object.None ->
         None
-    | Pointer.List list_pointer ->
-        Some (make_list_storage
-          ~message:pointer_bytes.Slice.msg
-          ~segment_id:pointer_bytes.Slice.segment_id
-          ~segment_offset:((Slice.get_end pointer_bytes) +
-                             (list_pointer.ListPointer.offset * sizeof_uint64))
-          ~list_pointer)
-    | Pointer.Far far_pointer ->
-        deref_far_pointer far_pointer pointer_bytes.Slice.msg
-          deref_list_pointer deref_list_tagged_far_pointer
-    | Pointer.Struct _ ->
+    | Object.List list_descr ->
+        Some list_descr
+    | Object.Struct _ ->
         invalid_msg "decoded struct pointer where list pointer was expected"
-
-
-  (* Given a far-pointer "landing pad" which is expected to point to struct storage,
-     compute the corresponding struct storage descriptor. *)
-  let deref_struct_tagged_far_pointer
-      (landing_pad_bytes : 'cap Slice.t)
-    : 'cap StructStorage.t =
-    let far_pointer_bytes = {
-      landing_pad_bytes with
-      Slice.len = sizeof_uint64
-    } in
-    let struct_tag_bytes = {
-      landing_pad_bytes with
-      Slice.start = Slice.get_end far_pointer_bytes;
-      Slice.len   = sizeof_uint64;
-    } in
-    match (decode_pointer far_pointer_bytes, decode_pointer struct_tag_bytes) with
-    | (Pointer.Far far_pointer, Pointer.Struct struct_pointer) ->
-        let data = {
-          Slice.msg        = landing_pad_bytes.Slice.msg;
-          Slice.segment_id = far_pointer.FarPointer.segment_id;
-          Slice.start      = far_pointer.FarPointer.offset * sizeof_uint64;
-          Slice.len        = struct_pointer.StructPointer.data_size * sizeof_uint64;
-        } in
-        let pointers = {
-          data with
-          Slice.start = Slice.get_end data;
-          Slice.len   = struct_pointer.StructPointer.pointers_size * sizeof_uint64;
-        } in
-        let () = bounds_check_slice_exn
-          ~err:"struct-tagged far pointer describes invalid data region" data
-        in
-        let () = bounds_check_slice_exn
-          ~err:"struct-tagged far pointer describes invalid pointers region" pointers
-        in
-        { StructStorage.data; StructStorage.pointers; }
-    | _ ->
-        invalid_msg "invalid type tags for struct-tagged far pointer"
 
 
   (* Given a pointer which is expected to be a struct pointer, compute the corresponding
      struct storage descriptor.  Returns None if the pointer is null. *)
-  let rec deref_struct_pointer (pointer_bytes : 'cap Slice.t) : 'cap StructStorage.t option =
-    match decode_pointer pointer_bytes with
-    | Pointer.Null ->
+  let deref_struct_pointer (pointer_bytes : 'cap Slice.t) : 'cap StructStorage.t option =
+    match deref_pointer pointer_bytes with
+    | Object.None ->
         None
-    | Pointer.Struct struct_pointer ->
-        let open StructPointer in
-        let data = {
-          pointer_bytes with
-          Slice.start = (Slice.get_end pointer_bytes) + (struct_pointer.offset * sizeof_uint64);
-          Slice.len   = struct_pointer.data_size * sizeof_uint64;
-        } in
-        let pointers = {
-          data with
-          Slice.start = Slice.get_end data;
-          Slice.len   = struct_pointer.pointers_size * sizeof_uint64;
-        } in
-        let () = bounds_check_slice_exn
-          ~err:"struct pointer describes invalid data region" data
-        in
-        let () = bounds_check_slice_exn
-          ~err:"struct pointer describes invalid pointers region" data
-        in
-        Some { StructStorage.data; StructStorage.pointers; }
-    | Pointer.Far far_pointer ->
-        deref_far_pointer far_pointer pointer_bytes.Slice.msg
-          deref_struct_pointer deref_struct_tagged_far_pointer
-    | Pointer.List _ ->
+    | Object.Struct struct_descr ->
+        Some struct_descr
+    | Object.List _ ->
         invalid_msg "decoded list pointer where struct pointer was expected"
 
 

@@ -113,6 +113,14 @@ module Make (MessageWrapper : Message.S) = struct
   end
 
 
+  module Object = struct
+    type 'cap t =
+      | None
+      | List of 'cap ListStorage.t
+      | Struct of 'cap StructStorage.t
+  end
+
+
   (* Given a range of eight bytes corresponding to a cap'n proto pointer,
      decode the information stored in the pointer. *)
   let decode_pointer (pointer_bytes : 'cap Slice.t) : Pointer.t =
@@ -194,17 +202,113 @@ module Make (MessageWrapper : Message.S) = struct
             let num_words = list_pointer.num_elements in
             let num_elements = struct_pointer.SP.offset in
             let words_per_element =
-              struct_pointer.SP.data_size + struct_pointer.SP.pointers_size
+              struct_pointer.SP.data_words + struct_pointer.SP.pointer_words
             in
             if num_elements * words_per_element > num_words then
               invalid_msg "composite list pointer describes invalid word count";
             make_list_storage_aux ~offset:sizeof_uint64 ~num_words:list_pointer.num_elements
               ~num_elements:struct_pointer.SP.offset
               ~storage_type:(ListStorage.Composite
-                               (struct_pointer.SP.data_size, struct_pointer.SP.pointers_size))
+                 (struct_pointer.SP.data_words, struct_pointer.SP.pointer_words))
         | _ ->
             invalid_msg "composite list pointer has malformed element type tag"
         end
+
+
+  (* Given a description of a cap'n proto far pointer, get the object which
+     the pointer points to. *)
+  let rec deref_far_pointer
+      (far_pointer : FarPointer.t)
+      (message : 'cap Message.t)
+    : 'cap Object.t =
+    let open FarPointer in
+    match far_pointer.landing_pad with
+    | NormalPointer ->
+        let next_pointer_bytes = {
+          Slice.msg        = message;
+          Slice.segment_id = far_pointer.segment_id;
+          Slice.start      = far_pointer.offset * sizeof_uint64;
+          Slice.len        = sizeof_uint64;
+        } in
+        let () = bounds_check_slice_exn
+          ~err:"far pointer describes invalid landing pad" next_pointer_bytes
+        in
+        deref_pointer next_pointer_bytes
+    | TaggedFarPointer ->
+        let content_pointer_bytes = {
+          Slice.msg        = message;
+          Slice.segment_id = far_pointer.segment_id;
+          Slice.start      = far_pointer.offset * sizeof_uint64;
+          Slice.len        = sizeof_uint64;
+        } in
+        let tag_bytes = {
+          content_pointer_bytes with
+          Slice.start = Slice.get_end content_pointer_bytes;
+        } in
+        match (decode_pointer content_pointer_bytes, decode_pointer tag_bytes) with
+        | (Pointer.Far content_pointer, Pointer.List list_pointer) ->
+            Object.List (make_list_storage
+              ~message
+              ~segment_id:content_pointer.FarPointer.segment_id
+              ~segment_offset:(content_pointer.FarPointer.offset * sizeof_uint64)
+              ~list_pointer)
+        | (Pointer.Far content_pointer, Pointer.Struct struct_pointer) ->
+            let data = {
+              Slice.msg        = message;
+              Slice.segment_id = content_pointer.FarPointer.segment_id;
+              Slice.start      = content_pointer.FarPointer.offset * sizeof_uint64;
+              Slice.len        = struct_pointer.StructPointer.data_words * sizeof_uint64;
+            } in
+            let pointers = {
+              data with
+              Slice.start = Slice.get_end data;
+              Slice.len   = struct_pointer.StructPointer.pointer_words * sizeof_uint64;
+            } in
+            let () = bounds_check_slice_exn
+              ~err:"struct-tagged far pointer describes invalid data region" data
+            in
+            let () = bounds_check_slice_exn
+              ~err:"struct-tagged far pointer describes invalid pointers region" pointers
+            in
+            Object.Struct { StructStorage.data; StructStorage.pointers; }
+        | _ ->
+            invalid_msg "tagged far pointer points to invalid landing pad"
+
+
+  (* Given a range of eight bytes which represent a pointer, get the object which
+     the pointer points to. *)
+  and deref_pointer (pointer_bytes : 'cap Slice.t) : 'cap Object.t =
+    match decode_pointer pointer_bytes with
+    | Pointer.Null ->
+        Object.None
+    | Pointer.List list_pointer ->
+        Object.List (make_list_storage
+          ~message:pointer_bytes.Slice.msg
+          ~segment_id:pointer_bytes.Slice.segment_id
+          ~segment_offset:((Slice.get_end pointer_bytes) +
+                             (list_pointer.ListPointer.offset * sizeof_uint64))
+          ~list_pointer)
+    | Pointer.Struct struct_pointer ->
+        let open StructPointer in
+        let data = {
+          pointer_bytes with
+          Slice.start = (Slice.get_end pointer_bytes) + (struct_pointer.offset * sizeof_uint64);
+          Slice.len   = struct_pointer.data_words * sizeof_uint64;
+        } in
+        let pointers = {
+          data with
+          Slice.start = Slice.get_end data;
+          Slice.len   = struct_pointer.pointer_words * sizeof_uint64;
+        } in
+        let () = bounds_check_slice_exn
+          ~err:"struct pointer describes invalid data region" data
+        in
+        let () = bounds_check_slice_exn
+          ~err:"struct pointer describes invalid pointers region" pointers
+        in
+        Object.Struct { StructStorage.data; StructStorage.pointers; }
+    | Pointer.Far far_pointer ->
+        deref_far_pointer far_pointer pointer_bytes.Slice.msg
 
 
   let list_fold_left_generic
