@@ -1117,6 +1117,180 @@ module Make (MessageWrapper : Message.S) = struct
     init_list_pointer pointer_bytes new_string_storage
 
 
+  (* Given storage for a struct, set the data for the specified struct-embedded
+     pointer under the assumption that it points to a cap'n proto Text payload. *)
+  let set_struct_field_text
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      (src : string)
+    : unit =
+    let pointer_bytes = {
+      struct_storage.StructStorage.pointers with
+      Slice.start = pointer_word * sizeof_uint64;
+      Slice.len   = sizeof_uint64;
+    } in
+    let new_string_storage = uint8_list_of_string
+        ~null_terminated:true ~dest_message:pointer_bytes.Slice.msg
+        src
+    in
+    let () = deep_zero_pointer pointer_bytes in
+    init_list_pointer pointer_bytes new_string_storage
+
+
+  (* Given storage for a struct, set the data for the specified struct-embedded
+     pointer equal to a deep copy of the specified [src] list. *)
+  let set_struct_field_list
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      (src : 'cap ListStorage.t)
+    : unit =
+    let pointer_bytes = {
+      struct_storage.StructStorage.pointers with
+      Slice.start = struct_storage.StructStorage.pointers.Slice.start +
+          (pointer_word * sizeof_uint64);
+      Slice.len = sizeof_uint64;
+    } in
+    let list_storage = deep_copy_list ~src
+        ~dest_message:struct_storage.StructStorage.pointers.Slice.msg
+    in
+    let () = deep_zero_pointer pointer_bytes in
+    init_list_pointer pointer_bytes list_storage
+
+
+  (* Given storage for a struct, set the data for the specified struct-embedded
+     pointer equal to a deep copy of the specified [src] struct. *)
+  let set_struct_field_struct
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      (src : 'cap StructStorage.t)
+    : unit =
+    let pointer_bytes = {
+      struct_storage.StructStorage.pointers with
+      Slice.start = struct_storage.StructStorage.pointers.Slice.start +
+          (pointer_word * sizeof_uint64);
+      Slice.len = sizeof_uint64;
+    } in
+    let new_storage = deep_copy_struct ~src
+        ~dest_message:struct_storage.StructStorage.pointers.Slice.msg
+    in
+    let () = deep_zero_pointer pointer_bytes in
+    init_struct_pointer pointer_bytes new_storage
+
+
+  (* Given storage for a struct, write a new value for the boolean field stored
+     at the given byte and bit offset within the struct's data region. *)
+  let set_struct_field_bit
+      (struct_storage : rw StructStorage.t)
+      ~(default_bit : bool)
+      ~(byte_ofs : int)
+      ~(bit_ofs : int)
+      (value : bool)
+    : unit =
+    let default = if default_bit then 1 else 0 in
+    let bit_val = if value then 1 else 0 in
+    let bit = default lxor bit_val in
+    let byte_val = Slice.get_uint8 struct_storage.StructStorage.data byte_ofs in
+    let byte_val = byte_val land (lnot (1 lsl bit_ofs)) in
+    let byte_val = byte_val lor (bit lsl bit_ofs) in
+    Slice.set_uint8 struct_storage.StructStorage.data byte_ofs byte_val
+
+
+  (* Given storage for a struct, write a new value for the UInt8 field stored
+     at the given byte offset within the struct's data region. *)
+  let set_struct_field_uint8
+      (struct_storage : rw StructStorage.t)
+      ~(default : int)
+      (byte_ofs : int)
+      (value : int)
+    : unit =
+    Slice.set_uint8 struct_storage.StructStorage.data byte_ofs
+      (value lxor default)
+
+
+  (* Given storage for a struct, write a new value for the UInt16 field stored
+     at the given byte offset within the struct's data region. *)
+  let set_struct_field_uint16
+      (struct_storage : rw StructStorage.t)
+      ~(default : int)
+      (byte_ofs : int)
+      (value : int)
+    : unit =
+    Slice.set_uint16 struct_storage.StructStorage.data byte_ofs
+      (value lxor default)
+
+
+  (* Given storage for a struct, write a new value for the UInt32 field stored
+     at the given byte offset within the struct's data region. *)
+  let set_struct_field_uint32
+      (struct_storage : rw StructStorage.t)
+      ~(default : Uint32.t)
+      (byte_ofs : int)
+      (value : Uint32.t)
+    : unit =
+    Slice.set_uint32 struct_storage.StructStorage.data byte_ofs
+      (Uint32.logxor value default)
+
+
+  (* Given storage for a struct, write a new value for the UInt64 field stored
+     at the given byte offset within the struct's data region. *)
+  let set_struct_field_uint64
+      (struct_storage : rw StructStorage.t)
+      ~(default : Uint64.t)
+      (byte_ofs : int)
+      (value : Uint64.t)
+    : unit =
+    Slice.set_uint64 struct_storage.StructStorage.data byte_ofs
+      (Uint64.logxor value default)
+
+
+  (* Given storage for a struct, write a new value for the Int8 field stored
+     at the given byte offset within the struct's data region. *)
+  let set_struct_field_int8
+      (struct_storage : rw StructStorage.t)
+      ~(default : int)
+      (byte_ofs : int)
+      (value : int)
+    : unit =
+    Slice.set_int8 struct_storage.StructStorage.data byte_ofs
+      (value lxor default)
+
+
+  (* Given storage for a struct, write a new value for the Int16 field stored
+     at the given byte offset within the struct's data region. *)
+  let set_struct_field_int16
+      (struct_storage : rw StructStorage.t)
+      ~(default : int)
+      (byte_ofs : int)
+      (value : int)
+    : unit =
+    Slice.set_int16 struct_storage.StructStorage.data byte_ofs
+      (value lxor default)
+
+
+  (* Given storage for a struct, write a new value for the Int32 field stored
+     at the given byte offset within the struct's data region. *)
+  let set_struct_field_int32
+      (struct_storage : rw StructStorage.t)
+      ~(default : int32)
+      (byte_ofs : int)
+      (value : int32)
+    : unit =
+    Slice.set_int32 struct_storage.StructStorage.data byte_ofs
+      (Int32.bit_xor value default)
+
+
+  (* Given storage for a struct, write a new value for the Int64 field stored
+     at the given byte offset within the struct's data region. *)
+  let set_struct_field_int64
+      (struct_storage : rw StructStorage.t)
+      ~(default : int64)
+      (byte_ofs : int)
+      (value : int64)
+    : unit =
+    Slice.set_int64 struct_storage.StructStorage.data byte_ofs
+      (Int64.bit_xor value default)
+
+
   (* Locate the storage region corresponding to the root struct of a message.
      The [data_words] and [pointer_words] specify the expected struct layout. *)
   let get_root_struct
