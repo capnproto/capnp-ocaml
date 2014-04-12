@@ -244,11 +244,24 @@ let generate_list_accessor ~nodes_table ~scope ~list_type ~indent ~field_name ~f
         encoder_declaration
         indent
         (field_ofs * 2)
-  | PS.Type.Struct _ ->
-      sprintf "%slet %s_get x = get_struct_field_struct_list x %u\n"
-        indent
-        field_name
-        field_ofs
+  | PS.Type.Struct struct_def ->
+      let id = PS.Type.Struct.typeId_get struct_def in
+      let node = Hashtbl.find_exn nodes_table id in
+      begin match PS.Node.unnamed_union_get node with
+      | PS.Node.Struct struct_def' ->
+          let data_words    = PS.Node.Struct.dataWordCount_get struct_def' in
+          let pointer_words = PS.Node.Struct.pointerCount_get struct_def' in
+          sprintf
+            "%slet %s_get x = get_struct_field_struct_list x %u \
+             ~data_words:%u ~pointer_words:%u\n"
+            indent
+            field_name
+            field_ofs
+            data_words
+            pointer_words
+      | _ ->
+          failwith "decoded non-struct node where struct node was expected."
+      end
   | PS.Type.Interface _ ->
       sprintf "%slet %s_get x = failwith \"not implemented\"\n"
         indent
@@ -495,7 +508,8 @@ let generate_field_accessors ~nodes_table ~scope ~indent field =
           in
           if has_trivial_default then
             let list_type = PS.Type.List.elementType_get list_def in
-            generate_list_accessor ~nodes_table ~scope ~list_type ~indent ~field_name ~field_ofs
+            generate_list_accessor ~nodes_table ~scope ~list_type ~indent
+              ~field_name ~field_ofs
           else
             failwith "Default values for lists are not implemented."
       | (PS.Type.Enum enum_def, PS.Value.Enum val_uint16) ->
@@ -523,10 +537,22 @@ let generate_field_accessors ~nodes_table ~scope ~indent field =
             end
           in
           if has_trivial_default then
-            sprintf "%slet %s_get x = get_struct_field_struct x %u\n"
-              indent
-              field_name
-              field_ofs
+            let id = PS.Type.Struct.typeId_get struct_def in
+            let node = Hashtbl.find_exn nodes_table id in
+            match PS.Node.unnamed_union_get node with
+            | PS.Node.Struct struct_def' ->
+                let data_words    = PS.Node.Struct.dataWordCount_get struct_def' in
+                let pointer_words = PS.Node.Struct.pointerCount_get struct_def' in
+                sprintf
+                  "%slet %s_get x = get_struct_field_struct x %u \
+                   ~data_words:%u ~pointer_words:%u\n"
+                  indent
+                  field_name
+                  field_ofs
+                  data_words
+                  pointer_words
+            | _ ->
+                failwith "decoded non-struct node where struct node was expected."
           else
             failwith "Default values for structs are not implemented."
       | (PS.Type.Interface iface_def, PS.Value.Interface) ->
