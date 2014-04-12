@@ -840,37 +840,6 @@ module Make (MessageWrapper : Message.S) = struct
 
   (* Given storage for a struct, get the data for the specified
      struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<Text>. *)
-  let get_struct_field_text_list
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-    : (string, 'b) Runtime.BArray.t =
-    get_struct_field_bytes_list struct_storage pointer_word
-      ~element_size:8
-      ~decode:(fun slice ->
-        let pointer_bytes = get_struct_pointer struct_storage pointer_word in
-        (* Text fields are always accessed by value, not by reference, since
-           we always do an immediate decode to [string].  Therefore we can
-           use the Reader logic to handle this case. *)
-        match Reader.deref_list_pointer pointer_bytes with
-        | Some list_storage ->
-            string_of_uint8_list ~null_terminated:true list_storage
-        | None ->
-            "")
-      ~encode:(fun (src : string) pointer_bytes ->
-        (* Note: could avoid an allocation if the new string is not longer
-           than the old one.  This deep copy strategy has the advantage of
-           being correct in all cases. *)
-        let new_string_storage = uint8_list_of_string
-            ~null_terminated:true ~dest_message:pointer_bytes.Slice.msg
-            src
-        in
-        let () = deep_zero_pointer pointer_bytes in
-        init_list_pointer pointer_bytes new_string_storage)
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
      cap'n proto List<Data>. *)
   let get_struct_field_blob_list
       (struct_storage : rw StructStorage.t)
@@ -894,6 +863,37 @@ module Make (MessageWrapper : Message.S) = struct
            being correct in all cases. *)
         let new_string_storage = uint8_list_of_string
             ~null_terminated:false ~dest_message:pointer_bytes.Slice.msg
+            src
+        in
+        let () = deep_zero_pointer pointer_bytes in
+        init_list_pointer pointer_bytes new_string_storage)
+
+
+  (* Given storage for a struct, get the data for the specified
+     struct-embedded pointer under the assumption that it points to a
+     cap'n proto List<Text>. *)
+  let get_struct_field_text_list
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+    : (string, 'b) Runtime.BArray.t =
+    get_struct_field_bytes_list struct_storage pointer_word
+      ~element_size:8
+      ~decode:(fun slice ->
+        let pointer_bytes = get_struct_pointer struct_storage pointer_word in
+        (* Text fields are always accessed by value, not by reference, since
+           we always do an immediate decode to [string].  Therefore we can
+           use the Reader logic to handle this case. *)
+        match Reader.deref_list_pointer pointer_bytes with
+        | Some list_storage ->
+            string_of_uint8_list ~null_terminated:true list_storage
+        | None ->
+            "")
+      ~encode:(fun (src : string) pointer_bytes ->
+        (* Note: could avoid an allocation if the new string is not longer
+           than the old one.  This deep copy strategy has the advantage of
+           being correct in all cases. *)
+        let new_string_storage = uint8_list_of_string
+            ~null_terminated:true ~dest_message:pointer_bytes.Slice.msg
             src
         in
         let () = deep_zero_pointer pointer_bytes in
@@ -1243,6 +1243,275 @@ module Make (MessageWrapper : Message.S) = struct
     : unit =
     Slice.set_int64 struct_storage.StructStorage.data byte_ofs
       (Int64.bit_xor value default)
+
+
+  (* Given storage for a struct, allocate a new List<T> member for one of the
+     pointers stored within the struct. *)
+  let init_struct_field_list
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      ~(storage_type : ListStorage.storage_type_t)
+      ~(num_elements : int)
+    : unit =
+    if num_elements < 0 then
+      invalid_arg "index out of bounds"
+    else
+      let pointer_bytes = get_struct_pointer struct_storage pointer_word in
+      let dest_message  = struct_storage.StructStorage.pointers.Slice.msg in
+      let list_storage  = alloc_list_storage dest_message
+          storage_type num_elements
+      in
+      let () = deep_zero_pointer pointer_bytes in
+      init_list_pointer pointer_bytes list_storage
+
+
+  (* Given storage for a struct, allocate a new List<Bool> member for one
+     of the pointers stored within the struct.  Returns an array builder
+     for the resulting list. *)
+  let init_struct_field_bit_list
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      ~(num_elements : int)
+    : ('a, 'b) Runtime.BArray.t =
+    let () = init_struct_field_list struct_storage pointer_word
+        ~storage_type:ListStorage.Bit ~num_elements
+    in
+    get_struct_field_bit_list struct_storage pointer_word
+
+
+  (* Given storage for a struct, allocate a new List<Int8> member for
+     one of the pointers stored within the struct.  Returns an array
+     builder for the resulting list. *)
+  let init_struct_field_int8_list
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      ~(num_elements : int)
+    : (int, 'b) Runtime.BArray.t =
+    let () = init_struct_field_list struct_storage pointer_word
+        ~storage_type:(ListStorage.Bytes 1) ~num_elements
+    in
+    get_struct_field_int8_list struct_storage pointer_word
+
+
+  (* Given storage for a struct, allocate a new List<Int16> member for
+     one of the pointers stored within the struct.  Returns an array
+     builder for the resulting list. *)
+  let init_struct_field_int16_list
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      ~(num_elements : int)
+    : (int, 'b) Runtime.BArray.t =
+    let () = init_struct_field_list struct_storage pointer_word
+        ~storage_type:(ListStorage.Bytes 2) ~num_elements
+    in
+    get_struct_field_int16_list struct_storage pointer_word
+
+
+  (* Given storage for a struct, allocate a new List<Int32> member for
+     one of the pointers stored within the struct.  Returns an array
+     builder for the resulting list. *)
+  let init_struct_field_int32_list
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      ~(num_elements : int)
+    : (int32, 'b) Runtime.BArray.t =
+    let () = init_struct_field_list struct_storage pointer_word
+        ~storage_type:(ListStorage.Bytes 4) ~num_elements
+    in
+    get_struct_field_int32_list struct_storage pointer_word
+
+
+  (* Given storage for a struct, allocate a new List<Int64> member for
+     one of the pointers stored within the struct.  Returns an array
+     builder for the resulting list. *)
+  let init_struct_field_int64_list
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      ~(num_elements : int)
+    : (int64, 'b) Runtime.BArray.t =
+    let () = init_struct_field_list struct_storage pointer_word
+        ~storage_type:(ListStorage.Bytes 8) ~num_elements
+    in
+    get_struct_field_int64_list struct_storage pointer_word
+
+
+  (* Given storage for a struct, allocate a new List<UInt8> member for
+     one of the pointers stored within the struct.  Returns an array
+     builder for the resulting list. *)
+  let init_struct_field_uint8_list
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      ~(num_elements : int)
+    : (int, 'b) Runtime.BArray.t =
+    let () = init_struct_field_list struct_storage pointer_word
+        ~storage_type:(ListStorage.Bytes 1) ~num_elements
+    in
+    get_struct_field_uint8_list struct_storage pointer_word
+
+
+  (* Given storage for a struct, allocate a new List<UInt16> member for
+     one of the pointers stored within the struct.  Returns an array
+     builder for the resulting list. *)
+  let init_struct_field_uint16_list
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      ~(num_elements : int)
+    : (int, 'b) Runtime.BArray.t =
+    let () = init_struct_field_list struct_storage pointer_word
+        ~storage_type:(ListStorage.Bytes 2) ~num_elements
+    in
+    get_struct_field_uint16_list struct_storage pointer_word
+
+
+  (* Given storage for a struct, allocate a new List<UInt32> member for
+     one of the pointers stored within the struct.  Returns an array
+     builder for the resulting list. *)
+  let init_struct_field_uint32_list
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      ~(num_elements : int)
+    : (Uint32.t, 'b) Runtime.BArray.t =
+    let () = init_struct_field_list struct_storage pointer_word
+        ~storage_type:(ListStorage.Bytes 4) ~num_elements
+    in
+    get_struct_field_uint32_list struct_storage pointer_word
+
+
+  (* Given storage for a struct, allocate a new List<UInt64> member for
+     one of the pointers stored within the struct.  Returns an array
+     builder for the resulting list. *)
+  let get_struct_field_uint64_list
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      ~(num_elements : int)
+    : (Uint64.t, 'b) Runtime.BArray.t =
+    let () = init_struct_field_list struct_storage pointer_word
+        ~storage_type:(ListStorage.Bytes 8) ~num_elements
+    in
+    get_struct_field_uint64_list struct_storage pointer_word
+
+
+  (* Given storage for a struct, allocate a new List<Float32> member for
+     one of the pointers stored within the struct.  Returns an array
+     builder for the resulting list. *)
+  let init_struct_field_float32_list
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      ~(num_elements : int)
+    : (float, 'b) Runtime.BArray.t =
+    let () = init_struct_field_list struct_storage pointer_word
+        ~storage_type:(ListStorage.Bytes 4) ~num_elements
+    in
+    get_struct_field_float32_list struct_storage pointer_word
+
+
+  (* Given storage for a struct, allocate a new List<Float64> member for
+     one of the pointers stored within the struct.  Returns an array
+     builder for the resulting list. *)
+  let init_struct_field_float64_list
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      ~(num_elements : int)
+    : (float, 'b) Runtime.BArray.t =
+    let () = init_struct_field_list struct_storage pointer_word
+        ~storage_type:(ListStorage.Bytes 8) ~num_elements
+    in
+    get_struct_field_float64_list struct_storage pointer_word
+
+
+  (* Given storage for a struct, allocate a new List<List<Data>> member for
+     one of the pointers stored within the struct.  Returns an array
+     builder for the resulting list. *)
+  let init_struct_field_blob_list
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      ~(num_elements : int)
+    : (string, 'b) Runtime.BArray.t =
+    let () = init_struct_field_list struct_storage pointer_word
+        ~storage_type:ListStorage.Pointer ~num_elements
+    in
+    get_struct_field_blob_list struct_storage pointer_word
+
+
+  (* Given storage for a struct, allocate a new List<List<Text>> member for
+     one of the pointers stored within the struct.  Returns an array
+     builder for the resulting list. *)
+  let init_struct_field_text_list
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      ~(num_elements : int)
+    : (string, 'b) Runtime.BArray.t =
+    let () = init_struct_field_list struct_storage pointer_word
+        ~storage_type:ListStorage.Pointer ~num_elements
+    in
+    get_struct_field_text_list struct_storage pointer_word
+
+
+  (* Given storage for a struct, allocate a new List<T> member for one of the
+     pointers stored within the struct, where T is a struct type.  Returns
+     an array builder for the resulting list. *)
+  let init_struct_field_struct_list
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      ~(num_elements : int)
+      ~(data_words : int)
+      ~(pointer_words : int)
+    : ('a, 'b) Runtime.BArray.t =
+    let () = init_struct_field_list struct_storage pointer_word
+        ~storage_type:(ListStorage.Composite (data_words, pointer_words))
+        ~num_elements
+    in
+    get_struct_field_struct_list struct_storage pointer_word
+      ~data_words ~pointer_words
+
+
+  (* Given storage for a struct, allocate a new List<List<T>> member for
+     one of the pointers stored within the struct.  Returns an array builder
+     for the resulting list. *)
+  let init_struct_field_list_list
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      ~(num_elements : int)
+    : (rw ListStorage.t, 'b) Runtime.BArray.t =
+    let () = init_struct_field_list struct_storage pointer_word
+        ~storage_type:ListStorage.Pointer ~num_elements
+    in
+    get_struct_field_list_list struct_storage pointer_word
+
+
+  (* Given storage for a struct, allocate a new List<Enum> member for
+     one of the pointers stored within the struct.  Returns an array builder
+     for the resulting list. *)
+  let init_struct_field_enum_list
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      ~(num_elements : int)
+      ~(decode : int -> 'a)
+      ~(encode : 'a -> int)
+    : ('a, 'b) Runtime.BArray.t =
+    let () = init_struct_field_list struct_storage pointer_word
+        ~storage_type:(ListStorage.Bytes 2) ~num_elements
+    in
+    get_struct_field_enum_list struct_storage pointer_word
+      ~decode ~encode
+
+
+  (* Given storage for a parent struct, allocate a new child struct and link it
+     to one of the pointers stored within the parent.  Returns a reference to
+     the newly-created struct. *)
+  let init_struct_field_struct
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      ~(data_words : int)
+      ~(pointer_words : int)
+    : rw StructStorage.t =
+    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
+    let () = deep_zero_pointer pointer_bytes in
+    let alloc_default_struct message =
+      alloc_struct_storage message ~data_words ~pointer_words
+    in
+    deref_struct_pointer pointer_bytes alloc_default_struct
+      ~data_words ~pointer_words
 
 
   (* Locate the storage region corresponding to the root struct of a message.
