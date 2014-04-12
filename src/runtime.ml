@@ -50,7 +50,10 @@ module Array = struct
   let get x i =
     match x with
     | Some storage ->
-        storage.get storage.storage i
+        if i < 0 || i >= (storage.length storage.storage) then
+          invalid_arg "index out of bounds"
+        else
+          storage.get storage.storage i
     | None ->
         invalid_arg "index out of bounds"
 
@@ -76,9 +79,17 @@ module BArray = struct
 
   let length x = x.length x.storage
 
-  let get x i = x.get x.storage i
+  let get x i =
+    if i < 0 || i >= (x.length x.storage) then
+      invalid_arg "index out of bounds"
+    else
+      x.get x.storage i
 
-  let set x i v = x.set x.storage i v
+  let set x i v =
+    if i < 0 || i >= (x.length x.storage) then
+      invalid_arg "index out of bounds"
+    else
+      x.set x.storage i v
 
   let make ~length ~get ~set storage = { storage; length; get; set }
 end
