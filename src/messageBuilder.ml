@@ -42,6 +42,21 @@ module Make (MessageWrapper : Message.S) = struct
   include RC
 
 
+  (* Given storage for a struct, get the pointer bytes for the given
+     struct-relative pointer index. *)
+  let get_struct_pointer
+      (struct_storage : 'cap StructStorage.t)
+      (pointer_word : int)
+    : 'cap Slice.t =
+    let pointers = struct_storage.StructStorage.pointers in
+    let num_pointers = pointers.Slice.len / sizeof_uint64 in
+    let () = assert (pointer_word < num_pointers) in {
+      pointers with
+      Slice.start = pointers.Slice.start + (pointer_word * sizeof_uint64);
+      Slice.len   = sizeof_uint64;
+    }
+
+
   (* Allocate storage for a struct within the specified message. *)
   let alloc_struct_storage
       (message : rw Message.t)
@@ -498,7 +513,7 @@ module Make (MessageWrapper : Message.S) = struct
           for i = 0 to list_storage.num_elements - 1 do
             let pointer_bytes = {
               list_storage.storage with
-              Slice.start = i * sizeof_uint64;
+              Slice.start = list_storage.storage.Slice.start + (i * sizeof_uint64);
               Slice.len   = sizeof_uint64;
             } in
             deep_zero_pointer pointer_bytes
@@ -515,8 +530,9 @@ module Make (MessageWrapper : Message.S) = struct
                because it means we clear most of the list twice. *)
             let data = {
               list_storage.storage with
-              Slice.start = i * total_words * sizeof_uint64;
-              Slice.len   = data_words * sizeof_uint64;
+              Slice.start = list_storage.storage.Slice.start +
+                  (i * total_words * sizeof_uint64);
+              Slice.len = data_words * sizeof_uint64;
             } in
             let pointers = {
               list_storage.storage with
@@ -543,11 +559,7 @@ module Make (MessageWrapper : Message.S) = struct
       struct_storage.pointers.Slice.len / sizeof_uint64
     in
     for i = 0 to pointer_words - 1 do
-      let pointer_bytes = {
-        struct_storage.pointers with
-        Slice.start = struct_storage.pointers.Slice.start + (i * sizeof_uint64);
-        Slice.len   = sizeof_uint64;
-      } in
+      let pointer_bytes = get_struct_pointer struct_storage i in
       deep_zero_pointer pointer_bytes
     done;
     Slice.zero_out struct_storage.data
@@ -585,16 +597,8 @@ module Make (MessageWrapper : Message.S) = struct
           min pointer_words (orig.pointers.Slice.len / sizeof_uint64)
         in
         for i = 0 to pointer_copy_words - 1 do
-          let src = {
-            orig.pointers with
-            Slice.start = orig.pointers.Slice.start + (i * sizeof_uint64);
-            Slice.len = sizeof_uint64;
-          } in
-          let dest = {
-            new_storage.pointers with
-            Slice.start = new_storage.pointers.Slice.start + (i * sizeof_uint64);
-            Slice.len = sizeof_uint64;
-          } in
+          let src  = get_struct_pointer orig i in
+          let dest = get_struct_pointer new_storage i in
           copy_pointer ~src ~dest
         done
       in
@@ -630,11 +634,7 @@ module Make (MessageWrapper : Message.S) = struct
       (pointer_word : int)
       ~(default : string)
     : string =
-    let pointer_bytes = {
-      struct_storage.StructStorage.pointers with
-      Slice.start = pointer_word * sizeof_uint64;
-      Slice.len   = sizeof_uint64;
-    } in
+    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
     (* Data fields are always accessed by value, not by reference, since
        we always do an immediate decode to [string].  Therefore we can
        use the Reader logic to handle this case. *)
@@ -653,11 +653,7 @@ module Make (MessageWrapper : Message.S) = struct
       (pointer_word : int)
       ~(default : string)
     : string =
-    let pointer_bytes = {
-      struct_storage.StructStorage.pointers with
-      Slice.start = pointer_word * sizeof_uint64;
-      Slice.len   = sizeof_uint64;
-    } in
+    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
     (* Text fields are always accessed by value, not by reference, since
        we always do an immediate decode to [string].  Therefore we can
        use the Reader logic to handle this case. *)
@@ -675,11 +671,7 @@ module Make (MessageWrapper : Message.S) = struct
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
     : ('a, 'b) Runtime.BArray.t =
-    let pointer_bytes = {
-      struct_storage.StructStorage.pointers with
-      Slice.start = pointer_word * sizeof_uint64;
-      Slice.len   = sizeof_uint64;
-    } in
+    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
     let alloc_default_list message =
       alloc_list_storage message ListStorage.Bit 0
     in
@@ -704,11 +696,7 @@ module Make (MessageWrapper : Message.S) = struct
       ~(decode : rw Slice.t -> 'a)
       ~(encode : 'a -> rw Slice.t -> unit)
     : ('a, 'b) Runtime.BArray.t =
-    let pointer_bytes = {
-      struct_storage.StructStorage.pointers with
-      Slice.start = pointer_word * sizeof_uint64;
-      Slice.len   = sizeof_uint64;
-    } in
+    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
     let alloc_default_list message =
       alloc_list_storage message (ListStorage.Bytes element_size) 0
     in
@@ -860,11 +848,7 @@ module Make (MessageWrapper : Message.S) = struct
     get_struct_field_bytes_list struct_storage pointer_word
       ~element_size:8
       ~decode:(fun slice ->
-        let pointer_bytes = {
-          struct_storage.StructStorage.pointers with
-          Slice.start = pointer_word * sizeof_uint64;
-          Slice.len   = sizeof_uint64;
-        } in
+        let pointer_bytes = get_struct_pointer struct_storage pointer_word in
         (* Text fields are always accessed by value, not by reference, since
            we always do an immediate decode to [string].  Therefore we can
            use the Reader logic to handle this case. *)
@@ -895,11 +879,7 @@ module Make (MessageWrapper : Message.S) = struct
     get_struct_field_bytes_list struct_storage pointer_word
       ~element_size:8
       ~decode:(fun slice ->
-        let pointer_bytes = {
-          struct_storage.StructStorage.pointers with
-          Slice.start = pointer_word * sizeof_uint64;
-          Slice.len   = sizeof_uint64;
-        } in
+        let pointer_bytes = get_struct_pointer struct_storage pointer_word in
         (* Data fields are always accessed by value, not by reference, since
            we always do an immediate decode to [string].  Therefore we can
            use the Reader logic to handle this case. *)
@@ -930,11 +910,7 @@ module Make (MessageWrapper : Message.S) = struct
       ~(data_words : int)
       ~(pointer_words : int)
     : ('a, 'b) Runtime.BArray.t =
-    let pointer_bytes = {
-      struct_storage.StructStorage.pointers with
-      Slice.start = pointer_word * sizeof_uint64;
-      Slice.len   = sizeof_uint64;
-    } in
+    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
     let alloc_default_list message =
       alloc_list_storage message (ListStorage.Composite (data_words, pointer_words)) 0
     in
@@ -993,11 +969,7 @@ module Make (MessageWrapper : Message.S) = struct
       ~(data_words : int)
       ~(pointer_words : int)
     : rw StructStorage.t =
-    let pointer_bytes = {
-      struct_storage.StructStorage.pointers with
-      Slice.start = pointer_word * sizeof_uint64;
-      Slice.len   = sizeof_uint64;
-    } in
+    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
     let alloc_default_struct message =
       alloc_struct_storage message ~data_words ~pointer_words
     in
@@ -1104,11 +1076,7 @@ module Make (MessageWrapper : Message.S) = struct
       (pointer_word : int)
       (src : string)
     : unit =
-    let pointer_bytes = {
-      struct_storage.StructStorage.pointers with
-      Slice.start = pointer_word * sizeof_uint64;
-      Slice.len   = sizeof_uint64;
-    } in
+    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
     let new_string_storage = uint8_list_of_string
         ~null_terminated:false ~dest_message:pointer_bytes.Slice.msg
         src
@@ -1124,11 +1092,7 @@ module Make (MessageWrapper : Message.S) = struct
       (pointer_word : int)
       (src : string)
     : unit =
-    let pointer_bytes = {
-      struct_storage.StructStorage.pointers with
-      Slice.start = pointer_word * sizeof_uint64;
-      Slice.len   = sizeof_uint64;
-    } in
+    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
     let new_string_storage = uint8_list_of_string
         ~null_terminated:true ~dest_message:pointer_bytes.Slice.msg
         src
@@ -1144,12 +1108,7 @@ module Make (MessageWrapper : Message.S) = struct
       (pointer_word : int)
       (src : 'cap ListStorage.t)
     : unit =
-    let pointer_bytes = {
-      struct_storage.StructStorage.pointers with
-      Slice.start = struct_storage.StructStorage.pointers.Slice.start +
-          (pointer_word * sizeof_uint64);
-      Slice.len = sizeof_uint64;
-    } in
+    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
     let list_storage = deep_copy_list ~src
         ~dest_message:struct_storage.StructStorage.pointers.Slice.msg
     in
@@ -1164,12 +1123,7 @@ module Make (MessageWrapper : Message.S) = struct
       (pointer_word : int)
       (src : 'cap StructStorage.t)
     : unit =
-    let pointer_bytes = {
-      struct_storage.StructStorage.pointers with
-      Slice.start = struct_storage.StructStorage.pointers.Slice.start +
-          (pointer_word * sizeof_uint64);
-      Slice.len = sizeof_uint64;
-    } in
+    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
     let new_storage = deep_copy_struct ~src
         ~dest_message:struct_storage.StructStorage.pointers.Slice.msg
     in
