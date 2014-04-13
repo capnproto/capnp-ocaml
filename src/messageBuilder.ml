@@ -1856,7 +1856,7 @@ module Make (MessageWrapper : Message.S) = struct
       ~(num_elements : int)
       ~(data_words : int)
       ~(pointer_words : int)
-    : ('a, 'b) Runtime.BArray.t =
+    : (rw StructStorage.t, 'b) Runtime.BArray.t =
     let () = set_discriminant struct_storage discr in
     let () = init_struct_field_list struct_storage pointer_word
         ~storage_type:(ListStorage.Composite (data_words, pointer_words))

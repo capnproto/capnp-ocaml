@@ -151,82 +151,67 @@ let generate_enum_unsafe_setter ~nodes_table ~scope ~enum_node ~indent
 
 (* Generate an accessor for retrieving a list of the given type. *)
 let generate_list_accessor ~nodes_table ~scope ~list_type ~indent
-    ~field_name ~field_ofs =
+    ~field_name ~field_ofs ~discr_str =
+  let make_accessors type_str =
+    (sprintf "%slet %s_get x = get_struct_field_%s_list x %u\n"
+      indent
+      field_name
+      type_str
+      field_ofs) ^
+    (sprintf "%slet %s_set x v = set_struct_field_%s_list \
+              %sx %u v\n"
+      indent
+      field_name
+      type_str
+      discr_str
+      field_ofs) ^
+    (sprintf "%slet %s_init x n = init_struct_field_%s_list \
+              %sx %u ~num_elements:n"
+      indent
+      field_name
+      type_str
+      discr_str
+      field_ofs)
+  in
   match PS.Type.unnamed_union_get list_type with
   | PS.Type.Void ->
-      sprintf "%slet %s_get x = failwith \"not implemented\"\n"
+      (sprintf "%slet %s_get x = failwith \"not implemented\"\n"
         indent
-        field_name
+        field_name) ^
+      (sprintf "%slet %s_set x v = failwith \"not implemented\"\n"
+        indent
+        field_name) ^
+      (sprintf "%slet %s_init x n = failwith \"not implemented\"\n"
+        indent
+        field_name)
   | PS.Type.Bool ->
-      sprintf "%slet %s_get x = get_struct_field_bit_list x %u\n"
-        indent
-        field_name
-        field_ofs
+      make_accessors "bit"
   | PS.Type.Int8 ->
-      sprintf "%slet %s_get x = get_struct_field_int8_list x %u\n"
-        indent
-        field_name
-        field_ofs
+      make_accessors "int8"
   | PS.Type.Int16 ->
-      sprintf "%slet %s_get x = get_struct_field_int16_list x %u\n"
-        indent
-        field_name
-        field_ofs
+      make_accessors "int16"
   | PS.Type.Int32 ->
-      sprintf "%slet %s_get x = get_struct_field_int32_list x %u\n"
-        indent
-        field_name
-        field_ofs
+      make_accessors "int32"
   | PS.Type.Int64 ->
-      sprintf "%slet %s_get x = get_struct_field_int64_list x %u\n"
-        indent
-        field_name
-        field_ofs
+      make_accessors "int64"
   | PS.Type.Uint8 ->
-      sprintf "%slet %s_get x = get_struct_field_uint8_list x %u\n"
-        indent
-        field_name
-        field_ofs
+      make_accessors "uint8"
   | PS.Type.Uint16 ->
-      sprintf "%slet %s_get x = get_struct_field_uint16_list x %u\n"
-        indent
-        field_name
-        field_ofs
+      make_accessors "uint16"
   | PS.Type.Uint32 ->
-      sprintf "%slet %s_get x = get_struct_field_uint32_list x %u\n"
-        indent
-        field_name
-        field_ofs
+      make_accessors "uint32"
   | PS.Type.Uint64 ->
-      sprintf "%slet %s_get x = get_struct_field_uint64_list x %u\n"
-        indent
-        field_name
-        field_ofs
+      make_accessors "uint64"
   | PS.Type.Float32 ->
-      sprintf "%slet %s_get x = get_struct_field_float32_list x %u\n"
-        indent
-        field_name
-        field_ofs
+      make_accessors "float32"
   | PS.Type.Float64 ->
-      sprintf "%slet %s_get x = get_struct_field_float64_list x %u\n"
-        indent
-        field_name
-        field_ofs
+      make_accessors "float64"
   | PS.Type.Text ->
-      sprintf "%slet %s_get x = get_struct_field_text_list x %u\n"
-        indent
-        field_name
-        field_ofs
+      make_accessors "text"
   | PS.Type.Data ->
-      sprintf "%slet %s_get x = get_struct_field_blob_list x %u\n"
-        indent
-        field_name
-        field_ofs
+      make_accessors "blob"
   | PS.Type.List _ ->
-      sprintf "%slet %s_get x = get_struct_field_list_list x %u\n"
-        indent
-        field_name
-        field_ofs
+      make_accessors "list"
   | PS.Type.Enum enum_def ->
       let enum_id = PS.Type.Enum.typeId_get enum_def in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
@@ -244,14 +229,32 @@ let generate_list_accessor ~nodes_table ~scope ~list_type ~indent
              ~enum_node ~indent:(indent ^ "    ") ~field_ofs)
           indent
       in
-      sprintf "%slet %s_get x =\n%s%s%s  \
-               get_struct_field_enum_list x %u ~decode ~encode\n"
+      (sprintf "%slet %s_get x =\n%s%s\
+                %s  get_struct_field_enum_list x %u ~decode ~encode\n"
         indent
         field_name
         decoder_declaration
         encoder_declaration
         indent
-        (field_ofs * 2)
+        (field_ofs * 2)) ^
+      (sprintf "%slet %s_set x v =\n%s%s\
+                %s  set_struct_field_enum_list %sx %u v ~decode ~encode\n"
+        indent
+        field_name
+        decoder_declaration
+        encoder_declaration
+        indent
+        discr_str
+        (field_ofs * 2)) ^
+      (sprintf "%slet %s_init x n =\n%s%s\
+                %s  init_struct_field_enum_list %sx %u ~decode ~encode ~num_elements:n\n"
+        indent
+        field_name
+        decoder_declaration
+        encoder_declaration
+        indent
+        discr_str
+        (field_ofs * 2))
   | PS.Type.Struct struct_def ->
       let id = PS.Type.Struct.typeId_get struct_def in
       let node = Hashtbl.find_exn nodes_table id in
@@ -259,25 +262,55 @@ let generate_list_accessor ~nodes_table ~scope ~list_type ~indent
       | PS.Node.Struct struct_def' ->
           let data_words    = PS.Node.Struct.dataWordCount_get struct_def' in
           let pointer_words = PS.Node.Struct.pointerCount_get struct_def' in
-          sprintf
+          (sprintf
             "%slet %s_get x = get_struct_field_struct_list x %u \
              ~data_words:%u ~pointer_words:%u\n"
             indent
             field_name
             field_ofs
             data_words
-            pointer_words
+            pointer_words) ^
+          (sprintf
+             "%slet %s_set x v = set_struct_field_struct_list %sx %u v \
+              ~data_words:%u ~pointer_words:%u\n"
+            indent
+            field_name
+            discr_str
+            field_ofs
+            data_words
+            pointer_words) ^
+          (sprintf
+             "%slet %s_init x n = init_struct_field_struct_list %sx %u \
+              ~data_words:%u ~pointer_words:%u ~num_elements:n\n"
+            indent
+            field_name
+            discr_str
+            field_ofs
+            data_words
+            pointer_words)
       | _ ->
           failwith "decoded non-struct node where struct node was expected."
       end
   | PS.Type.Interface _ ->
-      sprintf "%slet %s_get x = failwith \"not implemented\"\n"
+      (sprintf "%slet %s_get x = failwith \"not implemented\"\n"
         indent
-        field_name
+        field_name) ^
+      (sprintf "%slet %s_set x v = failwith \"not implemented\"\n"
+        indent
+        field_name) ^
+      (sprintf "%slet %s_init x n = failwith \"not implemented\"\n"
+        indent
+        field_name)
   | PS.Type.AnyPointer ->
-      sprintf "%slet %s_get x = failwith \"not implemented\"\n"
+      (sprintf "%slet %s_get x = failwith \"not implemented\"\n"
         indent
-        field_name
+        field_name) ^
+      (sprintf "%slet %s_set x v = failwith \"not implemented\"\n"
+        indent
+        field_name) ^
+      (sprintf "%slet %s_init x n = failwith \"not implemented\"\n"
+        indent
+        field_name)
   | PS.Type.Undefined_ x ->
        failwith (sprintf "Unknown Type union discriminant %d" x)
 
@@ -556,7 +589,7 @@ let generate_field_accessors ~nodes_table ~scope ~indent ~discr_ofs field =
           if has_trivial_default then
             let list_type = PS.Type.List.elementType_get list_def in
             generate_list_accessor ~nodes_table ~scope ~list_type ~indent
-              ~field_name ~field_ofs
+              ~field_name ~field_ofs ~discr_str
           else
             failwith "Default values for lists are not implemented."
       | (PS.Type.Enum enum_def, PS.Value.Enum val_uint16) ->
