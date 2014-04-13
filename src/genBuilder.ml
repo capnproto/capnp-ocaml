@@ -720,12 +720,18 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
         (generate_union_setter ~nodes_table ~scope struct_def union_fields)
   in
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
-  let unique_typename = GenCommon.make_unique_typename
-      ~mode:Mode.Builder ~scope_mode:Mode.Builder ~nodes_table node
-  in
-  (sprintf "%stype t = ro StructStorage.t option\n" indent) ^
-  (sprintf "%stype %s = t\n" indent unique_typename) ^
-  (sprintf "%stype array_t = ro ListStorage.t\n\n" indent) ^
+  (sprintf "%stype t = Reader.%s.builder_t = rw StructStorage.t\n"
+     indent
+     (GenCommon.get_fully_qualified_name nodes_table node)) ^
+  (sprintf "%stype %s = t\n" indent
+     (GenCommon.make_unique_typename ~mode:Mode.Builder
+        ~scope_mode:Mode.Builder ~nodes_table node)) ^
+  (sprintf "%stype reader_t = Reader.%s.t\n" indent
+     (GenCommon.get_fully_qualified_name nodes_table node)) ^
+  (sprintf "%stype %s = reader_t\n" indent
+     (GenCommon.make_unique_typename ~mode:Mode.Reader
+        ~scope_mode:Mode.Builder ~nodes_table node)) ^
+  (sprintf "%stype array_t = rw ListStorage.t\n\n" indent) ^
     nested_modules ^ accessors ^ union_accessors ^
     (sprintf "%slet of_message x = get_root_struct x\n" indent)
 

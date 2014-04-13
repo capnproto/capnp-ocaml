@@ -500,15 +500,17 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
     | _  -> generate_union_accessor ~nodes_table ~scope struct_def union_fields
   in
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
-  let unique_typename =
-    GenCommon.make_unique_typename ~mode:Mode.Reader
-      ~scope_mode:Mode.Reader ~nodes_table node
-  in
   (sprintf "%stype t = ro StructStorage.t option\n" indent) ^
-  (sprintf "%stype %s = t\n" indent unique_typename) ^
+  (sprintf "%stype %s = t\n" indent 
+     (GenCommon.make_unique_typename ~mode:Mode.Reader
+      ~scope_mode:Mode.Reader ~nodes_table node)) ^
+  (sprintf "%stype builder_t = rw StructStorage.t\n" indent) ^
+  (sprintf "%stype %s = builder_t\n" indent
+     (GenCommon.make_unique_typename ~mode:Mode.Builder
+        ~scope_mode:Mode.Reader ~nodes_table node)) ^
   (sprintf "%stype array_t = ro ListStorage.t\n\n" indent) ^
-    nested_modules ^ accessors ^ union_accessors ^
-    (sprintf "%slet of_message x = get_root_struct x\n" indent)
+  nested_modules ^ accessors ^ union_accessors ^
+  (sprintf "%slet of_message x = get_root_struct x\n" indent)
 
 
 (* Generate the OCaml module and type signature corresponding to a node.  [scope] is
