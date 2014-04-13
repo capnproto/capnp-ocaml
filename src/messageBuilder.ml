@@ -341,12 +341,73 @@ module Make (MessageWrapper : Message.S) = struct
         init_struct_pointer dest struct_storage
 
 
+  let shallow_copy_struct
+      ~(src : 'cap StructStorage.t)
+      ~(dest : rw StructStorage.t)
+    : unit =
+    let open StructStorage in
+    let data_copy_size =
+      min src.data.Slice.len dest.data.Slice.len
+    in
+    let () = Slice.blit
+        ~src:src.data ~src_ofs:0
+        ~dest:dest.data ~dest_ofs:0
+        ~len:data_copy_size
+    in
+    let pointer_copy_size =
+      min src.pointers.Slice.len dest.pointers.Slice.len
+    in
+    let pointer_copy_words = pointer_copy_size / sizeof_uint64 in
+    for i = 0 to pointer_copy_words - 1 do
+      let src_pointer  = get_struct_pointer src i in
+      let dest_pointer = get_struct_pointer dest i in
+      copy_pointer ~src:src_pointer ~dest:dest_pointer
+    done
+
+
+  let shallow_zero_out_struct
+      (struct_storage : rw StructStorage.t)
+    : unit =
+    let open StructStorage in
+    Slice.zero_out struct_storage.data
+      ~ofs:0 ~len:struct_storage.data.Slice.len;
+    Slice.zero_out struct_storage.pointers
+      ~ofs:0 ~len:struct_storage.pointers.Slice.len
+
+
+  (* Upgrade a struct so that its data and pointer regions are at least as large
+     as the protocol currently specifies.  If the [orig] struct satisfies the
+     requirements of the [data_words] and [pointer_words], this is a no-op.
+     Otherwise a new struct is allocated, the data is copied over, the [orig]
+     is zeroed out, and the pointer to the struct is updated.
+
+     Returns: new struct descriptor (possibly the same as the old one). *)
+  let upgrade_struct
+      (pointer_bytes : rw Slice.t)
+      (orig : rw StructStorage.t)
+      ~(data_words : int)
+      ~(pointer_words : int)
+    : rw StructStorage.t =
+    let open StructStorage in
+    if orig.data.Slice.len < data_words * sizeof_uint64 ||
+       orig.pointers.Slice.len < pointer_words * sizeof_uint64 then
+      let new_storage =
+        alloc_struct_storage orig.data.Slice.msg ~data_words ~pointer_words
+      in
+      let () = shallow_copy_struct ~src:orig ~dest:new_storage in
+      let () = init_struct_pointer pointer_bytes new_storage in
+      let () = shallow_zero_out_struct orig in
+      new_storage
+    else
+      orig
+
+
   (* Given a pointer which is expected to be a struct pointer, compute the
-    corresponding struct storage descriptor.  If the pointer is null, storage
-    for a default struct is immediately allocated using [alloc_default_struct].
-    [data_words] and [pointer_words] indicate the expected structure layout;
-    if the struct has a smaller layout (i.e. from an older protocol version),
-    then a new struct is allocated and the data is copied over. *)
+     corresponding struct storage descriptor.  If the pointer is null, storage
+     for a default struct is immediately allocated using [alloc_default_struct].
+     [data_words] and [pointer_words] indicate the expected structure layout;
+     if the struct has a smaller layout (i.e. from an older protocol version),
+     then a new struct is allocated and the data is copied over. *)
   let deref_struct_pointer
       (pointer_bytes : rw Slice.t)
       (alloc_default_struct : rw Message.t -> rw StructStorage.t)
@@ -359,7 +420,7 @@ module Make (MessageWrapper : Message.S) = struct
         let () = init_struct_pointer pointer_bytes struct_storage in
         struct_storage
     | Some struct_storage ->
-        struct_storage
+        upgrade_struct pointer_bytes struct_storage ~data_words ~pointer_words
 
 
   (* Given a [src] pointer to an arbitrary struct or list, first create a
@@ -379,19 +440,29 @@ module Make (MessageWrapper : Message.S) = struct
         init_list_pointer dest dest_list_storage
     | Object.Struct src_struct_storage ->
         let dest_struct_storage =
+          let data_words =
+            src_struct_storage.StructStorage.data.Slice.len / sizeof_uint64
+          in
+          let pointer_words =
+            src_struct_storage.StructStorage.pointers.Slice.len / sizeof_uint64
+          in
           deep_copy_struct ~src:src_struct_storage ~dest_message:dest.Slice.msg
+            ~data_words ~pointer_words
         in
         init_struct_pointer dest dest_struct_storage
 
   (* Given a [src] struct storage descriptor, first allocate storage in
      [dest_message] for a copy of the struct and then fill the allocated
-     region with a deep copy. *)
+     region with a deep copy.  [data_words] and [pointer_words] specify the
+     allocation regions for the destination struct, and may exceed the
+     corresponding sizes from the [src] (for example, when fields are added
+     during a schema upgrade). *)
   and deep_copy_struct
       ~(src : 'cap StructStorage.t)
       ~(dest_message : rw Message.t)
+      ~(data_words : int)
+      ~(pointer_words : int)
     : rw StructStorage.t =
-    let data_words    = src.StructStorage.data.Slice.len / sizeof_uint64 in
-    let pointer_words = src.StructStorage.pointers.Slice.len / sizeof_uint64 in
     let dest = alloc_struct_storage dest_message ~data_words ~pointer_words in
     let () = deep_copy_struct_to_dest ~src ~dest in
     dest
@@ -404,9 +475,15 @@ module Make (MessageWrapper : Message.S) = struct
     let () = Slice.blit
       ~src:src.StructStorage.data ~src_ofs:0
       ~dest:dest.StructStorage.data ~dest_ofs:0
-      ~len:dest.StructStorage.data.Slice.len
+      ~len:(min src.StructStorage.data.Slice.len dest.StructStorage.data.Slice.len)
     in
-    let pointer_words = dest.StructStorage.pointers.Slice.len / sizeof_uint64 in
+    let src_pointer_words =
+      src.StructStorage.pointers.Slice.len / sizeof_uint64
+    in
+    let dest_pointer_words =
+      dest.StructStorage.pointers.Slice.len / sizeof_uint64
+    in
+    let pointer_words = min src_pointer_words dest_pointer_words in
     for i = 0 to pointer_words - 1 do
       let open StructStorage in
       let src_pointer = {
@@ -577,47 +654,6 @@ module Make (MessageWrapper : Message.S) = struct
     Slice.zero_out struct_storage.pointers
       ~ofs:0 ~len:struct_storage.pointers.Slice.len
 
-
-  (* Upgrade a struct so that its data and pointer regions are at least as large
-     as the protocol currently specifies.  If the [orig] struct satisfies the
-     requirements of the [data_words] and [pointer_words], this is a no-op.
-     Otherwise a new struct is allocated, the data is copied over, and the [orig]
-     is zeroed out.
-
-     Returns: new struct descriptor (possibly the same as the old one). *)
-  let upgrade_struct
-      ~(data_words : int)
-      ~(pointer_words : int)
-      (orig : rw StructStorage.t)
-    : rw StructStorage.t =
-    let open StructStorage in
-    if orig.data.Slice.len < data_words * sizeof_uint64 ||
-       orig.pointers.Slice.len < pointer_words * sizeof_uint64 then
-      let new_storage =
-        alloc_struct_storage orig.data.Slice.msg ~data_words ~pointer_words
-      in
-      let () =
-        let data_copy_size =
-          min (data_words * sizeof_uint64) orig.data.Slice.len
-        in
-        let () = Slice.blit
-            ~src:orig.data ~src_ofs:0
-            ~dest:new_storage.data ~dest_ofs:0
-            ~len:data_copy_size
-        in
-        let pointer_copy_words =
-          min pointer_words (orig.pointers.Slice.len / sizeof_uint64)
-        in
-        for i = 0 to pointer_copy_words - 1 do
-          let src  = get_struct_pointer orig i in
-          let dest = get_struct_pointer new_storage i in
-          copy_pointer ~src ~dest
-        done
-      in
-      let () = deep_zero_struct orig in
-      new_storage
-    else
-      orig
 
   (* Given a string, generate an orphaned cap'n proto List<Uint8> which contains
      the string content. *)
@@ -912,10 +948,84 @@ module Make (MessageWrapper : Message.S) = struct
         init_list_pointer pointer_bytes new_string_storage)
 
 
+  (* Upgrade a List<Struct> so that each of the elements is at least as large
+     as the requirements of the current schema version.  In general, this will
+     allocate a new list, make a shallow copy of the old data into the new list,
+     zero out the old data, and update the list pointer to reflect the change.
+     If the schema has not changed, this is a noop.
+
+     Returns the new list storage descriptor. *)
+  let upgrade_struct_list
+      (pointer_bytes : rw Slice.t)
+      (list_storage : rw ListStorage.t)
+      ~(data_words : int)
+      ~(pointer_words : int)
+    : rw ListStorage.t =
+    let needs_upgrade =
+      match list_storage.ListStorage.storage_type with
+      | ListStorage.Bytes orig_data_size ->
+          data_words * sizeof_uint64 > orig_data_size || pointer_words > 0
+      | ListStorage.Pointer ->
+          data_words > 0 || pointer_words > 1
+      | ListStorage.Composite (orig_data_words, orig_pointer_words) ->
+          data_words > orig_data_words || pointer_words > orig_pointer_words
+      | ListStorage.Empty
+      | ListStorage.Bit ->
+          invalid_msg "decoded non-struct list where struct list was expected"
+    in
+    if needs_upgrade then
+      let message = pointer_bytes.Slice.msg in
+      let new_storage = alloc_list_storage message
+          (ListStorage.Composite (data_words, pointer_words))
+          list_storage.ListStorage.num_elements
+      in
+      let total_words = data_words + pointer_words in
+      for i = 0 to list_storage.ListStorage.num_elements - 1 do
+        let dest =
+          let data = {
+            new_storage.ListStorage.storage with
+            Slice.start = new_storage.ListStorage.storage.Slice.start +
+                (i * total_words * sizeof_uint64);
+            Slice.len = data_words * sizeof_uint64;
+          } in
+          let pointers = {
+            data with
+            Slice.start = Slice.get_end data;
+            Slice.len   = pointer_words * sizeof_uint64;
+          } in
+          { StructStorage.data; StructStorage.pointers }
+        in
+        shallow_copy_struct ~src:(StructList.get list_storage i) ~dest
+      done;
+      let content_slice =
+        match list_storage.ListStorage.storage_type with
+        | ListStorage.Composite _ ->
+            (* Composite lists prefix the storage region with a tag word,
+               which we can zero out as well. *)
+            { list_storage.ListStorage.storage with
+              Slice.start =
+                list_storage.ListStorage.storage.Slice.start - sizeof_uint64;
+              Slice.len =
+                list_storage.ListStorage.storage.Slice.len + sizeof_uint64; }
+        | _ ->
+            list_storage.ListStorage.storage
+      in
+      let () = init_list_pointer pointer_bytes new_storage in
+      let () = Slice.zero_out content_slice
+          ~ofs:0 ~len:content_slice.Slice.len
+      in
+      new_storage
+    else
+      list_storage
+
+
   (* Given storage for a struct, get the data for the specified
      struct-embedded pointer under the assumption that it points to a
      cap'n proto List<S> for some struct S.  The [data_words] and
-     [pointer_words] describe the struct layout. *)
+     [pointer_words] describe the struct layout.  After a schema
+     upgrade, it is possible that the structs stored in the list
+     are smaller than expected; in this case, the data is immediately
+     (shallow) copied into a new list with appropriately-sized members. *)
   let get_struct_field_struct_list
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
@@ -926,7 +1036,12 @@ module Make (MessageWrapper : Message.S) = struct
     let alloc_default_list message = alloc_list_storage message
         (ListStorage.Composite (data_words, pointer_words)) 0
     in
-    let list_storage = deref_list_pointer pointer_bytes alloc_default_list in
+    let orig_list_storage =
+      deref_list_pointer pointer_bytes alloc_default_list
+    in
+    let list_storage = upgrade_struct_list pointer_bytes orig_list_storage
+      ~data_words ~pointer_words
+    in
     Runtime.BArray.make
       ~length:(fun x -> x.ListStorage.num_elements)
       ~get:StructList.get
@@ -1134,10 +1249,13 @@ module Make (MessageWrapper : Message.S) = struct
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       (src : 'cap StructStorage.t)
+      ~(data_words : int)
+      ~(pointer_words : int)
     : unit =
     let pointer_bytes = get_struct_pointer struct_storage pointer_word in
     let new_storage = deep_copy_struct ~src
         ~dest_message:struct_storage.StructStorage.pointers.Slice.msg
+        ~data_words ~pointer_words
     in
     let () = deep_zero_pointer pointer_bytes in
     init_struct_pointer pointer_bytes new_storage
