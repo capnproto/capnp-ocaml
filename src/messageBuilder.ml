@@ -1268,19 +1268,208 @@ module Make (MessageWrapper : Message.S) = struct
   (* Given storage for a struct, set the data for the specified struct-embedded
      pointer equal to a deep copy of the specified [src] list. *)
   let set_struct_field_list
-      ?(discr : Discr.t option)
+      ~(discr : Discr.t option)
+      ~(storage_type : ListStorage.storage_type_t)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
-      (src : 'cap ListStorage.t)
+      (src : 'cap ListStorage.t option)
     : unit =
     let pointer_bytes = get_struct_pointer struct_storage pointer_word in
-    let list_storage = deep_copy_list ~src
-        ~dest_message:struct_storage.StructStorage.pointers.Slice.msg
+    let list_storage =
+      let message = struct_storage.StructStorage.pointers.Slice.msg in
+      match src with
+      | Some src' ->
+          deep_copy_list ~src:src' ~dest_message:message
+      | None ->
+          alloc_list_storage message storage_type 0
     in
     let () = deep_zero_pointer pointer_bytes in
     let () = set_discriminant struct_storage discr in
     init_list_pointer pointer_bytes list_storage
 
+
+  let set_struct_field_bit_list
+      ?(discr : Discr.t option)
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      (src : 'cap ListStorage.t option)
+    : (bool, 'a) Runtime.BArray.t =
+    let () = set_struct_field_list ~discr ~storage_type:ListStorage.Bit
+        struct_storage pointer_word src
+    in
+    get_struct_field_bit_list struct_storage pointer_word
+
+  let set_struct_field_int8_list
+      ?(discr : Discr.t option)
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      (src : 'cap ListStorage.t option)
+    : (int, 'b) Runtime.BArray.t =
+    let () = set_struct_field_list ~discr ~storage_type:(ListStorage.Bytes 1)
+        struct_storage pointer_word src
+    in
+    get_struct_field_int8_list struct_storage pointer_word
+
+  let set_struct_field_int16_list
+      ?(discr : Discr.t option)
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      (src : 'cap ListStorage.t option)
+    : (int, 'b) Runtime.BArray.t =
+    let () = set_struct_field_list ~discr ~storage_type:(ListStorage.Bytes 2)
+        struct_storage pointer_word src
+    in
+    get_struct_field_int16_list struct_storage pointer_word
+
+  let set_struct_field_int32_list
+      ?(discr : Discr.t option)
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      (src : 'cap ListStorage.t option)
+    : (int32, 'b) Runtime.BArray.t =
+    let () = set_struct_field_list ~discr ~storage_type:(ListStorage.Bytes 4)
+        struct_storage pointer_word src
+    in
+    get_struct_field_int32_list struct_storage pointer_word
+
+  let set_struct_field_int64_list
+      ?(discr : Discr.t option)
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      (src : 'cap ListStorage.t option)
+    : (int64, 'b) Runtime.BArray.t =
+    let () = set_struct_field_list ~discr ~storage_type:(ListStorage.Bytes 8)
+        struct_storage pointer_word src
+    in
+    get_struct_field_int64_list struct_storage pointer_word
+
+  let set_struct_field_uint8_list
+      ?(discr : Discr.t option)
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      (src : 'cap ListStorage.t option)
+    : (int, 'b) Runtime.BArray.t =
+    let () = set_struct_field_list ~discr ~storage_type:(ListStorage.Bytes 1)
+        struct_storage pointer_word src
+    in
+    get_struct_field_uint8_list struct_storage pointer_word
+
+  let set_struct_field_uint16_list
+      ?(discr : Discr.t option)
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      (src : 'cap ListStorage.t option)
+    : (int, 'b) Runtime.BArray.t =
+    let () = set_struct_field_list ~discr ~storage_type:(ListStorage.Bytes 2)
+        struct_storage pointer_word src
+    in
+    get_struct_field_uint16_list struct_storage pointer_word
+
+  let set_struct_field_uint32_list
+      ?(discr : Discr.t option)
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      (src : 'cap ListStorage.t option)
+    : (Uint32.t, 'b) Runtime.BArray.t =
+    let () = set_struct_field_list ~discr ~storage_type:(ListStorage.Bytes 4)
+        struct_storage pointer_word src
+    in
+    get_struct_field_uint32_list struct_storage pointer_word
+
+  let set_struct_field_uint64_list
+      ?(discr : Discr.t option)
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      (src : 'cap ListStorage.t option)
+    : (Uint64.t, 'b) Runtime.BArray.t =
+    let () = set_struct_field_list ~discr ~storage_type:(ListStorage.Bytes 8)
+        struct_storage pointer_word src
+    in
+    get_struct_field_uint64_list struct_storage pointer_word
+
+  let set_struct_field_float32_list
+      ?(discr : Discr.t option)
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      (src : 'cap ListStorage.t option)
+    : (float, 'b) Runtime.BArray.t =
+    let () = set_struct_field_list ~discr ~storage_type:(ListStorage.Bytes 4)
+        struct_storage pointer_word src
+    in
+    get_struct_field_float32_list struct_storage pointer_word
+
+  let set_struct_field_float64_list
+      ?(discr : Discr.t option)
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      (src : 'cap ListStorage.t option)
+    : (float, 'b) Runtime.BArray.t =
+    let () = set_struct_field_list ~discr ~storage_type:(ListStorage.Bytes 8)
+        struct_storage pointer_word src
+    in
+    get_struct_field_float64_list struct_storage pointer_word
+
+  let set_struct_field_blob_list
+      ?(discr : Discr.t option)
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      (src : 'cap ListStorage.t option)
+      : (string, 'b) Runtime.BArray.t =
+    let () = set_struct_field_list ~discr ~storage_type:ListStorage.Pointer
+        struct_storage pointer_word src
+    in
+    get_struct_field_blob_list struct_storage pointer_word
+
+  let set_struct_field_text_list
+      ?(discr : Discr.t option)
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      (src : 'cap ListStorage.t option)
+      : (string, 'b) Runtime.BArray.t =
+    let () = set_struct_field_list ~discr ~storage_type:ListStorage.Pointer
+        struct_storage pointer_word src
+    in
+    get_struct_field_text_list struct_storage pointer_word
+
+  let set_struct_field_struct_list
+      ?(discr : Discr.t option)
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      (src : 'cap ListStorage.t option)
+      ~(data_words : int)
+      ~(pointer_words : int)
+      : (rw StructStorage.t, 'b) Runtime.BArray.t =
+    let () = set_struct_field_list ~discr
+        ~storage_type:(ListStorage.Composite (data_words, pointer_words))
+            struct_storage pointer_word src
+    in
+    get_struct_field_struct_list struct_storage pointer_word
+      ~data_words ~pointer_words
+
+  let set_struct_field_list_list
+      ?(discr : Discr.t option)
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      (src : 'cap ListStorage.t option)
+      : (rw ListStorage.t, 'b) Runtime.BArray.t =
+    let () = set_struct_field_list ~discr ~storage_type:ListStorage.Pointer
+        struct_storage pointer_word src
+    in
+    get_struct_field_list_list struct_storage pointer_word
+
+  let set_struct_field_enum_list
+      ?(discr : Discr.t option)
+      (struct_storage : rw StructStorage.t)
+      (pointer_word : int)
+      (src : 'cap ListStorage.t option)
+      ~(decode : int -> 'a)
+      ~(encode : 'a -> int)
+    : ('a, 'b) Runtime.BArray.t =
+    let () = set_struct_field_list ~discr ~storage_type:(ListStorage.Bytes 2)
+        struct_storage pointer_word src
+    in
+    get_struct_field_enum_list struct_storage pointer_word
+      ~decode ~encode
 
   (* Given storage for a struct, set the data for the specified struct-embedded
      pointer equal to a deep copy of the specified [src] struct. *)
@@ -1288,14 +1477,19 @@ module Make (MessageWrapper : Message.S) = struct
       ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
-      (src : 'cap StructStorage.t)
+      (src : 'cap StructStorage.t option)
       ~(data_words : int)
       ~(pointer_words : int)
     : rw StructStorage.t =
     let pointer_bytes = get_struct_pointer struct_storage pointer_word in
-    let new_storage = deep_copy_struct ~src
-        ~dest_message:struct_storage.StructStorage.pointers.Slice.msg
-        ~data_words ~pointer_words
+    let new_storage =
+      let message = struct_storage.StructStorage.pointers.Slice.msg in
+      match src with
+      | Some src' ->
+          deep_copy_struct ~src:src'
+            ~dest_message:message ~data_words ~pointer_words
+      | None ->
+          alloc_struct_storage message ~data_words ~pointer_words
     in
     let () = deep_zero_pointer pointer_bytes in
     let () = set_discriminant struct_storage discr in
