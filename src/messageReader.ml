@@ -38,9 +38,11 @@ module Make (MessageWrapper : Message.S) = struct
   include RC
 
 
-  (* Given a pointer which is expected to be a list pointer, compute the corresponding
-     list storage descriptor.  Returns None if the pointer is null. *)
-  let deref_list_pointer (pointer_bytes : 'cap Slice.t) : 'cap ListStorage.t option =
+  (* Given a pointer which is expected to be a list pointer, compute the
+     corresponding list storage descriptor.  Returns None if the pointer is
+     null. *)
+  let deref_list_pointer (pointer_bytes : 'cap Slice.t)
+    : 'cap ListStorage.t option =
     match deref_pointer pointer_bytes with
     | Object.None ->
         None
@@ -50,9 +52,11 @@ module Make (MessageWrapper : Message.S) = struct
         invalid_msg "decoded struct pointer where list pointer was expected"
 
 
-  (* Given a pointer which is expected to be a struct pointer, compute the corresponding
-     struct storage descriptor.  Returns None if the pointer is null. *)
-  let deref_struct_pointer (pointer_bytes : 'cap Slice.t) : 'cap StructStorage.t option =
+  (* Given a pointer which is expected to be a struct pointer, compute the
+     corresponding struct storage descriptor.  Returns None if the pointer is
+     null. *)
+  let deref_struct_pointer (pointer_bytes : 'cap Slice.t)
+    : 'cap StructStorage.t option =
     match deref_pointer pointer_bytes with
     | Object.None ->
         None

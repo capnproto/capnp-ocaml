@@ -39,8 +39,8 @@ let sprintf = Printf.sprintf
 (* Generate an encoder lambda for converting from an enum value to the associated
    uint16.  [allow_undefined] indicates whether or not to permit enum values which
    use the [Undefined_] constructor. *)
-let generate_enum_encoder ~(allow_undefined : bool) ~nodes_table ~scope ~enum_node
-    ~indent ~field_ofs =
+let generate_enum_encoder ~(allow_undefined : bool) ~nodes_table ~scope
+    ~enum_node ~indent ~field_ofs =
   let header = sprintf "%s(fun enum -> match enum with\n" indent in
   let match_cases =
     let scope_relative_name =
@@ -72,7 +72,8 @@ let generate_enum_encoder ~(allow_undefined : bool) ~nodes_table ~scope ~enum_no
         String.concat ~sep:"" [
           sprintf "%s  | %s.Undefined_ _ ->\n" indent scope_relative_name;
           sprintf
-            "%s      raise (Invalid_message \"Cannot encode undefined enum value.\"))\n"
+            "%s      raise \
+             (Invalid_message \"Cannot encode undefined enum value.\"))\n"
             indent;
         ]
     in
@@ -83,8 +84,8 @@ let generate_enum_encoder ~(allow_undefined : bool) ~nodes_table ~scope ~enum_no
 
 
 (* Generate an accessor for decoding an enum type. *)
-let generate_enum_getter ~nodes_table ~scope ~enum_node ~indent ~field_name ~field_ofs
-    ~default =
+let generate_enum_getter ~nodes_table ~scope ~enum_node ~indent ~field_name
+    ~field_ofs ~default =
   let decoder_declaration =
     sprintf "%s  let decode =\n%s%s  in\n"
       indent
@@ -103,8 +104,8 @@ let generate_enum_getter ~nodes_table ~scope ~enum_node ~indent ~field_name ~fie
 
 
 (* Generate an accessor for setting the value of an enum. *)
-let generate_enum_safe_setter ~nodes_table ~scope ~enum_node ~indent ~field_name ~field_ofs
-    ~default =
+let generate_enum_safe_setter ~nodes_table ~scope ~enum_node ~indent ~field_name
+    ~field_ofs ~default =
   let encoder_declaration =
     sprintf "%s  let encode =\n%s%s  in\n"
       indent
@@ -113,7 +114,8 @@ let generate_enum_safe_setter ~nodes_table ~scope ~enum_node ~indent ~field_name
       indent
   in
   sprintf
-    "%slet %s_set x e =\n%s%s  set_struct_field_uint16 ~default:%u x %u (encode e)\n"
+    "%slet %s_set x e =\n%s%s  \
+     set_struct_field_uint16 ~default:%u x %u (encode e)\n"
     indent
     field_name
     encoder_declaration
@@ -122,10 +124,10 @@ let generate_enum_safe_setter ~nodes_table ~scope ~enum_node ~indent ~field_name
     (2 * field_ofs)
 
 
-(* Generate an accessor for setting the value of an enum, permitting values which
-   are not defined in the schema. *)
-let generate_enum_unsafe_setter ~nodes_table ~scope ~enum_node ~indent ~field_name
-    ~field_ofs ~default =
+(* Generate an accessor for setting the value of an enum, permitting values
+   which are not defined in the schema. *)
+let generate_enum_unsafe_setter ~nodes_table ~scope ~enum_node ~indent
+    ~field_name ~field_ofs ~default =
   let encoder_declaration =
     sprintf "%s  let encode =\n%s%s  in\n"
       indent
@@ -134,7 +136,8 @@ let generate_enum_unsafe_setter ~nodes_table ~scope ~enum_node ~indent ~field_na
       indent
   in
   sprintf
-    "%slet %s_set_unsafe x e =\n%s%s  set_struct_field_uint16 ~default:%u x %u (encode e)\n"
+    "%slet %s_set_unsafe x e =\n%s%s  \
+     set_struct_field_uint16 ~default:%u x %u (encode e)\n"
     indent
     field_name
     encoder_declaration
@@ -144,7 +147,8 @@ let generate_enum_unsafe_setter ~nodes_table ~scope ~enum_node ~indent ~field_na
 
 
 (* Generate an accessor for retrieving a list of the given type. *)
-let generate_list_accessor ~nodes_table ~scope ~list_type ~indent ~field_name ~field_ofs =
+let generate_list_accessor ~nodes_table ~scope ~list_type ~indent
+    ~field_name ~field_ofs =
   match PS.Type.unnamed_union_get list_type with
   | PS.Type.Void ->
       sprintf "%slet %s_get x = failwith \"not implemented\"\n"
@@ -233,11 +237,12 @@ let generate_list_accessor ~nodes_table ~scope ~list_type ~indent ~field_name ~f
       let encoder_declaration =
         sprintf "%s  let encode =\n%s%s  in\n"
           indent
-          (generate_enum_encoder ~allow_undefined:false ~nodes_table ~scope ~enum_node
-             ~indent:(indent ^ "    ") ~field_ofs)
+          (generate_enum_encoder ~allow_undefined:false ~nodes_table ~scope
+             ~enum_node ~indent:(indent ^ "    ") ~field_ofs)
           indent
       in
-      sprintf "%slet %s_get x =\n%s%s%s  get_struct_field_enum_list x %u ~decode ~encode\n"
+      sprintf "%slet %s_get x =\n%s%s%s  \
+               get_struct_field_enum_list x %u ~decode ~encode\n"
         indent
         field_name
         decoder_declaration
@@ -293,11 +298,13 @@ let generate_field_accessors ~nodes_table ~scope ~indent field =
       let field_ofs = Uint32.to_int (PS.Field.Slot.offset_get slot) in
       let tp = PS.Field.Slot.type_get slot in
       let default = PS.Field.Slot.defaultValue_get slot in
-      begin match (PS.Type.unnamed_union_get tp, PS.Value.unnamed_union_get default) with
+      begin match (PS.Type.unnamed_union_get tp,
+        PS.Value.unnamed_union_get default) with
       | (PS.Type.Void, PS.Value.Void) ->
           sprintf "%slet %s_get x = ()\n" indent field_name
       | (PS.Type.Bool, PS.Value.Bool a) ->
-          (sprintf "%slet %s_get x = get_struct_field_bit ~default_bit:%s x %u %u\n"
+          (sprintf "%slet %s_get x = \
+                    get_struct_field_bit ~default_bit:%s x %u %u\n"
             indent
             field_name
             (if a then "true" else "false")
@@ -344,7 +351,8 @@ let generate_field_accessors ~nodes_table ~scope ~indent field =
             indent
             field_name
             field_name) ^
-          (sprintf "%slet %s_set x v = set_struct_field_int32 ~default:%sl x %u v\n"
+          (sprintf "%slet %s_set x v = \
+                    set_struct_field_int32 ~default:%sl x %u v\n"
             indent
             field_name
             (Int32.to_string a)
@@ -363,7 +371,8 @@ let generate_field_accessors ~nodes_table ~scope ~indent field =
             indent
             field_name
             field_name) ^
-          (sprintf "%slet %s_set x v = set_struct_field_int64 ~default:%sL x %u v\n"
+          (sprintf "%slet %s_set x v = \
+                    set_struct_field_int64 ~default:%sL x %u v\n"
             indent
             field_name
             (Int64.to_string a)
@@ -378,7 +387,8 @@ let generate_field_accessors ~nodes_table ~scope ~indent field =
             field_name
             a
             field_ofs) ^
-          (sprintf "%slet %s_set x v = set_struct_field_uint8 ~default:%d x %u v\n"
+          (sprintf "%slet %s_set x v = \
+                    set_struct_field_uint8 ~default:%d x %u v\n"
             indent
             field_name
             a
@@ -389,7 +399,8 @@ let generate_field_accessors ~nodes_table ~scope ~indent field =
             field_name
             a
             (field_ofs * 2)) ^
-          (sprintf "%slet %s_set x v = set_struct_field_uint16 ~default:%d x %u v\n"
+          (sprintf "%slet %s_set x v = \
+                    set_struct_field_uint16 ~default:%d x %u v\n"
             indent
             field_name
             a
@@ -410,7 +421,8 @@ let generate_field_accessors ~nodes_table ~scope ~indent field =
             indent
             field_name
             field_name) ^
-          (sprintf "%slet %s_set x v = set_struct_field_uint32 ~default:%s x %u v\n"
+          (sprintf "%slet %s_set x v = \
+                    set_struct_field_uint32 ~default:%s x %u v\n"
             indent
             field_name
             default
@@ -435,7 +447,8 @@ let generate_field_accessors ~nodes_table ~scope ~indent field =
             indent
             field_name
             field_name) ^
-          (sprintf "%slet %s_set x v = set_struct_field_uint64 ~default:%s x %u v\n"
+          (sprintf "%slet %s_set x v = \
+                    set_struct_field_uint64 ~default:%s x %u v\n"
             indent
             field_name
             default
@@ -447,13 +460,15 @@ let generate_field_accessors ~nodes_table ~scope ~indent field =
       | (PS.Type.Float32, PS.Value.Float32 a) ->
           let default_int32 = Int32.bits_of_float a in
           (sprintf
-            "%slet %s_get x = Int32.float_of_bits (get_struct_field_int32 ~default:%sl x %u)\n"
+             "%slet %s_get x = Int32.float_of_bits \
+              (get_struct_field_int32 ~default:%sl x %u)\n"
             indent
             field_name
             (Int32.to_string default_int32)
             (field_ofs * 4)) ^
           (sprintf
-            "%slet %s_set x v = set_struct_field_int32 ~default:%sl x %u (Int32.bits_of_float v)\n"
+             "%slet %s_set x v = set_struct_field_int32 ~default:%sl x %u \
+              (Int32.bits_of_float v)\n"
             indent
             field_name
             (Int32.to_string default_int32)
@@ -461,35 +476,45 @@ let generate_field_accessors ~nodes_table ~scope ~indent field =
       | (PS.Type.Float64, PS.Value.Float64 a) ->
           let default_int64 = Int64.bits_of_float a in
           (sprintf
-            "%slet %s_get x = Int64.float_of_bits (get_struct_field_int64 ~default:%sL x %u)\n"
+             "%slet %s_get x = Int64.float_of_bits \
+              (get_struct_field_int64 ~default:%sL x %u)\n"
             indent
             field_name
             (Int64.to_string default_int64)
             (field_ofs * 8)) ^
           (sprintf
-            "%slet %s_set x = set_struct_field_int64 ~default:%sL x %u (Int64.bits_of_float v)\n"
+             "%slet %s_set x = set_struct_field_int64 ~default:%sL x %u \
+              (Int64.bits_of_float v)\n"
             indent
             field_name
             (Int64.to_string default_int64)
             (field_ofs * 8))
       | (PS.Type.Text, PS.Value.Text a) ->
-          (sprintf "%slet %s_get x = get_struct_field_text ~default:\"%s\" x %u\n"
+          (sprintf
+             "%slet %s_get x = \
+              get_struct_field_text ~default:\"%s\" x %u\n"
             indent
             field_name
             (String.escaped a)
             (field_ofs * 8)) ^
-          (sprintf "%slet %s_set x v = set_struct_field_text ~default:\"%s\" x %u v\n"
+          (sprintf
+             "%slet %s_set x v = \
+              set_struct_field_text ~default:\"%s\" x %u v\n"
             indent
             field_name
             (String.escaped a)
             (field_ofs * 8))
       | (PS.Type.Data, PS.Value.Data a) ->
-          (sprintf "%slet %s_get x = get_struct_field_blob ~default:\"%s\" x %u\n"
+          (sprintf
+             "%slet %s_get x = \
+              get_struct_field_blob ~default:\"%s\" x %u\n"
             indent
             field_name
             (String.escaped a)
             (field_ofs * 8)) ^
-          (sprintf "%slet %s_set x v = set_struct_field_blob ~default:\"%s\" x %u v\n"
+          (sprintf
+             "%slet %s_set x v = \
+              set_struct_field_blob ~default:\"%s\" x %u v\n"
             indent
             field_name
             (String.escaped a)
@@ -541,8 +566,12 @@ let generate_field_accessors ~nodes_table ~scope ~indent field =
             let node = Hashtbl.find_exn nodes_table id in
             match PS.Node.unnamed_union_get node with
             | PS.Node.Struct struct_def' ->
-                let data_words    = PS.Node.Struct.dataWordCount_get struct_def' in
-                let pointer_words = PS.Node.Struct.pointerCount_get struct_def' in
+                let data_words =
+                  PS.Node.Struct.dataWordCount_get struct_def'
+                in
+                let pointer_words =
+                  PS.Node.Struct.pointerCount_get struct_def'
+                in
                 sprintf
                   "%slet %s_get x = get_struct_field_struct x %u \
                    ~data_words:%u ~pointer_words:%u\n"
@@ -552,7 +581,8 @@ let generate_field_accessors ~nodes_table ~scope ~indent field =
                   data_words
                   pointer_words
             | _ ->
-                failwith "decoded non-struct node where struct node was expected."
+                failwith
+                  "decoded non-struct node where struct node was expected."
           else
             failwith "Default values for structs are not implemented."
       | (PS.Type.Interface iface_def, PS.Value.Interface) ->
@@ -587,8 +617,9 @@ let generate_field_accessors ~nodes_table ~scope ~indent field =
       | (PS.Type.Struct _, _)
       | (PS.Type.Interface _, _)
       | (PS.Type.AnyPointer, _) ->
-          let err_msg =
-            sprintf "The default value for field \"%s\" has an unexpected type." field_name
+          let err_msg = sprintf
+              "The default value for field \"%s\" has an unexpected type."
+              field_name
           in
           failwith err_msg
       end
@@ -606,7 +637,8 @@ let generate_union_setter ~nodes_table ~scope struct_def fields =
     let field_has_void_type =
       match PS.Field.unnamed_union_get field with
       | PS.Field.Slot slot ->
-          begin match PS.Type.unnamed_union_get (PS.Field.Slot.type_get slot) with
+          begin match PS.Type.unnamed_union_get
+                        (PS.Field.Slot.type_get slot) with
           | PS.Type.Void -> true
           | _ -> false
           end
@@ -632,7 +664,8 @@ let generate_union_setter ~nodes_table ~scope struct_def fields =
   let footer = [
     sprintf "%s  in" indent;
     sprintf "%s  set_struct_field_uint16 ~default:0 x %u discr_val\n"
-      indent((Uint32.to_int (PS.Node.Struct.discriminantOffset_get struct_def)) * 2);
+      indent
+      ((Uint32.to_int (PS.Node.Struct.discriminantOffset_get struct_def)) * 2);
   ] in
   (GenCommon.generate_union_type nodes_table scope struct_def fields) ^ "\n" ^
   String.concat ~sep:"\n" (header @ cases @ footer)
@@ -680,7 +713,8 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
     | [] ->
         ""
     | _  ->
-        (GenReader.generate_union_accessor ~nodes_table ~scope struct_def union_fields) ^
+        (GenReader.generate_union_accessor ~nodes_table ~scope
+           struct_def union_fields) ^
         (generate_union_setter ~nodes_table ~scope struct_def union_fields)
   in
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
@@ -707,7 +741,8 @@ and generate_node
   let node_id = PS.Node.id_get node in
   let indent = String.make (2 * (List.length scope)) ' ' in
   let generate_nested_modules () =
-    match Topsort.topological_sort nodes_table (GenCommon.children_of nodes_table node) with
+    match Topsort.topological_sort nodes_table
+            (GenCommon.children_of nodes_table node) with
     | Some child_nodes ->
         let child_modules = List.map child_nodes ~f:(fun child ->
           let child_name = GenCommon.get_unqualified_name ~parent:node ~child in

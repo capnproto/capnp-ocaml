@@ -146,7 +146,9 @@ module Make (MessageWrapper : Message.S) = struct
     | None ->
         (* Use the "double far" convention. *)
         let landing_pad_bytes =
-          let landing_pad = Slice.alloc pointer_bytes.Slice.msg (2 * sizeof_uint64) in
+          let landing_pad =
+            Slice.alloc pointer_bytes.Slice.msg (2 * sizeof_uint64)
+          in
           let far_pointer_desc = {
             FarPointer.landing_pad = FarPointer.NormalPointer;
             FarPointer.offset = content_slice.Slice.start / 8;
@@ -194,7 +196,9 @@ module Make (MessageWrapper : Message.S) = struct
       (list_storage : rw ListStorage.t)
     : unit =
     let storage_slice = list_storage.ListStorage.storage in
-    let () = assert (storage_slice.Slice.segment_id = pointer_bytes.Slice.segment_id) in
+    let () =
+      assert (storage_slice.Slice.segment_id = pointer_bytes.Slice.segment_id)
+    in
     let offset_bytes = storage_slice.Slice.start - Slice.get_end pointer_bytes in
     let () = assert (offset_bytes land 7 = 0) in
     let offset_words = offset_bytes / 8 in
@@ -237,8 +241,8 @@ module Make (MessageWrapper : Message.S) = struct
         in
         let tag_word_desc = {
           ListPointer.offset = 0;
-          ListPointer.element_type =
-            list_pointer_type_of_storage_type list_storage.ListStorage.storage_type;
+          ListPointer.element_type = list_pointer_type_of_storage_type
+              list_storage.ListStorage.storage_type;
           ListPointer.num_elements = pointer_element_count;
         } in
         Slice.set_int64 pointer_bytes 0 (ListPointer.encode tag_word_desc)
@@ -250,9 +254,9 @@ module Make (MessageWrapper : Message.S) = struct
         ~init_far_pointer_tag
 
 
-  (* Given a pointer which is expected to be a list pointer, compute the corresponding
-     list storage descriptor.  If the pointer is null, storage for a default list is
-     immediately allocated using [alloc_default_list]. *)
+  (* Given a pointer which is expected to be a list pointer, compute the
+     corresponding list storage descriptor.  If the pointer is null, storage
+     for a default list is immediately allocated using [alloc_default_list]. *)
   let deref_list_pointer
       (pointer_bytes : rw Slice.t)
       (alloc_default_list : rw Message.t -> rw ListStorage.t)
@@ -279,14 +283,17 @@ module Make (MessageWrapper : Message.S) = struct
     let pointer_descr = {
       StructPointer.offset = struct_storage.StructStorage.data.Slice.start -
           Slice.get_end pointer_bytes;
-      StructPointer.data_words = struct_storage.StructStorage.data.Slice.len / 8;
-      StructPointer.pointer_words = struct_storage.StructStorage.pointers.Slice.len / 8;
+      StructPointer.data_words =
+        struct_storage.StructStorage.data.Slice.len / 8;
+      StructPointer.pointer_words =
+        struct_storage.StructStorage.pointers.Slice.len / 8;
     } in
     let pointer_val = StructPointer.encode pointer_descr in
     Slice.set_int64 pointer_bytes 0 pointer_val
 
 
-  (* Initialize a struct pointer so that it points to the specified struct storage. *)
+  (* Initialize a struct pointer so that it points to the specified
+     struct storage. *)
   let init_struct_pointer
       (pointer_bytes : rw Slice.t)
       (struct_storage : 'cap StructStorage.t)
@@ -299,8 +306,10 @@ module Make (MessageWrapper : Message.S) = struct
       let init_far_pointer_tag tag_slice =
         let tag_word_desc = {
           StructPointer.offset = 0;
-          StructPointer.data_words = struct_storage.StructStorage.data.Slice.len / 8;
-          StructPointer.pointer_words = struct_storage.StructStorage.pointers.Slice.len / 8;
+          StructPointer.data_words =
+            struct_storage.StructStorage.data.Slice.len / 8;
+          StructPointer.pointer_words =
+            struct_storage.StructStorage.pointers.Slice.len / 8;
         } in
         Slice.set_int64 pointer_bytes 0 (StructPointer.encode tag_word_desc)
       in
@@ -332,12 +341,12 @@ module Make (MessageWrapper : Message.S) = struct
         init_struct_pointer dest struct_storage
 
 
-  (* Given a pointer which is expected to be a struct pointer, compute the corresponding
-     struct storage descriptor.  If the pointer is null, storage for a default struct
-     is immediately allocated using [alloc_default_struct].  [data_words] and
-     [pointer_words] indicate the expected structure layout; if the struct has a
-     smaller layout (i.e. from an older protocol version), then a new struct is
-     allocated and the data is copied over. *)
+  (* Given a pointer which is expected to be a struct pointer, compute the
+    corresponding struct storage descriptor.  If the pointer is null, storage
+    for a default struct is immediately allocated using [alloc_default_struct].
+    [data_words] and [pointer_words] indicate the expected structure layout;
+    if the struct has a smaller layout (i.e. from an older protocol version),
+    then a new struct is allocated and the data is copied over. *)
   let deref_struct_pointer
       (pointer_bytes : rw Slice.t)
       (alloc_default_struct : rw Message.t -> rw StructStorage.t)
@@ -513,8 +522,9 @@ module Make (MessageWrapper : Message.S) = struct
           for i = 0 to list_storage.num_elements - 1 do
             let pointer_bytes = {
               list_storage.storage with
-              Slice.start = list_storage.storage.Slice.start + (i * sizeof_uint64);
-              Slice.len   = sizeof_uint64;
+              Slice.start =
+                list_storage.storage.Slice.start + (i * sizeof_uint64);
+              Slice.len = sizeof_uint64;
             } in
             deep_zero_pointer pointer_bytes
           done
@@ -587,7 +597,9 @@ module Make (MessageWrapper : Message.S) = struct
         alloc_struct_storage orig.data.Slice.msg ~data_words ~pointer_words
       in
       let () =
-        let data_copy_size = min (data_words * sizeof_uint64) orig.data.Slice.len in
+        let data_copy_size =
+          min (data_words * sizeof_uint64) orig.data.Slice.len
+        in
         let () = Slice.blit
             ~src:orig.data ~src_ofs:0
             ~dest:new_storage.data ~dest_ofs:0
@@ -911,8 +923,8 @@ module Make (MessageWrapper : Message.S) = struct
       ~(pointer_words : int)
     : ('a, 'b) Runtime.BArray.t =
     let pointer_bytes = get_struct_pointer struct_storage pointer_word in
-    let alloc_default_list message =
-      alloc_list_storage message (ListStorage.Composite (data_words, pointer_words)) 0
+    let alloc_default_list message = alloc_list_storage message
+        (ListStorage.Composite (data_words, pointer_words)) 0
     in
     let list_storage = deref_list_pointer pointer_bytes alloc_default_list in
     Runtime.BArray.make

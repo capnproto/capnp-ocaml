@@ -127,11 +127,11 @@ let compile (request : PS.CodeGeneratorRequest.t) (dest_dir : string) : unit =
         ~scope:[] ~node_name:requested_filename requested_file_node) ^
       mod_footer
     in
-    let () = Out_channel.with_file (mli_filename requested_filename) ~f:(fun chan ->
-      Out_channel.output_string chan sig_file_content)
+    let () = Out_channel.with_file (mli_filename requested_filename)
+        ~f:(fun chan -> Out_channel.output_string chan sig_file_content)
     in
-    let () = Out_channel.with_file (ml_filename requested_filename) ~f:(fun chan ->
-      Out_channel.output_string chan mod_file_content)
+    let () = Out_channel.with_file (ml_filename requested_filename)
+        ~f:(fun chan -> Out_channel.output_string chan mod_file_content)
     in
     ()
   done

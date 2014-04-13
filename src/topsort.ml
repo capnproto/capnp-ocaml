@@ -44,7 +44,9 @@ let add_parentage_maps
     let child_nodes = PS.Node.nestedNodes_get parent in
     for i = 0 to R.Array.length child_nodes - 1 do
       let child_nested_node = R.Array.get child_nodes i in
-      let child_node = Hashtbl.find_exn nodes_table (PS.Node.NestedNode.id_get child_nested_node) in
+      let child_node =
+        Hashtbl.find_exn nodes_table (PS.Node.NestedNode.id_get child_nested_node)
+      in
       let child_node_id = PS.Node.id_get child_node in
       let () = add_children child_node in
       Hashtbl.replace parentage_table ~key:child_node_id ~data:node_id
@@ -61,7 +63,8 @@ let build_parentage_table
 : (Uint64.t, Uint64.t) Hashtbl.t =
   let parentage_table = Hashtbl.Poly.create () in
   let () =
-    List.iter nodes ~f:(fun node -> add_parentage_maps nodes_table parentage_table node)
+    List.iter nodes
+      ~f:(fun node -> add_parentage_maps nodes_table parentage_table node)
   in
   parentage_table
 
@@ -70,18 +73,19 @@ let register_reference ~parentage_table ~edges ~referrer ~referee : unit =
   match Hashtbl.find parentage_table referee with
   | Some parent_referee ->
       if Util.uint64_equal parent_referee referrer then
-        (* This would be be a reference from a child node to one of its grandparents, or
-         * a reference between two child nodes.  In the first case, this reference is
-         * not important for the purpose of topological sorting; in the second case,
-         * this implies a topological sorting of the child nodes which will be sorted
-         * out on a later pass. *)
+        (* This would be be a reference from a child node to one of its
+           grandparents, or a reference between two child nodes.  In the first
+           case, this reference is not important for the purpose of topological
+           sorting; in the second case, this implies a topological sorting of
+           the child nodes which will be sorted out on a later pass. *)
         ()
       else
         Hashtbl.add_multi edges ~key:parent_referee ~data:referrer
   | None ->
-      (* When recursing within node M, we may find reference to nodes which are not contained
-       * within node M.  These references will not be contained in the parentage table,
-       * and are not important for the purpose of topological sorting. *)
+      (* When recursing within node M, we may find reference to nodes which are
+         not contained within node M.  These references will not be contained in
+         the parentage table, and are not important for the purpose of
+         topological sorting. *)
       ()
 
 
@@ -94,7 +98,8 @@ let rec register_type_reference
   match PS.Type.unnamed_union_get tp with
   | PS.Type.List x ->
       let inner_type = PS.Type.List.elementType_get x in
-      register_type_reference ~parentage_table ~edges ~referrer ~referee_type:inner_type
+      register_type_reference ~parentage_table ~edges
+        ~referrer ~referee_type:inner_type
   | PS.Type.Enum x ->
       register_reference ~parentage_table ~edges ~referrer
         ~referee:(PS.Type.Enum.typeId_get x)
@@ -117,9 +122,9 @@ let build_reference_graph
     (nodes_to_graph : PS.Node.t list)
 : (Uint64.t, Uint64.t list) Hashtbl.t =
   let rec add_edges ~parentage_table ~edges ?parent_id_opt node =
-    (* While iterating through a node's children, we create edges from the *parent*
-     * and not from the child.  [parent_id] will always record the toplevel
-     * node ID regardless of how deep we recurse. *)
+    (* While iterating through a node's children, we create edges from the
+       *parent* and not from the child.  [parent_id] will always record the
+       toplevel node ID regardless of how deep we recurse. *)
     let parent_id =
       match parent_id_opt with
       | None -> (* i.e. current node is toplevel *)
@@ -131,7 +136,9 @@ let build_reference_graph
       let child_nodes = PS.Node.nestedNodes_get node in
       for i = 0 to R.Array.length child_nodes - 1 do
         let child_nested_node = R.Array.get child_nodes i in
-        let child_node = Hashtbl.find_exn nodes_table (PS.Node.NestedNode.id_get child_nested_node) in
+        let child_node = Hashtbl.find_exn nodes_table
+            (PS.Node.NestedNode.id_get child_nested_node)
+        in
         add_edges ~parentage_table ~edges ~parent_id_opt:parent_id child_node;
       done
     in
@@ -139,9 +146,9 @@ let build_reference_graph
     | PS.Node.File
     | PS.Node.Enum _
     | PS.Node.Annotation _ ->
-        (* Annotations are (typically) not reflected directly in the generated code,
-         * so at least for the present we ignore annotation types when determining
-         * the order in which to generate code. *)
+        (* Annotations are (typically) not reflected directly in the generated
+           code, so at least for the present we ignore annotation types when
+           determining the order in which to generate code. *)
         ()
     | PS.Node.Struct node_struct ->
         let fields = PS.Node.Struct.fields_get node_struct in
@@ -152,8 +159,11 @@ let build_reference_graph
               register_type_reference ~parentage_table ~edges
                 ~referrer:parent_id ~referee_type:(PS.Field.Slot.type_get slot)
           | PS.Field.Group group ->
-              let group_node = Hashtbl.find_exn nodes_table (PS.Field.Group.typeId_get group) in
-              add_edges ~parentage_table ~edges ~parent_id_opt:parent_id group_node
+              let group_node =
+                Hashtbl.find_exn nodes_table (PS.Field.Group.typeId_get group)
+              in
+              add_edges ~parentage_table ~edges ~parent_id_opt:parent_id
+                group_node
           | PS.Field.Undefined_ x ->
               failwith (Printf.sprintf "Unknown Field union discriminant %d" x)
         done
@@ -174,7 +184,9 @@ let build_reference_graph
   in
   let parentage_table = build_parentage_table nodes_table nodes_to_graph in
   let edges = Hashtbl.Poly.create () in
-  let () = List.iter nodes_to_graph ~f:(fun node -> add_edges ~parentage_table ~edges node) in
+  let () = List.iter nodes_to_graph
+      ~f:(fun node -> add_edges ~parentage_table ~edges node)
+  in
   edges
 
 
@@ -182,7 +194,8 @@ let dump_reference_graph reference_graph =
   let () = Printf.printf "reference graph:\n" in
   Hashtbl.iter reference_graph ~f:(fun ~key ~data ->
     let () = Printf.printf "  key: %s\n" (Uint64.to_string key) in
-    List.iter data ~f:(fun x -> Printf.printf "    data: %s\n" (Uint64.to_string x)))
+    List.iter data
+      ~f:(fun x -> Printf.printf "    data: %s\n" (Uint64.to_string x)))
 
 
 let has_incoming_edges reference_graph (node_id : Uint64.t) : bool =
@@ -230,7 +243,9 @@ let topological_sort
   let priority_node_ids = List.filter node_ids ~f:(fun id ->
     not (has_incoming_edges reference_graph id))
   in
-  let rev_sorted_node_ids = kahn_sort ~reference_graph ~sorted_output_ids:[] ~priority_node_ids in
+  let rev_sorted_node_ids = kahn_sort ~reference_graph
+      ~sorted_output_ids:[] ~priority_node_ids
+  in
   if Hashtbl.is_empty reference_graph then
     Some (List.rev_map rev_sorted_node_ids ~f:(Hashtbl.find_exn nodes_table))
   else

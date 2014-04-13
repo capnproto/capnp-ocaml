@@ -69,8 +69,8 @@ module Make (MessageWrapper : Message.S) = struct
     (** Get the range of bytes associated with a pointer stored in a struct. *)
     let get_pointer
         (struct_storage : 'cap t)
-        (word : int)                (* Struct-relative pointer index *)
-      : 'cap Slice.t option =       (* Returns None if storage is too small for this word *)
+        (word : int)           (* Struct-relative pointer index *)
+      : 'cap Slice.t option =  (* Returns None if storage is too small for this word *)
       let pointers = struct_storage.pointers in
       let start = word * sizeof_uint64 in
       let len   = sizeof_uint64 in
@@ -94,14 +94,15 @@ module Make (MessageWrapper : Message.S) = struct
       (** list(bool), tightly packed bits *)
       | Bit
 
-      (** either primitive values or a data-only struct; argument is the byte count *)
+      (** either primitive values or a data-only struct; argument is the byte
+          count *)
       | Bytes of int
 
       (** either a pointer to an external object, or a pointer-only struct *)
       | Pointer
 
-      (** typical struct; parameters are per-element word size for data section and pointers
-       *  section, respectively *)
+      (** typical struct; parameters are per-element word size for data section
+          and pointers section, respectively *)
       | Composite of int * int
 
     (** Storage associated with a cap'n proto list. *)
@@ -143,9 +144,9 @@ module Make (MessageWrapper : Message.S) = struct
   (* Given a list pointer descriptor, construct the corresponding list storage
      descriptor. *)
   let make_list_storage
-      ~(message : 'cap Message.t)         (* Message of interest *)
-      ~(segment_id : int)                 (* Segment ID where list storage is found *)
-      ~(segment_offset : int)             (* Segment offset where list storage is found *)
+      ~(message : 'cap Message.t)     (* Message of interest *)
+      ~(segment_id : int)             (* Segment ID where list storage is found *)
+      ~(segment_offset : int)         (* Segment offset where list storage is found *)
       ~(list_pointer : ListPointer.t)
     : 'cap ListStorage.t =
     let make_list_storage_aux ~offset ~num_words ~num_elements ~storage_type =
@@ -166,26 +167,35 @@ module Make (MessageWrapper : Message.S) = struct
     let open ListPointer in
     match list_pointer.element_type with
     | Void ->
-        make_list_storage_aux ~offset:0 ~num_words:0 ~num_elements:list_pointer.num_elements
-          ~storage_type:ListStorage.Empty
+        make_list_storage_aux ~offset:0 ~num_words:0
+          ~num_elements:list_pointer.num_elements ~storage_type:ListStorage.Empty
     | OneBitValue ->
-        make_list_storage_aux ~offset:0 ~num_words:(Util.ceil_int list_pointer.num_elements 64)
+        make_list_storage_aux ~offset:0
+          ~num_words:(Util.ceil_int list_pointer.num_elements 64)
           ~num_elements:list_pointer.num_elements ~storage_type:ListStorage.Bit
     | OneByteValue ->
-        make_list_storage_aux ~offset:0 ~num_words:(Util.ceil_int list_pointer.num_elements 8)
-          ~num_elements:list_pointer.num_elements ~storage_type:(ListStorage.Bytes 1)
+        make_list_storage_aux ~offset:0
+          ~num_words:(Util.ceil_int list_pointer.num_elements 8)
+          ~num_elements:list_pointer.num_elements
+          ~storage_type:(ListStorage.Bytes 1)
     | TwoByteValue ->
-        make_list_storage_aux ~offset:0 ~num_words:(Util.ceil_int list_pointer.num_elements 4)
-          ~num_elements:list_pointer.num_elements ~storage_type:(ListStorage.Bytes 2)
+        make_list_storage_aux ~offset:0
+          ~num_words:(Util.ceil_int list_pointer.num_elements 4)
+          ~num_elements:list_pointer.num_elements
+          ~storage_type:(ListStorage.Bytes 2)
     | FourByteValue ->
-        make_list_storage_aux ~offset:0 ~num_words:(Util.ceil_int list_pointer.num_elements 2)
-          ~num_elements:list_pointer.num_elements ~storage_type:(ListStorage.Bytes 4)
+        make_list_storage_aux ~offset:0
+          ~num_words:(Util.ceil_int list_pointer.num_elements 2)
+          ~num_elements:list_pointer.num_elements
+          ~storage_type:(ListStorage.Bytes 4)
     | EightByteValue ->
         make_list_storage_aux ~offset:0 ~num_words:list_pointer.num_elements
-          ~num_elements:list_pointer.num_elements ~storage_type:(ListStorage.Bytes 8)
+          ~num_elements:list_pointer.num_elements
+          ~storage_type:(ListStorage.Bytes 8)
     | EightBytePointer ->
         make_list_storage_aux ~offset:0 ~num_words:list_pointer.num_elements
-          ~num_elements:list_pointer.num_elements ~storage_type:ListStorage.Pointer
+          ~num_elements:list_pointer.num_elements
+          ~storage_type:ListStorage.Pointer
     | Composite ->
         let struct_tag_bytes = {
           Slice.msg        = message;
@@ -194,7 +204,8 @@ module Make (MessageWrapper : Message.S) = struct
           Slice.len        = sizeof_uint64;
         } in
         let () = bounds_check_slice_exn
-          ~err:"composite list pointer describes invalid storage region" struct_tag_bytes
+            ~err:"composite list pointer describes invalid storage region"
+            struct_tag_bytes
         in
         begin match decode_pointer struct_tag_bytes with
         | Pointer.Struct struct_pointer ->
@@ -206,7 +217,8 @@ module Make (MessageWrapper : Message.S) = struct
             in
             if num_elements * words_per_element > num_words then
               invalid_msg "composite list pointer describes invalid word count";
-            make_list_storage_aux ~offset:sizeof_uint64 ~num_words:list_pointer.num_elements
+            make_list_storage_aux ~offset:sizeof_uint64
+              ~num_words:list_pointer.num_elements
               ~num_elements:struct_pointer.SP.offset
               ~storage_type:(ListStorage.Composite
                  (struct_pointer.SP.data_words, struct_pointer.SP.pointer_words))
@@ -254,21 +266,24 @@ module Make (MessageWrapper : Message.S) = struct
               ~list_pointer)
         | (Pointer.Far content_pointer, Pointer.Struct struct_pointer) ->
             let data = {
-              Slice.msg        = message;
+              Slice.msg = message;
               Slice.segment_id = content_pointer.FarPointer.segment_id;
-              Slice.start      = content_pointer.FarPointer.offset * sizeof_uint64;
-              Slice.len        = struct_pointer.StructPointer.data_words * sizeof_uint64;
+              Slice.start = content_pointer.FarPointer.offset * sizeof_uint64;
+              Slice.len = struct_pointer.StructPointer.data_words * sizeof_uint64;
             } in
             let pointers = {
               data with
               Slice.start = Slice.get_end data;
-              Slice.len   = struct_pointer.StructPointer.pointer_words * sizeof_uint64;
+              Slice.len =
+                struct_pointer.StructPointer.pointer_words * sizeof_uint64;
             } in
             let () = bounds_check_slice_exn
-              ~err:"struct-tagged far pointer describes invalid data region" data
+                ~err:"struct-tagged far pointer describes invalid data region"
+                data
             in
             let () = bounds_check_slice_exn
-              ~err:"struct-tagged far pointer describes invalid pointers region" pointers
+                ~err:"struct-tagged far pointer describes invalid pointers region"
+                pointers
             in
             Object.Struct { StructStorage.data; StructStorage.pointers; }
         | _ ->
@@ -292,8 +307,9 @@ module Make (MessageWrapper : Message.S) = struct
         let open StructPointer in
         let data = {
           pointer_bytes with
-          Slice.start = (Slice.get_end pointer_bytes) + (struct_pointer.offset * sizeof_uint64);
-          Slice.len   = struct_pointer.data_words * sizeof_uint64;
+          Slice.start =
+            (Slice.get_end pointer_bytes) + (struct_pointer.offset * sizeof_uint64);
+          Slice.len = struct_pointer.data_words * sizeof_uint64;
         } in
         let pointers = {
           data with
@@ -343,13 +359,17 @@ module Make (MessageWrapper : Message.S) = struct
     loop init (list_storage.ListStorage.num_elements - 1)
 
 
+  (* FIXME: rewrite as make_get() and make_set() which perform pointer decoding
+     up-front and return a closure *)
   module BitList = struct
     let get (list_storage : 'cap ListStorage.t) (i : int) : bool =
       match list_storage.ListStorage.storage_type with
       | ListStorage.Bit ->
           let byte_ofs = i / 8 in
           let bit_ofs  = i mod 8 in
-          let byte_val = Slice.get_uint8 list_storage.ListStorage.storage byte_ofs in
+          let byte_val =
+            Slice.get_uint8 list_storage.ListStorage.storage byte_ofs
+          in
           (byte_val land (1 lsl bit_ofs)) <> 0
       | _ ->
           invalid_msg "decoded non-bool list where bool list was expected"
@@ -360,7 +380,9 @@ module Make (MessageWrapper : Message.S) = struct
           let byte_ofs = i / 8 in
           let bit_ofs  = i mod 8 in
           let bitmask  = 1 lsl bit_ofs in
-          let old_byte_val = Slice.get_uint8 list_storage.ListStorage.storage byte_ofs in
+          let old_byte_val =
+            Slice.get_uint8 list_storage.ListStorage.storage byte_ofs
+          in
           let new_byte_val =
             if v then
               old_byte_val lor bitmask
@@ -387,6 +409,8 @@ module Make (MessageWrapper : Message.S) = struct
   end
 
 
+  (* FIXME: rewrite as make_get() and make_set() which perform pointer decoding
+     up-front and return a closure *)
   module BytesList = struct
     let get (list_storage : 'cap ListStorage.t) (i : int) : 'cap Slice.t =
       let byte_count =
@@ -396,8 +420,9 @@ module Make (MessageWrapper : Message.S) = struct
         | _ -> invalid_msg "decoded non-bytes list where bytes list was expected"
       in {
         list_storage.ListStorage.storage with
-        Slice.start = list_storage.ListStorage.storage.Slice.start + (i * byte_count);
-        Slice.len   = byte_count
+        Slice.start =
+          list_storage.ListStorage.storage.Slice.start + (i * byte_count);
+        Slice.len = byte_count
       }
 
     let fold_left
@@ -416,6 +441,8 @@ module Make (MessageWrapper : Message.S) = struct
   end
 
 
+  (* FIXME: rewrite as make_get() and make_set() which perform pointer decoding
+     up-front and return a closure *)
   module StructList = struct
     let get (list_storage : 'cap ListStorage.t) (i : int) : 'cap StructStorage.t =
       match list_storage.ListStorage.storage_type with
@@ -423,8 +450,9 @@ module Make (MessageWrapper : Message.S) = struct
           (* List storage contains inlined data-only structs *)
           let data = {
             list_storage.ListStorage.storage with
-            Slice.start = list_storage.ListStorage.storage.Slice.start + (i * byte_count);
-            Slice.len   = byte_count;
+            Slice.start =
+              list_storage.ListStorage.storage.Slice.start + (i * byte_count);
+            Slice.len = byte_count;
           } in
           let pointers = {
             list_storage.ListStorage.storage with
@@ -441,8 +469,9 @@ module Make (MessageWrapper : Message.S) = struct
           } in
           let pointers = {
             list_storage.ListStorage.storage with
-            Slice.start = list_storage.ListStorage.storage.Slice.start + (i * sizeof_uint64);
-            Slice.len   = sizeof_uint64;
+            Slice.start =
+              list_storage.ListStorage.storage.Slice.start + (i * sizeof_uint64);
+            Slice.len = sizeof_uint64;
           } in
           { StructStorage.data; StructStorage.pointers; }
       | ListStorage.Composite (data_words, pointers_words) ->
@@ -452,8 +481,9 @@ module Make (MessageWrapper : Message.S) = struct
           let total_size    = data_size + pointers_size in
           let data = {
             list_storage.ListStorage.storage with
-            Slice.start = list_storage.ListStorage.storage.Slice.start + (i * total_size);
-            Slice.len   = data_size;
+            Slice.start =
+              list_storage.ListStorage.storage.Slice.start + (i * total_size);
+            Slice.len = data_size;
           } in
           let pointers = {
             data with
@@ -466,7 +496,10 @@ module Make (MessageWrapper : Message.S) = struct
 
 
     (* FIXME: This needs to make a deep copy *)
-    let set (list_storage : 'cap ListStorage.t) (i : int) (v : 'cap StructStorage.t) : unit =
+    let set (list_storage : 'cap ListStorage.t)
+        (i : int)
+        (v : 'cap StructStorage.t)
+      : unit =
       failwith "not implemented"
 
 

@@ -83,7 +83,8 @@ let get_unqualified_name
       String.capitalize s
   | None ->
       let error_msg = sprintf
-        "Unable to find unqualified name of child node %s (%s) within parent node %s (%s)."
+          "Unable to find unqualified name of child node %s (%s) \
+           within parent node %s (%s)."
         (Uint64.to_string child_id)
         (PS.Node.displayName_get child)
         (Uint64.to_string (PS.Node.id_get parent))
@@ -107,7 +108,8 @@ let get_unqualified_name
               | PS.Field.Slot _ ->
                   loop_fields (i + 1)
               | PS.Field.Group group ->
-                  if Util.uint64_equal child_id (PS.Field.Group.typeId_get group) then
+                  if Util.uint64_equal child_id
+                      (PS.Field.Group.typeId_get group) then
                     String.capitalize (PS.Field.name_get field)
                   else
                     loop_fields (i + 1)
@@ -140,7 +142,8 @@ let get_fully_qualified_name nodes_table node : (string * Uint64.t) list =
 let get_scope_relative_name nodes_table (scope_stack : Uint64.t list) node : string =
   let rec pop_components components scope =
     match components, scope with
-    | ( (component_name, component_scope_id) :: other_components, scope_id :: scope_ids) ->
+    | ( (component_name, component_scope_id) ::
+          other_components, scope_id :: scope_ids) ->
         if Util.uint64_equal component_scope_id scope_id then
           pop_components other_components scope_ids
         else
@@ -206,7 +209,8 @@ let rec type_name nodes_table scope tp : string =
   | PS.Type.Data    -> "string"
   | PS.Type.List list_descr ->
       let list_type = PS.Type.List.elementType_get list_descr in
-      sprintf "(%s, array_t) Runtime.Array.t" (type_name nodes_table scope list_type)
+      sprintf "(%s, array_t) Runtime.Array.t"
+        (type_name nodes_table scope list_type)
   | PS.Type.Enum enum_descr ->
       let enum_id = PS.Type.Enum.typeId_get enum_descr in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
@@ -244,7 +248,9 @@ let generate_union_type nodes_table scope struct_def fields =
         let group_type_name =
           let group_id = PS.Field.Group.typeId_get group in
           let group_node = Hashtbl.find_exn nodes_table group_id in
-          let group_module_name = get_scope_relative_name nodes_table scope group_node in
+          let group_module_name =
+            get_scope_relative_name nodes_table scope group_node
+          in
           group_module_name ^ ".t"
         in
         (sprintf "%s  | %s of %s" indent field_name group_type_name) :: acc
@@ -268,7 +274,9 @@ let generate_enum_sig ~nodes_table ~scope ~nested_modules ~mode ~node enum_def =
     if is_builder then
       let reader_type = get_fully_qualified_name nodes_table node in
       let reader_type_string =
-        "Reader." ^ (reader_type |> List.map ~f:fst |> String.concat ~sep:".") ^ ".t"
+        "Reader." ^
+          (reader_type |> List.map ~f:fst |> String.concat ~sep:".") ^
+          ".t"
       in
       sprintf "%stype t = %s =\n" indent reader_type_string
     else

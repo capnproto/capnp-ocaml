@@ -70,8 +70,8 @@ let generate_enum_decoder ~nodes_table ~scope ~enum_node ~indent ~field_ofs =
 
 
 (* Generate an accessor for decoding an enum type. *)
-let generate_enum_accessor ~nodes_table ~scope ~enum_node ~indent ~field_name ~field_ofs
-    ~default =
+let generate_enum_accessor ~nodes_table ~scope ~enum_node ~indent ~field_name
+    ~field_ofs ~default =
   let decoder_declaration =
     sprintf "%s  let decode =\n%s%s  in\n"
       indent
@@ -79,7 +79,8 @@ let generate_enum_accessor ~nodes_table ~scope ~enum_node ~indent ~field_name ~f
          ~indent:(indent ^ "    ") ~field_ofs)
       indent
   in
-  sprintf "%slet %s_get x =\n%s%s  decode (get_struct_field_uint16 ~default:%u x %u)\n"
+  sprintf "%slet %s_get x =\n%s%s  decode (get_struct_field_uint16 \
+           ~default:%u x %u)\n"
     indent
     field_name
     decoder_declaration
@@ -175,7 +176,8 @@ let generate_list_accessor ~nodes_table ~scope ~list_type ~indent ~field_name ~f
             ~indent:(indent ^ "    ") ~field_ofs)
           indent
       in
-      sprintf "%slet %s_get x =\n%s%s  get_struct_field_enum_list x %u decode\n"
+      sprintf "%slet %s_get x =\n%s%s  \
+               get_struct_field_enum_list x %u decode\n"
         indent
         field_name
         decoder_declaration
@@ -214,7 +216,8 @@ let generate_field_accessor ~nodes_table ~scope ~indent field =
       | (PS.Type.Void, PS.Value.Void) ->
           sprintf "%slet %s_get x = ()\n" indent field_name
       | (PS.Type.Bool, PS.Value.Bool a) ->
-          sprintf "%slet %s_get x = get_struct_field_bit ~default_bit:%s x %u %u\n"
+          sprintf "%slet %s_get x = get_struct_field_bit \
+                   ~default_bit:%s x %u %u\n"
             indent
             field_name
             (if a then "true" else "false")
@@ -299,7 +302,8 @@ let generate_field_accessor ~nodes_table ~scope ~indent field =
       | (PS.Type.Float32, PS.Value.Float32 a) ->
           let default_int32 = Int32.bits_of_float a in
           sprintf
-            "%slet %s_get x = Int32.float_of_bits (get_struct_field_int32 ~default:%sl x %u)\n"
+            "%slet %s_get x = Int32.float_of_bits \
+             (get_struct_field_int32 ~default:%sl x %u)\n"
               indent
               field_name
               (Int32.to_string default_int32)
@@ -307,7 +311,8 @@ let generate_field_accessor ~nodes_table ~scope ~indent field =
       | (PS.Type.Float64, PS.Value.Float64 a) ->
           let default_int64 = Int64.bits_of_float a in
           sprintf
-            "%slet %s_get x = Int64.float_of_bits (get_struct_field_int64 ~default:%sL x %u)\n"
+            "%slet %s_get x = Int64.float_of_bits \
+             (get_struct_field_int64 ~default:%sL x %u)\n"
               indent
               field_name
               (Int64.to_string default_int64)
@@ -338,7 +343,8 @@ let generate_field_accessor ~nodes_table ~scope ~indent field =
           in
           if has_trivial_default then
             let list_type = PS.Type.List.elementType_get list_def in
-            generate_list_accessor ~nodes_table ~scope ~list_type ~indent ~field_name ~field_ofs
+            generate_list_accessor ~nodes_table ~scope ~list_type ~indent
+              ~field_name ~field_ofs
           else
             failwith "Default values for lists are not implemented."
       | (PS.Type.Enum enum_def, PS.Value.Enum val_uint16) ->
@@ -398,8 +404,9 @@ let generate_field_accessor ~nodes_table ~scope ~indent field =
       | (PS.Type.Struct _, _)
       | (PS.Type.Interface _, _)
       | (PS.Type.AnyPointer, _) ->
-          let err_msg =
-            sprintf "The default value for field \"%s\" has an unexpected type." field_name
+          let err_msg = sprintf
+              "The default value for field \"%s\" has an unexpected type."
+              field_name
           in
           failwith err_msg
       end
@@ -514,7 +521,8 @@ and generate_node
   let node_id = PS.Node.id_get node in
   let indent = String.make (2 * (List.length scope)) ' ' in
   let generate_nested_modules () =
-    match Topsort.topological_sort nodes_table (GenCommon.children_of nodes_table node) with
+    match Topsort.topological_sort nodes_table
+            (GenCommon.children_of nodes_table node) with
     | Some child_nodes ->
         let child_modules = List.map child_nodes ~f:(fun child ->
           let child_name = GenCommon.get_unqualified_name ~parent:node ~child in
