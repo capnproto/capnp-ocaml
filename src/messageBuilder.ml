@@ -1196,9 +1196,43 @@ module Make (MessageWrapper : Message.S) = struct
     Int64.bit_xor numeric default
 
 
+  module Discr = struct
+    type t = {
+      value    : int;
+      byte_ofs : int;
+    }
+  end
+
+  let rec set_discriminant
+      (struct_storage : rw StructStorage.t)
+      (discr : Discr.t option)
+    : unit =
+    match discr with
+    | None ->
+        ()
+    | Some x ->
+        set_struct_field_uint16 struct_storage ~default:0
+          x.Discr.byte_ofs x.Discr.value
+
+  (* Given storage for a struct, write a new value for the UInt16 field stored
+     at the given byte offset within the struct's data region. *)
+  and set_struct_field_uint16
+      ?(discr : Discr.t option)
+      (struct_storage : rw StructStorage.t)
+      ~(default : int)
+      (byte_ofs : int)
+      (value : int)
+    : unit =
+    let () = set_discriminant struct_storage discr in
+    Slice.set_uint16 struct_storage.StructStorage.data byte_ofs
+      (value lxor default)
+
+
+
   (* Given storage for a struct, set the data for the specified struct-embedded
      pointer under the assumption that it points to a cap'n proto Data payload. *)
   let set_struct_field_blob
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       (src : string)
@@ -1209,12 +1243,14 @@ module Make (MessageWrapper : Message.S) = struct
         src
     in
     let () = deep_zero_pointer pointer_bytes in
+    let () = set_discriminant struct_storage discr in
     init_list_pointer pointer_bytes new_string_storage
 
 
   (* Given storage for a struct, set the data for the specified struct-embedded
      pointer under the assumption that it points to a cap'n proto Text payload. *)
   let set_struct_field_text
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       (src : string)
@@ -1225,12 +1261,14 @@ module Make (MessageWrapper : Message.S) = struct
         src
     in
     let () = deep_zero_pointer pointer_bytes in
+    let () = set_discriminant struct_storage discr in
     init_list_pointer pointer_bytes new_string_storage
 
 
   (* Given storage for a struct, set the data for the specified struct-embedded
      pointer equal to a deep copy of the specified [src] list. *)
   let set_struct_field_list
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       (src : 'cap ListStorage.t)
@@ -1240,30 +1278,36 @@ module Make (MessageWrapper : Message.S) = struct
         ~dest_message:struct_storage.StructStorage.pointers.Slice.msg
     in
     let () = deep_zero_pointer pointer_bytes in
+    let () = set_discriminant struct_storage discr in
     init_list_pointer pointer_bytes list_storage
 
 
   (* Given storage for a struct, set the data for the specified struct-embedded
      pointer equal to a deep copy of the specified [src] struct. *)
   let set_struct_field_struct
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       (src : 'cap StructStorage.t)
       ~(data_words : int)
       ~(pointer_words : int)
-    : unit =
+    : rw StructStorage.t =
     let pointer_bytes = get_struct_pointer struct_storage pointer_word in
     let new_storage = deep_copy_struct ~src
         ~dest_message:struct_storage.StructStorage.pointers.Slice.msg
         ~data_words ~pointer_words
     in
     let () = deep_zero_pointer pointer_bytes in
-    init_struct_pointer pointer_bytes new_storage
+    let () = set_discriminant struct_storage discr in
+    let () = init_struct_pointer pointer_bytes new_storage in
+    get_struct_field_struct struct_storage pointer_word
+      ~data_words ~pointer_words
 
 
   (* Given storage for a struct, write a new value for the boolean field stored
      at the given byte and bit offset within the struct's data region. *)
   let set_struct_field_bit
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       ~(default_bit : bool)
       ~(byte_ofs : int)
@@ -1276,41 +1320,34 @@ module Make (MessageWrapper : Message.S) = struct
     let byte_val = Slice.get_uint8 struct_storage.StructStorage.data byte_ofs in
     let byte_val = byte_val land (lnot (1 lsl bit_ofs)) in
     let byte_val = byte_val lor (bit lsl bit_ofs) in
+    let () = set_discriminant struct_storage discr in
     Slice.set_uint8 struct_storage.StructStorage.data byte_ofs byte_val
 
 
   (* Given storage for a struct, write a new value for the UInt8 field stored
      at the given byte offset within the struct's data region. *)
   let set_struct_field_uint8
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       ~(default : int)
       (byte_ofs : int)
       (value : int)
     : unit =
+    let () = set_discriminant struct_storage discr in
     Slice.set_uint8 struct_storage.StructStorage.data byte_ofs
-      (value lxor default)
-
-
-  (* Given storage for a struct, write a new value for the UInt16 field stored
-     at the given byte offset within the struct's data region. *)
-  let set_struct_field_uint16
-      (struct_storage : rw StructStorage.t)
-      ~(default : int)
-      (byte_ofs : int)
-      (value : int)
-    : unit =
-    Slice.set_uint16 struct_storage.StructStorage.data byte_ofs
       (value lxor default)
 
 
   (* Given storage for a struct, write a new value for the UInt32 field stored
      at the given byte offset within the struct's data region. *)
   let set_struct_field_uint32
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       ~(default : Uint32.t)
       (byte_ofs : int)
       (value : Uint32.t)
     : unit =
+    let () = set_discriminant struct_storage discr in
     Slice.set_uint32 struct_storage.StructStorage.data byte_ofs
       (Uint32.logxor value default)
 
@@ -1318,11 +1355,13 @@ module Make (MessageWrapper : Message.S) = struct
   (* Given storage for a struct, write a new value for the UInt64 field stored
      at the given byte offset within the struct's data region. *)
   let set_struct_field_uint64
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       ~(default : Uint64.t)
       (byte_ofs : int)
       (value : Uint64.t)
     : unit =
+    let () = set_discriminant struct_storage discr in
     Slice.set_uint64 struct_storage.StructStorage.data byte_ofs
       (Uint64.logxor value default)
 
@@ -1330,11 +1369,13 @@ module Make (MessageWrapper : Message.S) = struct
   (* Given storage for a struct, write a new value for the Int8 field stored
      at the given byte offset within the struct's data region. *)
   let set_struct_field_int8
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       ~(default : int)
       (byte_ofs : int)
       (value : int)
     : unit =
+    let () = set_discriminant struct_storage discr in
     Slice.set_int8 struct_storage.StructStorage.data byte_ofs
       (value lxor default)
 
@@ -1342,11 +1383,13 @@ module Make (MessageWrapper : Message.S) = struct
   (* Given storage for a struct, write a new value for the Int16 field stored
      at the given byte offset within the struct's data region. *)
   let set_struct_field_int16
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       ~(default : int)
       (byte_ofs : int)
       (value : int)
     : unit =
+    let () = set_discriminant struct_storage discr in
     Slice.set_int16 struct_storage.StructStorage.data byte_ofs
       (value lxor default)
 
@@ -1354,11 +1397,13 @@ module Make (MessageWrapper : Message.S) = struct
   (* Given storage for a struct, write a new value for the Int32 field stored
      at the given byte offset within the struct's data region. *)
   let set_struct_field_int32
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       ~(default : int32)
       (byte_ofs : int)
       (value : int32)
     : unit =
+    let () = set_discriminant struct_storage discr in
     Slice.set_int32 struct_storage.StructStorage.data byte_ofs
       (Int32.bit_xor value default)
 
@@ -1366,11 +1411,13 @@ module Make (MessageWrapper : Message.S) = struct
   (* Given storage for a struct, write a new value for the Int64 field stored
      at the given byte offset within the struct's data region. *)
   let set_struct_field_int64
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       ~(default : int64)
       (byte_ofs : int)
       (value : int64)
     : unit =
+    let () = set_discriminant struct_storage discr in
     Slice.set_int64 struct_storage.StructStorage.data byte_ofs
       (Int64.bit_xor value default)
 
@@ -1378,6 +1425,7 @@ module Make (MessageWrapper : Message.S) = struct
   (* Given storage for a struct, allocate a new List<T> member for one of the
      pointers stored within the struct. *)
   let init_struct_field_list
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       ~(storage_type : ListStorage.storage_type_t)
@@ -1392,6 +1440,7 @@ module Make (MessageWrapper : Message.S) = struct
           storage_type num_elements
       in
       let () = deep_zero_pointer pointer_bytes in
+      let () = set_discriminant struct_storage discr in
       init_list_pointer pointer_bytes list_storage
 
 
@@ -1399,10 +1448,12 @@ module Make (MessageWrapper : Message.S) = struct
      of the pointers stored within the struct.  Returns an array builder
      for the resulting list. *)
   let init_struct_field_bit_list
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       ~(num_elements : int)
     : ('a, 'b) Runtime.BArray.t =
+    let () = set_discriminant struct_storage discr in
     let () = init_struct_field_list struct_storage pointer_word
         ~storage_type:ListStorage.Bit ~num_elements
     in
@@ -1413,10 +1464,12 @@ module Make (MessageWrapper : Message.S) = struct
      one of the pointers stored within the struct.  Returns an array
      builder for the resulting list. *)
   let init_struct_field_int8_list
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       ~(num_elements : int)
     : (int, 'b) Runtime.BArray.t =
+    let () = set_discriminant struct_storage discr in
     let () = init_struct_field_list struct_storage pointer_word
         ~storage_type:(ListStorage.Bytes 1) ~num_elements
     in
@@ -1427,10 +1480,12 @@ module Make (MessageWrapper : Message.S) = struct
      one of the pointers stored within the struct.  Returns an array
      builder for the resulting list. *)
   let init_struct_field_int16_list
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       ~(num_elements : int)
     : (int, 'b) Runtime.BArray.t =
+    let () = set_discriminant struct_storage discr in
     let () = init_struct_field_list struct_storage pointer_word
         ~storage_type:(ListStorage.Bytes 2) ~num_elements
     in
@@ -1441,10 +1496,12 @@ module Make (MessageWrapper : Message.S) = struct
      one of the pointers stored within the struct.  Returns an array
      builder for the resulting list. *)
   let init_struct_field_int32_list
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       ~(num_elements : int)
     : (int32, 'b) Runtime.BArray.t =
+    let () = set_discriminant struct_storage discr in
     let () = init_struct_field_list struct_storage pointer_word
         ~storage_type:(ListStorage.Bytes 4) ~num_elements
     in
@@ -1455,10 +1512,12 @@ module Make (MessageWrapper : Message.S) = struct
      one of the pointers stored within the struct.  Returns an array
      builder for the resulting list. *)
   let init_struct_field_int64_list
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       ~(num_elements : int)
     : (int64, 'b) Runtime.BArray.t =
+    let () = set_discriminant struct_storage discr in
     let () = init_struct_field_list struct_storage pointer_word
         ~storage_type:(ListStorage.Bytes 8) ~num_elements
     in
@@ -1469,10 +1528,12 @@ module Make (MessageWrapper : Message.S) = struct
      one of the pointers stored within the struct.  Returns an array
      builder for the resulting list. *)
   let init_struct_field_uint8_list
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       ~(num_elements : int)
     : (int, 'b) Runtime.BArray.t =
+    let () = set_discriminant struct_storage discr in
     let () = init_struct_field_list struct_storage pointer_word
         ~storage_type:(ListStorage.Bytes 1) ~num_elements
     in
@@ -1483,10 +1544,12 @@ module Make (MessageWrapper : Message.S) = struct
      one of the pointers stored within the struct.  Returns an array
      builder for the resulting list. *)
   let init_struct_field_uint16_list
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       ~(num_elements : int)
     : (int, 'b) Runtime.BArray.t =
+    let () = set_discriminant struct_storage discr in
     let () = init_struct_field_list struct_storage pointer_word
         ~storage_type:(ListStorage.Bytes 2) ~num_elements
     in
@@ -1497,10 +1560,12 @@ module Make (MessageWrapper : Message.S) = struct
      one of the pointers stored within the struct.  Returns an array
      builder for the resulting list. *)
   let init_struct_field_uint32_list
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       ~(num_elements : int)
     : (Uint32.t, 'b) Runtime.BArray.t =
+    let () = set_discriminant struct_storage discr in
     let () = init_struct_field_list struct_storage pointer_word
         ~storage_type:(ListStorage.Bytes 4) ~num_elements
     in
@@ -1511,10 +1576,12 @@ module Make (MessageWrapper : Message.S) = struct
      one of the pointers stored within the struct.  Returns an array
      builder for the resulting list. *)
   let get_struct_field_uint64_list
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       ~(num_elements : int)
     : (Uint64.t, 'b) Runtime.BArray.t =
+    let () = set_discriminant struct_storage discr in
     let () = init_struct_field_list struct_storage pointer_word
         ~storage_type:(ListStorage.Bytes 8) ~num_elements
     in
@@ -1525,10 +1592,12 @@ module Make (MessageWrapper : Message.S) = struct
      one of the pointers stored within the struct.  Returns an array
      builder for the resulting list. *)
   let init_struct_field_float32_list
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       ~(num_elements : int)
     : (float, 'b) Runtime.BArray.t =
+    let () = set_discriminant struct_storage discr in
     let () = init_struct_field_list struct_storage pointer_word
         ~storage_type:(ListStorage.Bytes 4) ~num_elements
     in
@@ -1539,10 +1608,12 @@ module Make (MessageWrapper : Message.S) = struct
      one of the pointers stored within the struct.  Returns an array
      builder for the resulting list. *)
   let init_struct_field_float64_list
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       ~(num_elements : int)
     : (float, 'b) Runtime.BArray.t =
+    let () = set_discriminant struct_storage discr in
     let () = init_struct_field_list struct_storage pointer_word
         ~storage_type:(ListStorage.Bytes 8) ~num_elements
     in
@@ -1553,10 +1624,12 @@ module Make (MessageWrapper : Message.S) = struct
      one of the pointers stored within the struct.  Returns an array
      builder for the resulting list. *)
   let init_struct_field_blob_list
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       ~(num_elements : int)
     : (string, 'b) Runtime.BArray.t =
+    let () = set_discriminant struct_storage discr in
     let () = init_struct_field_list struct_storage pointer_word
         ~storage_type:ListStorage.Pointer ~num_elements
     in
@@ -1567,10 +1640,12 @@ module Make (MessageWrapper : Message.S) = struct
      one of the pointers stored within the struct.  Returns an array
      builder for the resulting list. *)
   let init_struct_field_text_list
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       ~(num_elements : int)
     : (string, 'b) Runtime.BArray.t =
+    let () = set_discriminant struct_storage discr in
     let () = init_struct_field_list struct_storage pointer_word
         ~storage_type:ListStorage.Pointer ~num_elements
     in
@@ -1581,12 +1656,14 @@ module Make (MessageWrapper : Message.S) = struct
      pointers stored within the struct, where T is a struct type.  Returns
      an array builder for the resulting list. *)
   let init_struct_field_struct_list
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       ~(num_elements : int)
       ~(data_words : int)
       ~(pointer_words : int)
     : ('a, 'b) Runtime.BArray.t =
+    let () = set_discriminant struct_storage discr in
     let () = init_struct_field_list struct_storage pointer_word
         ~storage_type:(ListStorage.Composite (data_words, pointer_words))
         ~num_elements
@@ -1599,10 +1676,12 @@ module Make (MessageWrapper : Message.S) = struct
      one of the pointers stored within the struct.  Returns an array builder
      for the resulting list. *)
   let init_struct_field_list_list
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       ~(num_elements : int)
     : (rw ListStorage.t, 'b) Runtime.BArray.t =
+    let () = set_discriminant struct_storage discr in
     let () = init_struct_field_list struct_storage pointer_word
         ~storage_type:ListStorage.Pointer ~num_elements
     in
@@ -1613,12 +1692,14 @@ module Make (MessageWrapper : Message.S) = struct
      one of the pointers stored within the struct.  Returns an array builder
      for the resulting list. *)
   let init_struct_field_enum_list
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       ~(num_elements : int)
       ~(decode : int -> 'a)
       ~(encode : 'a -> int)
     : ('a, 'b) Runtime.BArray.t =
+    let () = set_discriminant struct_storage discr in
     let () = init_struct_field_list struct_storage pointer_word
         ~storage_type:(ListStorage.Bytes 2) ~num_elements
     in
@@ -1630,6 +1711,7 @@ module Make (MessageWrapper : Message.S) = struct
      to one of the pointers stored within the parent.  Returns a reference to
      the newly-created struct. *)
   let init_struct_field_struct
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
       ~(data_words : int)
@@ -1640,6 +1722,7 @@ module Make (MessageWrapper : Message.S) = struct
     let alloc_default_struct message =
       alloc_struct_storage message ~data_words ~pointer_words
     in
+    let () = set_discriminant struct_storage discr in
     deref_struct_pointer pointer_bytes alloc_default_struct
       ~data_words ~pointer_words
 
