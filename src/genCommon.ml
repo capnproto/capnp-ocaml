@@ -125,7 +125,8 @@ let get_unqualified_name
 (* Get a representation of the fully-qualified module name for [node].
  * The resulting list associates each component of the name with scope which it
  * defines.  The head of the list is at the outermost scope. *)
-let get_fully_qualified_name nodes_table node : (string * Uint64.t) list =
+let get_fully_qualified_name_components nodes_table node
+  : (string * Uint64.t) list =
   let rec loop acc curr_node =
     let scope_id = PS.Node.scopeId_get curr_node in
     if Util.uint64_equal scope_id Uint64.zero then
@@ -137,9 +138,17 @@ let get_fully_qualified_name nodes_table node : (string * Uint64.t) list =
   loop [] node
 
 
-(* Get a the qualified module name for [node] which is suitable for use at the given
+(* Get the fully-qualified name for [node]. *)
+let get_fully_qualified_name nodes_table node : string =
+  get_fully_qualified_name_components nodes_table node |>
+  List.map ~f:fst |>
+  String.concat ~sep:"."
+
+
+(* Get a qualified module name for [node] which is suitable for use at the given
  * [scope_stack] position. *)
-let get_scope_relative_name nodes_table (scope_stack : Uint64.t list) node : string =
+let get_scope_relative_name nodes_table (scope_stack : Uint64.t list) node
+  : string =
   let rec pop_components components scope =
     match components, scope with
     | ( (component_name, component_scope_id) ::
@@ -151,16 +160,25 @@ let get_scope_relative_name nodes_table (scope_stack : Uint64.t list) node : str
     | _ ->
         components
   in
-  let fq_name = get_fully_qualified_name nodes_table node in
+  let fq_name = get_fully_qualified_name_components nodes_table node in
   let rel_name = pop_components fq_name (List.rev scope_stack) in
   String.concat ~sep:"." (List.map rel_name ~f:fst)
 
 
-let make_unique_typename ~nodes_table node =
+let make_unique_typename ~(mode : Mode.t) ~(scope_mode : Mode.t)
+    ~nodes_table node =
   let uq_name = get_unqualified_name
     ~parent:(Hashtbl.find_exn nodes_table (PS.Node.scopeId_get node)) ~child:node
   in
-  sprintf "t_%s_%s" uq_name (Uint64.to_string (PS.Node.id_get node))
+  let t_str =
+    if mode = Mode.Reader && scope_mode = Mode.Builder then
+      "reader_t"
+    else if mode = Mode.Builder && scope_mode = Mode.Reader then
+      "builder_t"
+    else
+      "t"
+  in
+  sprintf "%s_%s_%s" t_str uq_name (Uint64.to_string (PS.Node.id_get node))
 
 
 (* When modules refer to types defined in other modules, readability dictates that we use
@@ -181,17 +199,30 @@ let make_unique_typename ~nodes_table node =
  * In this case, module Foo does not have a complete declaration at the time foo_get is
  * declared.  So for this case instead of using Foo.t we emit an unambiguous type identifier
  * based on the 64-bit unique ID for Foo. *)
-let make_disambiguated_type_name ~nodes_table ~scope node =
+let make_disambiguated_type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
+    ~nodes_table ~scope node =
   let node_id = PS.Node.id_get node in
   if List.mem scope node_id then
-    make_unique_typename ~nodes_table node
+    make_unique_typename ~mode ~scope_mode ~nodes_table node
   else
     let module_name = get_scope_relative_name nodes_table scope node in
-    module_name ^ ".t"
+    let t_str =
+      if mode = Mode.Reader && scope_mode = Mode.Builder then
+        ".reader_t"
+      else if mode = Mode.Builder && scope_mode = Mode.Reader then
+        ".builder_t"
+      else
+        ".t"
+    in
+    module_name ^ t_str
 
 
-(* Construct an ocaml name for the given schema-defined type. *)
-let rec type_name nodes_table scope tp : string =
+(* Construct an ocaml name for the given schema-defined type.
+   [mode] indicates whether the generated type name represents a Reader or a
+   Builder type.  [scope_mode] indicates whether the generated type name is
+   to be referenced within the scope of a Reader or a Builder. *)
+let rec type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
+    nodes_table scope tp : string =
   match PS.Type.unnamed_union_get tp with
   | PS.Type.Void    -> "unit"
   | PS.Type.Bool    -> "bool"
@@ -209,20 +240,21 @@ let rec type_name nodes_table scope tp : string =
   | PS.Type.Data    -> "string"
   | PS.Type.List list_descr ->
       let list_type = PS.Type.List.elementType_get list_descr in
-      sprintf "(%s, array_t) Runtime.Array.t"
-        (type_name nodes_table scope list_type)
+      sprintf "(%s, array_t) Runtime.%s.t"
+        (type_name ~mode ~scope_mode nodes_table scope list_type)
+        (if mode = Mode.Reader then "Array" else "BArray")
   | PS.Type.Enum enum_descr ->
       let enum_id = PS.Type.Enum.typeId_get enum_descr in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
-      make_disambiguated_type_name ~nodes_table ~scope enum_node
+      make_disambiguated_type_name ~mode ~scope_mode ~nodes_table ~scope enum_node
   | PS.Type.Struct struct_descr ->
       let struct_id = PS.Type.Struct.typeId_get struct_descr in
       let struct_node = Hashtbl.find_exn nodes_table struct_id in
-      make_disambiguated_type_name ~nodes_table ~scope struct_node
+      make_disambiguated_type_name ~mode ~scope_mode ~nodes_table ~scope struct_node
   | PS.Type.Interface iface_descr ->
       let iface_id = PS.Type.Interface.typeId_get iface_descr in
       let iface_node = Hashtbl.find_exn nodes_table iface_id in
-      make_disambiguated_type_name ~nodes_table ~scope iface_node
+      make_disambiguated_type_name ~mode ~scope_mode ~nodes_table ~scope iface_node
   | PS.Type.AnyPointer ->
       "AnyPointer.t"
   | PS.Type.Undefined_ x ->
@@ -230,7 +262,8 @@ let rec type_name nodes_table scope tp : string =
 
 
 (* Generate a variant type declaration for a capnp union type. *)
-let generate_union_type nodes_table scope struct_def fields =
+let generate_union_type ~(mode : Mode.t) nodes_table scope
+    struct_def fields =
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
     let field_name = String.capitalize (PS.Field.name_get field) in
@@ -242,7 +275,8 @@ let generate_union_type nodes_table scope struct_def fields =
             (sprintf "%s  | %s" indent field_name) :: acc
         | _ ->
             (sprintf "%s  | %s of %s" indent field_name
-              (type_name nodes_table scope field_type)) :: acc
+               (type_name ~mode ~scope_mode:mode nodes_table scope field_type))
+            :: acc
         end
     | PS.Field.Group group ->
         let group_type_name =
@@ -268,15 +302,12 @@ let generate_union_type nodes_table scope struct_def fields =
 
 (* Generate the signature for an enum type. *)
 let generate_enum_sig ~nodes_table ~scope ~nested_modules ~mode ~node enum_def =
-  let indent = String.make (2 * (List.length scope + 1)) ' ' in
+  let indent = String.make (2 * (List.length scope + 2)) ' ' in
   let is_builder = mode = Mode.Builder in
   let header =
     if is_builder then
-      let reader_type = get_fully_qualified_name nodes_table node in
       let reader_type_string =
-        "Reader." ^
-          (reader_type |> List.map ~f:fst |> String.concat ~sep:".") ^
-          ".t"
+        "Reader." ^ (get_fully_qualified_name nodes_table node) ^ ".t"
       in
       sprintf "%stype t = %s =\n" indent reader_type_string
     else

@@ -31,6 +31,7 @@
 open Core.Std
 
 module PS = GenCommon.PS
+module Mode = GenCommon.Mode
 module R  = Runtime
 module Reader = MessageReader.Make(GenCommon.M)
 
@@ -450,7 +451,8 @@ let generate_union_accessor ~nodes_table ~scope struct_def fields =
   let footer = [
     sprintf "%s  | v -> Undefined_ v\n" indent
   ] in
-  (GenCommon.generate_union_type nodes_table scope struct_def fields) ^ "\n" ^
+  (GenCommon.generate_union_type ~mode:Mode.Reader nodes_table scope
+     struct_def fields) ^ "\n" ^
   String.concat ~sep:"\n" (header @ cases @ footer)
 
 
@@ -498,7 +500,10 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
     | _  -> generate_union_accessor ~nodes_table ~scope struct_def union_fields
   in
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
-  let unique_typename = GenCommon.make_unique_typename ~nodes_table node in
+  let unique_typename =
+    GenCommon.make_unique_typename ~mode:Mode.Reader
+      ~scope_mode:Mode.Reader ~nodes_table node
+  in
   (sprintf "%stype t = ro StructStorage.t option\n" indent) ^
   (sprintf "%stype %s = t\n" indent unique_typename) ^
   (sprintf "%stype array_t = ro ListStorage.t\n\n" indent) ^

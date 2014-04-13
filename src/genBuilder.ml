@@ -31,6 +31,7 @@
 open Core.Std
 
 module PS = GenCommon.PS
+module Mode = GenCommon.Mode
 module R  = Runtime
 module Builder = MessageBuilder.Make(GenCommon.M)
 
@@ -667,7 +668,8 @@ let generate_union_setter ~nodes_table ~scope struct_def fields =
       indent
       ((Uint32.to_int (PS.Node.Struct.discriminantOffset_get struct_def)) * 2);
   ] in
-  (GenCommon.generate_union_type nodes_table scope struct_def fields) ^ "\n" ^
+  (GenCommon.generate_union_type ~mode:Mode.Builder nodes_table scope
+     struct_def fields) ^ "\n" ^
   String.concat ~sep:"\n" (header @ cases @ footer)
 
 
@@ -718,7 +720,9 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
         (generate_union_setter ~nodes_table ~scope struct_def union_fields)
   in
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
-  let unique_typename = GenCommon.make_unique_typename ~nodes_table node in
+  let unique_typename = GenCommon.make_unique_typename
+      ~mode:Mode.Builder ~scope_mode:Mode.Builder ~nodes_table node
+  in
   (sprintf "%stype t = ro StructStorage.t option\n" indent) ^
   (sprintf "%stype %s = t\n" indent unique_typename) ^
   (sprintf "%stype array_t = ro ListStorage.t\n\n" indent) ^
