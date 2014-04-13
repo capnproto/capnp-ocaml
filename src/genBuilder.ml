@@ -643,6 +643,15 @@ let generate_field_accessors ~nodes_table ~scope ~indent ~discr_ofs field =
                    field_ofs
                    discr_str
                    data_words
+                   pointer_words) ^
+                (sprintf
+                   "%slet %s_init x = init_struct_field_struct x %u \
+                    %s~data_words:%u ~pointer_words:%u\n"
+                   indent
+                   field_name
+                   field_ofs
+                   discr_str
+                   data_words
                    pointer_words)
             | _ ->
                 failwith
