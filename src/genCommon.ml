@@ -264,7 +264,7 @@ let rec type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
 (* Generate a variant type declaration for a capnp union type. *)
 let generate_union_type ~(mode : Mode.t) nodes_table scope
     struct_def fields =
-  let indent = String.make (2 * (List.length scope + 1)) ' ' in
+  let indent = String.make (2 * (List.length scope + 2)) ' ' in
   let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
     let field_name = String.capitalize (PS.Field.name_get field) in
     match PS.Field.unnamed_union_get field with

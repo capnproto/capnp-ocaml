@@ -417,7 +417,7 @@ let generate_field_accessor ~nodes_table ~scope ~indent field =
 
 (* Generate a function for unpacking a capnp union type as an OCaml variant. *)
 let generate_union_accessor ~nodes_table ~scope struct_def fields =
-  let indent = String.make (2 * (List.length scope + 1)) ' ' in
+  let indent = String.make (2 * (List.length scope + 2)) ' ' in
   let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
     let field_name = String.uncapitalize (PS.Field.name_get field) in
     let ctor_name = String.capitalize field_name in
@@ -461,7 +461,7 @@ let generate_union_accessor ~nodes_table ~scope struct_def fields =
  * or not the fields are packed into a union.  (Fields packed inside a union are
  * not exposed in the module signature. *)
 let generate_accessors ~nodes_table ~scope struct_def fields =
-  let indent = String.make (2 * (List.length scope + 1)) ' ' in
+  let indent = String.make (2 * (List.length scope + 2)) ' ' in
   let accessors = List.fold_left fields ~init:[] ~f:(fun acc field ->
     let x = generate_field_accessor ~nodes_table ~scope ~indent field in
     x :: acc)
@@ -499,7 +499,7 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
     | [] -> ""
     | _  -> generate_union_accessor ~nodes_table ~scope struct_def union_fields
   in
-  let indent = String.make (2 * (List.length scope + 1)) ' ' in
+  let indent = String.make (2 * (List.length scope + 2)) ' ' in
   (sprintf "%stype t = ro StructStorage.t option\n" indent) ^
   (sprintf "%stype %s = t\n" indent 
      (GenCommon.make_unique_typename ~mode:Mode.Reader
@@ -526,7 +526,7 @@ and generate_node
     (node : PS.Node.t)
 : string =
   let node_id = PS.Node.id_get node in
-  let indent = String.make (2 * (List.length scope)) ' ' in
+  let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let generate_nested_modules () =
     match Topsort.topological_sort nodes_table
             (GenCommon.children_of nodes_table node) with
