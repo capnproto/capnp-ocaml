@@ -37,7 +37,7 @@
 open Core.Std
 
 module Make (MessageWrapper : Message.S) = struct
-  module Reader = MessageReader.Make(MessageWrapper)
+  module RReader = MessageReader.Make(MessageWrapper)
   module RC = RuntimeCommon.Make(MessageWrapper)
   include RC
 
@@ -261,7 +261,7 @@ module Make (MessageWrapper : Message.S) = struct
       (pointer_bytes : rw Slice.t)
       (alloc_default_list : rw Message.t -> rw ListStorage.t)
     : rw ListStorage.t =
-    match Reader.deref_list_pointer pointer_bytes with
+    match RReader.deref_list_pointer pointer_bytes with
     | None ->
         let list_storage = alloc_default_list pointer_bytes.Slice.msg in
         let () = init_list_pointer pointer_bytes list_storage in
@@ -414,7 +414,7 @@ module Make (MessageWrapper : Message.S) = struct
       ~(data_words : int)
       ~(pointer_words : int)
     : rw StructStorage.t =
-    match Reader.deref_struct_pointer pointer_bytes with
+    match RReader.deref_struct_pointer pointer_bytes with
     | None ->
         let struct_storage = alloc_default_struct pointer_bytes.Slice.msg in
         let () = init_struct_pointer pointer_bytes struct_storage in
@@ -686,7 +686,7 @@ module Make (MessageWrapper : Message.S) = struct
     (* Data fields are always accessed by value, not by reference, since
        we always do an immediate decode to [string].  Therefore we can
        use the Reader logic to handle this case. *)
-    match Reader.deref_list_pointer pointer_bytes with
+    match RReader.deref_list_pointer pointer_bytes with
     | Some list_storage ->
         string_of_uint8_list ~null_terminated:false list_storage
     | None ->
@@ -705,7 +705,7 @@ module Make (MessageWrapper : Message.S) = struct
     (* Text fields are always accessed by value, not by reference, since
        we always do an immediate decode to [string].  Therefore we can
        use the Reader logic to handle this case. *)
-    match Reader.deref_list_pointer pointer_bytes with
+    match RReader.deref_list_pointer pointer_bytes with
     | Some list_storage ->
         string_of_uint8_list ~null_terminated:true list_storage
     | None ->
@@ -900,7 +900,7 @@ module Make (MessageWrapper : Message.S) = struct
         (* Data fields are always accessed by value, not by reference, since
            we always do an immediate decode to [string].  Therefore we can
            use the Reader logic to handle this case. *)
-        match Reader.deref_list_pointer pointer_bytes with
+        match RReader.deref_list_pointer pointer_bytes with
         | Some list_storage ->
             string_of_uint8_list ~null_terminated:false list_storage
         | None ->
@@ -931,7 +931,7 @@ module Make (MessageWrapper : Message.S) = struct
         (* Text fields are always accessed by value, not by reference, since
            we always do an immediate decode to [string].  Therefore we can
            use the Reader logic to handle this case. *)
-        match Reader.deref_list_pointer pointer_bytes with
+        match RReader.deref_list_pointer pointer_bytes with
         | Some list_storage ->
             string_of_uint8_list ~null_terminated:true list_storage
         | None ->
@@ -1109,7 +1109,8 @@ module Make (MessageWrapper : Message.S) = struct
   let get_struct_field_bit
       (struct_storage : rw StructStorage.t)
       ~(default_bit : bool)
-      (byte_ofs : int) (bit_ofs : int)
+      ~(byte_ofs : int)
+      ~(bit_ofs : int)
     : bool =
     let byte_val = Slice.get_uint8 struct_storage.StructStorage.data byte_ofs in
     let bit_val = (byte_val land (1 lsl bit_ofs)) <> 0 in
@@ -1769,7 +1770,7 @@ module Make (MessageWrapper : Message.S) = struct
   (* Given storage for a struct, allocate a new List<UInt64> member for
      one of the pointers stored within the struct.  Returns an array
      builder for the resulting list. *)
-  let get_struct_field_uint64_list
+  let init_struct_field_uint64_list
       ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)

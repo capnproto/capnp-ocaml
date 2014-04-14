@@ -36,15 +36,19 @@ module R  = Runtime
 
 let sig_s_header =
   "module type S = sig\n" ^
-  "  type message_t\n\n" ^
-  "  module AnyPointer : sig\n" ^
-  "    type t\n" ^
-  "  end\n\n" ^
-  "  module Reader : sig\n"
+  "  module Reader : sig\n" ^
+  "    type message_t\n\n" ^
+  "    module AnyPointer : sig\n" ^
+  "      type t\n" ^
+  "    end\n\n"
 
 let sig_s_divide_reader_builder =
   "  end\n\n" ^
-  "  module Builder : sig\n"
+  "  module Builder : sig\n" ^
+  "    type message_t\n\n" ^
+  "    module AnyPointer : sig\n" ^
+  "      type t\n" ^
+  "    end\n\n"
 
 let sig_s_footer =
   "  end\n" ^
@@ -52,8 +56,9 @@ let sig_s_footer =
 
 let functor_sig =
   "module Make (MessageWrapper : Message.S) :\n" ^
-  "  (S with type message_t = Message.ro MessageWrapper.Message.t\n" ^
-  "    and type AnyPointer.t = Message.ro MessageWrapper.Slice.t option)\n\n"
+  "  (S with type Reader.message_t = Message.ro MessageWrapper.Message.t\n" ^
+  "    and type Builder.message_t = Message.rw MessageWrapper.Message.t\n" ^
+  "    and type Reader.AnyPointer.t = Message.ro MessageWrapper.Slice.t option)\n\n"
 
 let mod_header =
   "module Make (MessageWrapper : Message.S) = struct\n" ^
@@ -71,9 +76,9 @@ let mod_divide_reader_builder =
   "  module Builder = struct\n" ^
   "    module RuntimeBuilder_ = MessageBuilder.Make(MessageWrapper)\n" ^
   "    open RuntimeBuilder_\n\n" ^
-  "    type message_t = ro RuntimeBuilder_.Message.t\n\n" ^
+  "    type message_t = rw RuntimeBuilder_.Message.t\n\n" ^
   "    module AnyPointer = struct\n" ^
-  "      type t = ro Slice.t option\n" ^
+  "      type t = rw Slice.t\n" ^
   "    end\n\n"
 
 let mod_footer =
