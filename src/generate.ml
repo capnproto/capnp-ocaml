@@ -47,6 +47,7 @@ let sig_s_divide_reader_builder =
   "  module Builder : sig\n"
 
 let sig_s_footer =
+  "  end\n" ^
   "end\n\n"
 
 let functor_sig =
@@ -76,6 +77,7 @@ let mod_divide_reader_builder =
   "    end\n\n"
 
 let mod_footer =
+  "  end\n" ^
   "end\n\n"
 
 
