@@ -202,19 +202,25 @@ let make_unique_typename ~(mode : Mode.t) ~(scope_mode : Mode.t)
  * declared.  So for this case instead of using Foo.t we emit an unambiguous type identifier
  * based on the 64-bit unique ID for Foo. *)
 let make_disambiguated_type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
-    ~nodes_table ~scope node =
+    ~nodes_table ~scope ~tp node =
   let node_id = PS.Node.id_get node in
   if List.mem scope node_id then
     make_unique_typename ~mode ~scope_mode ~nodes_table node
   else
     let module_name = get_scope_relative_name nodes_table scope node in
     let t_str =
-      if mode = Mode.Reader && scope_mode = Mode.Builder then
-        ".reader_t"
-      else if mode = Mode.Builder && scope_mode = Mode.Reader then
-        ".builder_t"
-      else
-        ".t"
+      match PS.Type.unnamed_union_get tp with
+      | PS.Type.Enum _ ->
+          (* Enum types are identical across reader and builder, no need
+             to distinguish between them *)
+          ".t"
+      | _ ->
+          if mode = Mode.Reader && scope_mode = Mode.Builder then
+            ".reader_t"
+          else if mode = Mode.Builder && scope_mode = Mode.Reader then
+            ".builder_t"
+          else
+            ".t"
     in
     module_name ^ t_str
 
@@ -248,15 +254,18 @@ let rec type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
   | PS.Type.Enum enum_descr ->
       let enum_id = PS.Type.Enum.typeId_get enum_descr in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
-      make_disambiguated_type_name ~mode ~scope_mode ~nodes_table ~scope enum_node
+      make_disambiguated_type_name ~mode ~scope_mode ~nodes_table
+        ~scope ~tp enum_node
   | PS.Type.Struct struct_descr ->
       let struct_id = PS.Type.Struct.typeId_get struct_descr in
       let struct_node = Hashtbl.find_exn nodes_table struct_id in
-      make_disambiguated_type_name ~mode ~scope_mode ~nodes_table ~scope struct_node
+      make_disambiguated_type_name ~mode ~scope_mode ~nodes_table
+        ~scope ~tp struct_node
   | PS.Type.Interface iface_descr ->
       let iface_id = PS.Type.Interface.typeId_get iface_descr in
       let iface_node = Hashtbl.find_exn nodes_table iface_id in
-      make_disambiguated_type_name ~mode ~scope_mode ~nodes_table ~scope iface_node
+      make_disambiguated_type_name ~mode ~scope_mode ~nodes_table
+        ~scope ~tp iface_node
   | PS.Type.AnyPointer ->
       "AnyPointer.t"
   | PS.Type.Undefined_ x ->
