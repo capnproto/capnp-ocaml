@@ -123,8 +123,8 @@ let get_unqualified_name
 
 
 (* Get a representation of the fully-qualified module name for [node].
- * The resulting list associates each component of the name with scope which it
- * defines.  The head of the list is at the outermost scope. *)
+ * The resulting list associates each component of the name with the scope
+ * which it defines.  The head of the list is at the outermost scope. *)
 let get_fully_qualified_name_components nodes_table node
   : (string * Uint64.t) list =
   let rec loop acc curr_node =
@@ -133,7 +133,9 @@ let get_fully_qualified_name_components nodes_table node
       acc
     else
       let parent = Hashtbl.find_exn nodes_table scope_id in
-      (get_unqualified_name ~parent ~child:curr_node, PS.Node.id_get node) :: acc
+      let node_name = get_unqualified_name ~parent ~child:curr_node in
+      let node_id = PS.Node.id_get curr_node in
+      loop ((node_name, node_id) :: acc) parent
   in
   loop [] node
 

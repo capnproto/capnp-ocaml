@@ -785,8 +785,9 @@ and generate_node
     | Some child_nodes ->
         let child_modules = List.map child_nodes ~f:(fun child ->
           let child_name = GenCommon.get_unqualified_name ~parent:node ~child in
+          let child_node_id = PS.Node.id_get child in
           generate_node ~suppress_module_wrapper:false ~nodes_table
-            ~scope:(node_id :: scope) ~node_name:child_name child)
+            ~scope:(child_node_id :: scope) ~node_name:child_name child)
         in
         begin match child_modules with
         | [] -> ""
