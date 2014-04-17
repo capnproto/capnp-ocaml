@@ -1,29 +1,38 @@
 
+type ro = Message.ro
+type rw = Message.rw
+
+module type ARRAY = sig
+  type ('cap, 'a, 'arr) t
+
+  val length : ('cap, 'a, 'arr) t -> int
+
+  val get : ('cap, 'a, 'arr) t -> int -> 'a
+
+  val set : (rw, 'a, 'arr) t -> int -> 'a -> unit
+end
+
 module Array : sig
-  type ('a, 'arr) t
-
-  val length : ('a, 'arr) t -> int
-
-  val get : ('a, 'arr) t -> int -> 'a
-
-  val make : length:('arr -> int) -> get:('arr -> int -> 'a) -> 'arr -> ('a, 'arr) t
-
-  val make_default : unit -> ('a, 'arr) t
+  include ARRAY
 end
 
+module InnerArray : sig
+  type ('cap, 'a, 'arr) t = {
+    length : unit -> int;
+    get_unsafe : int -> 'a;
+    set_unsafe : int -> 'a -> unit;
+    storage : 'arr option;
+  }
 
-module BArray : sig
-  type ('a, 'arr) t
+  include ARRAY with type ('a, 'b, 'c) t := ('a, 'b, 'c) t
 
-  val length : ('a, 'arr) t -> int
+  val of_outer_array : ('cap, 'a, 'arr) Array.t -> ('cap, 'a, 'arr) t
 
-  val get : ('a, 'arr) t -> int -> 'a
+  val to_outer_array : ('cap, 'a, 'arr) t -> ('cap, 'a, 'arr) Array.t
 
-  val set : ('a, 'arr) t -> int -> 'a -> unit
+  val to_storage : ('cap, 'a, 'arr) t -> 'arr option
 
-  val make :
-    length:('arr -> int) ->
-    get:('arr -> int -> 'a) ->
-    set:('arr -> int -> 'a -> unit) ->
-    'arr -> ('a, 'arr) t
+  val invalid_set_unsafe : int -> 'a -> unit
 end
+  
+

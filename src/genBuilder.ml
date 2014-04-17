@@ -166,7 +166,7 @@ let generate_list_accessor ~nodes_table ~scope ~list_type ~indent
       discr_str
       field_ofs) ^
     (sprintf "%slet %s_init x n = init_struct_field_%s_list \
-              %sx %u ~num_elements:n"
+              %sx %u ~num_elements:n\n"
       indent
       field_name
       type_str
@@ -780,7 +780,8 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
   (sprintf "%stype %s = reader_t\n" indent
      (GenCommon.make_unique_typename ~mode:Mode.Reader
         ~scope_mode:Mode.Builder ~nodes_table node)) ^
-  (sprintf "%stype array_t = rw ListStorage.t\n\n" indent) ^
+  (sprintf "%stype array_t = rw ListStorage.t\n" indent) ^
+  (sprintf "%stype reader_array_t = ro ListStorage.t\n\n" indent) ^
     nested_modules ^ accessors ^ union_accessors ^
     (sprintf "%slet of_message x = \
               get_root_struct ~data_words:%u ~pointer_words:%u x\n"

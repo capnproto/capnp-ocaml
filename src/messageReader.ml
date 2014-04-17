@@ -122,50 +122,32 @@ module Make (MessageWrapper : Message.S) = struct
         default
 
 
+  let get_struct_field_list
+      (struct_storage : 'cap StructStorage.t option)
+      (pointer_word : int)
+      (decoders : ('cap, 'a) ListDecoders.t)
+    : (ro, 'a, 'cap ListStorage.t) Runtime.Array.t =
+    match get_struct_pointer struct_storage pointer_word with
+    | Some slice ->
+        begin match deref_list_pointer slice with
+        | Some list_storage ->
+            make_array_readonly list_storage decoders
+        | None ->
+            make_empty_array ()
+        end
+    | None ->
+        make_empty_array ()
+
+
   (* Given storage for a struct, get the data for the specified
      struct-embedded pointer under the assumption that it points to a
      cap'n proto List<Bool>. *)
   let get_struct_field_bit_list
       (struct_storage : 'cap StructStorage.t option)
       (pointer_word : int)
-    : ('a, 'b) Runtime.Array.t =
-    match get_struct_pointer struct_storage pointer_word with
-    | Some slice ->
-        begin match deref_list_pointer slice with
-        | Some list_storage ->
-            Runtime.Array.make
-              ~length:(fun x -> x.ListStorage.num_elements)
-              ~get:BitList.get
-              list_storage
-        | None ->
-            Runtime.Array.make_default ()
-        end
-    | None ->
-        Runtime.Array.make_default ()
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto list encoded as packed bytes (e.g. List<UInt32>).  The
-     provided [convert] is used to decode packed bytes as list elements. *)
-  let get_struct_field_bytes_list
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-      (convert : 'cap Slice.t -> 'a)
-    : ('a, 'b) Runtime.Array.t =
-    match get_struct_pointer struct_storage pointer_word with
-    | Some slice ->
-        begin match deref_list_pointer slice with
-        | Some list_storage ->
-            Runtime.Array.make
-              ~length:(fun x -> x.ListStorage.num_elements)
-              ~get:(fun x i -> convert (BytesList.get x i))
-              list_storage
-        | None ->
-            Runtime.Array.make_default ()
-        end
-    | None ->
-        Runtime.Array.make_default ()
+    : (ro, bool, 'cap ListStorage.t) Runtime.Array.t =
+    get_struct_field_list struct_storage pointer_word
+      (ListDecoders.Bit (fun (x : bool) -> x))
 
 
   (* Given storage for a struct, get the data for the specified
@@ -174,9 +156,9 @@ module Make (MessageWrapper : Message.S) = struct
   let get_struct_field_int8_list
       (struct_storage : 'cap StructStorage.t option)
       (pointer_word : int)
-    : (int, 'b) Runtime.Array.t =
-    get_struct_field_bytes_list struct_storage pointer_word
-      (fun slice -> Slice.get_int8 slice 0)
+    : (ro, int, 'cap ListStorage.t) Runtime.Array.t =
+    get_struct_field_list struct_storage pointer_word
+      (ListDecoders.Bytes1 (fun slice -> Slice.get_int8 slice 0))
 
 
   (* Given storage for a struct, get the data for the specified
@@ -185,9 +167,9 @@ module Make (MessageWrapper : Message.S) = struct
   let get_struct_field_int16_list
       (struct_storage : 'cap StructStorage.t option)
       (pointer_word : int)
-    : (int, 'b) Runtime.Array.t =
-    get_struct_field_bytes_list struct_storage pointer_word
-      (fun slice -> Slice.get_int16 slice 0)
+    : (ro, int, 'cap ListStorage.t) Runtime.Array.t =
+    get_struct_field_list struct_storage pointer_word
+      (ListDecoders.Bytes2 (fun slice -> Slice.get_int16 slice 0))
 
 
   (* Given storage for a struct, get the data for the specified
@@ -196,9 +178,9 @@ module Make (MessageWrapper : Message.S) = struct
   let get_struct_field_int32_list
       (struct_storage : 'cap StructStorage.t option)
       (pointer_word : int)
-    : (int32, 'b) Runtime.Array.t =
-    get_struct_field_bytes_list struct_storage pointer_word
-      (fun slice -> Slice.get_int32 slice 0)
+    : (ro, int32, 'cap ListStorage.t) Runtime.Array.t =
+    get_struct_field_list struct_storage pointer_word
+      (ListDecoders.Bytes4 (fun slice -> Slice.get_int32 slice 0))
 
 
   (* Given storage for a struct, get the data for the specified
@@ -207,9 +189,9 @@ module Make (MessageWrapper : Message.S) = struct
   let get_struct_field_int64_list
       (struct_storage : 'cap StructStorage.t option)
       (pointer_word : int)
-    : (int64, 'b) Runtime.Array.t =
-    get_struct_field_bytes_list struct_storage pointer_word
-      (fun slice -> Slice.get_int64 slice 0)
+    : (ro, int64, 'cap ListStorage.t) Runtime.Array.t =
+    get_struct_field_list struct_storage pointer_word
+      (ListDecoders.Bytes8 (fun slice -> Slice.get_int64 slice 0))
 
 
   (* Given storage for a struct, get the data for the specified
@@ -218,9 +200,9 @@ module Make (MessageWrapper : Message.S) = struct
   let get_struct_field_uint8_list
       (struct_storage : 'cap StructStorage.t option)
       (pointer_word : int)
-    : (int, 'b) Runtime.Array.t =
-    get_struct_field_bytes_list struct_storage pointer_word
-      (fun slice -> Slice.get_uint8 slice 0)
+    : (ro, int, 'cap ListStorage.t) Runtime.Array.t =
+    get_struct_field_list struct_storage pointer_word
+      (ListDecoders.Bytes1 (fun slice -> Slice.get_uint8 slice 0))
 
 
   (* Given storage for a struct, get the data for the specified
@@ -229,9 +211,9 @@ module Make (MessageWrapper : Message.S) = struct
   let get_struct_field_uint16_list
       (struct_storage : 'cap StructStorage.t option)
       (pointer_word : int)
-    : (int, 'b) Runtime.Array.t =
-    get_struct_field_bytes_list struct_storage pointer_word
-      (fun slice -> Slice.get_uint16 slice 0)
+    : (ro, int, 'cap ListStorage.t) Runtime.Array.t =
+    get_struct_field_list struct_storage pointer_word
+      (ListDecoders.Bytes2 (fun slice -> Slice.get_uint16 slice 0))
 
 
   (* Given storage for a struct, get the data for the specified
@@ -240,9 +222,9 @@ module Make (MessageWrapper : Message.S) = struct
   let get_struct_field_uint32_list
       (struct_storage : 'cap StructStorage.t option)
       (pointer_word : int)
-    : (Uint32.t, 'b) Runtime.Array.t =
-    get_struct_field_bytes_list struct_storage pointer_word
-      (fun slice -> Slice.get_uint32 slice 0)
+    : (ro, Uint32.t, 'cap ListStorage.t) Runtime.Array.t =
+    get_struct_field_list struct_storage pointer_word
+      (ListDecoders.Bytes4 (fun slice -> Slice.get_uint32 slice 0))
 
 
   (* Given storage for a struct, get the data for the specified
@@ -251,9 +233,9 @@ module Make (MessageWrapper : Message.S) = struct
   let get_struct_field_uint64_list
       (struct_storage : 'cap StructStorage.t option)
       (pointer_word : int)
-    : (Uint64.t, 'b) Runtime.Array.t =
-    get_struct_field_bytes_list struct_storage pointer_word
-      (fun slice -> Slice.get_uint64 slice 0)
+    : (ro, Uint64.t, 'cap ListStorage.t) Runtime.Array.t =
+    get_struct_field_list struct_storage pointer_word
+      (ListDecoders.Bytes8 (fun slice -> Slice.get_uint64 slice 0))
 
 
   (* Given storage for a struct, get the data for the specified
@@ -262,9 +244,10 @@ module Make (MessageWrapper : Message.S) = struct
   let get_struct_field_float32_list
       (struct_storage : 'cap StructStorage.t option)
       (pointer_word : int)
-    : (float, 'b) Runtime.Array.t =
-    get_struct_field_bytes_list struct_storage pointer_word
-      (fun slice -> Int32.float_of_bits (Slice.get_int32 slice 0))
+    : (ro, float, 'cap ListStorage.t) Runtime.Array.t =
+    get_struct_field_list struct_storage pointer_word
+      (ListDecoders.Bytes4
+         (fun slice -> Int32.float_of_bits (Slice.get_int32 slice 0)))
 
 
   (* Given storage for a struct, get the data for the specified
@@ -273,9 +256,10 @@ module Make (MessageWrapper : Message.S) = struct
   let get_struct_field_float64_list
       (struct_storage : 'cap StructStorage.t option)
       (pointer_word : int)
-    : (float, 'b) Runtime.Array.t =
-    get_struct_field_bytes_list struct_storage pointer_word
-      (fun slice -> Int64.float_of_bits (Slice.get_int64 slice 0))
+    : (ro, float, 'cap ListStorage.t) Runtime.Array.t =
+    get_struct_field_list struct_storage pointer_word
+      (ListDecoders.Bytes8
+         (fun slice -> Int64.float_of_bits (Slice.get_int64 slice 0)))
 
 
   (* Given storage for a struct, get the data for the specified
@@ -284,13 +268,14 @@ module Make (MessageWrapper : Message.S) = struct
   let get_struct_field_text_list
       (struct_storage : 'cap StructStorage.t option)
       (pointer_word : int)
-    : (string, 'b) Runtime.Array.t =
-    get_struct_field_bytes_list struct_storage pointer_word (fun slice ->
-      match deref_list_pointer slice with
-      | Some list_storage ->
-          string_of_uint8_list ~null_terminated:true list_storage
-      | None ->
-          "")
+    : (ro, string, 'cap ListStorage.t) Runtime.Array.t =
+    get_struct_field_list struct_storage pointer_word
+      (ListDecoders.Pointer (fun slice ->
+          match deref_list_pointer slice with
+          | Some list_storage ->
+              string_of_uint8_list ~null_terminated:true list_storage
+          | None ->
+              ""))
 
 
   (* Given storage for a struct, get the data for the specified
@@ -299,13 +284,14 @@ module Make (MessageWrapper : Message.S) = struct
   let get_struct_field_blob_list
       (struct_storage : 'cap StructStorage.t option)
       (pointer_word : int)
-    : (string, 'b) Runtime.Array.t =
-    get_struct_field_bytes_list struct_storage pointer_word (fun slice ->
-      match deref_list_pointer slice with
-      | Some list_storage ->
-          string_of_uint8_list ~null_terminated:false list_storage
-      | None ->
-          "")
+    : (ro, string, 'cap ListStorage.t) Runtime.Array.t =
+    get_struct_field_list struct_storage pointer_word
+      (ListDecoders.Pointer (fun slice ->
+          match deref_list_pointer slice with
+          | Some list_storage ->
+              string_of_uint8_list ~null_terminated:false list_storage
+          | None ->
+              ""))
 
 
   (* Given storage for a struct, get the data for the specified
@@ -314,20 +300,42 @@ module Make (MessageWrapper : Message.S) = struct
   let get_struct_field_struct_list
       (struct_storage : 'cap StructStorage.t option)
       (pointer_word : int)
-    : ('a, 'b) Runtime.Array.t =
+    : (ro, 'cap StructStorage.t option, 'cap ListStorage.t) Runtime.Array.t =
     match get_struct_pointer struct_storage pointer_word with
     | Some slice ->
         begin match deref_list_pointer slice with
         | Some list_storage ->
-            Runtime.Array.make
-              ~length:(fun x -> x.ListStorage.num_elements)
-              ~get:(fun x i -> Some (StructList.get x i))
-              list_storage
+            let struct_decoders =
+              let bytes slice = Some {
+                  StructStorage.data = slice;
+                  StructStorage.pointers = {
+                    slice with
+                    Slice.start = Slice.get_end slice;
+                    Slice.len   = 0;
+                  };
+                }
+              in
+              let pointer slice = Some {
+                  StructStorage.data = {
+                    slice with
+                    Slice.len = 0;
+                  };
+                  StructStorage.pointers = slice;
+                }
+              in
+              let composite x = Some x in {
+                ListDecoders.bytes;
+                ListDecoders.pointer;
+                ListDecoders.composite;
+              }
+            in
+            make_array_readonly list_storage
+              (ListDecoders.Struct struct_decoders)
         | None ->
-            Runtime.Array.make_default ()
+            make_empty_array ()
         end
     | None ->
-        Runtime.Array.make_default ()
+        make_empty_array ()
 
 
   (* Given storage for a struct, get the data for the specified
@@ -336,9 +344,27 @@ module Make (MessageWrapper : Message.S) = struct
   let get_struct_field_list_list
       (struct_storage : 'cap StructStorage.t option)
       (pointer_word : int)
-    : ('cap ListStorage.t option, 'b) Runtime.Array.t =
-    get_struct_field_bytes_list struct_storage pointer_word
-      (fun slice -> deref_list_pointer slice)
+      ~(decode : 'cap ListStorage.t ->
+          (ro, 'a, 'cap ListStorage.t) Runtime.Array.t)
+    : (ro, 'b, 'cap ListStorage.t) Runtime.Array.t =
+    match get_struct_pointer struct_storage pointer_word with
+    | Some slice ->
+        begin match deref_list_pointer slice with
+        | Some list_storage ->
+            let decode_list_item pointer_bytes =
+              match deref_list_pointer pointer_bytes with
+              | Some inner_list_storage ->
+                  decode inner_list_storage
+              | None ->
+                  make_empty_array ()
+            in
+            make_array_readonly list_storage
+              (ListDecoders.Pointer decode_list_item)
+        | None ->
+            make_empty_array ()
+        end
+    | None ->
+        make_empty_array ()
 
 
   (* Given storage for a struct, get the data for the specified
@@ -347,10 +373,10 @@ module Make (MessageWrapper : Message.S) = struct
   let get_struct_field_enum_list
       (struct_storage : 'cap StructStorage.t option)
       (pointer_word : int)
-      (convert : int -> 'a)
-    : ('a, 'b) Runtime.Array.t =
-    get_struct_field_bytes_list struct_storage pointer_word
-      (fun slice -> convert (Slice.get_uint16 slice 0))
+      ~(decode : int -> 'a)
+    : (ro, 'a, 'cap ListStorage.t) Runtime.Array.t =
+    get_struct_field_list struct_storage pointer_word
+      (ListDecoders.Bytes2 (fun slice -> decode (Slice.get_uint16 slice 0)))
 
 
   (* Given storage for a struct, get the data for the specified

@@ -35,6 +35,8 @@ module R  = Runtime
 
 
 let sig_s_header =
+  "type ro = Message.ro\n" ^
+  "type rw = Message.rw\n\n" ^
   "module type S = sig\n" ^
   "  module Reader : sig\n" ^
   "    type message_t\n\n" ^

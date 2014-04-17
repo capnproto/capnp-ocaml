@@ -98,7 +98,22 @@ let generate_setters ~nodes_table ~scope struct_def fields =
                   indent field_name;
               ] in
               String.concat ~sep:"" accessor_list
-          | PS.Type.List _
+          | PS.Type.List _ ->
+              let accessor_list = [
+                sprintf "%sval %s_set : t -> %s -> %s\n"
+                  indent
+                  field_name
+                  (GenCommon.type_name ~mode:Mode.Reader ~scope_mode:Mode.Builder
+                     nodes_table scope tp)
+                  (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
+                     nodes_table scope tp);
+                sprintf "%sval %s_init : t -> int -> %s\n"
+                  indent
+                  field_name
+                  (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
+                     nodes_table scope tp);
+              ] in
+              String.concat ~sep:"" accessor_list
           | PS.Type.Struct _ ->
               let accessor_list = [
                 sprintf "%sval %s_set : t -> %s -> %s\n"
@@ -303,8 +318,14 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~mode
           (GenCommon.make_unique_typename ~mode:Mode.Reader
              ~scope_mode:mode ~nodes_table node) ^
           " = reader_t")) ^
-  (* declare an opaque type for array state *)
-  (sprintf "%stype array_t\n\n" indent) ^
+  (* declare opaque types for array state *)
+  (sprintf "%stype array_t\n" indent) ^
+  (if mode = Mode.Builder then
+     sprintf "%stype reader_array_t = Reader.%s.array_t\n\n" 
+       indent
+       (GenCommon.get_fully_qualified_name nodes_table node)
+   else
+     "") ^
   nested_modules ^ union_accessors ^ non_union_accessors ^
   (sprintf "%sval of_message : message_t -> t\n" indent)
 

@@ -27,69 +27,57 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
+type ro = Message.ro
+type rw = Message.rw
 
-module Array = struct
-  type ('a, 'arr) storage_t = {
-    storage : 'arr;
-    length  : 'arr -> int;
-    get     : 'arr -> int -> 'a;
-  }
+module type ARRAY = sig
+  type ('cap, 'a, 'arr) t
 
-  (** The storage type is optional because an RArray may be represented as
-      a null pointer within a read-only message.  The None case is simply
-      treated as an empty array. *)
-  type ('a, 'arr) t = ('a, 'arr) storage_t option
+  val length : ('cap, 'a, 'arr) t -> int
 
-  let length x =
-    match x with
-    | Some storage ->
-        storage.length storage.storage
-    | None ->
-        0
+  val get : ('cap, 'a, 'arr) t -> int -> 'a
 
-  let get x i =
-    match x with
-    | Some storage ->
-        if i < 0 || i >= (storage.length storage.storage) then
-          invalid_arg "index out of bounds"
-        else
-          storage.get storage.storage i
-    | None ->
-        invalid_arg "index out of bounds"
-
-  let make ~length ~get storage = Some { storage; length; get }
-
-  let make_default () = None
+  val set : (rw, 'a, 'arr) t -> int -> 'a -> unit
 end
 
-
-module BArray = struct
-  type ('a, 'arr) storage_t = {
-    storage : 'arr;
-    length  : 'arr -> int;
-    get     : 'arr -> int -> 'a;
-    set     : 'arr -> int -> 'a -> unit;
+module InnerArray = struct
+  type ('cap, 'a, 'arr) t = {
+    length : unit -> int;
+    get_unsafe : int -> 'a;
+    set_unsafe : int -> 'a -> unit;
+    storage : 'arr option;
   }
 
-  (** A Builder will never use a null pointer for the backing storage of
-      a BArray--array storage is always allocated within the message as soon
-      as the array pointer is dereferenced.  Therefore the storage_t is not
-      optional. *)
-  type ('a, 'arr) t = ('a, 'arr) storage_t
-
-  let length x = x.length x.storage
+  let length x = x.length ()
 
   let get x i =
-    if i < 0 || i >= (x.length x.storage) then
+    if i < 0 || i >= x.length () then
       invalid_arg "index out of bounds"
     else
-      x.get x.storage i
+      x.get_unsafe i
 
   let set x i v =
-    if i < 0 || i >= (x.length x.storage) then
+    if i < 0 || i >= x.length () then
       invalid_arg "index out of bounds"
     else
-      x.set x.storage i v
+      x.set_unsafe i v
 
-  let make ~length ~get ~set storage = { storage; length; get; set }
+  let of_outer_array x = x
+
+  let to_outer_array x = x
+
+  let to_storage x = x.storage
+
+  let invalid_set_unsafe i v = assert false
 end
+
+
+module Array = struct
+  type ('cap, 'a, 'arr) t = ('cap, 'a, 'arr) InnerArray.t
+
+  let length = InnerArray.length
+  let get    = InnerArray.get
+  let set    = InnerArray.set
+end
+
+

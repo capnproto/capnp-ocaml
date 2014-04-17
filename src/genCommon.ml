@@ -31,7 +31,8 @@
 open Core.Std
 
 module M  = Message.Make(StrStorage)
-module PS = PluginSchema.Make(M)
+module PS_ = PluginSchema.Make(M)
+module PS = PS_.Reader
 module R  = Runtime
 
 let sprintf = Printf.sprintf
@@ -248,9 +249,13 @@ let rec type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
   | PS.Type.Data    -> "string"
   | PS.Type.List list_descr ->
       let list_type = PS.Type.List.elementType_get list_descr in
-      sprintf "(%s, array_t) Runtime.%s.t"
+      sprintf "(%s, %s, %s) Runtime.Array.t"
+        (if mode = Mode.Reader then "ro" else "rw")
         (type_name ~mode ~scope_mode nodes_table scope list_type)
-        (if mode = Mode.Reader then "Array" else "BArray")
+        (if mode = Mode.Reader && scope_mode = Mode.Builder
+          then "reader_array_t"
+        else
+          "array_t")
   | PS.Type.Enum enum_descr ->
       let enum_id = PS.Type.Enum.typeId_get enum_descr in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
