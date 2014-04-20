@@ -94,112 +94,124 @@ let generate_enum_accessor ~nodes_table ~scope ~enum_node ~indent ~field_name
   apply_indent ~indent lines
 
 
+(* There is no get_enum() or get_enum_list() in the runtime API,
+   because the enum values are schema-dependent.  This function
+   will generate something appropriate for localized use. *)
+let generate_enum_runtime_getters ~nodes_table ~scope ~indent enum_def =
+  let enum_id = PS.Type.Enum.typeId_get enum_def in
+  let enum_node = Hashtbl.find_exn nodes_table enum_id in
+  let decoder_lambda =
+    (generate_enum_decoder_lines ~nodes_table ~scope ~enum_node
+        ~indent:(indent ^ "    "))
+  in
+  let lines = [
+    "let get_enum ~byte_ofs data_opt =";
+    "  let decode ="; ] @ decoder_lambda @ [
+    "  in";
+    "  decode (get_uint16 ~default:0 ~byte_ofs data_opt)";
+    "let get_enum_list ~default pointer_opt =";
+    "  let decode ="; ] @ decoder_lambda @ [
+    "  in";
+    "  get_list ~default (ListDecoders.Bytes2 (fun slice ->";
+    "    decode (Slice.get_uint16 slice 0)))";
+    "    pointer_opt";
+  ] in
+  apply_indent ~indent lines
+
+
+let rec generate_list_element_decoder ~nodes_table ~scope ~list_def ~indent =
+  let make_terminal_decoder element_name = apply_indent ~indent [
+      "let decoders = ListDecoders.Pointer (fun slice ->";
+      "  get_" ^ element_name ^ "_list ~default:(make_empty_array ()) (Some slice))";
+      "in";
+    ]
+  in
+  let contained_type = PS.Type.List.elementType_get list_def in
+  match PS.Type.unnamed_union_get contained_type with
+  | PS.Type.Void     -> make_terminal_decoder "void"
+  | PS.Type.Bool     -> make_terminal_decoder "bit"
+  | PS.Type.Int8     -> make_terminal_decoder "int8"
+  | PS.Type.Int16    -> make_terminal_decoder "int16"
+  | PS.Type.Int32    -> make_terminal_decoder "int32"
+  | PS.Type.Int64    -> make_terminal_decoder "int64"
+  | PS.Type.Uint8    -> make_terminal_decoder "uint8"
+  | PS.Type.Uint16   -> make_terminal_decoder "uint16"
+  | PS.Type.Uint32   -> make_terminal_decoder "uint32"
+  | PS.Type.Uint64   -> make_terminal_decoder "uint64"
+  | PS.Type.Float32  -> make_terminal_decoder "float32"
+  | PS.Type.Float64  -> make_terminal_decoder "float64"
+  | PS.Type.Text     -> make_terminal_decoder "text"
+  | PS.Type.Data     -> make_terminal_decoder "blob"
+  | PS.Type.Struct _ -> make_terminal_decoder "struct"
+  | PS.Type.List inner_list_def ->
+      let inner_decoder_decl = generate_list_element_decoder ~nodes_table
+         ~scope ~list_def:inner_list_def ~indent:(indent ^ "  ")
+      in
+      apply_indent ~indent [
+        "let decoders = ListDecoders.Pointer (fun slice ->";
+      ] @ inner_decoder_decl @ [
+        "  get_list ~default:(make_empty_array ()) decoders (Some slice))";
+      ]
+  | PS.Type.Enum enum_def ->
+      let enum_getters =
+        generate_enum_runtime_getters ~nodes_table ~scope
+          ~indent:(indent ^ "  ") enum_def
+      in
+      let lines = [
+        "let decoders =";
+      ] @ enum_getters @ [
+        "  ListDecoders.Pointer (fun slice ->";
+        "    get_enum_list ~default:(make_empty_array ()) (Some slice))";
+        "in";
+      ] in
+      apply_indent ~indent lines
+  | PS.Type.Interface _ ->
+      failwith "not implemented"
+  | PS.Type.AnyPointer ->
+      failwith "not implemented"
+  | PS.Type.Undefined_ x ->
+       failwith (sprintf "Unknown Type union discriminant %d" x)
+
+
 (* Generate an accessor for retrieving a list of the given type. *)
 let generate_list_accessor ~nodes_table ~scope ~list_type ~indent
     ~field_name ~field_ofs =
+  let make_primitive_accessor element_name =
+    apply_indent ~indent [
+      "let " ^ field_name ^ "_get x =";
+      sprintf "  get_pointer_field x %u ~f:(get_%s_list \
+               ~default:(make_empty_array ()))"
+        field_ofs element_name;
+    ]
+  in
   match PS.Type.unnamed_union_get list_type with
-  | PS.Type.Void ->
-      apply_indent ~indent [
+  | PS.Type.Void     -> make_primitive_accessor "void"
+  | PS.Type.Bool     -> make_primitive_accessor "bit"
+  | PS.Type.Int8     -> make_primitive_accessor "int8"
+  | PS.Type.Int16    -> make_primitive_accessor "int16"
+  | PS.Type.Int32    -> make_primitive_accessor "int32"
+  | PS.Type.Int64    -> make_primitive_accessor "int64"
+  | PS.Type.Uint8    -> make_primitive_accessor "uint8"
+  | PS.Type.Uint16   -> make_primitive_accessor "uint16"
+  | PS.Type.Uint32   -> make_primitive_accessor "uint32"
+  | PS.Type.Uint64   -> make_primitive_accessor "uint64"
+  | PS.Type.Float32  -> make_primitive_accessor "float32"
+  | PS.Type.Float64  -> make_primitive_accessor "float64"
+  | PS.Type.Text     -> make_primitive_accessor "text"
+  | PS.Type.Data     -> make_primitive_accessor "blob"
+  | PS.Type.Struct _ -> make_primitive_accessor "struct"
+  | PS.Type.List list_def ->
+      let decoder_declaration = generate_list_element_decoder
+          ~nodes_table ~scope ~list_def ~indent:(indent ^ "  ")
+      in
+      let lines = [
         "let " ^ field_name ^ "_get x =";
-        sprintf "  get_pointer_field x %u ~f:(get_void_list \
-                 ~default:(make_empty_array ()))"
+      ] @ decoder_declaration @ [
+        sprintf "  get_pointer_field x %u ~f:(get_list \
+                 ~default:(make_empty_array ()) decoders)"
           field_ofs;
-      ]
-  | PS.Type.Bool ->
-      apply_indent ~indent [
-        "let " ^ field_name ^ "_get x =";
-        sprintf "  get_pointer_field x %u ~f:(get_bit_list \
-                 ~default:(make_empty_array ()))"
-          field_ofs;
-      ]
-  | PS.Type.Int8 ->
-      apply_indent ~indent [
-        "let " ^ field_name ^ "_get x =";
-        sprintf "  get_pointer_field x %u ~f:(get_int8_list \
-                 ~default:(make_empty_array ()))"
-          field_ofs;
-      ]
-  | PS.Type.Int16 ->
-      apply_indent ~indent [
-        "let " ^ field_name ^ "_get x =";
-        sprintf "  get_pointer_field x %u ~f:(get_int16_list \
-                 ~default:(make_empty_array ()))"
-          field_ofs;
-      ]
-  | PS.Type.Int32 ->
-      apply_indent ~indent [
-        "let " ^ field_name ^ "_get x =";
-        sprintf "  get_pointer_field x %u ~f:(get_int32_list \
-                 ~default:(make_empty_array ()))"
-          field_ofs;
-      ]
-  | PS.Type.Int64 ->
-      apply_indent ~indent [
-        "let " ^ field_name ^ "_get x =";
-        sprintf "  get_pointer_field x %u ~f:(get_int64_list \
-                 ~default:(make_empty_array ()))"
-          field_ofs;
-      ]
-  | PS.Type.Uint8 ->
-      apply_indent ~indent [
-        "let " ^ field_name ^ "_get x =";
-        sprintf "  get_pointer_field x %u ~f:(get_uint8_list \
-                 ~default:(make_empty_array ()))"
-          field_ofs;
-      ]
-  | PS.Type.Uint16 ->
-      apply_indent ~indent [
-        "let " ^ field_name ^ "_get x =";
-        sprintf "  get_pointer_field x %u ~f:(get_uint16_list \
-                 ~default:(make_empty_array ()))"
-          field_ofs;
-      ]
-  | PS.Type.Uint32 ->
-      apply_indent ~indent [
-        "let " ^ field_name ^ "_get x =";
-        sprintf "  get_pointer_field x %u ~f:(get_uint32_list \
-                 ~default:(make_empty_array ()))"
-          field_ofs;
-      ]
-  | PS.Type.Uint64 ->
-      apply_indent ~indent [
-        "let " ^ field_name ^ "_get x =";
-        sprintf "  get_pointer_field x %u ~f:(get_uint64_list \
-                 ~default:(make_empty_array ()))"
-          field_ofs;
-      ]
-  | PS.Type.Float32 ->
-      apply_indent ~indent [
-        "let " ^ field_name ^ "_get x =";
-        sprintf "  get_pointer_field x %u ~f:(get_float32_list \
-                 ~default:(make_empty_array ()))"
-          field_ofs;
-      ]
-  | PS.Type.Float64 ->
-      apply_indent ~indent [
-        "let " ^ field_name ^ "_get x =";
-        sprintf "  get_pointer_field x %u ~f:(get_float64_list \
-                 ~default:(make_empty_array ()))"
-          field_ofs;
-      ]
-  | PS.Type.Text ->
-      apply_indent ~indent [
-        "let " ^ field_name ^ "_get x =";
-        sprintf "  get_pointer_field x %u ~f:(get_text_list \
-                 ~default:(make_empty_array ()))"
-          field_ofs;
-      ]
-  | PS.Type.Data ->
-      apply_indent ~indent [
-        "let " ^ field_name ^ "_get x =";
-        sprintf "  get_pointer_field x %u ~f:(get_blob_list \
-                 ~default:(make_empty_array ()))"
-          field_ofs;
-      ]
-  | PS.Type.List _ ->
-      apply_indent ~indent [
-        "let " ^ field_name ^ "_get x = failwith \"not implemented (type list)\"";
-      ]
+      ] in
+      apply_indent ~indent lines
   | PS.Type.Enum enum_def ->
       let enum_id = PS.Type.Enum.typeId_get enum_def in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
@@ -215,13 +227,6 @@ let generate_list_accessor ~nodes_table ~scope ~list_type ~indent
         "    decoders:(ListDecoders.Bytes2 enum_decoder))";
         ] in
       apply_indent ~indent lines
-  | PS.Type.Struct _ ->
-      apply_indent ~indent [
-        "let " ^ field_name ^ "_get x =";
-        sprintf "  get_pointer_field x %u ~f:(get_struct_list \
-                 ~default:(make_empty_array ()))"
-          field_ofs;
-      ]
   | PS.Type.Interface _ ->
       apply_indent ~indent [
         "let " ^ field_name ^ "_get x = failwith \"not implemented (type iface)\"";
