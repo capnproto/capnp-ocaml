@@ -36,6 +36,8 @@ module R  = Runtime
 module Builder = MessageBuilder.Make(GenCommon.M)
 
 let sprintf = Printf.sprintf
+let apply_indent = GenCommon.apply_indent
+
 
 (* Generate an encoder lambda for converting from an enum value to the associated
    uint16.  [allow_undefined] indicates whether or not to permit enum values which
@@ -732,6 +734,49 @@ let generate_accessors ~nodes_table ~scope struct_def fields =
   in
   String.concat ~sep:"" accessors
 
+(* Generate a function for unpacking a capnp union type as an OCaml variant. *)
+let generate_union_accessor_lines ~nodes_table ~scope struct_def fields =
+  let indent = String.make (2 * (List.length scope + 2)) ' ' in
+  let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
+    let field_name = String.uncapitalize (PS.Field.name_get field) in
+    let ctor_name = String.capitalize field_name in
+    let field_value = PS.Field.discriminantValue_get field in
+    let field_has_void_type =
+      match PS.Field.unnamed_union_get field with
+      | PS.Field.Slot slot ->
+          begin match PS.Type.unnamed_union_get (PS.Field.Slot.type_get slot) with
+          | PS.Type.Void -> true
+          | _ -> false
+          end
+      | _ -> false
+    in
+    if field_has_void_type then
+      (sprintf "%s  | %u -> %s"
+        indent
+        field_value
+        ctor_name) :: acc
+    else
+      (sprintf "%s  | %u -> %s (%s_get x)"
+        indent
+        field_value
+        ctor_name
+        field_name) :: acc)
+  in
+  let header = apply_indent ~indent [
+      "let unnamed_union_get x =";
+      sprintf "  match get_struct_field_uint16 x ~default:0 %u with"
+        ((Uint32.to_int (PS.Node.Struct.discriminantOffset_get struct_def)) * 2);
+    ] in
+  let footer = [ indent ^ "  | v -> Undefined_ v" ] in
+  (GenCommon.generate_union_type_lines ~mode:Mode.Reader nodes_table scope
+     struct_def fields) @ header @ cases @ footer
+
+
+(* FIXME: get rid of this *)
+let generate_union_accessor ~nodes_table ~scope struct_def fields =
+  (String.concat ~sep:"\n"
+     (generate_union_accessor_lines ~nodes_table ~scope struct_def fields)) ^ "\n"
+
 
 (* Generate the OCaml module corresponding to a struct definition.  [scope] is a
  * stack of scope IDs corresponding to this lexical context, and is used to figure
@@ -765,8 +810,7 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
     | [] ->
         ""
     | _  ->
-        (GenReader.generate_union_accessor ~nodes_table ~scope
-           struct_def union_fields)
+        (generate_union_accessor ~nodes_table ~scope struct_def union_fields)
   in
   let data_words    = PS.Node.Struct.dataWordCount_get struct_def in
   let pointer_words = PS.Node.Struct.pointerCount_get struct_def in
@@ -841,8 +885,8 @@ and generate_node
         body ^
         (sprintf "%send\n" indent)
   | PS.Node.Enum enum_def ->
-      let nested_modules = generate_nested_modules () in
-      let body =
+      let nested_modules : string = generate_nested_modules () in
+      let body : string =
         GenCommon.generate_enum_sig ~nodes_table ~scope ~nested_modules
           ~mode:GenCommon.Mode.Builder ~node enum_def
       in

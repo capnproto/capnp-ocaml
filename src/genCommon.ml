@@ -45,6 +45,10 @@ module Mode = struct
 end
 
 
+let apply_indent ~(indent : string) (lines : string list) : string list =
+  List.map ~f:(fun line -> indent ^ line) lines
+
+
 let children_of
     (nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
     (parent : PS.Node.t)
@@ -277,8 +281,7 @@ let rec type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
       failwith (sprintf "Unknown Type union discriminant %d" x)
 
 
-(* Generate a variant type declaration for a capnp union type. *)
-let generate_union_type ~(mode : Mode.t) nodes_table scope
+let generate_union_type_lines ~(mode : Mode.t) nodes_table scope
     struct_def fields =
   let indent = String.make (2 * (List.length scope + 2)) ' ' in
   let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
@@ -288,9 +291,9 @@ let generate_union_type ~(mode : Mode.t) nodes_table scope
         let field_type = PS.Field.Slot.type_get slot in
         begin match PS.Type.unnamed_union_get field_type with
         | PS.Type.Void ->
-            (sprintf "%s  | %s" indent field_name) :: acc
+            (indent ^ "  | " ^ field_name) :: acc
         | _ ->
-            (sprintf "%s  | %s of %s" indent field_name
+            (indent ^ "  | " ^ field_name ^ " of " ^
                (type_name ~mode ~scope_mode:mode nodes_table scope field_type))
             :: acc
         end
@@ -303,21 +306,28 @@ let generate_union_type ~(mode : Mode.t) nodes_table scope
           in
           group_module_name ^ ".t"
         in
-        (sprintf "%s  | %s of %s" indent field_name group_type_name) :: acc
+        (indent ^ "  | " ^ field_name ^ " of " ^ group_type_name) :: acc
     | PS.Field.Undefined_ x ->
         failwith (sprintf "Unknown Field union discriminant %d" x))
   in
-  let header = [
-    sprintf "%stype unnamed_union_t =" indent;
-  ] in
-  let footer = [
-    sprintf "%s  | Undefined_ of int\n" indent
-  ] in
-  String.concat ~sep:"\n" (header @ cases @ footer)
+  let header = [ indent ^ "type unnamed_union_t =" ] in
+  let footer = [ indent ^ "  | Undefined_ of int" ] in
+  (header @ cases @ footer)
+
+
+(* Generate a variant type declaration for a capnp union type. *)
+(* FIXME: get rid of this *)
+let generate_union_type ~(mode : Mode.t) nodes_table scope
+    struct_def fields =
+  (String.concat ~sep:"\n"
+    (generate_union_type_lines ~mode nodes_table scope
+       struct_def fields)) ^
+    "\n"
 
 
 (* Generate the signature for an enum type. *)
-let generate_enum_sig ~nodes_table ~scope ~nested_modules ~mode ~node enum_def =
+let generate_enum_sig_lines ~nodes_table ~scope ~nested_modules
+    ~mode ~node enum_def =
   let indent = String.make (2 * (List.length scope + 2)) ' ' in
   let is_builder = mode = Mode.Builder in
   let header =
@@ -325,26 +335,34 @@ let generate_enum_sig ~nodes_table ~scope ~nested_modules ~mode ~node enum_def =
       let reader_type_string =
         "Reader." ^ (get_fully_qualified_name nodes_table node) ^ ".t"
       in
-      sprintf "%stype t = %s =\n" indent reader_type_string
+      [ indent ^ "type t = " ^ reader_type_string ^ " =" ]
     else
-      sprintf "%stype t =\n" indent in
+      [ indent ^ "type t =" ]
+  in
   let variants =
     let enumerants = PS.Node.Enum.enumerants_get enum_def in
-    let buf = Buffer.create 512 in
-    for i = 0 to R.Array.length enumerants - 1 do
-      let enumerant = R.Array.get enumerants i in
-      let match_case =
-        sprintf "%s  | %s\n"
-          indent
-          (String.capitalize (PS.Enumerant.name_get enumerant))
-      in
-      Buffer.add_string buf match_case
-    done;
-    let footer = sprintf "%s  | Undefined_ of int\n" indent in
-    let () = Buffer.add_string buf footer in
-    Buffer.contents buf
+    let footer = indent ^ "  | Undefined_ of int" in
+    let rec loop acc i =
+      if i = R.Array.length enumerants then
+        List.rev (footer :: acc)
+      else
+        let enumerant = R.Array.get enumerants i in
+        let name = String.capitalize (PS.Enumerant.name_get enumerant) in
+        let match_case = indent ^ "  | " ^ name in
+        loop (match_case :: acc) (i + 1)
+    in
+    loop [] 0
   in
-  nested_modules ^ header ^ variants
+  nested_modules @ header @ variants
+
+
+(* Generate the signature for an enum type. *)
+(* FIXME: get rid of this *)
+let generate_enum_sig ~nodes_table ~scope ~(nested_modules : string) ~mode ~node enum_def =
+  (String.concat ~sep:"\n"
+     (generate_enum_sig_lines ~nodes_table ~scope
+        ~nested_modules:(String.split_lines nested_modules) ~mode
+        ~node enum_def)) ^ "\n"
 
 
 let generate_constant ~nodes_table ~scope const_def =

@@ -50,8 +50,11 @@ let main () : int =
       begin try
         let () = Generate.compile request "dir_name" in
         ExitCode.success
-      with Failure msg ->
-        let () = prerr_endline msg in
+      with (Failure msg) as e ->
+        let bs = Exn.backtrace () in
+        let es = Exn.to_string e in
+        let () = prerr_endline es in
+        let () = prerr_endline bs in
         ExitCode.general_error
       end
   | Result.Error StrStorage.FramingError.Incomplete ->

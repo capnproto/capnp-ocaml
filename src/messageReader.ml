@@ -66,477 +66,6 @@ module Make (MessageWrapper : Message.S) = struct
         invalid_msg "decoded list pointer where struct pointer was expected"
 
 
-  (* Given storage for a struct, get the pointer bytes for the given
-     struct-relative pointer index.  Returns None if the requested
-     pointer bytes are not backed by physical storage (i.e. the struct
-     was specified by a null pointer, or the specified pointer word
-     lies at an offset which is not present in the struct). *)
-  let get_struct_pointer
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-    : 'cap Slice.t option =
-    match struct_storage with
-    | Some storage ->
-        StructStorage.get_pointer storage pointer_word
-    | None ->
-        None
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto Data payload. *)
-  let get_struct_field_blob
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-      ~(default : string)
-    : string =
-    match get_struct_pointer struct_storage pointer_word with
-    | Some pointer_bytes ->
-        begin match deref_list_pointer pointer_bytes with
-        | Some list_storage ->
-            string_of_uint8_list ~null_terminated:false list_storage
-        | None ->
-            default
-        end
-    | None ->
-        default
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto Text payload. *)
-  let get_struct_field_text
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-      ~(default : string)
-    : string =
-    match get_struct_pointer struct_storage pointer_word with
-    | Some pointer_bytes ->
-        begin match deref_list_pointer pointer_bytes with
-        | Some list_storage ->
-            string_of_uint8_list ~null_terminated:true list_storage
-        | None ->
-            default
-        end
-    | None ->
-        default
-
-
-  let get_struct_field_list
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-      (decoders : ('cap, 'a) ListDecoders.t)
-    : (ro, 'a, 'cap ListStorage.t) Runtime.Array.t =
-    match get_struct_pointer struct_storage pointer_word with
-    | Some slice ->
-        begin match deref_list_pointer slice with
-        | Some list_storage ->
-            make_array_readonly list_storage decoders
-        | None ->
-            make_empty_array ()
-        end
-    | None ->
-        make_empty_array ()
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<Bool>. *)
-  let get_struct_field_bit_list
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-    : (ro, bool, 'cap ListStorage.t) Runtime.Array.t =
-    get_struct_field_list struct_storage pointer_word
-      (ListDecoders.Bit (fun (x : bool) -> x))
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<Int8>. *)
-  let get_struct_field_int8_list
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-    : (ro, int, 'cap ListStorage.t) Runtime.Array.t =
-    get_struct_field_list struct_storage pointer_word
-      (ListDecoders.Bytes1 (fun slice -> Slice.get_int8 slice 0))
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<Int16>. *)
-  let get_struct_field_int16_list
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-    : (ro, int, 'cap ListStorage.t) Runtime.Array.t =
-    get_struct_field_list struct_storage pointer_word
-      (ListDecoders.Bytes2 (fun slice -> Slice.get_int16 slice 0))
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<Int32>. *)
-  let get_struct_field_int32_list
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-    : (ro, int32, 'cap ListStorage.t) Runtime.Array.t =
-    get_struct_field_list struct_storage pointer_word
-      (ListDecoders.Bytes4 (fun slice -> Slice.get_int32 slice 0))
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<Int64>. *)
-  let get_struct_field_int64_list
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-    : (ro, int64, 'cap ListStorage.t) Runtime.Array.t =
-    get_struct_field_list struct_storage pointer_word
-      (ListDecoders.Bytes8 (fun slice -> Slice.get_int64 slice 0))
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<UInt8>. *)
-  let get_struct_field_uint8_list
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-    : (ro, int, 'cap ListStorage.t) Runtime.Array.t =
-    get_struct_field_list struct_storage pointer_word
-      (ListDecoders.Bytes1 (fun slice -> Slice.get_uint8 slice 0))
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<UInt16>. *)
-  let get_struct_field_uint16_list
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-    : (ro, int, 'cap ListStorage.t) Runtime.Array.t =
-    get_struct_field_list struct_storage pointer_word
-      (ListDecoders.Bytes2 (fun slice -> Slice.get_uint16 slice 0))
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<UInt32>. *)
-  let get_struct_field_uint32_list
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-    : (ro, Uint32.t, 'cap ListStorage.t) Runtime.Array.t =
-    get_struct_field_list struct_storage pointer_word
-      (ListDecoders.Bytes4 (fun slice -> Slice.get_uint32 slice 0))
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<UInt64>. *)
-  let get_struct_field_uint64_list
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-    : (ro, Uint64.t, 'cap ListStorage.t) Runtime.Array.t =
-    get_struct_field_list struct_storage pointer_word
-      (ListDecoders.Bytes8 (fun slice -> Slice.get_uint64 slice 0))
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<Float32>. *)
-  let get_struct_field_float32_list
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-    : (ro, float, 'cap ListStorage.t) Runtime.Array.t =
-    get_struct_field_list struct_storage pointer_word
-      (ListDecoders.Bytes4
-         (fun slice -> Int32.float_of_bits (Slice.get_int32 slice 0)))
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<Float64>. *)
-  let get_struct_field_float64_list
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-    : (ro, float, 'cap ListStorage.t) Runtime.Array.t =
-    get_struct_field_list struct_storage pointer_word
-      (ListDecoders.Bytes8
-         (fun slice -> Int64.float_of_bits (Slice.get_int64 slice 0)))
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<Text>. *)
-  let get_struct_field_text_list
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-    : (ro, string, 'cap ListStorage.t) Runtime.Array.t =
-    get_struct_field_list struct_storage pointer_word
-      (ListDecoders.Pointer (fun slice ->
-          match deref_list_pointer slice with
-          | Some list_storage ->
-              string_of_uint8_list ~null_terminated:true list_storage
-          | None ->
-              ""))
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<Data>. *)
-  let get_struct_field_blob_list
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-    : (ro, string, 'cap ListStorage.t) Runtime.Array.t =
-    get_struct_field_list struct_storage pointer_word
-      (ListDecoders.Pointer (fun slice ->
-          match deref_list_pointer slice with
-          | Some list_storage ->
-              string_of_uint8_list ~null_terminated:false list_storage
-          | None ->
-              ""))
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<S> for some struct S. *)
-  let get_struct_field_struct_list
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-    : (ro, 'cap StructStorage.t option, 'cap ListStorage.t) Runtime.Array.t =
-    match get_struct_pointer struct_storage pointer_word with
-    | Some slice ->
-        begin match deref_list_pointer slice with
-        | Some list_storage ->
-            let struct_decoders =
-              let bytes slice = Some {
-                  StructStorage.data = slice;
-                  StructStorage.pointers = {
-                    slice with
-                    Slice.start = Slice.get_end slice;
-                    Slice.len   = 0;
-                  };
-                }
-              in
-              let pointer slice = Some {
-                  StructStorage.data = {
-                    slice with
-                    Slice.len = 0;
-                  };
-                  StructStorage.pointers = slice;
-                }
-              in
-              let composite x = Some x in {
-                ListDecoders.bytes;
-                ListDecoders.pointer;
-                ListDecoders.composite;
-              }
-            in
-            make_array_readonly list_storage
-              (ListDecoders.Struct struct_decoders)
-        | None ->
-            make_empty_array ()
-        end
-    | None ->
-        make_empty_array ()
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<L> for some list L. *)
-  let get_struct_field_list_list
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-      ~(decode : 'cap ListStorage.t ->
-          (ro, 'a, 'cap ListStorage.t) Runtime.Array.t)
-    : (ro, 'b, 'cap ListStorage.t) Runtime.Array.t =
-    match get_struct_pointer struct_storage pointer_word with
-    | Some slice ->
-        begin match deref_list_pointer slice with
-        | Some list_storage ->
-            let decode_list_item pointer_bytes =
-              match deref_list_pointer pointer_bytes with
-              | Some inner_list_storage ->
-                  decode inner_list_storage
-              | None ->
-                  make_empty_array ()
-            in
-            make_array_readonly list_storage
-              (ListDecoders.Pointer decode_list_item)
-        | None ->
-            make_empty_array ()
-        end
-    | None ->
-        make_empty_array ()
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<E> for some enum E. *)
-  let get_struct_field_enum_list
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-      ~(decode : int -> 'a)
-    : (ro, 'a, 'cap ListStorage.t) Runtime.Array.t =
-    get_struct_field_list struct_storage pointer_word
-      (ListDecoders.Bytes2 (fun slice -> decode (Slice.get_uint16 slice 0)))
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto struct. *)
-  let get_struct_field_struct
-      (struct_storage : 'cap StructStorage.t option)
-      (pointer_word : int)
-    : 'cap StructStorage.t option =
-    match get_struct_pointer struct_storage pointer_word with
-    | Some pointer_bytes -> deref_struct_pointer pointer_bytes
-    | None -> None
-
-
-  (* Given storage for a struct, decode the boolean field stored
-     at the given byte and bit offset within the struct's data region. *)
-  let get_struct_field_bit
-      (struct_storage : 'cap StructStorage.t option)
-      ~(default_bit : bool)
-      (byte_ofs : int) (bit_ofs : int)
-    : bool =
-    let byte_val =
-      match struct_storage with
-      | Some { StructStorage.data = data; _ } when byte_ofs < data.Slice.len ->
-          Slice.get_uint8 data byte_ofs
-      | _ ->
-          0
-    in
-    let bit_val = (byte_val land (1 lsl bit_ofs)) <> 0 in
-    if default_bit then not bit_val else bit_val
-
-
-  (* Given storage for a struct, decode the UInt8 field stored
-     at the given byte offset within the struct's data region. *)
-  let get_struct_field_uint8
-      (struct_storage : 'cap StructStorage.t option)
-      ~(default : int) (byte_ofs : int)
-    : int =
-    let numeric =
-      match struct_storage with
-      | Some { StructStorage.data = data; _ } when byte_ofs < data.Slice.len ->
-          Slice.get_uint8 data byte_ofs
-      | _ ->
-          0
-    in
-    numeric lxor default
-
-
-  (* Given storage for a struct, decode the UInt16 field stored
-     at the given byte offset within the struct's data region. *)
-  let get_struct_field_uint16
-      (struct_storage : 'cap StructStorage.t option)
-      ~(default : int) (byte_ofs : int)
-    : int =
-    let numeric =
-      match struct_storage with
-      | Some { StructStorage.data = data; _ } when byte_ofs < data.Slice.len - 1 ->
-          Slice.get_uint16 data byte_ofs
-      | _ ->
-          0
-    in
-    numeric lxor default
-
-
-  (* Given storage for a struct, decode the UInt32 field stored
-     at the given byte offset within the struct's data region. *)
-  let get_struct_field_uint32
-      (struct_storage : 'cap StructStorage.t option)
-      ~(default : Uint32.t) (byte_ofs : int)
-    : Uint32.t =
-    let numeric =
-      match struct_storage with
-      | Some { StructStorage.data = data; _ } when byte_ofs < data.Slice.len - 3 ->
-          Slice.get_uint32 data byte_ofs
-      | _ ->
-          Uint32.zero
-    in
-    Uint32.logxor numeric default
-
-
-  (* Given storage for a struct, decode the UInt64 field stored
-     at the given byte offset within the struct's data region. *)
-  let get_struct_field_uint64
-      (struct_storage : 'cap StructStorage.t option)
-      ~(default : Uint64.t) (byte_ofs : int)
-    : Uint64.t =
-    let numeric =
-      match struct_storage with
-      | Some { StructStorage.data = data; _ } when byte_ofs < data.Slice.len - 7 ->
-          Slice.get_uint64 data byte_ofs
-      | _ ->
-          Uint64.zero
-    in
-    Uint64.logxor numeric default
-
-
-  (* Given storage for a struct, decode the Int8 field stored
-     at the given byte offset within the struct's data region. *)
-  let get_struct_field_int8
-      (struct_storage : 'cap StructStorage.t option)
-      ~(default : int) (byte_ofs : int)
-    : int =
-    let numeric =
-      match struct_storage with
-      | Some { StructStorage.data = data; _ } when byte_ofs < data.Slice.len ->
-          Slice.get_int8 data byte_ofs
-      | _ ->
-          0
-    in
-    numeric lxor default
-
-
-  (* Given storage for a struct, decode the Int16 field stored
-     at the given byte offset within the struct's data region. *)
-  let get_struct_field_int16
-      (struct_storage : 'cap StructStorage.t option)
-      ~(default : int) (byte_ofs : int)
-    : int =
-    let numeric =
-      match struct_storage with
-      | Some { StructStorage.data = data; _ } when byte_ofs < data.Slice.len - 1 ->
-          Slice.get_int16 data byte_ofs
-      | _ ->
-          0
-    in
-    numeric lxor default
-
-
-  (* Given storage for a struct, decode the Int32 field stored
-     at the given byte offset within the struct's data region. *)
-  let get_struct_field_int32
-      (struct_storage : 'cap StructStorage.t option)
-      ~(default : int32) (byte_ofs : int)
-    : Int32.t =
-    let numeric =
-      match struct_storage with
-      | Some { StructStorage.data = data; _ } when byte_ofs < data.Slice.len - 3 ->
-          Slice.get_int32 data byte_ofs
-      | _ ->
-          Int32.zero
-    in
-    Int32.bit_xor numeric default
-
-
-  (* Given storage for a struct, decode the Int64 field stored
-     at the given byte offset within the struct's data region. *)
-  let get_struct_field_int64
-      (struct_storage : 'cap StructStorage.t option)
-      ~(default : int64) (byte_ofs : int)
-    : Int64.t =
-    let numeric =
-      match struct_storage with
-      | Some { StructStorage.data = data; _ } when byte_ofs < data.Slice.len - 7 ->
-          Slice.get_int64 data byte_ofs
-      | _ ->
-          Int64.zero
-    in
-    Int64.bit_xor numeric default
-
-
   (* Locate the storage region corresponding to the root struct of a message. *)
   let get_root_struct (m : 'cap Message.t) : 'cap StructStorage.t option =
     let first_segment = Message.get_segment m 0 in
@@ -550,6 +79,420 @@ module Make (MessageWrapper : Message.S) = struct
         Slice.len        = sizeof_uint64
       } in
       deref_struct_pointer pointer_bytes
+
+
+  (*******************************************************************************
+   * METHODS FOR DECODING OBJECTS STORED BY VALUE
+   *******************************************************************************)
+
+  (* Given storage for a struct, attempt to get the bytes associated
+     with the struct data section.  The provided decoding function
+     is applied to the resulting region. *)
+  let get_data_field
+      (struct_storage_opt : 'cap StructStorage.t option)
+      ~(f : 'cap Slice.t option -> 'a)
+    : 'a =
+    let data_opt =
+      match struct_storage_opt with
+      | Some struct_storage ->
+          Some struct_storage.StructStorage.data
+      | None ->
+          None
+    in
+    f data_opt
+
+  let get_void
+      (data_opt : 'cap Slice.t option)
+    : unit =
+    ()
+
+  let get_bit
+      ~(default : bool)
+      ~(byte_ofs : int)
+      ~(bit_ofs : int)
+      (data_opt : 'cap Slice.t option)
+    : bool =
+    let byte_val =
+      match data_opt with
+      | Some data when byte_ofs < data.Slice.len ->
+          Slice.get_uint8 data byte_ofs
+      | _ ->
+          0
+    in
+    let bit_val = (byte_val land (1 lsl bit_ofs)) <> 0 in
+    if default then not bit_val else bit_val
+
+  let get_int8
+      ~(default : int)
+      ~(byte_ofs : int)
+      (data_opt : 'cap Slice.t option)
+    : int =
+    let numeric =
+      match data_opt with
+      | Some data when byte_ofs < data.Slice.len ->
+          Slice.get_int8 data byte_ofs
+      | _ ->
+          0
+    in
+    numeric lxor default
+
+  let get_int16
+      ~(default : int)
+      ~(byte_ofs : int)
+      (data_opt : 'cap Slice.t option)
+    : int =
+    let numeric =
+      match data_opt with
+      | Some data when byte_ofs + 1 < data.Slice.len ->
+          Slice.get_int16 data byte_ofs
+      | _ ->
+          0
+    in
+    numeric lxor default
+
+  let get_int32
+      ~(default : int32)
+      ~(byte_ofs : int)
+      (data_opt : 'cap Slice.t option)
+      : int32 =
+    let numeric =
+      match data_opt with
+      | Some data when byte_ofs + 3 < data.Slice.len ->
+          Slice.get_int32 data byte_ofs
+      | _ ->
+          Int32.zero
+    in
+    Int32.bit_xor numeric default
+
+  let get_int64
+      ~(default : int64)
+      ~(byte_ofs : int)
+      (data_opt : 'cap Slice.t option)
+    : int64 =
+    let numeric =
+      match data_opt with
+      | Some data when byte_ofs + 7 < data.Slice.len ->
+          Slice.get_int64 data byte_ofs
+      | _ ->
+          Int64.zero
+    in
+    Int64.bit_xor numeric default
+
+  let get_uint8
+      ~(default : int)
+      ~(byte_ofs : int)
+      (data_opt : 'cap Slice.t option)
+    : int =
+    let numeric =
+      match data_opt with
+      | Some data when byte_ofs < data.Slice.len ->
+          Slice.get_uint8 data byte_ofs
+      | _ ->
+          0
+    in
+    numeric lxor default
+
+  let get_uint16
+      ~(default : int)
+      ~(byte_ofs : int)
+      (data_opt : 'cap Slice.t option)
+    : int =
+    let numeric =
+      match data_opt with
+      | Some data when byte_ofs + 1 < data.Slice.len ->
+          Slice.get_uint16 data byte_ofs
+      | _ ->
+          0
+    in
+    numeric lxor default
+
+  let get_uint32
+      ~(default : Uint32.t)
+      ~(byte_ofs : int)
+      (data_opt : 'cap Slice.t option)
+      : Uint32.t =
+    let numeric =
+      match data_opt with
+      | Some data when byte_ofs + 3 < data.Slice.len ->
+          Slice.get_uint32 data byte_ofs
+      | _ ->
+          Uint32.zero
+    in
+    Uint32.logxor numeric default
+
+  let get_uint64
+      ~(default : Uint64.t)
+      ~(byte_ofs : int)
+      (data_opt : 'cap Slice.t option)
+    : Uint64.t =
+    let numeric =
+      match data_opt with
+      | Some data when byte_ofs + 7 < data.Slice.len ->
+          Slice.get_uint64 data byte_ofs
+      | _ ->
+          Uint64.zero
+    in
+    Uint64.logxor numeric default
+
+  let get_float32
+      ~(default_bits : int32)
+      ~(byte_ofs : int)
+      (data_opt : 'cap Slice.t option)
+    : float =
+    let numeric =
+      match data_opt with
+      | Some data when byte_ofs + 3 < data.Slice.len ->
+          Slice.get_int32 data byte_ofs
+      | _ ->
+          Int32.zero
+    in
+    let bits = Int32.bit_xor numeric default_bits in
+    Int32.float_of_bits bits
+
+  let get_float64
+      ~(default_bits : int64)
+      ~(byte_ofs : int)
+      (data_opt : 'cap Slice.t option)
+    : float =
+    let numeric =
+      match data_opt with
+      | Some data when byte_ofs + 7 < data.Slice.len ->
+          Slice.get_int64 data byte_ofs
+      | _ ->
+          Int64.zero
+    in
+    let bits = Int64.bit_xor numeric default_bits in
+    Int64.float_of_bits bits
+
+
+  (*******************************************************************************
+   * METHODS FOR DECODING OBJECTS STORED BY POINTER
+   *******************************************************************************)
+
+  (* Given storage for a struct, attempt to get the bytes associated
+     with the struct-relative pointer index. The provided decoding
+     function is applied to the resulting pointer. *)
+  let get_pointer_field
+      (struct_storage_opt : 'cap StructStorage.t option)
+      (pointer_word : int)
+      ~(f : 'cap Slice.t option -> 'a)
+    : 'a =
+    let pointer_opt =
+      match struct_storage_opt with
+      | Some struct_storage ->
+          StructStorage.get_pointer struct_storage pointer_word
+      | None -> 
+          None
+    in
+    f pointer_opt
+
+  let get_text
+      ~(default : string)
+      (pointer_opt : 'cap Slice.t option)
+    : string =
+    match pointer_opt with
+    | Some pointer_bytes ->
+        begin match deref_list_pointer pointer_bytes with
+        | Some list_storage ->
+            string_of_uint8_list ~null_terminated:true list_storage
+        | None ->
+            default
+        end
+    | None ->
+        default
+
+  let get_blob
+      ~(default : string)
+      (pointer_opt : 'cap Slice.t option)
+    : string =
+    match pointer_opt with
+    | Some pointer_bytes ->
+        begin match deref_list_pointer pointer_bytes with
+        | Some list_storage ->
+            string_of_uint8_list ~null_terminated:false list_storage
+        | None ->
+            default
+        end
+    | None ->
+        default
+
+  let get_list
+      ~(default : (ro, 'a, 'cap ListStorage.t) Runtime.Array.t)
+      (decoders : ('cap, 'a) ListDecoders.t)
+      (pointer_opt : 'cap Slice.t option)
+    : (ro, 'a, 'cap ListStorage.t) Runtime.Array.t =
+    match pointer_opt with
+    | Some pointer_bytes ->
+        begin match deref_list_pointer pointer_bytes with
+        | Some list_storage ->
+            make_array_readonly list_storage decoders
+        | None ->
+            default
+        end
+    | None ->
+        default
+
+  let get_void_list
+      ~(default : (ro, unit, 'cap ListStorage.t) Runtime.Array.t)
+      (pointer_opt : 'cap Slice.t option)
+    : (ro, unit, 'cap ListStorage.t) Runtime.Array.t =
+    get_list ~default (ListDecoders.Empty (fun (x : unit) -> x)) pointer_opt
+
+  let get_bit_list
+      ~(default : (ro, bool, 'cap ListStorage.t) Runtime.Array.t)
+      (pointer_opt : 'cap Slice.t option)
+    : (ro, bool, 'cap ListStorage.t) Runtime.Array.t =
+    get_list ~default (ListDecoders.Bit (fun (x : bool) -> x)) pointer_opt
+
+  let get_int8_list
+      ~(default : (ro, int, 'cap ListStorage.t) Runtime.Array.t)
+      (pointer_opt : 'cap Slice.t option)
+    : (ro, int, 'cap ListStorage.t) Runtime.Array.t =
+    get_list ~default (ListDecoders.Bytes1 (fun slice -> Slice.get_int8 slice 0))
+      pointer_opt
+
+  let get_int16_list
+      ~(default : (ro, int, 'cap ListStorage.t) Runtime.Array.t)
+      (pointer_opt : 'cap Slice.t option)
+    : (ro, int, 'cap ListStorage.t) Runtime.Array.t =
+    get_list ~default (ListDecoders.Bytes2 (fun slice -> Slice.get_int16 slice 0))
+      pointer_opt
+
+  let get_int32_list
+      ~(default : (ro, int32, 'cap ListStorage.t) Runtime.Array.t)
+      (pointer_opt : 'cap Slice.t option)
+    : (ro, int32, 'cap ListStorage.t) Runtime.Array.t =
+    get_list ~default (ListDecoders.Bytes4 (fun slice -> Slice.get_int32 slice 0))
+      pointer_opt
+
+  let get_int64_list
+      ~(default : (ro, int64, 'cap ListStorage.t) Runtime.Array.t)
+      (pointer_opt : 'cap Slice.t option)
+    : (ro, int64, 'cap ListStorage.t) Runtime.Array.t =
+    get_list ~default (ListDecoders.Bytes8 (fun slice -> Slice.get_int64 slice 0))
+      pointer_opt
+
+  let get_uint8_list
+      ~(default : (ro, int, 'cap ListStorage.t) Runtime.Array.t)
+      (pointer_opt : 'cap Slice.t option)
+    : (ro, int, 'cap ListStorage.t) Runtime.Array.t =
+    get_list ~default (ListDecoders.Bytes1 (fun slice -> Slice.get_uint8 slice 0))
+      pointer_opt
+
+  let get_uint16_list
+      ~(default : (ro, int, 'cap ListStorage.t) Runtime.Array.t)
+      (pointer_opt : 'cap Slice.t option)
+    : (ro, int, 'cap ListStorage.t) Runtime.Array.t =
+    get_list ~default (ListDecoders.Bytes2 (fun slice -> Slice.get_uint16 slice 0))
+      pointer_opt
+
+  let get_uint32_list
+      ~(default : (ro, Uint32.t, 'cap ListStorage.t) Runtime.Array.t)
+      (pointer_opt : 'cap Slice.t option)
+    : (ro, Uint32.t, 'cap ListStorage.t) Runtime.Array.t =
+    get_list ~default (ListDecoders.Bytes4 (fun slice -> Slice.get_uint32 slice 0))
+      pointer_opt
+
+  let get_uint64_list
+      ~(default : (ro, Uint64.t, 'cap ListStorage.t) Runtime.Array.t)
+      (pointer_opt : 'cap Slice.t option)
+    : (ro, Uint64.t, 'cap ListStorage.t) Runtime.Array.t =
+    get_list ~default (ListDecoders.Bytes8 (fun slice -> Slice.get_uint64 slice 0))
+      pointer_opt
+
+  let get_float32_list
+      ~(default : (ro, float, 'cap ListStorage.t) Runtime.Array.t)
+      (pointer_opt : 'cap Slice.t option)
+    : (ro, float, 'cap ListStorage.t) Runtime.Array.t =
+    get_list ~default (ListDecoders.Bytes4
+        (fun slice -> Int32.float_of_bits (Slice.get_int32 slice 0)))
+      pointer_opt
+
+  let get_float64_list
+      ~(default : (ro, float, 'cap ListStorage.t) Runtime.Array.t)
+      (pointer_opt : 'cap Slice.t option)
+    : (ro, float, 'cap ListStorage.t) Runtime.Array.t =
+    get_list ~default (ListDecoders.Bytes4
+        (fun slice -> Int64.float_of_bits (Slice.get_int64 slice 0)))
+      pointer_opt
+
+  let get_text_list
+      ~(default : (ro, string, 'cap ListStorage.t) Runtime.Array.t)
+      (pointer_opt : 'cap Slice.t option)
+    : (ro, string, 'cap ListStorage.t) Runtime.Array.t =
+    let decoders =
+      ListDecoders.Pointer (fun slice ->
+        match deref_list_pointer slice with
+        | Some list_storage ->
+            string_of_uint8_list ~null_terminated:true list_storage
+        | None ->
+            "")
+    in
+    get_list ~default decoders pointer_opt
+
+  let get_blob_list
+      ~(default : (ro, string, 'cap ListStorage.t) Runtime.Array.t)
+      (pointer_opt : 'cap Slice.t option)
+    : (ro, string, 'cap ListStorage.t) Runtime.Array.t =
+    let decoders =
+      ListDecoders.Pointer (fun slice ->
+        match deref_list_pointer slice with
+        | Some list_storage ->
+            string_of_uint8_list ~null_terminated:false list_storage
+        | None ->
+            "")
+    in
+    get_list ~default decoders pointer_opt
+
+  let get_struct_list
+      ~(default :
+        (ro, 'cap StructStorage.t option, 'cap ListStorage.t) Runtime.Array.t)
+      (pointer_opt : 'cap Slice.t option)
+    : (ro, 'cap StructStorage.t option, 'cap ListStorage.t) Runtime.Array.t =
+    let decoders =
+      let struct_decoders =
+        let bytes slice = Some {
+            StructStorage.data = slice;
+            StructStorage.pointers = {
+              slice with
+              Slice.start = Slice.get_end slice;
+              Slice.len   = 0;
+            };
+          }
+        in
+        let pointer slice = Some {
+            StructStorage.data = {
+              slice with
+              Slice.len = 0;
+            };
+            StructStorage.pointers = slice;
+          }
+        in
+        let composite x = Some x in {
+          ListDecoders.bytes;
+          ListDecoders.pointer;
+          ListDecoders.composite;
+        }
+      in
+      (ListDecoders.Struct struct_decoders)
+    in
+    get_list ~default decoders pointer_opt
+
+  let get_struct
+      ~(default : ro StructStorage.t option)
+      (pointer_opt : 'cap Slice.t option)
+    : 'cap StructStorage.t option =
+    match pointer_opt with
+    | Some pointer_bytes ->
+        begin match deref_struct_pointer pointer_bytes with
+        | Some storage ->
+            Some storage
+        | None ->
+            default
+        end
+    | None ->
+        default
+
 
 end
 
