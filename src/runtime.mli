@@ -17,8 +17,16 @@ module Array : sig
 end
 
 module InnerArray : sig
+  (* If module ListStorage were defined elsewhere, then InnerArray
+     could reference it directly and we could drop the third argument.
+
+     But this would fail if we wanted to construct an [ro] array based on
+     rw ListStorage.  And that's a pretty reasonable thing to do.
+
+     I guess in that case we could use a constructor function
+     [readonly : 'cap ListStorage.t -> ro ListStorage.t]? *)
   type ('cap, 'a, 'arr) t = {
-    length : unit -> int;
+    length : unit -> int;    (* FIXME: should be just [int] *)
     get_unsafe : int -> 'a;
     set_unsafe : int -> 'a -> unit;
     storage : 'arr option;

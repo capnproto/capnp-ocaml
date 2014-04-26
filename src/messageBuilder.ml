@@ -50,6 +50,9 @@ module Make (MessageWrapper : Message.S) = struct
     : 'cap Slice.t =
     let pointers = struct_storage.StructStorage.pointers in
     let num_pointers = pointers.Slice.len / sizeof_uint64 in
+    (* By design, this function should always be invoked after the struct
+       has been upgraded to at least the expected data and pointer
+       slice sizes. *)
     let () = assert (pointer_word < num_pointers) in {
       pointers with
       Slice.start = pointers.Slice.start + (pointer_word * sizeof_uint64);
@@ -256,20 +259,76 @@ module Make (MessageWrapper : Message.S) = struct
         ~init_far_pointer_tag
 
 
-  (* Given a pointer which is expected to be a list pointer, compute the
-     corresponding list storage descriptor.  If the pointer is null, storage
-     for a default list is immediately allocated using [alloc_default_list]. *)
-  let deref_list_pointer
-      (pointer_bytes : rw Slice.t)
-      (alloc_default_list : rw Message.t -> rw ListStorage.t)
-    : rw ListStorage.t =
-    match RReader.deref_list_pointer pointer_bytes with
-    | None ->
-        let list_storage = alloc_default_list pointer_bytes.Slice.msg in
-        let () = init_list_pointer pointer_bytes list_storage in
-        list_storage
-    | Some list_storage ->
-        list_storage
+  let struct_of_bytes_slice slice =
+    let data = slice in
+    let pointers = {
+      slice with
+      Slice.start = Slice.get_end data;
+      Slice.len   = 0;
+    } in
+    { StructStorage.data; StructStorage.pointers }
+
+  let struct_of_pointer_slice slice =
+    let () = assert (slice.Slice.len = sizeof_uint64) in
+    let data = {
+      slice with
+      Slice.len = 0
+    } in
+    let pointers = {
+      slice with
+      Slice.len = sizeof_uint64;
+    } in
+    { StructStorage.data; StructStorage.pointers }
+
+
+  (* Given some list storage corresponding to a struct list, construct
+     a function for mapping an element index to the associated
+     struct storage. *)
+  let make_struct_of_list_index list_storage =
+    let storage      = list_storage.ListStorage.storage in
+    let storage_type = list_storage.ListStorage.storage_type in
+    match list_storage.ListStorage.storage_type with
+    | ListStorage.Bytes1
+    | ListStorage.Bytes2
+    | ListStorage.Bytes4
+    | ListStorage.Bytes8 ->
+        (* Short data-only struct *)
+        let byte_count = ListStorage.get_byte_count storage_type in
+        fun i ->
+          let slice = {
+            storage with
+            Slice.start = i * byte_count;
+            Slice.len   = byte_count;
+          } in
+          struct_of_bytes_slice slice
+    | ListStorage.Pointer ->
+        (* Single-pointer struct *)
+        fun i ->
+          let slice = {
+            storage with
+            Slice.start = i * sizeof_uint64;
+            Slice.len   = sizeof_uint64;
+          } in
+          struct_of_pointer_slice slice
+    | ListStorage.Composite (data_words, pointer_words) ->
+        let data_size     = data_words * sizeof_uint64 in
+        let pointers_size = pointer_words * sizeof_uint64 in
+        let element_size  = data_size + pointers_size in
+        fun i ->
+          let data = {
+            storage with
+            Slice.start = storage.Slice.start + (i * element_size);
+            Slice.len   = data_size;
+          } in
+          let pointers = {
+            storage with
+            Slice.start = Slice.get_end data;
+            Slice.len   = pointers_size;
+          } in
+          { StructStorage.data; StructStorage.pointers }
+    | _ ->
+        invalid_msg
+          "decoded unexpected list type where List<struct> was expected"
 
 
   (* Given a pointer location and struct storage located within the same
@@ -367,6 +426,101 @@ module Make (MessageWrapper : Message.S) = struct
     done
 
 
+  (* Upgrade a List<Struct> so that each of the elements is at least as large
+     as the requirements of the current schema version.  In general, this will
+     allocate a new list, make a shallow copy of the old data into the new list,
+     zero out the old data, and update the list pointer to reflect the change.
+     If the schema has not changed, this is a noop.
+
+     Returns the new list storage descriptor. *)
+  let upgrade_struct_list
+      (pointer_bytes : rw Slice.t)
+      (list_storage : rw ListStorage.t)
+      ~(data_words : int)
+      ~(pointer_words : int)
+    : rw ListStorage.t =
+    let needs_upgrade =
+      match list_storage.ListStorage.storage_type with
+      | ListStorage.Bytes1
+      | ListStorage.Bytes2
+      | ListStorage.Bytes4
+      | ListStorage.Bytes8 ->
+          let orig_data_size =
+            ListStorage.get_byte_count list_storage.ListStorage.storage_type
+          in
+          data_words * sizeof_uint64 > orig_data_size || pointer_words > 0
+      | ListStorage.Pointer ->
+          data_words > 0 || pointer_words > 1
+      | ListStorage.Composite (orig_data_words, orig_pointer_words) ->
+          data_words > orig_data_words || pointer_words > orig_pointer_words
+      | ListStorage.Empty
+      | ListStorage.Bit ->
+          invalid_msg "decoded non-struct list where struct list was expected"
+    in
+    if needs_upgrade then
+      let message = pointer_bytes.Slice.msg in
+      let new_storage = alloc_list_storage message
+          (ListStorage.Composite (data_words, pointer_words))
+          list_storage.ListStorage.num_elements
+      in
+      let src_struct_of_index  = make_struct_of_list_index list_storage in
+      let dest_struct_of_index = make_struct_of_list_index new_storage in
+      for i = 0 to list_storage.ListStorage.num_elements - 1 do
+        shallow_copy_struct ~src:(src_struct_of_index i)
+          ~dest:(dest_struct_of_index i)
+      done;
+      let content_slice =
+        match list_storage.ListStorage.storage_type with
+        | ListStorage.Composite _ ->
+            (* Composite lists prefix the storage region with a tag word,
+               which we can zero out as well. *)
+            { list_storage.ListStorage.storage with
+              Slice.start =
+                list_storage.ListStorage.storage.Slice.start - sizeof_uint64;
+              Slice.len =
+                list_storage.ListStorage.storage.Slice.len + sizeof_uint64; }
+        | _ ->
+            list_storage.ListStorage.storage
+      in
+      let () = init_list_pointer pointer_bytes new_storage in
+      let () = Slice.zero_out content_slice
+          ~ofs:0 ~len:content_slice.Slice.len
+      in
+      new_storage
+    else
+      list_storage
+
+
+  module StructSizes = struct
+    type t = {
+      data_words    : int;
+      pointer_words : int;
+    }
+  end
+
+  (* Given a pointer which is expected to be a list pointer, compute the
+     corresponding list storage descriptor.  If the pointer is null, storage
+     for a default list is immediately allocated using [alloc_default_list]. *)
+  let deref_list_pointer
+      ?(struct_sizes : StructSizes.t option)
+      ~(create_default : rw Message.t -> rw ListStorage.t)
+      (pointer_bytes : rw Slice.t)
+    : rw ListStorage.t =
+    match RReader.deref_list_pointer pointer_bytes with
+    | None ->
+        let list_storage = create_default pointer_bytes.Slice.msg in
+        let () = init_list_pointer pointer_bytes list_storage in
+        list_storage
+    | Some list_storage ->
+        begin match struct_sizes with
+        | Some { StructSizes.data_words; StructSizes.pointer_words } ->
+            upgrade_struct_list pointer_bytes list_storage
+              ~data_words ~pointer_words
+        | None ->
+            list_storage
+        end
+
+
   let shallow_zero_out_struct
       (struct_storage : rw StructStorage.t)
     : unit =
@@ -411,14 +565,14 @@ module Make (MessageWrapper : Message.S) = struct
      if the struct has a smaller layout (i.e. from an older protocol version),
      then a new struct is allocated and the data is copied over. *)
   let deref_struct_pointer
-      (pointer_bytes : rw Slice.t)
-      (alloc_default_struct : rw Message.t -> rw StructStorage.t)
+      ~(create_default : rw Message.t -> rw StructStorage.t)
       ~(data_words : int)
       ~(pointer_words : int)
+      (pointer_bytes : rw Slice.t)
     : rw StructStorage.t =
     match RReader.deref_struct_pointer pointer_bytes with
     | None ->
-        let struct_storage = alloc_default_struct pointer_bytes.Slice.msg in
+        let struct_storage = create_default pointer_bytes.Slice.msg in
         let () = init_struct_pointer pointer_bytes struct_storage in
         struct_storage
     | Some struct_storage ->
@@ -437,7 +591,7 @@ module Make (MessageWrapper : Message.S) = struct
         Slice.set_int64 dest 0 Int64.zero
     | Object.List src_list_storage ->
         let dest_list_storage =
-          deep_copy_list ~src:src_list_storage ~dest_message:dest.Slice.msg
+          deep_copy_list ~src:src_list_storage ~dest_message:dest.Slice.msg ()
         in
         init_list_pointer dest dest_list_storage
     | Object.Struct src_struct_storage ->
@@ -456,16 +610,23 @@ module Make (MessageWrapper : Message.S) = struct
   (* Given a [src] struct storage descriptor, first allocate storage in
      [dest_message] for a copy of the struct and then fill the allocated
      region with a deep copy.  [data_words] and [pointer_words] specify the
-     allocation regions for the destination struct, and may exceed the
+     minimum allocation regions for the destination struct, and may exceed the
      corresponding sizes from the [src] (for example, when fields are added
-     during a schema upgrade). *)
+     during a schema upgrade).
+  *)
   and deep_copy_struct
       ~(src : 'cap StructStorage.t)
       ~(dest_message : rw Message.t)
       ~(data_words : int)
       ~(pointer_words : int)
     : rw StructStorage.t =
-    let dest = alloc_struct_storage dest_message ~data_words ~pointer_words in
+    let src_data_words    = src.StructStorage.data.Slice.len / sizeof_uint64 in
+    let src_pointer_words = src.StructStorage.pointers.Slice.len / sizeof_uint64 in
+    let dest_data_words    = max data_words src_data_words in
+    let dest_pointer_words = max pointer_words src_pointer_words in
+    let dest = alloc_struct_storage dest_message
+        ~data_words:dest_data_words ~pointer_words:dest_pointer_words
+    in
     let () = deep_copy_struct_to_dest ~src ~dest in
     dest
 
@@ -503,80 +664,136 @@ module Make (MessageWrapper : Message.S) = struct
 
   (* Given a [src] list storage descriptor, first allocate storage in
      [dest_message] for a copy of the list and then fill the allocated
-     region with deep copies of the list elements. *)
+     region with deep copies of the list elements.  If the [struct_sizes]
+     are provided, the deep copy will create inlined structs which have
+     data and pointer regions at least as large as specified. *)
   and deep_copy_list
+      ?(struct_sizes : StructSizes.t option)
       ~(src : 'cap ListStorage.t)
       ~(dest_message : rw Message.t)
+      ()
     : rw ListStorage.t =
-    let dest = alloc_list_storage dest_message src.ListStorage.storage_type
-      src.ListStorage.num_elements
+    match struct_sizes with
+    | Some { StructSizes.data_words; StructSizes.pointer_words } ->
+        deep_copy_struct_list ~src ~dest_message
+          ~data_words ~pointer_words
+    | None ->
+        let dest =
+          alloc_list_storage dest_message src.ListStorage.storage_type
+            src.ListStorage.num_elements
+        in
+        let copy_by_value byte_count = Slice.blit
+          ~src:src.ListStorage.storage ~src_ofs:0
+          ~dest:dest.ListStorage.storage ~dest_ofs:0
+          ~len:byte_count
+        in
+        let () =
+          match src.ListStorage.storage_type with
+          | ListStorage.Empty ->
+              ()
+          | ListStorage.Bit ->
+              copy_by_value (Util.ceil_int src.ListStorage.num_elements 8)
+          | ListStorage.Bytes1
+          | ListStorage.Bytes2
+          | ListStorage.Bytes4
+          | ListStorage.Bytes8 ->
+              let byte_count =
+                ListStorage.get_byte_count src.ListStorage.storage_type
+              in
+              copy_by_value (src.ListStorage.num_elements * byte_count)
+          | ListStorage.Pointer ->
+              let open ListStorage in
+              for i = 0 to src.num_elements - 1 do
+                let src_pointer = {
+                  src.storage with
+                  Slice.start = src.storage.Slice.start + (i * sizeof_uint64);
+                  Slice.len   = sizeof_uint64;
+                } in
+                let dest_pointer = {
+                  dest.storage with
+                  Slice.start = dest.storage.Slice.start + (i * sizeof_uint64);
+                  Slice.len   = sizeof_uint64;
+                } in
+                deep_copy_pointer ~src:src_pointer ~dest:dest_pointer
+              done
+          | ListStorage.Composite (data_words, pointer_words) ->
+              let words_per_element = data_words + pointer_words in
+              let open ListStorage in
+              for i = 0 to src.num_elements - 1 do
+                let src_struct = {
+                  StructStorage.data = {
+                    src.storage with
+                    Slice.start = src.storage.Slice.start +
+                        (i * words_per_element * sizeof_uint64);
+                    Slice.len = data_words * sizeof_uint64;};
+                  StructStorage.pointers = {
+                    src.storage with
+                    Slice.start = src.storage.Slice.start +
+                        ((i * words_per_element) + data_words) * sizeof_uint64;
+                    Slice.len = pointer_words * sizeof_uint64;};
+                } in
+                let dest_struct = {
+                  StructStorage.data = {
+                    dest.storage with
+                    Slice.start = dest.storage.Slice.start +
+                        (i * words_per_element * sizeof_uint64);
+                    Slice.len = data_words * sizeof_uint64;};
+                  StructStorage.pointers = {
+                    dest.storage with
+                    Slice.start = dest.storage.Slice.start +
+                        ((i * words_per_element) + data_words) * sizeof_uint64;
+                    Slice.len = pointer_words * sizeof_uint64;};
+                } in
+                deep_copy_struct_to_dest ~src:src_struct ~dest:dest_struct
+              done
+        in
+        dest
+
+  (* Given a List<Struct>, allocate new (orphaned) list storage and
+     deep-copy the list elements into it.  The newly-allocated list
+     shall have data and pointers regions sized according to
+     [data_words] and [pointer_words], to support schema upgrades;
+     if the source has a larger data/pointers region, the additional
+     bytes are copied as well.
+
+     Returns: new list storage
+
+     FIXME: are we really copying additional source bytes here?
+  *)
+  and deep_copy_struct_list
+      ~(src : 'cap ListStorage.t)
+      ~(dest_message : rw Message.t)
+      ~(data_words : int)
+      ~(pointer_words : int)
+    : rw ListStorage.t =
+    let dest_storage =
+      let (dest_data_words, dest_pointer_words) =
+        match src.ListStorage.storage_type with
+        | ListStorage.Bytes1
+        | ListStorage.Bytes2
+        | ListStorage.Bytes4
+        | ListStorage.Bytes8
+        | ListStorage.Pointer ->
+            (data_words, pointer_words)
+        | ListStorage.Composite (src_data_words, src_pointer_words) ->
+            (max data_words src_data_words, max pointer_words src_pointer_words)
+        | ListStorage.Empty
+        | ListStorage.Bit ->
+          invalid_msg
+            "decoded unexpected list type where List<struct> was expected"
+      in
+      alloc_list_storage dest_message
+        (ListStorage.Composite (dest_data_words, dest_pointer_words))
+        src.ListStorage.num_elements
     in
-    let copy_by_value byte_count = Slice.blit
-      ~src:src.ListStorage.storage ~src_ofs:0
-      ~dest:dest.ListStorage.storage ~dest_ofs:0
-      ~len:byte_count
-    in
-    let () =
-      match src.ListStorage.storage_type with
-      | ListStorage.Empty ->
-          ()
-      | ListStorage.Bit ->
-          copy_by_value (Util.ceil_int src.ListStorage.num_elements 8)
-      | ListStorage.Bytes1
-      | ListStorage.Bytes2
-      | ListStorage.Bytes4
-      | ListStorage.Bytes8 ->
-          let byte_count =
-            ListStorage.get_byte_count src.ListStorage.storage_type
-          in
-          copy_by_value (src.ListStorage.num_elements * byte_count)
-      | ListStorage.Pointer ->
-          let open ListStorage in
-          for i = 0 to src.num_elements - 1 do
-            let src_pointer = {
-              src.storage with
-              Slice.start = src.storage.Slice.start + (i * sizeof_uint64);
-              Slice.len   = sizeof_uint64;
-            } in
-            let dest_pointer = {
-              dest.storage with
-              Slice.start = dest.storage.Slice.start + (i * sizeof_uint64);
-              Slice.len   = sizeof_uint64;
-            } in
-            deep_copy_pointer ~src:src_pointer ~dest:dest_pointer
-          done
-      | ListStorage.Composite (data_words, pointer_words) ->
-          let words_per_element = data_words + pointer_words in
-          let open ListStorage in
-          for i = 0 to src.num_elements - 1 do
-            let src_struct = {
-              StructStorage.data = {
-                src.storage with
-                Slice.start = src.storage.Slice.start +
-                    (i * words_per_element * sizeof_uint64);
-                Slice.len = data_words * sizeof_uint64;};
-              StructStorage.pointers = {
-                src.storage with
-                Slice.start = src.storage.Slice.start +
-                    ((i * words_per_element) + data_words) * sizeof_uint64;
-                Slice.len = pointer_words * sizeof_uint64;};
-            } in
-            let dest_struct = {
-              StructStorage.data = {
-                dest.storage with
-                Slice.start = dest.storage.Slice.start +
-                    (i * words_per_element * sizeof_uint64);
-                Slice.len = data_words * sizeof_uint64;};
-              StructStorage.pointers = {
-                dest.storage with
-                Slice.start = dest.storage.Slice.start +
-                    ((i * words_per_element) + data_words) * sizeof_uint64;
-                Slice.len = pointer_words * sizeof_uint64;};
-            } in
-            deep_copy_struct_to_dest ~src:src_struct ~dest:dest_struct
-          done
-    in
-    dest
+    let src_struct_of_list_index  = make_struct_of_list_index src in
+    let dest_struct_of_list_index = make_struct_of_list_index dest_storage in
+    for i = 0 to src.ListStorage.num_elements - 1 do
+      let src_struct  = src_struct_of_list_index i in
+      let dest_struct = dest_struct_of_list_index i in
+      deep_copy_struct_to_dest ~src:src_struct ~dest:dest_struct
+    done;
+    dest_storage
 
 
   (* Recursively zero out all data which this pointer points to.  The pointer
@@ -685,15 +902,411 @@ module Make (MessageWrapper : Message.S) = struct
     list_storage
 
 
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto Data payload. *)
-  let get_struct_field_blob
+  let void_list_codecs = ListCodecs.Empty (
+      (fun (x : unit) -> x), (fun (x : unit) -> x))
+
+  let bit_list_codecs = ListCodecs.Bit (
+      (fun (x : bool) -> x), (fun (x : bool) -> x))
+
+  let int8_list_codecs = ListCodecs.Bytes1 (
+      (fun slice -> Slice.get_int8 slice 0),
+        (fun v slice -> Slice.set_int8 slice 0 v))
+
+  let int16_list_codecs = ListCodecs.Bytes2 (
+      (fun slice -> Slice.get_int16 slice 0),
+        (fun v slice -> Slice.set_int16 slice 0 v))
+
+  let int32_list_codecs = ListCodecs.Bytes4 (
+      (fun slice -> Slice.get_int32 slice 0),
+        (fun v slice -> Slice.set_int32 slice 0 v))
+
+  let int64_list_codecs = ListCodecs.Bytes8 (
+      (fun slice -> Slice.get_int64 slice 0),
+        (fun v slice -> Slice.set_int64 slice 0 v))
+
+  let uint8_list_codecs = ListCodecs.Bytes1 (
+      (fun slice -> Slice.get_uint8 slice 0),
+        (fun v slice -> Slice.set_uint8 slice 0 v))
+
+  let uint16_list_codecs = ListCodecs.Bytes2 (
+      (fun slice -> Slice.get_uint16 slice 0),
+        (fun v slice -> Slice.set_uint16 slice 0 v))
+
+  let uint32_list_codecs = ListCodecs.Bytes4 (
+      (fun slice -> Slice.get_uint32 slice 0),
+        (fun v slice -> Slice.set_uint32 slice 0 v))
+
+  let uint64_list_codecs = ListCodecs.Bytes8 (
+      (fun slice -> Slice.get_uint64 slice 0),
+        (fun v slice -> Slice.set_uint64 slice 0 v))
+
+  let float32_list_codecs = ListCodecs.Bytes4 (
+      (fun slice -> Int32.float_of_bits (Slice.get_int32 slice 0)),
+        (fun v slice -> Slice.set_int32 slice 0
+          (Int32.bits_of_float v)))
+
+  let float64_list_codecs = ListCodecs.Bytes8 (
+      (fun slice -> Int64.float_of_bits (Slice.get_int64 slice 0)),
+        (fun v slice -> Slice.set_int64 slice 0
+          (Int64.bits_of_float v)))
+
+  let text_list_codecs =
+    let decode slice =
+      (* Text fields are always accessed by value, not by reference, since
+         we always do an immediate decode to [string].  Therefore we can
+         use the Reader logic to handle this case. *)
+      match RReader.deref_list_pointer slice with
+      | Some list_storage ->
+          string_of_uint8_list ~null_terminated:true list_storage
+      | None ->
+          ""
+    in
+    let encode s slice =
+      let new_list_storage = uint8_list_of_string ~null_terminated:true
+          ~dest_message:slice.Slice.msg s
+      in
+      init_list_pointer slice new_list_storage
+    in
+    ListCodecs.Pointer (decode, encode)
+
+  let blob_list_codecs =
+    let decode slice =
+      (* Data fields are always accessed by value, not by reference, since
+         we always do an immediate decode to [string].  Therefore we can
+         use the Reader logic to handle this case. *)
+      match RReader.deref_list_pointer slice with
+      | Some list_storage ->
+          string_of_uint8_list ~null_terminated:false list_storage
+      | None ->
+          ""
+    in
+    let encode s slice =
+      let new_list_storage = uint8_list_of_string ~null_terminated:false
+          ~dest_message:slice.Slice.msg s
+      in
+      init_list_pointer slice new_list_storage
+    in
+    ListCodecs.Pointer (decode, encode)
+
+  let struct_list_codecs =
+    let bytes_decoder slice =
+      struct_of_bytes_slice slice
+    in
+    let bytes_encoder v slice =
+      let dest = struct_of_bytes_slice slice in
+      deep_copy_struct_to_dest ~src:v ~dest
+    in
+    let pointer_decoder slice =
+      struct_of_pointer_slice slice
+    in
+    let pointer_encoder v slice =
+      let dest = struct_of_pointer_slice slice in
+      deep_copy_struct_to_dest ~src:v ~dest
+    in
+    let composite_decoder x = x in
+    let composite_encoder v dest = deep_copy_struct_to_dest ~src:v ~dest in
+    ListCodecs.Struct {
+      ListCodecs.bytes     = (bytes_decoder, bytes_encoder);
+      ListCodecs.pointer   = (pointer_decoder, pointer_encoder);
+      ListCodecs.composite = (composite_decoder, composite_encoder);
+    }
+
+
+  (*******************************************************************************
+   * METHODS FOR GETTING OBJECTS STORED BY VALUE
+   *******************************************************************************)
+
+  module Discr = struct
+    type t = {
+      value    : int;
+      byte_ofs : int;
+    }
+  end
+
+  let rec set_opt_discriminant
+      (data : rw Slice.t)
+      (discr : Discr.t option)
+    : unit =
+    match discr with
+    | None ->
+        ()
+    | Some x ->
+        set_uint16 data ~default:0 ~byte_ofs:x.Discr.byte_ofs x.Discr.value
+
+  and set_uint16
+      ?(discr : Discr.t option)
+      (data : rw Slice.t)
+      ~(default : int)
+      ~(byte_ofs : int)
+      (value : int)
+    : unit =
+    let () = set_opt_discriminant data discr in
+    Slice.set_uint16 data byte_ofs (value lxor default)
+
+  (* Given storage for a struct, get the bytes associated with the
+     struct data section.  The provided decoding function is applied
+     to the resulting region.  If the optional discriminant parameter
+     is supplied, then the discriminant is also set as a side-effect. *)
+  (* FIXME: [apply_data_field] would be a better name *)
+  let get_data_field
+      ?(discr : Discr.t option)
+      (struct_storage : rw StructStorage.t)
+      ~(f : rw Slice.t -> 'a)
+    : 'a =
+    let data = struct_storage.StructStorage.data in
+    let result = f data in
+    let () = set_opt_discriminant data discr in
+    result
+
+  let get_void
+      (data : 'cap Slice.t)
+    : unit =
+    ()
+
+   let get_bit
+      ~(default : bool)
+      ~(byte_ofs : int)
+      ~(bit_ofs : int)
+      (data : 'cap Slice.t)
+     : bool =
+     let byte_val = Slice.get_uint8 data byte_ofs in
+     let bit_val = (byte_val land (1 lsl bit_ofs)) <> 0 in
+     if default then not bit_val else bit_val
+
+  let get_int8
+      ~(default : int)
+      ~(byte_ofs : int)
+      (data : 'cap Slice.t)
+    : int =
+    let numeric = Slice.get_int8 data byte_ofs in
+    numeric lxor default
+
+  let get_int16
+      ~(default : int)
+      ~(byte_ofs : int)
+      (data : 'cap Slice.t)
+    : int =
+    let numeric = Slice.get_int16 data byte_ofs in
+    numeric lxor default
+
+  let get_int32
+      ~(default : int32)
+      ~(byte_ofs : int)
+      (data : 'cap Slice.t)
+      : int32 =
+    let numeric = Slice.get_int32 data byte_ofs in
+    Int32.bit_xor numeric default
+
+  let get_int64
+      ~(default : int64)
+      ~(byte_ofs : int)
+      (data : 'cap Slice.t)
+    : int64 =
+    let numeric = Slice.get_int64 data byte_ofs in
+    Int64.bit_xor numeric default
+
+  let get_uint8
+      ~(default : int)
+      ~(byte_ofs : int)
+      (data : 'cap Slice.t)
+    : int =
+    let numeric = Slice.get_uint8 data byte_ofs in
+    numeric lxor default
+
+  let get_uint16
+      ~(default : int)
+      ~(byte_ofs : int)
+      (data : 'cap Slice.t)
+    : int =
+    let numeric = Slice.get_uint16 data byte_ofs in
+    numeric lxor default
+
+  let get_uint32
+      ~(default : Uint32.t)
+      ~(byte_ofs : int)
+      (data : 'cap Slice.t)
+      : Uint32.t =
+    let numeric = Slice.get_uint32 data byte_ofs in
+    Uint32.logxor numeric default
+
+  let get_uint64
+      ~(default : Uint64.t)
+      ~(byte_ofs : int)
+      (data : 'cap Slice.t)
+    : Uint64.t =
+    let numeric = Slice.get_uint64 data byte_ofs in
+    Uint64.logxor numeric default
+
+  let get_float32
+      ~(default_bits : int32)
+      ~(byte_ofs : int)
+      (data : 'cap Slice.t)
+    : float =
+    let numeric = Slice.get_int32 data byte_ofs in
+    let bits = Int32.bit_xor numeric default_bits in
+    Int32.float_of_bits bits
+
+  let get_float64
+      ~(default_bits : int64)
+      ~(byte_ofs : int)
+      (data : 'cap Slice.t)
+    : float =
+    let numeric = Slice.get_int64 data byte_ofs in
+    let bits = Int64.bit_xor numeric default_bits in
+    Int64.float_of_bits bits
+
+
+  (*******************************************************************************
+   * METHODS FOR SETTING OBJECTS STORED BY VALUE
+   *******************************************************************************)
+
+  let set_void
+      (data : 'cap Slice.t)
+    : unit =
+    ()
+
+  let set_bit
+      ~(default : bool)
+      ~(byte_ofs : int)
+      ~(bit_ofs : int)
+      (value : bool)
+      (data : rw Slice.t)
+    : unit =
+    let default_bit = if default then 1 else 0 in
+    let value_bit = if value then 1 else 0 in
+    let stored_bit = default_bit lxor value_bit in
+    let byte_val = Slice.get_uint8 data byte_ofs in
+    let byte_val = byte_val land (lnot (1 lsl bit_ofs)) in
+    let byte_val = byte_val lor (stored_bit lsl bit_ofs) in
+    Slice.set_uint8 data byte_ofs byte_val
+
+  let set_int8
+      ~(default : int)
+      ~(byte_ofs : int)
+      (value : int)
+      (data : rw Slice.t)
+    : unit =
+    Slice.set_int8 data byte_ofs (value lxor default)
+
+  let set_int16
+      ~(default : int)
+      ~(byte_ofs : int)
+      (value : int)
+      (data : rw Slice.t)
+    : unit =
+    Slice.set_int16 data byte_ofs (value lxor default)
+
+  let set_int32
+      ~(default : int32)
+      ~(byte_ofs : int)
+      (value : int32)
+      (data : rw Slice.t)
+    : unit =
+    Slice.set_int32 data byte_ofs
+      (Int32.bit_xor value default)
+
+  let set_int64
+      ~(default : int64)
+      ~(byte_ofs : int)
+      (value : int64)
+      (data : rw Slice.t)
+    : unit =
+    Slice.set_int64 data byte_ofs
+      (Int64.bit_xor value default)
+
+  let set_uint8
+      ~(default : int)
+      ~(byte_ofs : int)
+      (value : int)
+      (data : rw Slice.t)
+    : unit =
+    Slice.set_uint8 data byte_ofs (value lxor default)
+
+  let set_uint16
+      ~(default : int)
+      ~(byte_ofs : int)
+      (value : int)
+      (data : rw Slice.t)
+    : unit =
+    Slice.set_uint16 data byte_ofs (value lxor default)
+
+  let set_uint32
+      ~(default : Uint32.t)
+      ~(byte_ofs : int)
+      (value : Uint32.t)
+      (data : rw Slice.t)
+    : unit =
+    Slice.set_uint32 data byte_ofs
+      (Uint32.logxor value default)
+
+  let set_uint64
+      ~(default : Uint64.t)
+      ~(byte_ofs : int)
+      (value : Uint64.t)
+      (data : rw Slice.t)
+    : unit =
+    Slice.set_uint64 data byte_ofs
+      (Uint64.logxor value default)
+
+  let set_float32
+      ~(default_bits : int32)
+      ~(byte_ofs : int)
+      (value : float)
+      (data : rw Slice.t)
+    : unit =
+    Slice.set_int32 data byte_ofs
+      (Int32.bit_xor (Int32.bits_of_float value) default_bits)
+
+  let set_float64
+      ~(default_bits : int64)
+      ~(byte_ofs : int)
+      (value : float)
+      (data : rw Slice.t)
+    : unit =
+    Slice.set_int64 data byte_ofs
+      (Int64.bit_xor (Int64.bits_of_float value) default_bits)
+
+
+  (*******************************************************************************
+   * METHODS FOR GETTING OBJECTS STORED BY POINTER
+   *******************************************************************************)
+
+
+  (* Given storage for a struct, get the bytes associated with struct
+     pointer at offset [pointer_word].  The provided decoding function
+     is applied to the resulting region.  If the optional discriminant
+     parameter is supplied, then the discriminant is also set as a
+     side-effect. *)
+  (* FIXME: [apply_pointer_field] would be a better name *)
+  let get_pointer_field
+      ?(discr : Discr.t option)
       (struct_storage : rw StructStorage.t)
       (pointer_word : int)
+      ~(f : 'cap Slice.t -> 'a)
+    : 'a =
+    let result =
+      f (get_struct_pointer struct_storage pointer_word)
+    in
+    let () = set_opt_discriminant struct_storage.StructStorage.data discr in
+    result
+
+  let get_text
       ~(default : string)
+      (pointer_bytes : 'cap Slice.t)
     : string =
-    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
+    (* Text fields are always accessed by value, not by reference, since
+       we always do an immediate decode to [string].  Therefore we can
+       use the Reader logic to handle this case. *)
+    match RReader.deref_list_pointer pointer_bytes with
+    | Some list_storage ->
+        string_of_uint8_list ~null_terminated:true list_storage
+    | None ->
+        default
+
+  let get_blob
+      ~(default : string)
+      (pointer_bytes : 'cap Slice.t)
+    : string =
     (* Data fields are always accessed by value, not by reference, since
        we always do an immediate decode to [string].  Therefore we can
        use the Reader logic to handle this case. *)
@@ -704,1556 +1317,461 @@ module Make (MessageWrapper : Message.S) = struct
         default
 
 
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto Text payload. *)
-  let get_struct_field_text
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(default : string)
-    : string =
-    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
-    (* Text fields are always accessed by value, not by reference, since
-       we always do an immediate decode to [string].  Therefore we can
-       use the Reader logic to handle this case. *)
-    match RReader.deref_list_pointer pointer_bytes with
-    | Some list_storage ->
-        string_of_uint8_list ~null_terminated:true list_storage
-    | None ->
-        default
-
-
-  let get_struct_field_list
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
+  let get_list
+      ?(struct_sizes : StructSizes.t option)
+      ?(default : ro ListStorage.t option)
+      ~(storage_type : ListStorage.storage_type_t)
       ~(codecs : 'a ListCodecs.t)
-      ~(alloc_default : rw Message.t -> rw ListStorage.t)
-    : (rw, 'a, rw ListStorage.t) Runtime.Array.t =
-    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
-    let list_storage = deref_list_pointer pointer_bytes alloc_default in
-    make_array_readwrite list_storage codecs
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<Bool>. *)
-  let get_struct_field_bit_list
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-    : (rw, bool, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bit ((fun (x : bool) -> x), (fun (x : bool) -> x)) in
-    let alloc_default message = alloc_list_storage message ListStorage.Bit 0 in
-    get_struct_field_list struct_storage pointer_word ~codecs ~alloc_default
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<Int8>. *)
-  let get_struct_field_int8_list
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-    : (rw, int, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes1 (
-        (fun slice -> Slice.get_int8 slice 0),
-          (fun v slice -> Slice.set_int8 slice 0 v))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes1 0
-    in
-    get_struct_field_list struct_storage pointer_word ~codecs ~alloc_default
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<Int16>. *)
-  let get_struct_field_int16_list
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-    : (rw, int, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes2 (
-        (fun slice -> Slice.get_int16 slice 0),
-          (fun v slice -> Slice.set_int16 slice 0 v))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes2 0
-    in
-    get_struct_field_list struct_storage pointer_word ~codecs ~alloc_default
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<Int32>. *)
-  let get_struct_field_int32_list
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-    : (rw, int32, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes4 (
-        (fun slice -> Slice.get_int32 slice 0),
-          (fun v slice -> Slice.set_int32 slice 0 v))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes4 0
-    in
-    get_struct_field_list struct_storage pointer_word ~codecs ~alloc_default
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<Int64>. *)
-  let get_struct_field_int64_list
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-    : (rw, int64, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes8 (
-        (fun slice -> Slice.get_int64 slice 0),
-          (fun v slice -> Slice.set_int64 slice 0 v))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes8 0
-    in
-    get_struct_field_list struct_storage pointer_word ~codecs ~alloc_default
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<UInt8>. *)
-  let get_struct_field_uint8_list
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-    : (rw, int, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes1 (
-        (fun slice -> Slice.get_uint8 slice 0),
-          (fun v slice -> Slice.set_uint8 slice 0 v))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes1 0
-    in
-    get_struct_field_list struct_storage pointer_word ~codecs ~alloc_default
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<UInt16>. *)
-  let get_struct_field_uint16_list
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-    : (rw, int, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes2 (
-        (fun slice -> Slice.get_uint16 slice 0),
-          (fun v slice -> Slice.set_uint16 slice 0 v))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes2 0
-    in
-    get_struct_field_list struct_storage pointer_word ~codecs ~alloc_default
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<UInt32>. *)
-  let get_struct_field_uint32_list
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-    : (rw, Uint32.t, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes4 (
-        (fun slice -> Slice.get_uint32 slice 0),
-          (fun v slice -> Slice.set_uint32 slice 0 v))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes4 0
-    in
-    get_struct_field_list struct_storage pointer_word ~codecs ~alloc_default
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<UInt64>. *)
-  let get_struct_field_uint64_list
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-    : (rw, Uint64.t, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes8 (
-        (fun slice -> Slice.get_uint64 slice 0),
-          (fun v slice -> Slice.set_uint64 slice 0 v))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes8 0
-    in
-    get_struct_field_list struct_storage pointer_word ~codecs ~alloc_default
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<Float32>. *)
-  let get_struct_field_float32_list
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-    : (rw, float, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes4 (
-        (fun slice -> Int32.float_of_bits (Slice.get_int32 slice 0)),
-          (fun v slice -> Slice.set_int32 slice 0 (Int32.bits_of_float v)))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes4 0
-    in
-    get_struct_field_list struct_storage pointer_word ~codecs ~alloc_default
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<Float64>. *)
-  let get_struct_field_float64_list
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-    : (rw, float, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes8 (
-        (fun slice -> Int64.float_of_bits (Slice.get_int64 slice 0)),
-          (fun v slice -> Slice.set_int64 slice 0 (Int64.bits_of_float v)))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes8 0
-    in
-    get_struct_field_list struct_storage pointer_word ~codecs ~alloc_default
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<Data>. *)
-  let get_struct_field_blob_list
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-    : (rw, string, rw ListStorage.t) Runtime.Array.t =
-    let codecs =
-      let decode slice =
-        (* In this implementation Data fields are always accessed by value,
-           not by reference, since we always do an immediate decode to [string].
-           Therefore we can use the Reader logic to handle this case. *)
-        match RReader.deref_list_pointer slice with
-        | Some list_storage ->
-            string_of_uint8_list ~null_terminated:false list_storage
-        | None ->
-            ""
-      in
-      let encode v slice =
-        (* Note: could avoid an allocation if the new string is not longer
-           than the old one.  This deep copy strategy has the advantage of
-           being correct in all cases. *)
-        let new_string_storage = uint8_list_of_string
-            ~null_terminated:false ~dest_message:slice.Slice.msg
-            v
-        in
-        let () = deep_zero_pointer slice in
-        init_list_pointer slice new_string_storage
-      in
-      ListCodecs.Pointer (decode, encode)
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Pointer 0
-    in
-    get_struct_field_list struct_storage pointer_word ~codecs ~alloc_default
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<Text>. *)
-  let get_struct_field_text_list
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-    : (rw, string, rw ListStorage.t) Runtime.Array.t =
-    let codecs =
-      let decode slice =
-        (* In this implementation Data fields are always accessed by value,
-           not by reference, since we always do an immediate decode to [string].
-           Therefore we can use the Reader logic to handle this case. *)
-        match RReader.deref_list_pointer slice with
-        | Some list_storage ->
-            string_of_uint8_list ~null_terminated:true list_storage
-        | None ->
-            ""
-      in
-      let encode v slice =
-        (* Note: could avoid an allocation if the new string is not longer
-           than the old one.  This deep copy strategy has the advantage of
-           being correct in all cases. *)
-        let new_string_storage = uint8_list_of_string
-            ~null_terminated:true ~dest_message:slice.Slice.msg
-            v
-        in
-        let () = deep_zero_pointer slice in
-        init_list_pointer slice new_string_storage
-      in
-      ListCodecs.Pointer (decode, encode)
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Pointer 0
-    in
-    get_struct_field_list struct_storage pointer_word ~codecs ~alloc_default
-
-
-  let make_struct_of_list_index list_storage =
-    let storage      = list_storage.ListStorage.storage in
-    let storage_type = list_storage.ListStorage.storage_type in
-    match list_storage.ListStorage.storage_type with
-    | ListStorage.Bytes1
-    | ListStorage.Bytes2
-    | ListStorage.Bytes4
-    | ListStorage.Bytes8 ->
-        (* Short data-only struct *)
-        let byte_count = ListStorage.get_byte_count storage_type in
-        fun i ->
-          let data = {
-            storage with
-            Slice.start = storage.Slice.start + (i * byte_count);
-            Slice.len   = byte_count;
-          } in
-          let pointers = {
-            storage with
-            Slice.start = Slice.get_end data;
-            Slice.len   = 0;
-          } in
-          { StructStorage.data; StructStorage.pointers }
-    | ListStorage.Pointer ->
-        (* Single-pointer struct *)
-        fun i ->
-          let data = {
-            storage with
-            Slice.start = storage.Slice.start + (i * sizeof_uint64);
-            Slice.len   = 0;
-          } in
-          let pointers = {
-            storage with
-            Slice.start = Slice.get_end data;
-            Slice.len   = sizeof_uint64;
-          } in
-          { StructStorage.data; StructStorage.pointers }
-    | ListStorage.Composite (data_words, pointer_words) ->
-        let data_size     = data_words * sizeof_uint64 in
-        let pointers_size = pointer_words * sizeof_uint64 in
-        let element_size  = data_size + pointers_size in
-        fun i ->
-          let data = {
-            storage with
-            Slice.start = storage.Slice.start + (i * element_size);
-            Slice.len   = data_size;
-          } in
-          let pointers = {
-            storage with
-            Slice.start = Slice.get_end data;
-            Slice.len   = pointers_size;
-          } in
-          { StructStorage.data; StructStorage.pointers }
-    | _ ->
-        invalid_msg
-          "decoded unexpected list type where List<struct> was expected"
-
-
-  (* Upgrade a List<Struct> so that each of the elements is at least as large
-     as the requirements of the current schema version.  In general, this will
-     allocate a new list, make a shallow copy of the old data into the new list,
-     zero out the old data, and update the list pointer to reflect the change.
-     If the schema has not changed, this is a noop.
-
-     Returns the new list storage descriptor. *)
-  let upgrade_struct_list
       (pointer_bytes : rw Slice.t)
-      (list_storage : rw ListStorage.t)
-      ~(data_words : int)
-      ~(pointer_words : int)
-    : rw ListStorage.t =
-    let needs_upgrade =
-      match list_storage.ListStorage.storage_type with
-      | ListStorage.Bytes1
-      | ListStorage.Bytes2
-      | ListStorage.Bytes4
-      | ListStorage.Bytes8 ->
-          let orig_data_size =
-            ListStorage.get_byte_count list_storage.ListStorage.storage_type
-          in
-          data_words * sizeof_uint64 > orig_data_size || pointer_words > 0
-      | ListStorage.Pointer ->
-          data_words > 0 || pointer_words > 1
-      | ListStorage.Composite (orig_data_words, orig_pointer_words) ->
-          data_words > orig_data_words || pointer_words > orig_pointer_words
-      | ListStorage.Empty
-      | ListStorage.Bit ->
-          invalid_msg "decoded non-struct list where struct list was expected"
+    : (rw, 'a, rw ListStorage.t) Runtime.Array.t =
+    let create_default message =
+      match default with
+      | Some default_storage ->
+          deep_copy_list ?struct_sizes ~src:default_storage ~dest_message:message ()
+      | None ->
+          alloc_list_storage message storage_type 0
     in
-    if needs_upgrade then
-      let message = pointer_bytes.Slice.msg in
-      let new_storage = alloc_list_storage message
-          (ListStorage.Composite (data_words, pointer_words))
-          list_storage.ListStorage.num_elements
-      in
-      let src_struct_of_index  = make_struct_of_list_index list_storage in
-      let dest_struct_of_index = make_struct_of_list_index new_storage in
-      for i = 0 to list_storage.ListStorage.num_elements - 1 do
-        shallow_copy_struct ~src:(src_struct_of_index i)
-          ~dest:(dest_struct_of_index i)
-      done;
-      let content_slice =
-        match list_storage.ListStorage.storage_type with
-        | ListStorage.Composite _ ->
-            (* Composite lists prefix the storage region with a tag word,
-               which we can zero out as well. *)
-            { list_storage.ListStorage.storage with
-              Slice.start =
-                list_storage.ListStorage.storage.Slice.start - sizeof_uint64;
-              Slice.len =
-                list_storage.ListStorage.storage.Slice.len + sizeof_uint64; }
-        | _ ->
-            list_storage.ListStorage.storage
-      in
-      let () = init_list_pointer pointer_bytes new_storage in
-      let () = Slice.zero_out content_slice
-          ~ofs:0 ~len:content_slice.Slice.len
-      in
-      new_storage
-    else
-      list_storage
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<S> for some struct S.  The [data_words] and
-     [pointer_words] describe the struct layout.  After a schema
-     upgrade, it is possible that the structs stored in the list
-     are smaller than expected; in this case, the data is immediately
-     (shallow) copied into a new list with appropriately-sized members. *)
-  let get_struct_field_struct_list
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(data_words : int)
-      ~(pointer_words : int)
-    : (rw, rw StructStorage.t, rw ListStorage.t) Runtime.Array.t =
-    let struct_codecs =
-      let decode_bytes slice =
-        let data = slice in
-        let pointers = {
-          slice with
-          Slice.start = Slice.get_end slice;
-          Slice.len = 0
-        } in
-        { StructStorage.data; StructStorage.pointers }
-      in
-      let encode_bytes v slice =
-        let dest =
-          let data = slice in
-          let pointers = {
-            slice with
-            Slice.start = Slice.get_end slice;
-            Slice.len = 0
-          } in
-          { StructStorage.data; StructStorage.pointers }
-        in
-        deep_copy_struct_to_dest ~src:v ~dest
-      in
-      let decode_pointer slice =
-        let data = {
-          slice with
-          Slice.len = 0;
-        } in
-        let pointers = {
-          slice with
-          Slice.len = sizeof_uint64;
-        } in
-        { StructStorage.data; StructStorage.pointers }
-      in
-      let encode_pointer v slice =
-        let dest =
-          let data = {
-            slice with
-            Slice.len = 0;
-          } in
-          let pointers = {
-            slice with
-            Slice.len = sizeof_uint64;
-          } in
-          { StructStorage.data; StructStorage.pointers }
-        in
-        deep_copy_struct_to_dest ~src:v ~dest
-      in
-      let decode_composite x = x in
-      let encode_composite src dest = deep_copy_struct_to_dest ~src ~dest in {
-        ListCodecs.bytes = (decode_bytes, encode_bytes);
-        ListCodecs.pointer = (decode_pointer, encode_pointer);
-        ListCodecs.composite = (decode_composite, encode_composite);
-      }
-    in
-    let codecs = ListCodecs.Struct struct_codecs in
-    let alloc_default message = alloc_list_storage message
-        (ListStorage.Composite (data_words, pointer_words)) 0
-    in
-    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
-    let orig_list_storage = deref_list_pointer pointer_bytes alloc_default in
-    let list_storage = upgrade_struct_list pointer_bytes orig_list_storage
-        ~data_words ~pointer_words
+    let list_storage = deref_list_pointer ?struct_sizes ~create_default
+        pointer_bytes
     in
     make_array_readwrite list_storage codecs
 
+  let get_void_list
+      ?(default : ro ListStorage.t option)
+      (pointer_bytes : rw Slice.t)
+    : (rw, unit, rw ListStorage.t) Runtime.Array.t =
+    get_list ?default ~storage_type:ListStorage.Empty
+      ~codecs:void_list_codecs pointer_bytes
 
-  (*
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<L> for some list L. *)
-  let get_struct_field_list_list
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(decode : rw ListStorage.t ->
-          (rw, 'a, rw ListStorage.t) Runtime.Array.t)
-    : (rw, (rw, 'a, rw ListStorage.t) Runtime.Array.t, rw ListStorage.t) Runtime.Array.t =
-    get_struct_field_bytes_list struct_storage pointer_word
-      ~element_size:8
-      ~decode:(fun slice ->
-        let alloc_default_list message =
-          alloc_list_storage message ListStorage.Pointer 0
-        in
-        decode (deref_list_pointer slice alloc_default_list))
-      ~encode:(fun arr pointer_bytes ->
-        let src_list_storage = InnerArray.to_storage arr in
-        let new_list_storage = deep_copy_list ~src:src_list_storage
-            ~dest_message:pointer_bytes.Slice.msg
-        in
-        let () = deep_zero_pointer pointer_bytes in
-        init_list_pointer pointer_bytes new_list_storage)
-  *)
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto List<E> for some enum E. *)
-  let get_struct_field_enum_list
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(decode : int -> 'a)
-      ~(encode : 'a -> int)
-    : (rw, 'a, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes2 (
-        (fun slice -> decode (Slice.get_uint16 slice 0)),
-          (fun v slice -> Slice.set_uint16 slice 0 (encode v)))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes8 0
-    in
-    get_struct_field_list struct_storage pointer_word ~codecs ~alloc_default
-
-
-  (* Given storage for a struct, get the data for the specified
-     struct-embedded pointer under the assumption that it points to a
-     cap'n proto struct.  The [data_words] and [pointer_words] indicate
-     the structure layout. *)
-  let get_struct_field_struct
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(data_words : int)
-      ~(pointer_words : int)
-    : rw StructStorage.t =
-    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
-    let alloc_default_struct message =
-      alloc_struct_storage message ~data_words ~pointer_words
-    in
-    deref_struct_pointer pointer_bytes alloc_default_struct
-      ~data_words ~pointer_words
-
-
-  (* Given storage for a struct, decode the boolean field stored
-     at the given byte and bit offset within the struct's data region. *)
-  let get_struct_field_bit
-      (struct_storage : rw StructStorage.t)
-      ~(default_bit : bool)
-      ~(byte_ofs : int)
-      ~(bit_ofs : int)
-    : bool =
-    let byte_val = Slice.get_uint8 struct_storage.StructStorage.data byte_ofs in
-    let bit_val = (byte_val land (1 lsl bit_ofs)) <> 0 in
-    if default_bit then not bit_val else bit_val
-
-
-  (* Given storage for a struct, decode the UInt8 field stored
-     at the given byte offset within the struct's data region. *)
-  let get_struct_field_uint8
-      (struct_storage : rw StructStorage.t)
-      ~(default : int) (byte_ofs : int)
-    : int =
-    let numeric = Slice.get_uint8 struct_storage.StructStorage.data byte_ofs in
-    numeric lxor default
-
-
-  (* Given storage for a struct, decode the UInt16 field stored
-     at the given byte offset within the struct's data region. *)
-  let get_struct_field_uint16
-      (struct_storage : rw StructStorage.t)
-      ~(default : int) (byte_ofs : int)
-    : int =
-    let numeric = Slice.get_uint16 struct_storage.StructStorage.data byte_ofs in
-    numeric lxor default
-
-
-  (* Given storage for a struct, decode the UInt32 field stored
-     at the given byte offset within the struct's data region. *)
-  let get_struct_field_uint32
-      (struct_storage : rw StructStorage.t)
-      ~(default : Uint32.t) (byte_ofs : int)
-    : Uint32.t =
-    let numeric = Slice.get_uint32 struct_storage.StructStorage.data byte_ofs in
-    Uint32.logxor numeric default
-
-
-  (* Given storage for a struct, decode the UInt64 field stored
-     at the given byte offset within the struct's data region. *)
-  let get_struct_field_uint64
-      (struct_storage : rw StructStorage.t)
-      ~(default : Uint64.t) (byte_ofs : int)
-    : Uint64.t =
-    let numeric = Slice.get_uint64 struct_storage.StructStorage.data byte_ofs in
-    Uint64.logxor numeric default
-
-
-  (* Given storage for a struct, decode the Int8 field stored
-     at the given byte offset within the struct's data region. *)
-  let get_struct_field_int8
-      (struct_storage : rw StructStorage.t)
-      ~(default : int) (byte_ofs : int)
-    : int =
-    let numeric = Slice.get_int8 struct_storage.StructStorage.data byte_ofs in
-    numeric lxor default
-
-
-  (* Given storage for a struct, decode the Int16 field stored
-     at the given byte offset within the struct's data region. *)
-  let get_struct_field_int16
-      (struct_storage : rw StructStorage.t)
-      ~(default : int) (byte_ofs : int)
-    : int =
-    let numeric = Slice.get_int16 struct_storage.StructStorage.data byte_ofs in
-    numeric lxor default
-
-
-  (* Given storage for a struct, decode the Int32 field stored
-     at the given byte offset within the struct's data region. *)
-  let get_struct_field_int32
-      (struct_storage : rw StructStorage.t)
-      ~(default : int32) (byte_ofs : int)
-    : Int32.t =
-    let numeric = Slice.get_int32 struct_storage.StructStorage.data byte_ofs in
-    Int32.bit_xor numeric default
-
-
-  (* Given storage for a struct, decode the Int64 field stored
-     at the given byte offset within the struct's data region. *)
-  let get_struct_field_int64
-      (struct_storage : rw StructStorage.t)
-      ~(default : int64) (byte_ofs : int)
-    : Int64.t =
-    let numeric = Slice.get_int64 struct_storage.StructStorage.data byte_ofs in
-    Int64.bit_xor numeric default
-
-
-  module Discr = struct
-    type t = {
-      value    : int;
-      byte_ofs : int;
-    }
-  end
-
-  let rec set_discriminant
-      (struct_storage : rw StructStorage.t)
-      (discr : Discr.t option)
-    : unit =
-    match discr with
-    | None ->
-        ()
-    | Some x ->
-        set_struct_field_uint16 struct_storage ~default:0
-          x.Discr.byte_ofs x.Discr.value
-
-  (* Given storage for a struct, write a new value for the UInt16 field stored
-     at the given byte offset within the struct's data region. *)
-  and set_struct_field_uint16
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      ~(default : int)
-      (byte_ofs : int)
-      (value : int)
-    : unit =
-    let () = set_discriminant struct_storage discr in
-    Slice.set_uint16 struct_storage.StructStorage.data byte_ofs
-      (value lxor default)
-
-
-
-  (* Given storage for a struct, set the data for the specified struct-embedded
-     pointer under the assumption that it points to a cap'n proto Data payload. *)
-  let set_struct_field_blob
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      (src : string)
-    : unit =
-    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
-    let new_string_storage = uint8_list_of_string
-        ~null_terminated:false ~dest_message:pointer_bytes.Slice.msg
-        src
-    in
-    let () = deep_zero_pointer pointer_bytes in
-    let () = set_discriminant struct_storage discr in
-    init_list_pointer pointer_bytes new_string_storage
-
-
-  (* Given storage for a struct, set the data for the specified struct-embedded
-     pointer under the assumption that it points to a cap'n proto Text payload. *)
-  let set_struct_field_text
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      (src : string)
-    : unit =
-    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
-    let new_string_storage = uint8_list_of_string
-        ~null_terminated:true ~dest_message:pointer_bytes.Slice.msg
-        src
-    in
-    let () = deep_zero_pointer pointer_bytes in
-    let () = set_discriminant struct_storage discr in
-    init_list_pointer pointer_bytes new_string_storage
-
-
-  let set_struct_field_list
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(discr : Discr.t option)
-      ~(src : ('cap, 'a, 'cap ListStorage.t) Runtime.Array.t)
-      ~(codecs : 'a ListCodecs.t)
-      ~(alloc_default : rw Message.t -> rw ListStorage.t)
-    : (rw, 'a, rw ListStorage.t) Runtime.Array.t =
-    let list_storage =
-      let message = struct_storage.StructStorage.pointers.Slice.msg in
-      let src = InnerArray.of_outer_array src in
-      let src_storage_opt = InnerArray.to_storage src in
-      match src_storage_opt with
-      | Some src_storage ->
-          deep_copy_list ~src:src_storage ~dest_message:message
-      | None ->
-          alloc_default message
-    in
-    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
-    let () = deep_zero_pointer pointer_bytes in
-    let () = set_discriminant struct_storage discr in
-    let () = init_list_pointer pointer_bytes list_storage in
-    get_struct_field_list struct_storage pointer_word ~codecs ~alloc_default
-
-
-  let set_struct_field_bit_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      (src : ('cap, bool, 'cap ListStorage.t) Runtime.Array.t)
+  let get_bit_list
+      ?(default : ro ListStorage.t option)
+      (pointer_bytes : rw Slice.t)
     : (rw, bool, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bit ((fun (x : bool) -> x), (fun (x : bool) -> x)) in
-    let alloc_default message = alloc_list_storage message ListStorage.Bit 0 in
-    set_struct_field_list struct_storage pointer_word ~discr ~src
-      ~codecs ~alloc_default
+    get_list ?default ~storage_type:ListStorage.Bit
+      ~codecs:bit_list_codecs pointer_bytes
 
-  let set_struct_field_int8_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      (src : ('cap, int, 'cap ListStorage.t) Runtime.Array.t)
+  let get_int8_list
+      ?(default : ro ListStorage.t option)
+      (pointer_bytes : rw Slice.t)
     : (rw, int, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes1 (
-        (fun slice -> Slice.get_int8 slice 0),
-          (fun v slice -> Slice.set_int8 slice 0 v))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes1 0
-    in
-    set_struct_field_list struct_storage pointer_word ~discr ~src
-      ~codecs ~alloc_default
+    get_list ?default ~storage_type:ListStorage.Bytes1
+      ~codecs:int8_list_codecs pointer_bytes
 
-  let set_struct_field_int16_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      (src : ('cap, int, 'cap ListStorage.t) Runtime.Array.t)
+  let get_int16_list
+      ?(default : ro ListStorage.t option)
+      (pointer_bytes : rw Slice.t)
     : (rw, int, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes2 (
-        (fun slice -> Slice.get_int16 slice 0),
-          (fun v slice -> Slice.set_int16 slice 0 v))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes2 0
-    in
-    set_struct_field_list struct_storage pointer_word ~discr ~src
-      ~codecs ~alloc_default
+    get_list ?default ~storage_type:ListStorage.Bytes2
+      ~codecs:int16_list_codecs pointer_bytes
 
-  let set_struct_field_int32_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      (src : ('cap, int32, 'cap ListStorage.t) Runtime.Array.t)
+  let get_int32_list
+      ?(default : ro ListStorage.t option)
+      (pointer_bytes : rw Slice.t)
     : (rw, int32, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes4 (
-        (fun slice -> Slice.get_int32 slice 0),
-          (fun v slice -> Slice.set_int32 slice 0 v))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes4 0
-    in
-    set_struct_field_list struct_storage pointer_word ~discr ~src
-      ~codecs ~alloc_default
+    get_list ?default ~storage_type:ListStorage.Bytes4
+      ~codecs:int32_list_codecs pointer_bytes
 
-  let set_struct_field_int64_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      (src : ('cap, int64, 'cap ListStorage.t) Runtime.Array.t)
+  let get_int64_list
+      ?(default : ro ListStorage.t option)
+      (pointer_bytes : rw Slice.t)
     : (rw, int64, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes8 (
-        (fun slice -> Slice.get_int64 slice 0),
-          (fun v slice -> Slice.set_int64 slice 0 v))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes8 0
-    in
-    set_struct_field_list struct_storage pointer_word ~discr ~src
-      ~codecs ~alloc_default
+    get_list ?default ~storage_type:ListStorage.Bytes8
+      ~codecs:int64_list_codecs pointer_bytes
 
-  let set_struct_field_uint8_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      (src : ('cap, int, 'cap ListStorage.t) Runtime.Array.t)
+  let get_uint8_list
+      ?(default : ro ListStorage.t option)
+      (pointer_bytes : rw Slice.t)
     : (rw, int, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes1 (
-        (fun slice -> Slice.get_uint8 slice 0),
-          (fun v slice -> Slice.set_uint8 slice 0 v))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes1 0
-    in
-    set_struct_field_list struct_storage pointer_word ~discr ~src
-      ~codecs ~alloc_default
+    get_list ?default ~storage_type:ListStorage.Bytes1
+      ~codecs:uint8_list_codecs pointer_bytes
 
-  let set_struct_field_uint16_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      (src : ('cap, int, 'cap ListStorage.t) Runtime.Array.t)
+  let get_uint16_list
+      ?(default : ro ListStorage.t option)
+      (pointer_bytes : rw Slice.t)
     : (rw, int, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes2 (
-        (fun slice -> Slice.get_uint16 slice 0),
-          (fun v slice -> Slice.set_uint16 slice 0 v))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes2 0
-    in
-    set_struct_field_list struct_storage pointer_word ~discr ~src
-      ~codecs ~alloc_default
+    get_list ?default ~storage_type:ListStorage.Bytes2
+      ~codecs:uint16_list_codecs pointer_bytes
 
-  let set_struct_field_uint32_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      (src : ('cap, Uint32.t, 'cap ListStorage.t) Runtime.Array.t)
+  let get_uint32_list
+      ?(default : ro ListStorage.t option)
+      (pointer_bytes : rw Slice.t)
     : (rw, Uint32.t, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes4 (
-        (fun slice -> Slice.get_uint32 slice 0),
-          (fun v slice -> Slice.set_uint32 slice 0 v))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes4 0
-    in
-    set_struct_field_list struct_storage pointer_word ~discr ~src
-      ~codecs ~alloc_default
+    get_list ?default ~storage_type:ListStorage.Bytes4
+      ~codecs:uint32_list_codecs pointer_bytes
 
-  let set_struct_field_uint64_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      (src : ('cap, Uint64.t, 'cap ListStorage.t) Runtime.Array.t)
+  let get_uint64_list
+      ?(default : ro ListStorage.t option)
+      (pointer_bytes : rw Slice.t)
     : (rw, Uint64.t, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes8 (
-        (fun slice -> Slice.get_uint64 slice 0),
-          (fun v slice -> Slice.set_uint64 slice 0 v))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes8 0
-    in
-    set_struct_field_list struct_storage pointer_word ~discr ~src
-      ~codecs ~alloc_default
+    get_list ?default ~storage_type:ListStorage.Bytes8
+      ~codecs:uint64_list_codecs pointer_bytes
 
-  let set_struct_field_float32_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      (src : ('cap, float, 'cap ListStorage.t) Runtime.Array.t)
+  let get_float32_list
+      ?(default : ro ListStorage.t option)
+      (pointer_bytes : rw Slice.t)
     : (rw, float, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes4 (
-        (fun slice -> Int32.float_of_bits (Slice.get_int32 slice 0)),
-          (fun v slice -> Slice.set_int32 slice 0 (Int32.bits_of_float v)))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes4 0
-    in
-    set_struct_field_list struct_storage pointer_word ~discr ~src
-      ~codecs ~alloc_default
+    get_list ?default ~storage_type:ListStorage.Bytes4
+      ~codecs:float32_list_codecs pointer_bytes
 
-  let set_struct_field_float64_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      (src : ('cap, float, 'cap ListStorage.t) Runtime.Array.t)
+  let get_float64_list
+      ?(default : ro ListStorage.t option)
+      (pointer_bytes : rw Slice.t)
     : (rw, float, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes8 (
-        (fun slice -> Int64.float_of_bits (Slice.get_int64 slice 0)),
-          (fun v slice -> Slice.set_int64 slice 0 (Int64.bits_of_float v)))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes8 0
-    in
-    set_struct_field_list struct_storage pointer_word ~discr ~src
-      ~codecs ~alloc_default
+    get_list ?default ~storage_type:ListStorage.Bytes8
+      ~codecs:float64_list_codecs pointer_bytes
 
-  let set_struct_field_blob_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      (src : ('cap, string, 'cap ListStorage.t) Runtime.Array.t)
+  let get_text_list
+      ?(default : ro ListStorage.t option)
+      (pointer_bytes : rw Slice.t)
     : (rw, string, rw ListStorage.t) Runtime.Array.t =
-    let codecs =
-      let decode slice =
-        (* In this implementation Data fields are always accessed by value,
-           not by reference, since we always do an immediate decode to [string].
-           Therefore we can use the Reader logic to handle this case. *)
-        match RReader.deref_list_pointer slice with
-        | Some list_storage ->
-            string_of_uint8_list ~null_terminated:false list_storage
-        | None ->
-            ""
-      in
-      let encode v slice =
-        (* Note: could avoid an allocation if the new string is not longer
-           than the old one.  This deep copy strategy has the advantage of
-           being correct in all cases. *)
-        let new_string_storage = uint8_list_of_string
-            ~null_terminated:false ~dest_message:slice.Slice.msg
-            v
-        in
-        let () = deep_zero_pointer slice in
-        init_list_pointer slice new_string_storage
-      in
-      ListCodecs.Pointer (decode, encode)
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Pointer 0
-    in
-    set_struct_field_list struct_storage pointer_word ~discr ~src
-      ~codecs ~alloc_default
+    get_list ?default ~storage_type:ListStorage.Pointer
+      ~codecs:text_list_codecs pointer_bytes
 
-  let set_struct_field_text_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      (src : ('cap, string, 'cap ListStorage.t) Runtime.Array.t)
+  let get_blob_list
+      ?(default : ro ListStorage.t option)
+      (pointer_bytes : rw Slice.t)
     : (rw, string, rw ListStorage.t) Runtime.Array.t =
-    let codecs =
-      let decode slice =
-        (* In this implementation Data fields are always accessed by value,
-           not by reference, since we always do an immediate decode to [string].
-           Therefore we can use the Reader logic to handle this case. *)
-        match RReader.deref_list_pointer slice with
-        | Some list_storage ->
-            string_of_uint8_list ~null_terminated:true list_storage
-        | None ->
-            ""
-      in
-      let encode v slice =
-        (* Note: could avoid an allocation if the new string is not longer
-           than the old one.  This deep copy strategy has the advantage of
-           being correct in all cases. *)
-        let new_string_storage = uint8_list_of_string
-            ~null_terminated:true ~dest_message:slice.Slice.msg
-            v
-        in
-        let () = deep_zero_pointer slice in
-        init_list_pointer slice new_string_storage
-      in
-      ListCodecs.Pointer (decode, encode)
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Pointer 0
-    in
-    set_struct_field_list struct_storage pointer_word ~discr ~src
-      ~codecs ~alloc_default
+    get_list ?default ~storage_type:ListStorage.Pointer
+      ~codecs:blob_list_codecs pointer_bytes
 
-  let set_struct_field_struct_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      (src : ('cap, 'cap StructStorage.t option, 'cap ListStorage.t) Runtime.Array.t)
+  let get_struct_list
+      ?(default : ro ListStorage.t option)
       ~(data_words : int)
       ~(pointer_words : int)
+      (pointer_bytes : rw Slice.t)
     : (rw, rw StructStorage.t, rw ListStorage.t) Runtime.Array.t =
-    let struct_codecs =
-      let decode_bytes slice =
-        let data = slice in
-        let pointers = {
-          slice with
-          Slice.start = Slice.get_end slice;
-          Slice.len = 0
-        } in
-        { StructStorage.data; StructStorage.pointers }
-      in
-      let encode_bytes v slice =
-        let dest =
-          let data = slice in
-          let pointers = {
-            slice with
-            Slice.start = Slice.get_end slice;
-            Slice.len = 0
-          } in
-          { StructStorage.data; StructStorage.pointers }
-        in
-        deep_copy_struct_to_dest ~src:v ~dest
-      in
-      let decode_pointer slice =
-        let data = {
-          slice with
-          Slice.len = 0;
-        } in
-        let pointers = {
-          slice with
-          Slice.len = sizeof_uint64;
-        } in
-        { StructStorage.data; StructStorage.pointers }
-      in
-      let encode_pointer v slice =
-        let dest =
-          let data = {
-            slice with
-            Slice.len = 0;
-          } in
-          let pointers = {
-            slice with
-            Slice.len = sizeof_uint64;
-          } in
-          { StructStorage.data; StructStorage.pointers }
-        in
-        deep_copy_struct_to_dest ~src:v ~dest
-      in
-      let decode_composite x = x in
-      let encode_composite src dest = deep_copy_struct_to_dest ~src ~dest in {
-        ListCodecs.bytes = (decode_bytes, encode_bytes);
-        ListCodecs.pointer = (decode_pointer, encode_pointer);
-        ListCodecs.composite = (decode_composite, encode_composite);
-      }
-    in
-    let codecs = ListCodecs.Struct struct_codecs in
-    let alloc_default message = alloc_list_storage message
-        (ListStorage.Composite (data_words, pointer_words)) 0
-    in
-    let list_storage =
-      let message = struct_storage.StructStorage.pointers.Slice.msg in
-      let src = InnerArray.of_outer_array src in
-      let src_storage_opt = InnerArray.to_storage src in
-      match src_storage_opt with
-      | Some src_storage ->
-          deep_copy_list ~src:src_storage ~dest_message:message
-      | None ->
-          alloc_default message
-    in
-    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
-    let () = deep_zero_pointer pointer_bytes in
-    let () = set_discriminant struct_storage discr in
-    let () = init_list_pointer pointer_bytes list_storage in
-    (* Note: this is pretty inefficient... first making a copy of the original,
-       then upgrading the copy. *)
-    let _ = upgrade_struct_list pointer_bytes list_storage
-        ~data_words ~pointer_words
-    in
-    get_struct_field_list struct_storage pointer_word ~codecs ~alloc_default
+    get_list ~struct_sizes:{ StructSizes.data_words; StructSizes.pointer_words }
+      ?default ~storage_type:(ListStorage.Composite (data_words, pointer_words))
+      ~codecs:struct_list_codecs pointer_bytes
 
-  (*
-  let set_struct_field_list_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      (src : 'cap ListStorage.t option)
-    : (rw, rw ListStorage.t, rw ListStorage.t) Runtime.Array.t =
-    let () = set_struct_field_list ~discr ~storage_type:ListStorage.Pointer
-        struct_storage pointer_word src
-    in
-    get_struct_field_list_list struct_storage pointer_word
-  *)
-
-  let set_struct_field_enum_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      (src : ('cap, 'a, 'cap ListStorage.t) Runtime.Array.t)
-      ~(decode : int -> 'a)
-      ~(encode : 'a -> int)
-    : (rw, 'a, rw ListStorage.t) Runtime.Array.t =
-    let codecs = ListCodecs.Bytes2 (
-        (fun slice -> decode (Slice.get_uint16 slice 0)),
-          (fun v slice -> Slice.set_uint16 slice 0 (encode v)))
-    in
-    let alloc_default message =
-      alloc_list_storage message ListStorage.Bytes8 0
-    in
-    set_struct_field_list struct_storage pointer_word ~discr ~src
-      ~codecs ~alloc_default
-
-  (* Given storage for a struct, set the data for the specified struct-embedded
-     pointer equal to a deep copy of the specified [src] struct. *)
-  let set_struct_field_struct
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      (src : 'cap StructStorage.t option)
+  let get_struct
+      ?(default : ro StructStorage.t option)
       ~(data_words : int)
       ~(pointer_words : int)
+      (pointer_bytes : rw Slice.t)
     : rw StructStorage.t =
-    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
-    let new_storage =
-      let message = struct_storage.StructStorage.pointers.Slice.msg in
-      match src with
-      | Some src' ->
-          deep_copy_struct ~src:src'
-            ~dest_message:message ~data_words ~pointer_words
+    let create_default message =
+      match default with
+      | Some default_storage ->
+          deep_copy_struct ~src:default_storage ~dest_message:message
+            ~data_words ~pointer_words
       | None ->
           alloc_struct_storage message ~data_words ~pointer_words
     in
+    deref_struct_pointer ~create_default ~data_words ~pointer_words pointer_bytes
+
+
+  (*******************************************************************************
+   * METHODS FOR SETTING OBJECTS STORED BY POINTER
+   *******************************************************************************)
+
+  let set_text
+      (value : string)
+      (pointer_bytes : rw Slice.t)
+    : unit =
+    let new_string_storage = uint8_list_of_string
+      ~null_terminated:true ~dest_message:pointer_bytes.Slice.msg
+      value
+    in
     let () = deep_zero_pointer pointer_bytes in
-    let () = set_discriminant struct_storage discr in
-    let () = init_struct_pointer pointer_bytes new_storage in
-    get_struct_field_struct struct_storage pointer_word
-      ~data_words ~pointer_words
+    init_list_pointer pointer_bytes new_string_storage
 
-
-  (* Given storage for a struct, write a new value for the boolean field stored
-     at the given byte and bit offset within the struct's data region. *)
-  let set_struct_field_bit
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      ~(default_bit : bool)
-      ~(byte_ofs : int)
-      ~(bit_ofs : int)
-      (value : bool)
+  let set_blob
+      (value : string)
+      (pointer_bytes : rw Slice.t)
     : unit =
-    let default = if default_bit then 1 else 0 in
-    let bit_val = if value then 1 else 0 in
-    let bit = default lxor bit_val in
-    let byte_val = Slice.get_uint8 struct_storage.StructStorage.data byte_ofs in
-    let byte_val = byte_val land (lnot (1 lsl bit_ofs)) in
-    let byte_val = byte_val lor (bit lsl bit_ofs) in
-    let () = set_discriminant struct_storage discr in
-    Slice.set_uint8 struct_storage.StructStorage.data byte_ofs byte_val
+    let new_string_storage = uint8_list_of_string
+      ~null_terminated:false ~dest_message:pointer_bytes.Slice.msg
+      value
+    in
+    let () = deep_zero_pointer pointer_bytes in
+    init_list_pointer pointer_bytes new_string_storage
 
-
-  (* Given storage for a struct, write a new value for the UInt8 field stored
-     at the given byte offset within the struct's data region. *)
-  let set_struct_field_uint8
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      ~(default : int)
-      (byte_ofs : int)
-      (value : int)
-    : unit =
-    let () = set_discriminant struct_storage discr in
-    Slice.set_uint8 struct_storage.StructStorage.data byte_ofs
-      (value lxor default)
-
-
-  (* Given storage for a struct, write a new value for the UInt32 field stored
-     at the given byte offset within the struct's data region. *)
-  let set_struct_field_uint32
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      ~(default : Uint32.t)
-      (byte_ofs : int)
-      (value : Uint32.t)
-    : unit =
-    let () = set_discriminant struct_storage discr in
-    Slice.set_uint32 struct_storage.StructStorage.data byte_ofs
-      (Uint32.logxor value default)
-
-
-  (* Given storage for a struct, write a new value for the UInt64 field stored
-     at the given byte offset within the struct's data region. *)
-  let set_struct_field_uint64
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      ~(default : Uint64.t)
-      (byte_ofs : int)
-      (value : Uint64.t)
-    : unit =
-    let () = set_discriminant struct_storage discr in
-    Slice.set_uint64 struct_storage.StructStorage.data byte_ofs
-      (Uint64.logxor value default)
-
-
-  (* Given storage for a struct, write a new value for the Int8 field stored
-     at the given byte offset within the struct's data region. *)
-  let set_struct_field_int8
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      ~(default : int)
-      (byte_ofs : int)
-      (value : int)
-    : unit =
-    let () = set_discriminant struct_storage discr in
-    Slice.set_int8 struct_storage.StructStorage.data byte_ofs
-      (value lxor default)
-
-
-  (* Given storage for a struct, write a new value for the Int16 field stored
-     at the given byte offset within the struct's data region. *)
-  let set_struct_field_int16
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      ~(default : int)
-      (byte_ofs : int)
-      (value : int)
-    : unit =
-    let () = set_discriminant struct_storage discr in
-    Slice.set_int16 struct_storage.StructStorage.data byte_ofs
-      (value lxor default)
-
-
-  (* Given storage for a struct, write a new value for the Int32 field stored
-     at the given byte offset within the struct's data region. *)
-  let set_struct_field_int32
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      ~(default : int32)
-      (byte_ofs : int)
-      (value : int32)
-    : unit =
-    let () = set_discriminant struct_storage discr in
-    Slice.set_int32 struct_storage.StructStorage.data byte_ofs
-      (Int32.bit_xor value default)
-
-
-  (* Given storage for a struct, write a new value for the Int64 field stored
-     at the given byte offset within the struct's data region. *)
-  let set_struct_field_int64
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      ~(default : int64)
-      (byte_ofs : int)
-      (value : int64)
-    : unit =
-    let () = set_discriminant struct_storage discr in
-    Slice.set_int64 struct_storage.StructStorage.data byte_ofs
-      (Int64.bit_xor value default)
-
-
-  (* Given storage for a struct, allocate a new List<T> member for one of the
-     pointers stored within the struct. *)
-  let init_struct_field_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
+  let set_list
+      ?(struct_sizes : StructSizes.t option)
       ~(storage_type : ListStorage.storage_type_t)
-      ~(num_elements : int)
-    : unit =
-    if num_elements < 0 then
-      invalid_arg "index out of bounds"
-    else
-      let pointer_bytes = get_struct_pointer struct_storage pointer_word in
-      let dest_message  = struct_storage.StructStorage.pointers.Slice.msg in
-      let list_storage  = alloc_list_storage dest_message
-          storage_type num_elements
-      in
-      let () = deep_zero_pointer pointer_bytes in
-      let () = set_discriminant struct_storage discr in
-      init_list_pointer pointer_bytes list_storage
-
-
-  (* Given storage for a struct, allocate a new List<Bool> member for one
-     of the pointers stored within the struct.  Returns an array builder
-     for the resulting list. *)
-  let init_struct_field_bit_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(num_elements : int)
-    : (rw, bool, rw ListStorage.t) Runtime.Array.t =
-    let () = set_discriminant struct_storage discr in
-    let () = init_struct_field_list struct_storage pointer_word
-        ~storage_type:ListStorage.Bit ~num_elements
-    in
-    get_struct_field_bit_list struct_storage pointer_word
-
-
-  (* Given storage for a struct, allocate a new List<Int8> member for
-     one of the pointers stored within the struct.  Returns an array
-     builder for the resulting list. *)
-  let init_struct_field_int8_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(num_elements : int)
-    : (rw, int, rw ListStorage.t) Runtime.Array.t =
-    let () = set_discriminant struct_storage discr in
-    let () = init_struct_field_list struct_storage pointer_word
-        ~storage_type:ListStorage.Bytes1 ~num_elements
-    in
-    get_struct_field_int8_list struct_storage pointer_word
-
-
-  (* Given storage for a struct, allocate a new List<Int16> member for
-     one of the pointers stored within the struct.  Returns an array
-     builder for the resulting list. *)
-  let init_struct_field_int16_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(num_elements : int)
-    : (rw, int, rw ListStorage.t) Runtime.Array.t =
-    let () = set_discriminant struct_storage discr in
-    let () = init_struct_field_list struct_storage pointer_word
-        ~storage_type:ListStorage.Bytes2 ~num_elements
-    in
-    get_struct_field_int16_list struct_storage pointer_word
-
-
-  (* Given storage for a struct, allocate a new List<Int32> member for
-     one of the pointers stored within the struct.  Returns an array
-     builder for the resulting list. *)
-  let init_struct_field_int32_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(num_elements : int)
-    : (rw, int32, rw ListStorage.t) Runtime.Array.t =
-    let () = set_discriminant struct_storage discr in
-    let () = init_struct_field_list struct_storage pointer_word
-        ~storage_type:ListStorage.Bytes4 ~num_elements
-    in
-    get_struct_field_int32_list struct_storage pointer_word
-
-
-  (* Given storage for a struct, allocate a new List<Int64> member for
-     one of the pointers stored within the struct.  Returns an array
-     builder for the resulting list. *)
-  let init_struct_field_int64_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(num_elements : int)
-    : (rw, int64, rw ListStorage.t) Runtime.Array.t =
-    let () = set_discriminant struct_storage discr in
-    let () = init_struct_field_list struct_storage pointer_word
-        ~storage_type:ListStorage.Bytes8 ~num_elements
-    in
-    get_struct_field_int64_list struct_storage pointer_word
-
-
-  (* Given storage for a struct, allocate a new List<UInt8> member for
-     one of the pointers stored within the struct.  Returns an array
-     builder for the resulting list. *)
-  let init_struct_field_uint8_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(num_elements : int)
-    : (rw, int, rw ListStorage.t) Runtime.Array.t =
-    let () = set_discriminant struct_storage discr in
-    let () = init_struct_field_list struct_storage pointer_word
-        ~storage_type:ListStorage.Bytes1 ~num_elements
-    in
-    get_struct_field_uint8_list struct_storage pointer_word
-
-
-  (* Given storage for a struct, allocate a new List<UInt16> member for
-     one of the pointers stored within the struct.  Returns an array
-     builder for the resulting list. *)
-  let init_struct_field_uint16_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(num_elements : int)
-    : (rw, int, rw ListStorage.t) Runtime.Array.t =
-    let () = set_discriminant struct_storage discr in
-    let () = init_struct_field_list struct_storage pointer_word
-        ~storage_type:ListStorage.Bytes2 ~num_elements
-    in
-    get_struct_field_uint16_list struct_storage pointer_word
-
-
-  (* Given storage for a struct, allocate a new List<UInt32> member for
-     one of the pointers stored within the struct.  Returns an array
-     builder for the resulting list. *)
-  let init_struct_field_uint32_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(num_elements : int)
-    : (rw, Uint32.t, rw ListStorage.t) Runtime.Array.t =
-    let () = set_discriminant struct_storage discr in
-    let () = init_struct_field_list struct_storage pointer_word
-        ~storage_type:ListStorage.Bytes4 ~num_elements
-    in
-    get_struct_field_uint32_list struct_storage pointer_word
-
-
-  (* Given storage for a struct, allocate a new List<UInt64> member for
-     one of the pointers stored within the struct.  Returns an array
-     builder for the resulting list. *)
-  let init_struct_field_uint64_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(num_elements : int)
-    : (rw, Uint64.t, rw ListStorage.t) Runtime.Array.t =
-    let () = set_discriminant struct_storage discr in
-    let () = init_struct_field_list struct_storage pointer_word
-        ~storage_type:ListStorage.Bytes8 ~num_elements
-    in
-    get_struct_field_uint64_list struct_storage pointer_word
-
-
-  (* Given storage for a struct, allocate a new List<Float32> member for
-     one of the pointers stored within the struct.  Returns an array
-     builder for the resulting list. *)
-  let init_struct_field_float32_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(num_elements : int)
-    : (rw, float, rw ListStorage.t) Runtime.Array.t =
-    let () = set_discriminant struct_storage discr in
-    let () = init_struct_field_list struct_storage pointer_word
-        ~storage_type:ListStorage.Bytes4 ~num_elements
-    in
-    get_struct_field_float32_list struct_storage pointer_word
-
-
-  (* Given storage for a struct, allocate a new List<Float64> member for
-     one of the pointers stored within the struct.  Returns an array
-     builder for the resulting list. *)
-  let init_struct_field_float64_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(num_elements : int)
-    : (rw, float, rw ListStorage.t) Runtime.Array.t =
-    let () = set_discriminant struct_storage discr in
-    let () = init_struct_field_list struct_storage pointer_word
-        ~storage_type:ListStorage.Bytes8 ~num_elements
-    in
-    get_struct_field_float64_list struct_storage pointer_word
-
-
-  (* Given storage for a struct, allocate a new List<List<Data>> member for
-     one of the pointers stored within the struct.  Returns an array
-     builder for the resulting list. *)
-  let init_struct_field_blob_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(num_elements : int)
-    : (rw, string, rw ListStorage.t) Runtime.Array.t =
-    let () = set_discriminant struct_storage discr in
-    let () = init_struct_field_list struct_storage pointer_word
-        ~storage_type:ListStorage.Pointer ~num_elements
-    in
-    get_struct_field_blob_list struct_storage pointer_word
-
-
-  (* Given storage for a struct, allocate a new List<List<Text>> member for
-     one of the pointers stored within the struct.  Returns an array
-     builder for the resulting list. *)
-  let init_struct_field_text_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(num_elements : int)
-    : (rw, string, rw ListStorage.t) Runtime.Array.t =
-    let () = set_discriminant struct_storage discr in
-    let () = init_struct_field_list struct_storage pointer_word
-        ~storage_type:ListStorage.Pointer ~num_elements
-    in
-    get_struct_field_text_list struct_storage pointer_word
-
-
-  (* Given storage for a struct, allocate a new List<T> member for one of the
-     pointers stored within the struct, where T is a struct type.  Returns
-     an array builder for the resulting list. *)
-  let init_struct_field_struct_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(num_elements : int)
-      ~(data_words : int)
-      ~(pointer_words : int)
-    : (rw, rw StructStorage.t, rw ListStorage.t) Runtime.Array.t =
-    let () = set_discriminant struct_storage discr in
-    let () = init_struct_field_list struct_storage pointer_word
-        ~storage_type:(ListStorage.Composite (data_words, pointer_words))
-        ~num_elements
-    in
-    get_struct_field_struct_list struct_storage pointer_word
-      ~data_words ~pointer_words
-
-
-  (*
-  (* Given storage for a struct, allocate a new List<List<T>> member for
-     one of the pointers stored within the struct.  Returns an array builder
-     for the resulting list. *)
-  let init_struct_field_list_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(num_elements : int)
-    : (rw ListStorage.t, 'b) Runtime.Array.t =
-    let () = set_discriminant struct_storage discr in
-    let () = init_struct_field_list struct_storage pointer_word
-        ~storage_type:ListStorage.Pointer ~num_elements
-    in
-    get_struct_field_list_list struct_storage pointer_word
-  *)
-
-
-  (* Given storage for a struct, allocate a new List<Enum> member for
-     one of the pointers stored within the struct.  Returns an array builder
-     for the resulting list. *)
-  let init_struct_field_enum_list
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
-      ~(num_elements : int)
-      ~(decode : int -> 'a)
-      ~(encode : 'a -> int)
+      ~(codecs : 'a ListCodecs.t)
+      (value : ('cap1, 'a, 'cap2 ListStorage.t) Runtime.Array.t)
+      (pointer_bytes : rw Slice.t)
     : (rw, 'a, rw ListStorage.t) Runtime.Array.t =
-    let () = set_discriminant struct_storage discr in
-    let () = init_struct_field_list struct_storage pointer_word
-        ~storage_type:ListStorage.Bytes2 ~num_elements
+    let dest_storage =
+      match InnerArray.to_storage (InnerArray.of_outer_array value) with
+      | Some src_storage ->
+          deep_copy_list ?struct_sizes
+            ~src:src_storage ~dest_message:pointer_bytes.Slice.msg ()
+      | None ->
+          let () = assert (Runtime.Array.length value = 0) in
+          alloc_list_storage pointer_bytes.Slice.msg storage_type 0
     in
-    get_struct_field_enum_list struct_storage pointer_word
-      ~decode ~encode
+    let () = deep_zero_pointer pointer_bytes in
+    let () = init_list_pointer pointer_bytes dest_storage in
+    make_array_readwrite dest_storage codecs
 
+  let set_void_list
+      (value : ('cap1, unit, 'cap2 ListStorage.t) Runtime.Array.t)
+      (pointer_bytes : rw Slice.t)
+    : (rw, unit, rw ListStorage.t) Runtime.Array.t =
+    set_list ~storage_type:ListStorage.Empty ~codecs:void_list_codecs
+      value pointer_bytes
 
-  (* Given storage for a parent struct, allocate a new child struct and link it
-     to one of the pointers stored within the parent.  Returns a reference to
-     the newly-created struct. *)
-  let init_struct_field_struct
-      ?(discr : Discr.t option)
-      (struct_storage : rw StructStorage.t)
-      (pointer_word : int)
+  let set_bit_list
+      (value : ('cap1, bool, 'cap2 ListStorage.t) Runtime.Array.t)
+      (pointer_bytes : rw Slice.t)
+    : (rw, bool, rw ListStorage.t) Runtime.Array.t =
+    set_list ~storage_type:ListStorage.Bit ~codecs:bit_list_codecs
+      value pointer_bytes
+
+  let set_int8_list
+      (value : ('cap1, int, 'cap2 ListStorage.t) Runtime.Array.t)
+      (pointer_bytes : rw Slice.t)
+    : (rw, int, 'cap ListStorage.t) Runtime.Array.t =
+    set_list ~storage_type:ListStorage.Bytes1 ~codecs:int8_list_codecs
+      value pointer_bytes
+
+  let set_int16_list
+      (value : ('cap1, int, 'cap2 ListStorage.t) Runtime.Array.t)
+      (pointer_bytes : rw Slice.t)
+    : (rw, int, 'cap ListStorage.t) Runtime.Array.t =
+    set_list ~storage_type:ListStorage.Bytes2 ~codecs:int16_list_codecs
+      value pointer_bytes
+
+  let set_int32_list
+      (value : ('cap1, int32, 'cap ListStorage.t) Runtime.Array.t)
+      (pointer_bytes : rw Slice.t)
+    : (rw, int32, rw ListStorage.t) Runtime.Array.t =
+    set_list ~storage_type:ListStorage.Bytes4 ~codecs:int32_list_codecs
+      value pointer_bytes
+
+  let set_int64_list
+      (value : ('cap1, int64, 'cap2 ListStorage.t) Runtime.Array.t)
+      (pointer_bytes : rw Slice.t)
+    : (rw, int64, rw ListStorage.t) Runtime.Array.t =
+    set_list ~storage_type:ListStorage.Bytes8 ~codecs:int64_list_codecs
+      value pointer_bytes
+
+  let set_uint8_list
+      (value : ('cap1, int, 'cap2 ListStorage.t) Runtime.Array.t)
+      (pointer_bytes : rw Slice.t)
+    : (rw, int, rw ListStorage.t) Runtime.Array.t =
+    set_list ~storage_type:ListStorage.Bytes1 ~codecs:uint8_list_codecs
+      value pointer_bytes
+
+  let set_uint16_list
+      (value : ('cap1, int, 'cap2 ListStorage.t) Runtime.Array.t)
+      (pointer_bytes : rw Slice.t)
+    : (rw, int, rw ListStorage.t) Runtime.Array.t =
+    set_list ~storage_type:ListStorage.Bytes2 ~codecs:uint16_list_codecs
+      value pointer_bytes
+
+  let set_uint32_list
+      (value : ('cap1, Uint32.t, 'cap2 ListStorage.t) Runtime.Array.t)
+      (pointer_bytes : rw Slice.t)
+    : (rw, Uint32.t, rw ListStorage.t) Runtime.Array.t =
+    set_list ~storage_type:ListStorage.Bytes4 ~codecs:uint32_list_codecs
+      value pointer_bytes
+
+  let set_uint64_list
+      (value : ('cap1, Uint64.t, 'cap2 ListStorage.t) Runtime.Array.t)
+      (pointer_bytes : rw Slice.t)
+    : (rw, Uint64.t, rw ListStorage.t) Runtime.Array.t =
+    set_list ~storage_type:ListStorage.Bytes8 ~codecs:uint64_list_codecs
+      value pointer_bytes
+
+  let set_float32_list
+      (value : ('cap1, float, 'cap2 ListStorage.t) Runtime.Array.t)
+      (pointer_bytes : rw Slice.t)
+    : (rw, float, rw ListStorage.t) Runtime.Array.t =
+    set_list ~storage_type:ListStorage.Bytes4 ~codecs:float32_list_codecs
+      value pointer_bytes
+
+  let set_float64_list
+      (value : ('cap1, float, 'cap2 ListStorage.t) Runtime.Array.t)
+      (pointer_bytes : rw Slice.t)
+    : (rw, float, rw ListStorage.t) Runtime.Array.t =
+    set_list ~storage_type:ListStorage.Bytes8 ~codecs:float64_list_codecs
+      value pointer_bytes
+
+  let set_text_list
+      (value : ('cap1, string, 'cap2 ListStorage.t) Runtime.Array.t)
+      (pointer_bytes : rw Slice.t)
+    : (rw, string, rw ListStorage.t) Runtime.Array.t =
+    set_list ~storage_type:ListStorage.Pointer ~codecs:text_list_codecs
+      value pointer_bytes
+
+  let set_blob_list
+      (value : ('cap1, string, 'cap2 ListStorage.t) Runtime.Array.t)
+      (pointer_bytes : rw Slice.t)
+    : (rw, string, rw ListStorage.t) Runtime.Array.t =
+    set_list ~storage_type:ListStorage.Pointer ~codecs:blob_list_codecs
+      value pointer_bytes
+
+  let set_struct_list
       ~(data_words : int)
       ~(pointer_words : int)
-    : rw StructStorage.t =
-    let pointer_bytes = get_struct_pointer struct_storage pointer_word in
-    let () = deep_zero_pointer pointer_bytes in
-    let alloc_default_struct message =
-      alloc_struct_storage message ~data_words ~pointer_words
-    in
-    let () = set_discriminant struct_storage discr in
-    deref_struct_pointer pointer_bytes alloc_default_struct
-      ~data_words ~pointer_words
+      (* FIXME: this won't allow assignment from Reader struct lists *)
+      (value : ('cap1, 'cap2 StructStorage.t, 'cap2 ListStorage.t) Runtime.Array.t)
+      (pointer_bytes : rw Slice.t)
+    : (rw, rw StructStorage.t, rw ListStorage.t) Runtime.Array.t =
+    set_list ~struct_sizes:{ StructSizes.data_words; StructSizes.pointer_words }
+      ~storage_type:(ListStorage.Composite (data_words, pointer_words))
+      ~codecs:struct_list_codecs value pointer_bytes
 
+  let set_struct
+      ~(data_words : int)
+      ~(pointer_words : int)
+      (* FIXME: this won't allow assignment from Reader structs *)
+      (value : 'cap StructStorage.t)
+      (pointer_bytes : rw Slice.t)
+    : rw StructStorage.t =
+    let dest_storage = deep_copy_struct ~src:value
+        ~dest_message:pointer_bytes.Slice.msg ~data_words ~pointer_words
+    in
+    let () = deep_zero_pointer pointer_bytes in
+    let () = init_struct_pointer pointer_bytes dest_storage in
+    dest_storage
+
+
+  (*******************************************************************************
+   * METHODS FOR INITIALIZING OBJECTS STORED BY POINTER
+   *******************************************************************************)
+
+  let init_blob
+      (num_elements : int)
+      (pointer_bytes : rw Slice.t)
+    : unit =
+    let s = String.make num_elements '\x00' in
+    set_blob s pointer_bytes
+
+  let init_list
+      ~(storage_type : ListStorage.storage_type_t)
+      ~(codecs : 'a ListCodecs.t)
+      (num_elements : int)
+      (pointer_bytes : rw Slice.t)
+    : (rw, 'a, rw ListStorage.t) Runtime.Array.t =
+    let () = deep_zero_pointer pointer_bytes in
+    let message = pointer_bytes.Slice.msg in
+    let list_storage = alloc_list_storage message storage_type num_elements in
+    let () = init_list_pointer pointer_bytes list_storage in
+    make_array_readwrite list_storage codecs
+
+  let init_void_list
+      (num_elements : int)
+      (pointer_bytes : rw Slice.t)
+    : (rw, unit, rw ListStorage.t) Runtime.Array.t =
+    init_list ~storage_type:ListStorage.Empty ~codecs:void_list_codecs
+      num_elements pointer_bytes
+
+  let init_bit_list
+      (num_elements : int)
+      (pointer_bytes : rw Slice.t)
+    : (rw, bool, rw ListStorage.t) Runtime.Array.t =
+    init_list ~storage_type:ListStorage.Bit ~codecs:bit_list_codecs
+      num_elements pointer_bytes
+
+  let init_int8_list
+      (num_elements : int)
+      (pointer_bytes : rw Slice.t)
+    : (rw, int, rw ListStorage.t) Runtime.Array.t =
+    init_list ~storage_type:ListStorage.Bytes1 ~codecs:int8_list_codecs
+      num_elements pointer_bytes
+
+  let init_int16_list
+      (num_elements : int)
+      (pointer_bytes : rw Slice.t)
+    : (rw, int, rw ListStorage.t) Runtime.Array.t =
+    init_list ~storage_type:ListStorage.Bytes2 ~codecs:int16_list_codecs
+      num_elements pointer_bytes
+
+  let init_int32_list
+      (num_elements : int)
+      (pointer_bytes : rw Slice.t)
+    : (rw, int32, rw ListStorage.t) Runtime.Array.t =
+    init_list ~storage_type:ListStorage.Bytes4 ~codecs:int32_list_codecs
+      num_elements pointer_bytes
+
+  let init_int64_list
+      (num_elements : int)
+      (pointer_bytes : rw Slice.t)
+    : (rw, int64, rw ListStorage.t) Runtime.Array.t =
+    init_list ~storage_type:ListStorage.Bytes8 ~codecs:int64_list_codecs
+      num_elements pointer_bytes
+
+  let init_uint8_list
+      (num_elements : int)
+      (pointer_bytes : rw Slice.t)
+    : (rw, int, rw ListStorage.t) Runtime.Array.t =
+    init_list ~storage_type:ListStorage.Bytes1 ~codecs:uint8_list_codecs
+      num_elements pointer_bytes
+
+  let init_uint16_list
+      (num_elements : int)
+      (pointer_bytes : rw Slice.t)
+    : (rw, int, rw ListStorage.t) Runtime.Array.t =
+    init_list ~storage_type:ListStorage.Bytes2 ~codecs:uint16_list_codecs
+      num_elements pointer_bytes
+
+  let init_uint32_list
+      (num_elements : int)
+      (pointer_bytes : rw Slice.t)
+    : (rw, Uint32.t, rw ListStorage.t) Runtime.Array.t =
+    init_list ~storage_type:ListStorage.Bytes4 ~codecs:uint32_list_codecs
+      num_elements pointer_bytes
+
+  let init_uint64_list
+      (num_elements : int)
+      (pointer_bytes : rw Slice.t)
+    : (rw, Uint64.t, rw ListStorage.t) Runtime.Array.t =
+    init_list ~storage_type:ListStorage.Bytes8 ~codecs:uint64_list_codecs
+      num_elements pointer_bytes
+
+  let init_float32_list
+      (num_elements : int)
+      (pointer_bytes : rw Slice.t)
+    : (rw, float, rw ListStorage.t) Runtime.Array.t =
+    init_list ~storage_type:ListStorage.Bytes4 ~codecs:float32_list_codecs
+      num_elements pointer_bytes
+
+  let init_float64_list
+      (num_elements : int)
+      (pointer_bytes : rw Slice.t)
+    : (rw, float, rw ListStorage.t) Runtime.Array.t =
+    init_list ~storage_type:ListStorage.Bytes8 ~codecs:float64_list_codecs
+      num_elements pointer_bytes
+
+  let init_text_list
+      (num_elements : int)
+      (pointer_bytes : rw Slice.t)
+    : (rw, string, rw ListStorage.t) Runtime.Array.t =
+    init_list ~storage_type:ListStorage.Pointer ~codecs:text_list_codecs
+      num_elements pointer_bytes
+
+  let init_blob_list
+      (num_elements : int)
+      (pointer_bytes : rw Slice.t)
+    : (rw, string, rw ListStorage.t) Runtime.Array.t =
+    init_list ~storage_type:ListStorage.Pointer ~codecs:blob_list_codecs
+      num_elements pointer_bytes
+
+  let init_struct_list
+      ~(data_words : int)
+      ~(pointer_words : int)
+      (num_elements : int)
+      (pointer_bytes : rw Slice.t)
+    : (rw, rw StructStorage.t, rw ListStorage.t) Runtime.Array.t =
+    init_list ~storage_type:(ListStorage.Composite (data_words, pointer_words))
+      ~codecs:struct_list_codecs num_elements pointer_bytes
+
+  let init_struct
+      ~(data_words : int)
+      ~(pointer_words : int)
+      (pointer_bytes : rw Slice.t)
+    : rw StructStorage.t =
+    let () = deep_zero_pointer pointer_bytes in
+    let storage =
+      alloc_struct_storage pointer_bytes.Slice.msg ~data_words ~pointer_words
+    in
+    let () = init_struct_pointer pointer_bytes storage in
+    storage
 
   (* Locate the storage region corresponding to the root struct of a message.
      The [data_words] and [pointer_words] specify the expected struct layout. *)
@@ -2272,11 +1790,11 @@ module Make (MessageWrapper : Message.S) = struct
         Slice.start      = 0;
         Slice.len        = sizeof_uint64
       } in
-      let alloc_default_struct message =
+      let create_default message =
         alloc_struct_storage message ~data_words ~pointer_words
       in
-      deref_struct_pointer pointer_bytes alloc_default_struct
-        ~data_words ~pointer_words
+      deref_struct_pointer ~create_default ~data_words ~pointer_words
+        pointer_bytes
 
 
   (* Allocate a new message of at least the given [message_size], creating a
