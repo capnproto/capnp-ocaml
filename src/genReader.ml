@@ -150,7 +150,7 @@ let rec generate_list_element_decoder ~nodes_table ~scope ~list_def ~indent =
       apply_indent ~indent [
         "let decoders = ListDecoders.Pointer (fun slice ->";
       ] @ inner_decoder_decl @ [
-        "  get_list ~default:(make_empty_array ()) decoders (Some slice))";
+        "  get_list decoders (Some slice))";
       ]
   | PS.Type.Enum enum_def ->
       let enum_getters =
@@ -161,7 +161,7 @@ let rec generate_list_element_decoder ~nodes_table ~scope ~list_def ~indent =
         "let decoders =";
       ] @ enum_getters @ [
         "  ListDecoders.Pointer (fun slice ->";
-        "    get_enum_list ~default:(make_empty_array ()) (Some slice))";
+        "    get_enum_list (Some slice))";
         "in";
       ] in
       apply_indent ~indent lines
@@ -179,8 +179,7 @@ let generate_list_accessor ~nodes_table ~scope ~list_type ~indent
   let make_primitive_accessor element_name =
     apply_indent ~indent [
       "let " ^ field_name ^ "_get x =";
-      sprintf "  get_pointer_field x %u ~f:(get_%s_list \
-               ~default:(make_empty_array ()))"
+      sprintf "  get_pointer_field x %u ~f:get_%s_list"
         field_ofs element_name;
     ]
   in
@@ -207,8 +206,7 @@ let generate_list_accessor ~nodes_table ~scope ~list_type ~indent
       let lines = [
         "let " ^ field_name ^ "_get x =";
       ] @ decoder_declaration @ [
-        sprintf "  get_pointer_field x %u ~f:(get_list \
-                 ~default:(make_empty_array ()) decoders)"
+        sprintf "  get_pointer_field x %u ~f:(get_list decoders)"
           field_ofs;
       ] in
       apply_indent ~indent lines
@@ -223,7 +221,7 @@ let generate_list_accessor ~nodes_table ~scope ~list_type ~indent
         "let " ^ field_name ^ "_get x =";
         "  let enum_decoder ="; ] @ decoder_declaration @ [
         "  in";
-        "  get_pointer_field x %u f:(get_list ~default:(make_empty_array ())";
+        "  get_pointer_field x %u f:(get_list ";
         "    decoders:(ListDecoders.Bytes2 enum_decoder))";
         ] in
       apply_indent ~indent lines
@@ -394,7 +392,7 @@ let generate_field_accessor ~nodes_table ~scope ~indent field =
           if has_trivial_default then
             apply_indent ~indent [
               "let " ^ field_name ^ "_get x =";
-              sprintf "  get_pointer_field x %u ~f:(get_struct ~default:None)"
+              sprintf "  get_pointer_field x %u ~f:get_struct"
                 field_ofs;
             ]
           else
