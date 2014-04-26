@@ -133,8 +133,9 @@ let compile (request : PS.CodeGeneratorRequest.t) (dest_dir : string) : unit =
         (GenReader.generate_node ~suppress_module_wrapper:true ~nodes_table
           ~scope:[] ~node_name:requested_filename requested_file_node)) ^
       mod_divide_reader_builder ^
-      (GenBuilder.generate_node ~suppress_module_wrapper:true ~nodes_table
-        ~scope:[] ~node_name:requested_filename requested_file_node) ^
+      (String.concat ~sep:"\n"
+        (GenBuilder.generate_node ~suppress_module_wrapper:true ~nodes_table
+          ~scope:[] ~node_name:requested_filename requested_file_node)) ^
       mod_footer
     in
     let () = Out_channel.with_file (mli_filename requested_filename)

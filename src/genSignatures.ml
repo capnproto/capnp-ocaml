@@ -51,22 +51,7 @@ let generate_setters ~nodes_table ~scope struct_def fields =
       let field_name = String.uncapitalize (PS.Field.name_get field) in
       match PS.Field.unnamed_union_get field with
       | PS.Field.Group group ->
-          let group_id = PS.Field.Group.typeId_get group in
-          let group_node = Hashtbl.find_exn nodes_table group_id in
-          let group_name =
-            GenCommon.get_scope_relative_name nodes_table scope group_node
-          in
-          (sprintf
-             "%sval %s_set : t -> %s.reader_t -> %s.t\n"
-             indent
-             field_name
-             group_name
-             group_name) ^
-          (sprintf
-             "%sval %s_init : t -> %s.t\n"
-             indent
-             field_name
-             group_name)
+          ""
       | PS.Field.Slot slot ->
           let tp = PS.Field.Slot.type_get slot in
           begin match PS.Type.unnamed_union_get tp with
@@ -103,7 +88,8 @@ let generate_setters ~nodes_table ~scope struct_def fields =
                 sprintf "%sval %s_set : t -> %s -> %s\n"
                   indent
                   field_name
-                  (GenCommon.type_name ~mode:Mode.Reader ~scope_mode:Mode.Builder
+                  (* FIXME: should allow setting from a Reader *)
+                  (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
                      nodes_table scope tp)
                   (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
                      nodes_table scope tp);
@@ -119,7 +105,8 @@ let generate_setters ~nodes_table ~scope struct_def fields =
                 sprintf "%sval %s_set : t -> %s -> %s\n"
                   indent
                   field_name
-                  (GenCommon.type_name ~mode:Mode.Reader ~scope_mode:Mode.Builder
+                  (* FIXME: should allow setting from a Reader *)
+                  (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
                      nodes_table scope tp)
                   (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
                      nodes_table scope tp);
