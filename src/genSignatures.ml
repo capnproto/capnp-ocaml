@@ -35,94 +35,80 @@ module Mode = GenCommon.Mode
 module R  = Runtime
 
 let sprintf = Printf.sprintf
+let apply_indent = GenCommon.apply_indent
+
 
 (* Generate a function for unpacking a capnp union type as an OCaml variant. *)
 let generate_union_accessors ~nodes_table ~scope ~mode struct_def fields =
   let indent = String.make (2 * (List.length scope + 2)) ' ' in
-  (GenCommon.generate_union_type ~mode nodes_table scope struct_def fields) ^
-    "\n" ^
-    (sprintf "%sval unnamed_union_get : t -> unnamed_union_t\n" indent)
+  (GenCommon.generate_union_type ~mode nodes_table scope fields) @
+    [ indent ^ "val unnamed_union_get : t -> unnamed_union_t" ]
 
 
-let generate_setters ~nodes_table ~scope struct_def fields =
+let generate_setters ~nodes_table ~scope fields =
   let indent = String.make (2 * (List.length scope + 2)) ' ' in
-  let setters = List.fold_left fields ~init:[] ~f:(fun acc field ->
-    let field_accessors : string =
+  List.fold_left fields ~init:[] ~f:(fun acc field ->
+    let field_accessors : string list =
       let field_name = String.uncapitalize (PS.Field.name_get field) in
       match PS.Field.unnamed_union_get field with
       | PS.Field.Group group ->
-          ""
+          []
       | PS.Field.Slot slot ->
           let tp = PS.Field.Slot.type_get slot in
           begin match PS.Type.unnamed_union_get tp with
           | PS.Type.Int32 ->
-              let accessor_list = [
-                sprintf "%sval %s_set : t -> int32 -> unit\n" indent field_name;
-                sprintf "%sval %s_set_int_exn : t -> int -> unit\n"
-                  indent field_name;
-              ] in
-              String.concat ~sep:"" accessor_list
+              apply_indent ~indent [
+                "val " ^ field_name ^ "_set : t -> int32 -> unit";
+                "val " ^ field_name ^ "_set_int_exn : t -> int -> unit";
+              ]
           | PS.Type.Int64 ->
-              let accessor_list = [
-                sprintf "%sval %s_set : t -> int64 -> unit\n" indent field_name;
-                sprintf "%sval %s_set_int_exn : t -> int -> unit\n"
-                  indent field_name;
-              ] in
-              String.concat ~sep:"" accessor_list
+              apply_indent ~indent [
+                "val " ^ field_name ^ "_set : t -> int64 -> unit";
+                "val " ^ field_name ^ "_set_int_exn : t -> int -> unit";
+              ]
           | PS.Type.Uint32 ->
-              let accessor_list = [
-                sprintf "%sval %s_set : t -> Uint32.t -> unit\n" indent field_name;
-                sprintf "%sval %s_set_int_exn : t -> int -> unit\n"
-                  indent field_name;
-              ] in
-              String.concat ~sep:"" accessor_list
+              apply_indent ~indent [
+                "val " ^ field_name ^ "_set : t -> Uint32.t -> unit";
+                "val " ^ field_name ^ "_set_int_exn : t -> int -> unit";
+              ]
           | PS.Type.Uint64 ->
-              let accessor_list = [
-                sprintf "%sval %s_set : t -> Uint64.t -> unit\n" indent field_name;
-                sprintf "%sval %s_set_int_exn : t -> int -> unit\n"
-                  indent field_name;
-              ] in
-              String.concat ~sep:"" accessor_list
+              apply_indent ~indent [
+                "val " ^ field_name ^ "_set : t -> Uint64.t -> unit";
+                "val " ^ field_name ^ "_set_int_exn : t -> int -> unit";
+              ]
           | PS.Type.List _ ->
-              let accessor_list = [
-                sprintf "%sval %s_set : t -> %s -> %s\n"
-                  indent
+              apply_indent ~indent [
+                (* FIXME: should allow setting from a Reader *)
+                sprintf "val %s_set : t -> %s -> %s"
                   field_name
-                  (* FIXME: should allow setting from a Reader *)
                   (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
                      nodes_table scope tp)
                   (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
                      nodes_table scope tp);
-                sprintf "%sval %s_init : t -> int -> %s\n"
-                  indent
+                sprintf "val %s_init : t -> int -> %s"
                   field_name
                   (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
                      nodes_table scope tp);
-              ] in
-              String.concat ~sep:"" accessor_list
+              ]
           | PS.Type.Struct _ ->
-              let accessor_list = [
-                sprintf "%sval %s_set_reader : t -> %s -> %s\n"
-                  indent
+              apply_indent ~indent [
+                sprintf "val %s_set_reader : t -> %s -> %s"
                   field_name
                   (GenCommon.type_name ~mode:Mode.Reader ~scope_mode:Mode.Builder
                      nodes_table scope tp)
                   (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
                      nodes_table scope tp);
-                sprintf "%sval %s_set_builder : t -> %s -> %s\n"
-                  indent
+                sprintf "val %s_set_builder : t -> %s -> %s"
                   field_name
                   (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
                      nodes_table scope tp)
                   (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
                      nodes_table scope tp);
-                sprintf "%sval %s_init : t -> %s\n"
-                  indent
+                sprintf "val %s_init : t -> %s"
                   field_name
                   (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
                      nodes_table scope tp);
-              ] in
-              String.concat ~sep:"" accessor_list
+              ]
           | PS.Type.Bool
           | PS.Type.Int8
           | PS.Type.Int16
@@ -135,64 +121,59 @@ let generate_setters ~nodes_table ~scope struct_def fields =
           | PS.Type.Enum _
           | PS.Type.Interface _
           | PS.Type.AnyPointer ->
-              sprintf "%sval %s_set : t -> %s -> unit\n"
-                indent
+              apply_indent ~indent [
+                sprintf "val %s_set : t -> %s -> unit"
                 field_name
                 (GenCommon.type_name ~mode:Mode.Reader ~scope_mode:Mode.Builder
-                   nodes_table scope tp)
+                   nodes_table scope tp);
+              ]
           | PS.Type.Void ->
               (* For void types, we suppress the argument *)
-              sprintf "%sval %s_set : t -> unit\n" indent field_name
+              [ indent ^ "val " ^ field_name ^ "_set : t -> unit" ]
           | PS.Type.Undefined_ x ->
               failwith (sprintf "Unknown Type union discriminant %d" x)
           end
       | PS.Field.Undefined_ x ->
           failwith (sprintf "Unknown Field union discriminant %d" x)
     in
-    (field_accessors :: acc))
-  in
-  String.concat ~sep:"" setters
+    (field_accessors @ acc))
 
 
 (* Generate accessors for retrieving all non-union fields of a struct. *)
-let generate_getters ~nodes_table ~scope ~mode struct_def fields =
+let generate_getters ~nodes_table ~scope ~mode fields =
   let indent = String.make (2 * (List.length scope + 2)) ' ' in
-  let accessors = List.fold_left fields ~init:[] ~f:(fun acc field ->
-    let field_accessors : string =
+  List.fold_left fields ~init:[] ~f:(fun acc field ->
+    let field_accessors : string list =
       let field_name = String.uncapitalize (PS.Field.name_get field) in
       match PS.Field.unnamed_union_get field with
       | PS.Field.Group group ->
           let group_id = PS.Field.Group.typeId_get group in
           let group_node = Hashtbl.find_exn nodes_table group_id in
           let group_name = GenCommon.get_scope_relative_name nodes_table scope group_node in
-          sprintf "%sval %s_get : t -> %s.t\n" indent field_name group_name
+          [ sprintf "%sval %s_get : t -> %s.t\n" indent field_name group_name ]
       | PS.Field.Slot slot ->
           let tp = PS.Field.Slot.type_get slot in
           begin match PS.Type.unnamed_union_get tp with
           | PS.Type.Int32 ->
-              let accessor_list = [
-                sprintf "%sval %s_get : t -> int32\n" indent field_name;
-                sprintf "%sval %s_get_int_exn : t -> int\n" indent field_name;
-              ] in
-              String.concat ~sep:"" accessor_list
+              apply_indent ~indent [
+                "val " ^ field_name ^ "_get : t -> int32";
+                "val " ^ field_name ^ "_get_int_exn : t -> int";
+              ]
           | PS.Type.Int64 ->
-              let accessor_list = [
-                sprintf "%sval %s_get : t -> int64\n" indent field_name;
-                sprintf "%sval %s_get_int_exn : t -> int\n" indent field_name;
-              ] in
-              String.concat ~sep:"" accessor_list
+              apply_indent ~indent [
+                "val " ^ field_name ^ "_get : t -> int64";
+                "val " ^ field_name ^ "_get_int_exn : t -> int";
+              ]
           | PS.Type.Uint32 ->
-              let accessor_list = [
-                sprintf "%sval %s_get : t -> Uint32.t\n" indent field_name;
-                sprintf "%sval %s_get_int_exn : t -> int\n" indent field_name;
-              ] in
-              String.concat ~sep:"" accessor_list
+              apply_indent ~indent [
+                "val " ^ field_name ^ "_get : t -> Uint32.t";
+                "val " ^ field_name ^ "_get_int_exn : t -> int";
+              ]
           | PS.Type.Uint64 ->
-              let accessor_list = [
-                sprintf "%sval %s_get : t -> Uint64.t\n" indent field_name;
-                sprintf "%sval %s_get_int_exn : t -> int\n" indent field_name;
-              ] in
-              String.concat ~sep:"" accessor_list
+              apply_indent ~indent [
+                "val " ^ field_name ^ "_get : t -> Uint64.t";
+                "val " ^ field_name ^ "_get_int_exn : t -> int";
+              ]
           | PS.Type.Void
           | PS.Type.Bool
           | PS.Type.Int8
@@ -208,19 +189,18 @@ let generate_getters ~nodes_table ~scope ~mode struct_def fields =
           | PS.Type.Struct _
           | PS.Type.Interface _
           | PS.Type.AnyPointer ->
-              sprintf "%sval %s_get : t -> %s\n"
-                indent
-                field_name
-                (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp)
+              apply_indent ~indent [
+                sprintf "val %s_get : t -> %s\n"
+                  field_name
+                  (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp);
+              ]
           | PS.Type.Undefined_ x ->
               failwith (sprintf "Unknown Type union discriminant %d" x)
           end
       | PS.Field.Undefined_ x ->
           failwith (sprintf "Unknown Field union discriminant %d" x)
     in
-    (field_accessors :: acc))
-  in
-  String.concat ~sep:"" accessors
+    (field_accessors @ acc))
 
 
 (* Generate the OCaml type signature corresponding to a struct definition.  [scope] is a
@@ -229,7 +209,7 @@ let generate_getters ~nodes_table ~scope ~mode struct_def fields =
  *
  * Raises: Failure if the children of this node contain a cycle. *)
 let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~mode
-    ~node struct_def : string =
+    ~node struct_def : string list =
   let unsorted_fields =
     let fields_accessor = PS.Node.Struct.fields_get struct_def in
     let rec loop_fields acc i =
@@ -251,76 +231,74 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~mode
   let union_accessors =
     match union_fields with
     | [] ->
-        ""
+        []
     | _  ->
         let union_setters =
           if mode = Mode.Builder then
-            generate_setters ~nodes_table ~scope struct_def union_fields
+            generate_setters ~nodes_table ~scope union_fields
           else
-            ""
+            []
         in
         (generate_union_accessors ~nodes_table ~scope ~mode
-           struct_def union_fields) ^
+           struct_def union_fields) @
         union_setters
   in
   let non_union_accessors =
     match non_union_fields with
-    | [] -> ""
+    | [] ->
+        []
     | _  ->
         let non_union_setters =
           if mode = Mode.Builder then
-            generate_setters ~nodes_table ~scope struct_def non_union_fields
+            generate_setters ~nodes_table ~scope non_union_fields
           else
-            ""
+            []
         in
-        (generate_getters ~nodes_table ~scope ~mode
-           struct_def non_union_fields) ^
+        (generate_getters ~nodes_table ~scope ~mode non_union_fields) @
         non_union_setters
   in
   let indent = String.make (2 * (List.length scope + 2)) ' ' in
-  (* declare the primary type of the node *)
-  (sprintf "%stype t%s\n"
-     indent
-     (if mode = Mode.Reader then
-        ""
-      else
-        " = Reader." ^
-          (GenCommon.get_fully_qualified_name nodes_table node) ^ ".builder_t")) ^
-  (* declare a schema-unique type alias for type [t] *)
-  (sprintf "%stype %s = t\n"
-     indent
-     (GenCommon.make_unique_typename ~mode ~scope_mode:mode ~nodes_table node)) ^
-  (* declare the [builder_t] or [reader_t] type alias *)
-  (sprintf "%s%s\n"
-     indent
-     (if mode = Mode.Reader then
-        "type builder_t"
-      else
-        "type reader_t = Reader." ^
-          (GenCommon.get_fully_qualified_name nodes_table node) ^ ".t")) ^
-  (* declare a schema-unique type alias for [builder_t] or [reader_t] *)
-  (sprintf "%s%s\n"
-     indent
-     (if mode = Mode.Reader then
-        "type " ^
-          (GenCommon.make_unique_typename ~mode:Mode.Builder
-            ~scope_mode:mode ~nodes_table node) ^
-          " = builder_t"
-      else
-        "type " ^
+  let lines = [
+    (* declare the primary type of the node *)
+    if mode = Mode.Reader then
+      "type t"
+    else
+      ("type t = Reader." ^
+         (GenCommon.get_fully_qualified_name nodes_table node) ^ ".builder_t");
+    (* declare a schema-unique type alias for type [t] *)
+    "type " ^
+       (GenCommon.make_unique_typename ~mode ~scope_mode:mode ~nodes_table node) ^
+      " = t";
+    (* declare the [builder_t] or [reader_t] type alias *)
+    if mode = Mode.Reader then
+      "type builder_t"
+    else
+      ("type reader_t = Reader." ^
+         (GenCommon.get_fully_qualified_name nodes_table node) ^ ".t");
+    (* declare a schema-unique type alias for [builder_t] or [reader_t] *)
+    if mode = Mode.Reader then
+      "type " ^
+        (GenCommon.make_unique_typename ~mode:Mode.Builder
+          ~scope_mode:mode ~nodes_table node) ^
+        " = builder_t"
+    else
+        ("type " ^
           (GenCommon.make_unique_typename ~mode:Mode.Reader
              ~scope_mode:mode ~nodes_table node) ^
-          " = reader_t")) ^
-  (* declare opaque types for array state *)
-  (sprintf "%stype array_t\n" indent) ^
-  (if mode = Mode.Builder then
-     sprintf "%stype reader_array_t = Reader.%s.array_t\n\n" 
-       indent
-       (GenCommon.get_fully_qualified_name nodes_table node)
+           " = reader_t");
+    (* declare opaque types for array state *)
+    "type array_t";
+    if mode = Mode.Builder then
+       sprintf "type reader_array_t = Reader.%s.array_t" 
+         (GenCommon.get_fully_qualified_name nodes_table node)
    else
-     "") ^
-  nested_modules ^ union_accessors ^ non_union_accessors ^
-  (sprintf "%sval of_message : message_t -> t\n" indent)
+     "";
+  ] in
+  (apply_indent ~indent lines) @
+    nested_modules @
+    union_accessors @
+    non_union_accessors @
+    [ indent ^ "val of_message : message_t -> t" ]
 
 
 (* Generate the OCaml type signature corresponding to a node.  [scope] is
@@ -335,23 +313,18 @@ and generate_node
     ~(node_name : string)
     ~(mode : GenCommon.Mode.t)
     (node : PS.Node.t)
-: string =
+: string list =
   let node_id = PS.Node.id_get node in
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let generate_nested_modules () =
     match Topsort.topological_sort nodes_table
             (GenCommon.children_of nodes_table node) with
     | Some child_nodes ->
-        let child_modules = List.map child_nodes ~f:(fun child ->
+        List.concat_map child_nodes ~f:(fun child ->
           let child_name = GenCommon.get_unqualified_name ~parent:node ~child in
           let child_node_id = PS.Node.id_get child in
           generate_node ~suppress_module_wrapper:false ~nodes_table
             ~scope:(child_node_id :: scope) ~node_name:child_name child ~mode)
-        in
-        begin match child_modules with
-        | [] -> ""
-        | _  -> (String.concat ~sep:"\n" child_modules) ^ "\n"
-        end
     | None ->
         let error_msg = sprintf
           "The children of node %s (%s) have a cyclic dependency."
@@ -372,28 +345,30 @@ and generate_node
       if suppress_module_wrapper then
         body
       else
-        (sprintf "%smodule %s : sig\n" indent node_name) ^
-        body ^
-        (sprintf "%send\n" indent)
+        [ indent ^ "module " ^ node_name ^ " : sig" ] @
+          body @
+          [ indent ^ "end" ]
   | PS.Node.Enum enum_def ->
       let nested_modules = generate_nested_modules () in
       let body =
-        GenCommon.generate_enum_sig ~nodes_table ~scope ~nested_modules ~mode ~node enum_def
+        GenCommon.generate_enum_sig ~nodes_table ~scope ~nested_modules
+          ~mode ~node enum_def
       in
       if suppress_module_wrapper then
         body
       else
-        (sprintf "%smodule %s : sig\n" indent node_name) ^
-        body ^
-        (sprintf "%send\n" indent)
+        [ indent ^ "module " ^ node_name ^ " : sig" ] @
+          body @
+          [ indent ^ "end" ]
   | PS.Node.Interface iface_def ->
       generate_nested_modules ()
-  | PS.Node.Const const_def ->
+  | PS.Node.Const const_def -> [
       sprintf "%sval %s : %s\n"
         indent
         (String.uncapitalize node_name)
         (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope
-           (PS.Node.Const.type_get const_def))
+           (PS.Node.Const.type_get const_def));
+    ]
   | PS.Node.Annotation annot_def ->
       generate_nested_modules ()
   | PS.Node.Undefined_ x ->

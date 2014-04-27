@@ -34,58 +34,82 @@ module PS = GenCommon.PS
 module R  = Runtime
 
 
-let sig_s_header =
-  "type ro = Message.ro\n" ^
-  "type rw = Message.rw\n\n" ^
-  "module type S = sig\n" ^
-  "  module Reader : sig\n" ^
-  "    type message_t\n\n" ^
-  "    module AnyPointer : sig\n" ^
-  "      type t\n" ^
-  "    end\n\n"
+let sig_s_header = [
+  "type ro = Message.ro";
+  "type rw = Message.rw";
+  "";
+  "module type S = sig";
+  "  module Reader : sig";
+  "    type message_t";
+  "";
+  "    module AnyPointer : sig";
+  "      type t";
+  "    end";
+  "";
+]
 
-let sig_s_divide_reader_builder =
-  "  end\n\n" ^
-  "  module Builder : sig\n" ^
-  "    type message_t\n\n" ^
-  "    module AnyPointer : sig\n" ^
-  "      type t\n" ^
-  "    end\n\n"
+let sig_s_divide_reader_builder = [
+  "  end";
+  "";
+  "  module Builder : sig";
+  "    type message_t";
+  "";
+  "    module AnyPointer : sig";
+  "      type t";
+  "    end";
+  "";
+]
 
-let sig_s_footer =
-  "  end\n" ^
-  "end\n\n"
+let sig_s_footer = [
+  "  end";
+  "end";
+  "";
+]
 
-let functor_sig =
-  "module Make (MessageWrapper : Message.S) :\n" ^
-  "  (S with type Reader.message_t = Message.ro MessageWrapper.Message.t\n" ^
-  "    and type Builder.message_t = Message.rw MessageWrapper.Message.t\n" ^
-  "    and type Reader.AnyPointer.t = Message.ro MessageWrapper.Slice.t option)\n\n"
+let functor_sig = [
+  "module Make (MessageWrapper : Message.S) :";
+  "  (S with type Reader.message_t = Message.ro MessageWrapper.Message.t";
+  "    and type Builder.message_t = Message.rw MessageWrapper.Message.t";
+  "    and type Reader.AnyPointer.t = Message.ro MessageWrapper.Slice.t option)";
+  "";
+]
 
-let mod_header =
-  "module Make (MessageWrapper : Message.S) = struct\n" ^
-  "  let invalid_msg = Message.invalid_msg\n\n" ^
-  "  module Reader = struct\n" ^
-  "    module RuntimeReader_ = MessageReader.Make(MessageWrapper)\n" ^
-  "    open RuntimeReader_\n\n" ^
-  "    type message_t = ro RuntimeReader_.Message.t\n\n" ^
-  "    module AnyPointer = struct\n" ^
-  "      type t = ro Slice.t option\n" ^
-  "    end\n\n"
+let mod_header = [
+  "module Make (MessageWrapper : Message.S) = struct";
+  "  let invalid_msg = Message.invalid_msg";
+  "";
+  "  module Reader = struct";
+  "    module RuntimeReader_ = MessageReader.Make(MessageWrapper)";
+  "    open RuntimeReader_";
+  "";
+  "    type message_t = ro RuntimeReader_.Message.t";
+  "";
+  "    module AnyPointer = struct";
+  "      type t = ro Slice.t option";
+  "    end";
+  "";
+]
 
-let mod_divide_reader_builder =
-  "  end\n\n" ^
-  "  module Builder = struct\n" ^
-  "    module RuntimeBuilder_ = MessageBuilder.Make(MessageWrapper)\n" ^
-  "    open RuntimeBuilder_\n\n" ^
-  "    type message_t = rw RuntimeBuilder_.Message.t\n\n" ^
-  "    module AnyPointer = struct\n" ^
-  "      type t = rw Slice.t\n" ^
-  "    end\n\n"
+let mod_divide_reader_builder = [
+  "  end";
+  "";
+  "  module Builder = struct";
+  "    module RuntimeBuilder_ = MessageBuilder.Make(MessageWrapper)";
+  "    open RuntimeBuilder_";
+  "";
+  "    type message_t = rw RuntimeBuilder_.Message.t";
+  "";
+  "    module AnyPointer = struct";
+  "      type t = rw Slice.t";
+  "    end";
+  "";
+]
 
-let mod_footer =
-  "  end\n" ^
-  "end\n\n"
+let mod_footer = [
+  "  end";
+  "end";
+  "";
+]
 
 
 let module_filename filename =
@@ -98,6 +122,10 @@ let module_filename filename =
 
 let ml_filename filename  = (module_filename filename) ^ ".ml"
 let mli_filename filename = (module_filename filename) ^ ".mli"
+
+
+let string_of_lines lines =
+  (String.concat ~sep:"\n" lines) ^ "\n"
 
 
 let compile (request : PS.CodeGeneratorRequest.t) (dest_dir : string) : unit =
@@ -115,28 +143,29 @@ let compile (request : PS.CodeGeneratorRequest.t) (dest_dir : string) : unit =
     let requested_file_node = Hashtbl.find_exn nodes_table requested_file_id in
     let requested_filename = RequestedFile.filename_get requested_file in
     let sig_s =
-      sig_s_header ^
+      sig_s_header @
       (GenSignatures.generate_node ~suppress_module_wrapper:true ~nodes_table
          ~scope:[] ~node_name:requested_filename ~mode:GenCommon.Mode.Reader
-         requested_file_node) ^
-      sig_s_divide_reader_builder ^
+         requested_file_node) @
+      sig_s_divide_reader_builder @
       (GenSignatures.generate_node ~suppress_module_wrapper:true ~nodes_table
          ~scope:[] ~node_name:requested_filename ~mode:GenCommon.Mode.Builder
-         requested_file_node) ^
+         requested_file_node) @
       sig_s_footer
     in
-    let sig_file_content = sig_s ^ functor_sig in
+    let sig_file_content =
+      string_of_lines (sig_s @ functor_sig)
+    in
     let mod_file_content =
-      sig_s ^
-      mod_header ^
-      (String.concat ~sep:"\n"
+      string_of_lines (
+        sig_s @
+        mod_header @
         (GenReader.generate_node ~suppress_module_wrapper:true ~nodes_table
-          ~scope:[] ~node_name:requested_filename requested_file_node)) ^
-      mod_divide_reader_builder ^
-      (String.concat ~sep:"\n"
+          ~scope:[] ~node_name:requested_filename requested_file_node) @
+        mod_divide_reader_builder @
         (GenBuilder.generate_node ~suppress_module_wrapper:true ~nodes_table
-          ~scope:[] ~node_name:requested_filename requested_file_node)) ^
-      mod_footer
+          ~scope:[] ~node_name:requested_filename requested_file_node) @
+        mod_footer)
     in
     let () = Out_channel.with_file (mli_filename requested_filename)
         ~f:(fun chan -> Out_channel.output_string chan sig_file_content)

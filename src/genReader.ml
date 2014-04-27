@@ -40,7 +40,7 @@ let apply_indent = GenCommon.apply_indent
 
 
 (* Generate a decoder lambda for converting from a uint16 to the associated enum value. *)
-let generate_enum_decoder_lines ~nodes_table ~scope ~enum_node ~indent =
+let generate_enum_decoder ~nodes_table ~scope ~enum_node ~indent =
   let header = [ "(fun u16 -> match u16 with" ] in
   let scope_relative_name =
     GenCommon.get_scope_relative_name nodes_table scope enum_node
@@ -70,20 +70,13 @@ let generate_enum_decoder_lines ~nodes_table ~scope ~enum_node ~indent =
   apply_indent ~indent (header @ match_cases @ footer)
 
 
-(* Generate a decoder lambda for converting from a uint16 to the associated enum value. *)
-(* FIXME: switch to generate_enum_decoder_lines *)
-let generate_enum_decoder ~nodes_table ~scope ~enum_node ~indent ~field_ofs =
-  let lines = generate_enum_decoder_lines ~nodes_table ~scope ~enum_node ~indent in
-  (String.concat ~sep:"\n" lines) ^ "\n"
-
-
 (* Generate an accessor for decoding an enum type. *)
 let generate_enum_accessor ~nodes_table ~scope ~enum_node ~indent ~field_name
     ~field_ofs ~default =
   let lines = [
     "let " ^ field_name ^ "_get x =";
     "  let decode =";
-  ] @ (generate_enum_decoder_lines ~nodes_table ~scope ~enum_node
+  ] @ (generate_enum_decoder ~nodes_table ~scope ~enum_node
       ~indent:(indent ^ "    ")) @ [
     "  in";
     sprintf "  let discr = get_data_field x \
@@ -101,7 +94,7 @@ let generate_enum_runtime_getters ~nodes_table ~scope ~indent enum_def =
   let enum_id = PS.Type.Enum.typeId_get enum_def in
   let enum_node = Hashtbl.find_exn nodes_table enum_id in
   let decoder_lambda =
-    (generate_enum_decoder_lines ~nodes_table ~scope ~enum_node
+    (generate_enum_decoder ~nodes_table ~scope ~enum_node
         ~indent:(indent ^ "    "))
   in
   let lines = [
@@ -214,7 +207,7 @@ let generate_list_accessor ~nodes_table ~scope ~list_type ~indent
       let enum_id = PS.Type.Enum.typeId_get enum_def in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
       let decoder_declaration =
-        (generate_enum_decoder_lines ~nodes_table ~scope ~enum_node
+        (generate_enum_decoder ~nodes_table ~scope ~enum_node
             ~indent:(indent ^ "    "))
       in
       let lines = [
@@ -438,7 +431,7 @@ let generate_field_accessor ~nodes_table ~scope ~indent field =
 
 
 (* Generate a function for unpacking a capnp union type as an OCaml variant. *)
-let generate_union_accessor_lines ~nodes_table ~scope struct_def fields =
+let generate_union_accessor ~nodes_table ~scope struct_def fields =
   let indent = String.make (2 * (List.length scope + 2)) ' ' in
   let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
     let field_name = String.uncapitalize (PS.Field.name_get field) in
@@ -472,14 +465,8 @@ let generate_union_accessor_lines ~nodes_table ~scope struct_def fields =
         ((Uint32.to_int (PS.Node.Struct.discriminantOffset_get struct_def)) * 2);
     ] in
   let footer = [ indent ^ "  | v -> Undefined_ v" ] in
-  (GenCommon.generate_union_type_lines ~mode:Mode.Reader nodes_table scope
-     struct_def fields) @ header @ cases @ footer
-
-
-(* FIXME: get rid of this *)
-let generate_union_accessor ~nodes_table ~scope struct_def fields =
-  (String.concat ~sep:"\n"
-     (generate_union_accessor_lines ~nodes_table ~scope struct_def fields)) ^ "\n"
+  (GenCommon.generate_union_type ~mode:Mode.Reader nodes_table scope
+     fields) @ header @ cases @ footer
 
 
 (* Generate accessors for retrieving all fields of a struct, regardless of whether
@@ -520,7 +507,7 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
   let union_accessors : string list =
     match union_fields with
     | [] -> []
-    | _  -> generate_union_accessor_lines ~nodes_table ~scope struct_def union_fields
+    | _  -> generate_union_accessor ~nodes_table ~scope struct_def union_fields
   in
   let indent = String.make (2 * (List.length scope + 2)) ' ' in
   let unique_reader = (GenCommon.make_unique_typename ~mode:Mode.Reader
@@ -589,7 +576,7 @@ and generate_node
   | PS.Node.Enum enum_def ->
       let nested_modules = generate_nested_modules () in
       let body =
-        GenCommon.generate_enum_sig_lines ~nodes_table ~scope ~nested_modules
+        GenCommon.generate_enum_sig ~nodes_table ~scope ~nested_modules
           (* FIXME *)
           ~mode:GenCommon.Mode.Reader
           ~node enum_def

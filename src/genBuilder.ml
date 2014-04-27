@@ -42,7 +42,7 @@ let apply_indent = GenCommon.apply_indent
 (* Generate an encoder lambda for converting from an enum value to the associated
    uint16.  [allow_undefined] indicates whether or not to permit enum values which
    use the [Undefined_] constructor. *)
-let generate_enum_encoder_lines ~(allow_undefined : bool) ~nodes_table ~scope
+let generate_enum_encoder ~(allow_undefined : bool) ~nodes_table ~scope
     ~enum_node ~indent =
   let header = [ "(fun enum -> match enum with" ] in
   let scope_relative_name =
@@ -82,17 +82,10 @@ let generate_enum_encoder_lines ~(allow_undefined : bool) ~nodes_table ~scope
   apply_indent ~indent (header @ match_cases @ footer)
 
 
-(* FIXME: get rid of this *)
-let generate_enum_encoder ~(allow_undefined : bool) ~nodes_table ~scope
-    ~enum_node ~indent ~field_ofs =
-  (String.concat ~sep:"\n" (generate_enum_encoder_lines ~allow_undefined
-      ~nodes_table ~scope ~enum_node ~indent)) ^ "\n"
-
-
 (* Generate an accessor for decoding an enum type. *)
 let generate_enum_getter ~nodes_table ~scope ~enum_node ~indent ~field_name
     ~field_ofs ~default =
-  let decoder_lambda = GenReader.generate_enum_decoder_lines ~nodes_table ~scope
+  let decoder_lambda = GenReader.generate_enum_decoder ~nodes_table ~scope
       ~enum_node ~indent:(indent ^ "    ")
   in
   let lines = [
@@ -108,7 +101,7 @@ let generate_enum_getter ~nodes_table ~scope ~enum_node ~indent ~field_name
 (* Generate an accessor for setting the value of an enum. *)
 let generate_enum_safe_setter ~nodes_table ~scope ~enum_node ~indent ~field_name
     ~field_ofs ~default ~discr_str =
-  let encoder_lambda = generate_enum_encoder_lines ~allow_undefined:false
+  let encoder_lambda = generate_enum_encoder ~allow_undefined:false
       ~nodes_table ~scope ~enum_node
       ~indent:(indent ^ "    ")
   in
@@ -129,7 +122,7 @@ let generate_enum_safe_setter ~nodes_table ~scope ~enum_node ~indent ~field_name
    which are not defined in the schema. *)
 let generate_enum_unsafe_setter ~nodes_table ~scope ~enum_node ~indent
     ~field_name ~field_ofs ~default ~discr_str =
-  let encoder_lambda = generate_enum_encoder_lines ~allow_undefined:true
+  let encoder_lambda = generate_enum_encoder ~allow_undefined:true
       ~nodes_table ~scope ~enum_node
       ~indent:(indent ^ "    ")
   in
@@ -194,7 +187,7 @@ let generate_list_accessor ~nodes_table ~scope ~list_type ~indent
       let enum_id = PS.Type.Enum.typeId_get enum_def in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
       let decoder_declaration =
-        let decoder_lambda = GenReader.generate_enum_decoder_lines ~nodes_table
+        let decoder_lambda = GenReader.generate_enum_decoder ~nodes_table
             ~scope ~enum_node ~indent:"  "
         in
         let lines = [
@@ -204,7 +197,7 @@ let generate_list_accessor ~nodes_table ~scope ~list_type ~indent
         apply_indent ~indent:"  " lines
       in
       let encoder_declaration =
-        let encoder_lambda = generate_enum_encoder_lines ~allow_undefined:false
+        let encoder_lambda = generate_enum_encoder ~allow_undefined:false
             ~nodes_table ~scope ~enum_node ~indent:"  "
         in
         let lines = [
@@ -623,7 +616,7 @@ let generate_accessors ~nodes_table ~scope struct_def fields =
 
 
 (* Generate a function for unpacking a capnp union type as an OCaml variant. *)
-let generate_union_accessor_lines ~nodes_table ~scope struct_def fields : string list =
+let generate_union_accessor ~nodes_table ~scope struct_def fields : string list =
   let indent = String.make (2 * (List.length scope + 2)) ' ' in
   let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
     let field_name = String.uncapitalize (PS.Field.name_get field) in
@@ -657,14 +650,8 @@ let generate_union_accessor_lines ~nodes_table ~scope struct_def fields : string
         ((Uint32.to_int (PS.Node.Struct.discriminantOffset_get struct_def)) * 2);
     ] in
   let footer = [ indent ^ "  | v -> Undefined_ v" ] in
-  (GenCommon.generate_union_type_lines ~mode:Mode.Reader nodes_table scope
-     struct_def fields) @ header @ cases @ footer
-
-
-(* FIXME: get rid of this *)
-let generate_union_accessor ~nodes_table ~scope struct_def fields =
-  (String.concat ~sep:"\n"
-     (generate_union_accessor_lines ~nodes_table ~scope struct_def fields)) ^ "\n"
+  (GenCommon.generate_union_type ~mode:Mode.Reader nodes_table scope
+     fields) @ header @ cases @ footer
 
 
 (* Generate the OCaml module corresponding to a struct definition.  [scope] is a
@@ -699,7 +686,7 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
     | [] ->
         []
     | _  ->
-        (generate_union_accessor_lines ~nodes_table ~scope struct_def union_fields)
+        (generate_union_accessor ~nodes_table ~scope struct_def union_fields)
   in
   let data_words    = PS.Node.Struct.dataWordCount_get struct_def in
   let pointer_words = PS.Node.Struct.pointerCount_get struct_def in
@@ -773,7 +760,7 @@ and generate_node
   | PS.Node.Enum enum_def ->
       let nested_modules = generate_nested_modules () in
       let body =
-        GenCommon.generate_enum_sig_lines ~nodes_table ~scope ~nested_modules
+        GenCommon.generate_enum_sig ~nodes_table ~scope ~nested_modules
           ~mode:GenCommon.Mode.Builder ~node enum_def
       in
       if suppress_module_wrapper then

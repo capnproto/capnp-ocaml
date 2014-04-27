@@ -46,7 +46,8 @@ end
 
 
 let apply_indent ~(indent : string) (lines : string list) : string list =
-  List.map ~f:(fun line -> indent ^ line) lines
+  List.map lines ~f:(fun line ->
+    if String.is_empty line then "" else indent ^ line)
 
 
 let children_of
@@ -193,13 +194,13 @@ let make_unique_typename ~(mode : Mode.t) ~(scope_mode : Mode.t)
  *
  * module Foo = struct
  *   type t
- *   type t_FOO_UID = t
+ *   type t_Foo_UID = t
  *
  *   module Bar = struct
  *     type t
- *     type t_BAR_UID = t
+ *     type t_Bar_UID = t
  *
- *     val foo_get : t -> t_FOO_UID
+ *     val foo_get : t -> t_Foo_UID
  *   end
  * end
  *
@@ -281,8 +282,7 @@ let rec type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
       failwith (sprintf "Unknown Type union discriminant %d" x)
 
 
-let generate_union_type_lines ~(mode : Mode.t) nodes_table scope
-    struct_def fields =
+let generate_union_type ~(mode : Mode.t) nodes_table scope fields =
   let indent = String.make (2 * (List.length scope + 2)) ' ' in
   let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
     let field_name = String.capitalize (PS.Field.name_get field) in
@@ -315,18 +315,8 @@ let generate_union_type_lines ~(mode : Mode.t) nodes_table scope
   (header @ cases @ footer)
 
 
-(* Generate a variant type declaration for a capnp union type. *)
-(* FIXME: get rid of this *)
-let generate_union_type ~(mode : Mode.t) nodes_table scope
-    struct_def fields =
-  (String.concat ~sep:"\n"
-    (generate_union_type_lines ~mode nodes_table scope
-       struct_def fields)) ^
-    "\n"
-
-
 (* Generate the signature for an enum type. *)
-let generate_enum_sig_lines ~nodes_table ~scope ~nested_modules
+let generate_enum_sig ~nodes_table ~scope ~nested_modules
     ~mode ~node enum_def =
   let indent = String.make (2 * (List.length scope + 2)) ' ' in
   let is_builder = mode = Mode.Builder in
@@ -354,15 +344,6 @@ let generate_enum_sig_lines ~nodes_table ~scope ~nested_modules
     loop [] 0
   in
   nested_modules @ header @ variants
-
-
-(* Generate the signature for an enum type. *)
-(* FIXME: get rid of this *)
-let generate_enum_sig ~nodes_table ~scope ~(nested_modules : string) ~mode ~node enum_def =
-  (String.concat ~sep:"\n"
-     (generate_enum_sig_lines ~nodes_table ~scope
-        ~nested_modules:(String.split_lines nested_modules) ~mode
-        ~node enum_def)) ^ "\n"
 
 
 let generate_constant ~nodes_table ~scope const_def =
