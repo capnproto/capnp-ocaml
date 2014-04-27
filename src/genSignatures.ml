@@ -102,10 +102,16 @@ let generate_setters ~nodes_table ~scope struct_def fields =
               String.concat ~sep:"" accessor_list
           | PS.Type.Struct _ ->
               let accessor_list = [
-                sprintf "%sval %s_set : t -> %s -> %s\n"
+                sprintf "%sval %s_set_reader : t -> %s -> %s\n"
                   indent
                   field_name
-                  (* FIXME: should allow setting from a Reader *)
+                  (GenCommon.type_name ~mode:Mode.Reader ~scope_mode:Mode.Builder
+                     nodes_table scope tp)
+                  (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
+                     nodes_table scope tp);
+                sprintf "%sval %s_set_builder : t -> %s -> %s\n"
+                  indent
+                  field_name
                   (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
                      nodes_table scope tp)
                   (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder

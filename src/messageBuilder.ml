@@ -1487,6 +1487,25 @@ module Make (MessageWrapper : Message.S) = struct
     let () = deep_zero_pointer pointer_bytes in
     init_list_pointer pointer_bytes new_string_storage
 
+  let set_list_from_storage
+      ?(struct_sizes : StructSizes.t option)
+      ~(storage_type : ListStorage.storage_type_t)
+      ~(codecs : 'a ListCodecs.t)
+      (value : 'cap ListStorage.t option)
+      (pointer_bytes : rw Slice.t)
+    : (rw, 'a, rw ListStorage.t) Runtime.Array.t =
+    let dest_storage =
+      match value with
+      | Some src_storage ->
+          deep_copy_list ?struct_sizes
+            ~src:src_storage ~dest_message:pointer_bytes.Slice.msg ()
+      | None ->
+          alloc_list_storage pointer_bytes.Slice.msg storage_type 0
+    in
+    let () = deep_zero_pointer pointer_bytes in
+    let () = init_list_pointer pointer_bytes dest_storage in
+    make_array_readwrite dest_storage codecs
+
   let set_list
       ?(struct_sizes : StructSizes.t option)
       ~(storage_type : ListStorage.storage_type_t)
@@ -1494,18 +1513,9 @@ module Make (MessageWrapper : Message.S) = struct
       (value : ('cap1, 'a, 'cap2 ListStorage.t) Runtime.Array.t)
       (pointer_bytes : rw Slice.t)
     : (rw, 'a, rw ListStorage.t) Runtime.Array.t =
-    let dest_storage =
-      match InnerArray.to_storage (InnerArray.of_outer_array value) with
-      | Some src_storage ->
-          deep_copy_list ?struct_sizes
-            ~src:src_storage ~dest_message:pointer_bytes.Slice.msg ()
-      | None ->
-          let () = assert (Runtime.Array.length value = 0) in
-          alloc_list_storage pointer_bytes.Slice.msg storage_type 0
-    in
-    let () = deep_zero_pointer pointer_bytes in
-    let () = init_list_pointer pointer_bytes dest_storage in
-    make_array_readwrite dest_storage codecs
+    set_list_from_storage ?struct_sizes ~storage_type ~codecs
+      (InnerArray.to_storage (InnerArray.of_outer_array value))
+      pointer_bytes
 
   let set_void_list
       (value : ('cap1, unit, 'cap2 ListStorage.t) Runtime.Array.t)
@@ -1619,12 +1629,16 @@ module Make (MessageWrapper : Message.S) = struct
   let set_struct
       ~(data_words : int)
       ~(pointer_words : int)
-      (* FIXME: this won't allow assignment from Reader structs *)
-      (value : 'cap StructStorage.t)
+      (value : 'cap StructStorage.t option)
       (pointer_bytes : rw Slice.t)
     : rw StructStorage.t =
-    let dest_storage = deep_copy_struct ~src:value
-        ~dest_message:pointer_bytes.Slice.msg ~data_words ~pointer_words
+    let dest_storage =
+      match value with
+      | Some src_storage ->
+          deep_copy_struct ~src:src_storage
+            ~dest_message:pointer_bytes.Slice.msg ~data_words ~pointer_words
+      | None ->
+          alloc_struct_storage pointer_bytes.Slice.msg ~data_words ~pointer_words
     in
     let () = deep_zero_pointer pointer_bytes in
     let () = init_struct_pointer pointer_bytes dest_storage in

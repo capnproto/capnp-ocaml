@@ -447,7 +447,8 @@ module type S = sig
         type reader_array_t = Reader.Type.List.array_t
 
         val elementType_get : t -> t_Type_15020482145304562784
-        val elementType_set : t -> t_Type_15020482145304562784 -> t_Type_15020482145304562784
+        val elementType_set_reader : t -> reader_t_Type_15020482145304562784 -> t_Type_15020482145304562784
+        val elementType_set_builder : t -> t_Type_15020482145304562784 -> t_Type_15020482145304562784
         val elementType_init : t -> t_Type_15020482145304562784
         val of_message : message_t -> t
       end
@@ -578,7 +579,8 @@ module type S = sig
       val value_get : t -> Value.t
       val id_set : t -> Uint64.t -> unit
       val id_set_int_exn : t -> int -> unit
-      val value_set : t -> Value.t -> Value.t
+      val value_set_reader : t -> Value.reader_t -> Value.t
+      val value_set_builder : t -> Value.t -> Value.t
       val value_init : t -> Value.t
       val of_message : message_t -> t
     end
@@ -686,9 +688,11 @@ module type S = sig
         val hadExplicitDefault_get : t -> bool
         val offset_set : t -> Uint32.t -> unit
         val offset_set_int_exn : t -> int -> unit
-        val type_set : t -> Type.t -> Type.t
+        val type_set_reader : t -> Type.reader_t -> Type.t
+        val type_set_builder : t -> Type.t -> Type.t
         val type_init : t -> Type.t
-        val defaultValue_set : t -> Value.t -> Value.t
+        val defaultValue_set_reader : t -> Value.reader_t -> Value.t
+        val defaultValue_set_builder : t -> Value.t -> Value.t
         val defaultValue_init : t -> Value.t
         val hadExplicitDefault_set : t -> bool -> unit
         val of_message : message_t -> t
@@ -784,7 +788,8 @@ module type S = sig
         val targetsMethod_get : t -> bool
         val targetsParam_get : t -> bool
         val targetsAnnotation_get : t -> bool
-        val type_set : t -> Type.t -> Type.t
+        val type_set_reader : t -> Type.reader_t -> Type.t
+        val type_set_builder : t -> Type.t -> Type.t
         val type_init : t -> Type.t
         val targetsFile_set : t -> bool -> unit
         val targetsConst_set : t -> bool -> unit
@@ -811,9 +816,11 @@ module type S = sig
 
         val type_get : t -> Type.t
         val value_get : t -> Value.t
-        val type_set : t -> Type.t -> Type.t
+        val type_set_reader : t -> Type.reader_t -> Type.t
+        val type_set_builder : t -> Type.t -> Type.t
         val type_init : t -> Type.t
-        val value_set : t -> Value.t -> Value.t
+        val value_set_reader : t -> Value.reader_t -> Value.t
+        val value_set_builder : t -> Value.t -> Value.t
         val value_init : t -> Value.t
         val of_message : message_t -> t
       end
@@ -1582,7 +1589,8 @@ module Make (MessageWrapper : Message.S) = struct
         type array_t = rw ListStorage.t
         type reader_array_t = ro ListStorage.t
         let elementType_get x = get_pointer_field x 0 ~f:(get_struct ~data_words:2 ~pointer_words:1)
-        let elementType_set x v = get_pointer_field x 0 ~f:(set_struct ~data_words:2 ~pointer_words:1 v)
+        let elementType_set_reader x v = get_pointer_field x 0 ~f:(set_struct ~data_words:2 ~pointer_words:1 v)
+        let elementType_set_builder x v = get_pointer_field x 0 ~f:(set_struct ~data_words:2 ~pointer_words:1 (Some v))
         let elementType_init x = get_pointer_field x 0 ~f:(init_struct ~data_words:2 ~pointer_words:1)
         let of_message x = get_root_struct ~data_words:2 ~pointer_words:1 x
       end
@@ -1628,17 +1636,9 @@ module Make (MessageWrapper : Message.S) = struct
       let data_get x = ()
       let data_set x = get_data_field ~discr:{Discr.value=13; Discr.byte_ofs=0} x ~f:set_void
       let list_get x = x
-      let list_set x v = failwith "not implemented"
-      let list_init x n = failwith "not implemented"
       let enum_get x = x
-      let enum_set x v = failwith "not implemented"
-      let enum_init x n = failwith "not implemented"
       let struct_get x = x
-      let struct_set x v = failwith "not implemented"
-      let struct_init x n = failwith "not implemented"
       let interface_get x = x
-      let interface_set x v = failwith "not implemented"
-      let interface_init x n = failwith "not implemented"
       let anyPointer_get x = ()
       let anyPointer_set x = get_data_field ~discr:{Discr.value=18; Discr.byte_ofs=0} x ~f:set_void
       type unnamed_union_t =
@@ -1796,7 +1796,8 @@ module Make (MessageWrapper : Message.S) = struct
       let id_set x v = get_data_field x ~f:(set_uint64 ~default:Uint64.zero ~byte_ofs:0 v)
       let id_set_int_exn x v = id_set x (Uint64.of_int v)
       let value_get x = get_pointer_field x 0 ~f:(get_struct ~data_words:2 ~pointer_words:1)
-      let value_set x v = get_pointer_field x 0 ~f:(set_struct ~data_words:2 ~pointer_words:1 v)
+      let value_set_reader x v = get_pointer_field x 0 ~f:(set_struct ~data_words:2 ~pointer_words:1 v)
+      let value_set_builder x v = get_pointer_field x 0 ~f:(set_struct ~data_words:2 ~pointer_words:1 (Some v))
       let value_init x = get_pointer_field x 0 ~f:(init_struct ~data_words:2 ~pointer_words:1)
       let of_message x = get_root_struct ~data_words:1 ~pointer_words:1 x
     end
@@ -1895,10 +1896,12 @@ module Make (MessageWrapper : Message.S) = struct
         let offset_set x v = get_data_field x ~f:(set_uint32 ~default:Uint32.zero ~byte_ofs:4 v)
         let offset_set_int_exn x v = offset_set x (Uint32.of_int v)
         let type_get x = get_pointer_field x 2 ~f:(get_struct ~data_words:2 ~pointer_words:1)
-        let type_set x v = get_pointer_field x 2 ~f:(set_struct ~data_words:2 ~pointer_words:1 v)
+        let type_set_reader x v = get_pointer_field x 2 ~f:(set_struct ~data_words:2 ~pointer_words:1 v)
+        let type_set_builder x v = get_pointer_field x 2 ~f:(set_struct ~data_words:2 ~pointer_words:1 (Some v))
         let type_init x = get_pointer_field x 2 ~f:(init_struct ~data_words:2 ~pointer_words:1)
         let defaultValue_get x = get_pointer_field x 3 ~f:(get_struct ~data_words:2 ~pointer_words:1)
-        let defaultValue_set x v = get_pointer_field x 3 ~f:(set_struct ~data_words:2 ~pointer_words:1 v)
+        let defaultValue_set_reader x v = get_pointer_field x 3 ~f:(set_struct ~data_words:2 ~pointer_words:1 v)
+        let defaultValue_set_builder x v = get_pointer_field x 3 ~f:(set_struct ~data_words:2 ~pointer_words:1 (Some v))
         let defaultValue_init x = get_pointer_field x 3 ~f:(init_struct ~data_words:2 ~pointer_words:1)
         let hadExplicitDefault_get x = get_data_field x ~f:(get_bit ~default:false ~byte_ofs:16 ~bit_ofs:0)
         let hadExplicitDefault_set x v = get_data_field x ~f:(set_bit ~default:false ~byte_ofs:16 ~bit_ofs:0 v)
@@ -1914,14 +1917,8 @@ module Make (MessageWrapper : Message.S) = struct
       let discriminantValue_get x = get_data_field x ~f:(get_uint16 ~default:65535 ~byte_ofs:1)
       let discriminantValue_set x v = get_data_field x ~f:(set_uint16 ~default:65535 ~byte_ofs:1 v)
       let slot_get x = x
-      let slot_set x v = failwith "not implemented"
-      let slot_init x n = failwith "not implemented"
       let group_get x = x
-      let group_set x v = failwith "not implemented"
-      let group_init x n = failwith "not implemented"
       let ordinal_get x = x
-      let ordinal_set x v = failwith "not implemented"
-      let ordinal_init x n = failwith "not implemented"
       type unnamed_union_t =
         | Slot of Slot.t
         | Group of Group.t
@@ -2027,7 +2024,8 @@ module Make (MessageWrapper : Message.S) = struct
         type array_t = rw ListStorage.t
         type reader_array_t = ro ListStorage.t
         let type_get x = get_pointer_field x 3 ~f:(get_struct ~data_words:2 ~pointer_words:1)
-        let type_set x v = get_pointer_field x 3 ~f:(set_struct ~data_words:2 ~pointer_words:1 v)
+        let type_set_reader x v = get_pointer_field x 3 ~f:(set_struct ~data_words:2 ~pointer_words:1 v)
+        let type_set_builder x v = get_pointer_field x 3 ~f:(set_struct ~data_words:2 ~pointer_words:1 (Some v))
         let type_init x = get_pointer_field x 3 ~f:(init_struct ~data_words:2 ~pointer_words:1)
         let targetsFile_get x = get_data_field x ~f:(get_bit ~default:false ~byte_ofs:14 ~bit_ofs:0)
         let targetsFile_set x v = get_data_field x ~f:(set_bit ~default:false ~byte_ofs:14 ~bit_ofs:0 v)
@@ -2063,10 +2061,12 @@ module Make (MessageWrapper : Message.S) = struct
         type array_t = rw ListStorage.t
         type reader_array_t = ro ListStorage.t
         let type_get x = get_pointer_field x 3 ~f:(get_struct ~data_words:2 ~pointer_words:1)
-        let type_set x v = get_pointer_field x 3 ~f:(set_struct ~data_words:2 ~pointer_words:1 v)
+        let type_set_reader x v = get_pointer_field x 3 ~f:(set_struct ~data_words:2 ~pointer_words:1 v)
+        let type_set_builder x v = get_pointer_field x 3 ~f:(set_struct ~data_words:2 ~pointer_words:1 (Some v))
         let type_init x = get_pointer_field x 3 ~f:(init_struct ~data_words:2 ~pointer_words:1)
         let value_get x = get_pointer_field x 4 ~f:(get_struct ~data_words:2 ~pointer_words:1)
-        let value_set x v = get_pointer_field x 4 ~f:(set_struct ~data_words:2 ~pointer_words:1 v)
+        let value_set_reader x v = get_pointer_field x 4 ~f:(set_struct ~data_words:2 ~pointer_words:1 v)
+        let value_set_builder x v = get_pointer_field x 4 ~f:(set_struct ~data_words:2 ~pointer_words:1 (Some v))
         let value_init x = get_pointer_field x 4 ~f:(init_struct ~data_words:2 ~pointer_words:1)
         let of_message x = get_root_struct ~data_words:5 ~pointer_words:5 x
       end
@@ -2123,20 +2123,10 @@ module Make (MessageWrapper : Message.S) = struct
       let file_get x = ()
       let file_set x = get_data_field ~discr:{Discr.value=0; Discr.byte_ofs=12} x ~f:set_void
       let struct_get x = x
-      let struct_set x v = failwith "not implemented"
-      let struct_init x n = failwith "not implemented"
       let enum_get x = x
-      let enum_set x v = failwith "not implemented"
-      let enum_init x n = failwith "not implemented"
       let interface_get x = x
-      let interface_set x v = failwith "not implemented"
-      let interface_init x n = failwith "not implemented"
       let const_get x = x
-      let const_set x v = failwith "not implemented"
-      let const_init x n = failwith "not implemented"
       let annotation_get x = x
-      let annotation_set x v = failwith "not implemented"
-      let annotation_init x n = failwith "not implemented"
       type unnamed_union_t =
         | File
         | Struct of Struct.t

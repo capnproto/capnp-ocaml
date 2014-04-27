@@ -447,7 +447,8 @@ module type S = sig
         type reader_array_t = Reader.Type.List.array_t
 
         val elementType_get : t -> t_Type_15020482145304562784
-        val elementType_set : t -> t_Type_15020482145304562784 -> t_Type_15020482145304562784
+        val elementType_set_reader : t -> reader_t_Type_15020482145304562784 -> t_Type_15020482145304562784
+        val elementType_set_builder : t -> t_Type_15020482145304562784 -> t_Type_15020482145304562784
         val elementType_init : t -> t_Type_15020482145304562784
         val of_message : message_t -> t
       end
@@ -578,7 +579,8 @@ module type S = sig
       val value_get : t -> Value.t
       val id_set : t -> Uint64.t -> unit
       val id_set_int_exn : t -> int -> unit
-      val value_set : t -> Value.t -> Value.t
+      val value_set_reader : t -> Value.reader_t -> Value.t
+      val value_set_builder : t -> Value.t -> Value.t
       val value_init : t -> Value.t
       val of_message : message_t -> t
     end
@@ -686,9 +688,11 @@ module type S = sig
         val hadExplicitDefault_get : t -> bool
         val offset_set : t -> Uint32.t -> unit
         val offset_set_int_exn : t -> int -> unit
-        val type_set : t -> Type.t -> Type.t
+        val type_set_reader : t -> Type.reader_t -> Type.t
+        val type_set_builder : t -> Type.t -> Type.t
         val type_init : t -> Type.t
-        val defaultValue_set : t -> Value.t -> Value.t
+        val defaultValue_set_reader : t -> Value.reader_t -> Value.t
+        val defaultValue_set_builder : t -> Value.t -> Value.t
         val defaultValue_init : t -> Value.t
         val hadExplicitDefault_set : t -> bool -> unit
         val of_message : message_t -> t
@@ -784,7 +788,8 @@ module type S = sig
         val targetsMethod_get : t -> bool
         val targetsParam_get : t -> bool
         val targetsAnnotation_get : t -> bool
-        val type_set : t -> Type.t -> Type.t
+        val type_set_reader : t -> Type.reader_t -> Type.t
+        val type_set_builder : t -> Type.t -> Type.t
         val type_init : t -> Type.t
         val targetsFile_set : t -> bool -> unit
         val targetsConst_set : t -> bool -> unit
@@ -811,9 +816,11 @@ module type S = sig
 
         val type_get : t -> Type.t
         val value_get : t -> Value.t
-        val type_set : t -> Type.t -> Type.t
+        val type_set_reader : t -> Type.reader_t -> Type.t
+        val type_set_builder : t -> Type.t -> Type.t
         val type_init : t -> Type.t
-        val value_set : t -> Value.t -> Value.t
+        val value_set_reader : t -> Value.reader_t -> Value.t
+        val value_set_builder : t -> Value.t -> Value.t
         val value_init : t -> Value.t
         val of_message : message_t -> t
       end

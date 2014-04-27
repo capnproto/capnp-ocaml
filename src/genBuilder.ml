@@ -546,8 +546,13 @@ let generate_field_accessors ~nodes_table ~scope ~indent ~discr_ofs field =
                      ~f:(get_struct ~data_words:%u ~pointer_words:%u)"
                     field_name field_ofs data_words pointer_words;
                   sprintf
-                    "let %s_set x v = get_pointer_field %sx %u \
+                    "let %s_set_reader x v = get_pointer_field %sx %u \
                      ~f:(set_struct ~data_words:%u ~pointer_words:%u v)"
+                    field_name discr_str field_ofs
+                    data_words pointer_words;
+                  sprintf
+                    "let %s_set_builder x v = get_pointer_field %sx %u \
+                     ~f:(set_struct ~data_words:%u ~pointer_words:%u (Some v))"
                     field_name discr_str field_ofs
                     data_words pointer_words;
                   sprintf
