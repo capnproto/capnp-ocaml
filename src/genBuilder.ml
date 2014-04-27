@@ -288,16 +288,7 @@ let generate_field_accessors ~nodes_table ~scope ~indent ~discr_ofs field =
   in
   match PS.Field.unnamed_union_get field with
   | PS.Field.Group group ->
-      apply_indent ~indent [
-        "let " ^ field_name ^ "_get x = x";
-        (* So group setters look unexpectedly complicated.  [x] is the parent struct
-         * which contains the group to be modified, and [v] is another struct which
-         * contains the group with values to be copied.  The resulting operation
-         * should merge the group fields from [v] into the proper place in struct [x]. *)
-        (* FIXME: based on C++ runtime, these should not be emitted at all. *)
-        "let " ^ field_name ^ "_set x v = failwith \"not implemented\"";
-        "let " ^ field_name ^ "_init x n = failwith \"not implemented\"";
-      ]
+      [ indent ^ "let " ^ field_name ^ "_get x = x" ]
   | PS.Field.Slot slot ->
       let field_ofs = Uint32.to_int (PS.Field.Slot.offset_get slot) in
       let tp = PS.Field.Slot.type_get slot in
