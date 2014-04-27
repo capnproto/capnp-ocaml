@@ -7,9 +7,11 @@ License:     FreeBSD
 
 Executable "capnpc-ocaml"
   Path:       src
+  Build:      true
   BuildTools: ocamlbuild
+  CompiledObject: best
   MainIs:     main.ml
   ByteOpt:    -g -thread -bin-annot -short-paths
   NativeOpt:  -g -thread -bin-annot -short-paths
   BuildDepends: core, uint, ocplib-endian, res
-  
+
