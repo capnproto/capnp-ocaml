@@ -694,13 +694,11 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
   let header = apply_indent ~indent [
     "type t = rw StructStorage.t";
     sprintf "type %s = t"
-      (GenCommon.make_unique_typename ~mode:Mode.Builder
-         ~scope_mode:Mode.Builder ~nodes_table node);
+      (GenCommon.make_unique_typename ~mode:Mode.Builder ~nodes_table node);
     sprintf "type reader_t = Reader.%s.t"
       (GenCommon.get_fully_qualified_name nodes_table node);
     sprintf "type %s = reader_t"
-      (GenCommon.make_unique_typename ~mode:Mode.Reader
-         ~scope_mode:Mode.Builder ~nodes_table node);
+      (GenCommon.make_unique_typename ~mode:Mode.Reader ~nodes_table node);
     "type array_t = rw ListStorage.t";
     "type reader_array_t = ro ListStorage.t";
     ] in

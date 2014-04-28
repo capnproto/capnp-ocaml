@@ -39,29 +39,16 @@ let sig_s_header = [
   "type rw = Message.rw";
   "";
   "module type S = sig";
-  "  module Reader : sig";
-  "    type message_t";
+  "  type reader_array_t";
+  "  type builder_array_t";
   "";
-  "    module AnyPointer : sig";
-  "      type t";
-  "    end";
-  "";
-]
-
-let sig_s_divide_reader_builder = [
+  "  module AnyPointer : sig";
+  "    type t";
   "  end";
-  "";
-  "  module Builder : sig";
-  "    type message_t";
-  "";
-  "    module AnyPointer : sig";
-  "      type t";
-  "    end";
   "";
 ]
 
 let sig_s_footer = [
-  "  end";
   "end";
   "";
 ]
@@ -145,12 +132,7 @@ let compile (request : PS.CodeGeneratorRequest.t) (dest_dir : string) : unit =
     let sig_s =
       sig_s_header @
       (GenSignatures.generate_node ~suppress_module_wrapper:true ~nodes_table
-         ~scope:[] ~node_name:requested_filename ~mode:GenCommon.Mode.Reader
-         requested_file_node) @
-      sig_s_divide_reader_builder @
-      (GenSignatures.generate_node ~suppress_module_wrapper:true ~nodes_table
-         ~scope:[] ~node_name:requested_filename ~mode:GenCommon.Mode.Builder
-         requested_file_node) @
+         ~scope:[] ~node_name:requested_filename requested_file_node) @
       sig_s_footer
     in
     let sig_file_content =

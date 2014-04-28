@@ -510,11 +510,11 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
     | _  -> generate_union_accessor ~nodes_table ~scope struct_def union_fields
   in
   let indent = String.make (2 * (List.length scope + 2)) ' ' in
-  let unique_reader = (GenCommon.make_unique_typename ~mode:Mode.Reader
-      ~scope_mode:Mode.Reader ~nodes_table node)
+  let unique_reader =
+    (GenCommon.make_unique_typename ~mode:Mode.Reader ~nodes_table node)
   in
-  let unique_builder = (GenCommon.make_unique_typename ~mode:Mode.Builder
-      ~scope_mode:Mode.Reader ~nodes_table node)
+  let unique_builder =
+    (GenCommon.make_unique_typename ~mode:Mode.Builder ~nodes_table node)
   in
   let types =
     apply_indent ~indent [

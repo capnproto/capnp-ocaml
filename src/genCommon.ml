@@ -173,45 +173,56 @@ let get_scope_relative_name nodes_table (scope_stack : Uint64.t list) node
   String.concat ~sep:"." (List.map rel_name ~f:fst)
 
 
-let make_unique_typename ~(mode : Mode.t) ~(scope_mode : Mode.t)
-    ~nodes_table node =
+let make_unique_typename ~(mode : Mode.t) ~nodes_table node =
   let uq_name = get_unqualified_name
     ~parent:(Hashtbl.find_exn nodes_table (PS.Node.scopeId_get node)) ~child:node
   in
   let t_str =
-    if mode = Mode.Reader && scope_mode = Mode.Builder then
-      "reader_t"
-    else if mode = Mode.Builder && scope_mode = Mode.Reader then
-      "builder_t"
-    else
-      "t"
+    match mode with
+    | Mode.Reader  -> "reader_t"
+    | Mode.Builder -> "builder_t"
   in
   sprintf "%s_%s_%s" t_str uq_name (Uint64.to_string (PS.Node.id_get node))
 
 
 (* When modules refer to types defined in other modules, readability dictates that we use
- * OtherModule.t as the preferred type name.  However, consider the case of nested modules:
+ * OtherModule.reader_t/OtherModule.builder_t as the preferred type name.  However,
+ * consider the case of nested modules:
  *
- * module Foo = struct
- *   type t
- *   type t_Foo_UID = t
+ * module Foo : sig
+ *   type reader_t
+ *   type builder_t
+ *   type reader_t_Foo_UID = reader_t
+ *   type builder_t_Foo_UID = builder_t
  *
- *   module Bar = struct
- *     type t
- *     type t_Bar_UID = t
+ *   module Bar : sig
+ *     type reader_t
+ *     type builder_t
+ *     type reader_t_Bar_UID = reader_t
+ *     type builder_t_Bar_UID = builder_t
  *
- *     val foo_get : t -> t_Foo_UID
+ *     module R : sig
+ *       val foo_get : t -> reader_t_Foo_UID
+ *     end
+ *     module B : sig
+ *       val foo_get : t -> builder_t_Foo_UID
+ *       val foo_set_reader : t -> reader_t_Foo_UID -> builder_t_Foo_UID
+ *       val foo_set_builder : t -> builder_t_Foo_UID -> builder_t_Foo_UID
  *   end
+ *   ...
  * end
  *
  * In this case, module Foo does not have a complete declaration at the time foo_get is
- * declared.  So for this case instead of using Foo.t we emit an unambiguous type identifier
- * based on the 64-bit unique ID for Foo. *)
+ * declared, so we can't refer to the type as "Foo.reader_t".  So for this case instead
+ * of using Foo.reader_t we emit an unambiguous type identifier based on the 64-bit
+ * unique ID for Foo. *)
 let make_disambiguated_type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
     ~nodes_table ~scope ~tp node =
   let node_id = PS.Node.id_get node in
   if List.mem scope node_id then
-    make_unique_typename ~mode ~scope_mode ~nodes_table node
+    (* The node of interest is a parent node of the node being generated.
+       this is the case where an unambiguous type is emitted. *)
+    make_unique_typename ~mode ~nodes_table node
   else
     let module_name = get_scope_relative_name nodes_table scope node in
     let t_str =
@@ -221,12 +232,10 @@ let make_disambiguated_type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
              to distinguish between them *)
           ".t"
       | _ ->
-          if mode = Mode.Reader && scope_mode = Mode.Builder then
-            ".reader_t"
-          else if mode = Mode.Builder && scope_mode = Mode.Reader then
-            ".builder_t"
-          else
-            ".t"
+          begin match mode with
+          | Mode.Reader  -> ".reader_t"
+          | Mode.Builder -> ".builder_t"
+          end
     in
     module_name ^ t_str
 
@@ -257,10 +266,7 @@ let rec type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
       sprintf "(%s, %s, %s) Runtime.Array.t"
         (if mode = Mode.Reader then "ro" else "rw")
         (type_name ~mode ~scope_mode nodes_table scope list_type)
-        (if mode = Mode.Reader && scope_mode = Mode.Builder
-          then "reader_array_t"
-        else
-          "array_t")
+        (if mode = Mode.Reader then "reader_array_t" else "builder_array_t")
   | PS.Type.Enum enum_descr ->
       let enum_id = PS.Type.Enum.typeId_get enum_descr in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
@@ -318,7 +324,7 @@ let generate_union_type ~(mode : Mode.t) nodes_table scope fields =
 (* Generate the signature for an enum type. *)
 let generate_enum_sig ~nodes_table ~scope ~nested_modules
     ~mode ~node enum_def =
-  let indent = String.make (2 * (List.length scope + 2)) ' ' in
+  let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let is_builder = mode = Mode.Builder in
   let header =
     if is_builder then
