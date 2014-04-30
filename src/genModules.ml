@@ -30,9 +30,9 @@
 
 open Core.Std
 
-module PS = GenCommon.PS
-module Mode = GenCommon.Mode
-module R  = Runtime
+module PS     = GenCommon.PS
+module Mode   = GenCommon.Mode
+module RT     = Runtime
 module Reader = MessageReader.Make(GenCommon.M)
 
 let sprintf = Printf.sprintf
@@ -54,20 +54,20 @@ let generate_enum_decoder ~nodes_table ~scope ~enum_node ~indent =
   in
   let match_cases =
     let enumerants =
-      match PS.Node.unnamed_union_get enum_node with
-      | PS.Node.Enum enum_group ->
-          PS.Node.Enum.enumerants_get enum_group
+      match PS.Node.R.get enum_node with
+      | PS.Node.R.Enum enum_group ->
+          PS.Node.Enum.R.enumerants_get enum_group
       | _ ->
           failwith "Decoded non-enum node where enum node was expected."
     in
     let rec loop_cases acc i =
-      if i = R.Array.length enumerants then
+      if i = RT.Array.length enumerants then
         List.rev acc
       else
-        let enumerant = R.Array.get enumerants i in
+        let enumerant = RT.Array.get enumerants i in
         let case_str =
           sprintf "  | %u -> %s.%s" i scope_relative_name
-            (String.capitalize (PS.Enumerant.name_get enumerant))
+            (String.capitalize (PS.Enumerant.R.name_get enumerant))
         in
         loop_cases (case_str :: acc) (i + 1)
     in
@@ -88,21 +88,21 @@ let generate_enum_encoder ~(allow_undefined : bool) ~nodes_table ~scope
   in
   let match_cases =
     let enumerants =
-      match PS.Node.unnamed_union_get enum_node with
-      | PS.Node.Enum enum_group ->
-          PS.Node.Enum.enumerants_get enum_group
+      match PS.Node.R.get enum_node with
+      | PS.Node.R.Enum enum_group ->
+          PS.Node.Enum.R.enumerants_get enum_group
       | _ ->
           failwith "Decoded non-enum node where enum node was expected."
     in
     let rec loop_cases acc i =
-      if i = R.Array.length enumerants then
+      if i = RT.Array.length enumerants then
         List.rev acc
       else
-        let enumerant = R.Array.get enumerants i in
+        let enumerant = RT.Array.get enumerants i in
         let case_str =
           sprintf "  | %s.%s -> %u"
             scope_relative_name
-            (String.capitalize (PS.Enumerant.name_get enumerant))
+            (String.capitalize (PS.Enumerant.R.name_get enumerant))
             i
         in
         loop_cases (case_str :: acc) (i + 1)
@@ -184,7 +184,7 @@ let generate_enum_unsafe_setter ~nodes_table ~scope ~enum_node
    will generate something appropriate for localized use. *)
 let generate_enum_runtime_getters ~nodes_table ~scope ~mode ~indent enum_def =
   let api_module = api_of_mode mode in
-  let enum_id = PS.Type.Enum.typeId_get enum_def in
+  let enum_id = PS.Type.Enum.R.typeId_get enum_def in
   let enum_node = Hashtbl.find_exn nodes_table enum_id in
   let decoder_lambda =
     generate_enum_decoder ~nodes_table ~scope ~enum_node
@@ -233,7 +233,7 @@ let generate_enum_runtime_getters ~nodes_table ~scope ~mode ~indent enum_def =
    because the enum values are schema-dependent.  This function
    will generate something appropriate for localized use. *)
 let generate_enum_runtime_setters ~nodes_table ~scope ~indent enum_def =
-  let enum_id = PS.Type.Enum.typeId_get enum_def in
+  let enum_id = PS.Type.Enum.R.typeId_get enum_def in
   let enum_node = Hashtbl.find_exn nodes_table enum_id in
   let decoder_lambda =
     (generate_enum_decoder ~nodes_table ~scope ~enum_node
@@ -274,24 +274,25 @@ let rec generate_list_element_decoder ~nodes_table ~scope ~indent list_def =
       "in";
     ]
   in
-  let contained_type = PS.Type.List.elementType_get list_def in
-  match PS.Type.unnamed_union_get contained_type with
-  | PS.Type.Void     -> make_terminal_decoder "void"
-  | PS.Type.Bool     -> make_terminal_decoder "bit"
-  | PS.Type.Int8     -> make_terminal_decoder "int8"
-  | PS.Type.Int16    -> make_terminal_decoder "int16"
-  | PS.Type.Int32    -> make_terminal_decoder "int32"
-  | PS.Type.Int64    -> make_terminal_decoder "int64"
-  | PS.Type.Uint8    -> make_terminal_decoder "uint8"
-  | PS.Type.Uint16   -> make_terminal_decoder "uint16"
-  | PS.Type.Uint32   -> make_terminal_decoder "uint32"
-  | PS.Type.Uint64   -> make_terminal_decoder "uint64"
-  | PS.Type.Float32  -> make_terminal_decoder "float32"
-  | PS.Type.Float64  -> make_terminal_decoder "float64"
-  | PS.Type.Text     -> make_terminal_decoder "text"
-  | PS.Type.Data     -> make_terminal_decoder "blob"
-  | PS.Type.Struct _ -> make_terminal_decoder "struct"
-  | PS.Type.List inner_list_def ->
+  let open PS.Type in
+  let contained_type = List.R.elementType_get list_def in
+  match R.get contained_type with
+  | R.Void     -> make_terminal_decoder "void"
+  | R.Bool     -> make_terminal_decoder "bit"
+  | R.Int8     -> make_terminal_decoder "int8"
+  | R.Int16    -> make_terminal_decoder "int16"
+  | R.Int32    -> make_terminal_decoder "int32"
+  | R.Int64    -> make_terminal_decoder "int64"
+  | R.Uint8    -> make_terminal_decoder "uint8"
+  | R.Uint16   -> make_terminal_decoder "uint16"
+  | R.Uint32   -> make_terminal_decoder "uint32"
+  | R.Uint64   -> make_terminal_decoder "uint64"
+  | R.Float32  -> make_terminal_decoder "float32"
+  | R.Float64  -> make_terminal_decoder "float64"
+  | R.Text     -> make_terminal_decoder "text"
+  | R.Data     -> make_terminal_decoder "blob"
+  | R.Struct _ -> make_terminal_decoder "struct"
+  | R.List inner_list_def ->
       let inner_decoder_decl = generate_list_element_decoder ~nodes_table
          ~scope ~indent:(indent ^ "  ") inner_list_def
       in
@@ -300,7 +301,7 @@ let rec generate_list_element_decoder ~nodes_table ~scope ~indent list_def =
       ] @ inner_decoder_decl @ [
         "  RA_.get_list decoders (Some slice))";
       ]
-  | PS.Type.Enum enum_def ->
+  | R.Enum enum_def ->
       let enum_getters =
         generate_enum_runtime_getters ~nodes_table ~scope ~mode:Mode.Reader
           ~indent:(indent ^ "  ") enum_def
@@ -313,11 +314,11 @@ let rec generate_list_element_decoder ~nodes_table ~scope ~indent list_def =
         "in";
       ] in
       apply_indent ~indent lines
-  | PS.Type.Interface _ ->
+  | R.Interface _ ->
       failwith "not implemented"
-  | PS.Type.AnyPointer ->
+  | R.AnyPointer ->
       failwith "not implemented"
-  | PS.Type.Undefined_ x ->
+  | R.Undefined_ x ->
        failwith (sprintf "Unknown Type union discriminant %d" x)
 
 
@@ -334,24 +335,25 @@ let rec generate_list_element_codecs ~nodes_table ~scope ~indent list_def =
       "in";
     ]
   in
-  let contained_type = PS.Type.List.elementType_get list_def in
-  match PS.Type.unnamed_union_get contained_type with
-  | PS.Type.Void     -> make_terminal_codecs "void"
-  | PS.Type.Bool     -> make_terminal_codecs "bit"
-  | PS.Type.Int8     -> make_terminal_codecs "int8"
-  | PS.Type.Int16    -> make_terminal_codecs "int16"
-  | PS.Type.Int32    -> make_terminal_codecs "int32"
-  | PS.Type.Int64    -> make_terminal_codecs "int64"
-  | PS.Type.Uint8    -> make_terminal_codecs "uint8"
-  | PS.Type.Uint16   -> make_terminal_codecs "uint16"
-  | PS.Type.Uint32   -> make_terminal_codecs "uint32"
-  | PS.Type.Uint64   -> make_terminal_codecs "uint64"
-  | PS.Type.Float32  -> make_terminal_codecs "float32"
-  | PS.Type.Float64  -> make_terminal_codecs "float64"
-  | PS.Type.Text     -> make_terminal_codecs "text"
-  | PS.Type.Data     -> make_terminal_codecs "blob"
-  | PS.Type.Struct _ -> make_terminal_codecs "struct"
-  | PS.Type.List inner_list_def ->
+  let open PS.Type in
+  let contained_type = List.R.elementType_get list_def in
+  match R.get contained_type with
+  | R.Void     -> make_terminal_codecs "void"
+  | R.Bool     -> make_terminal_codecs "bit"
+  | R.Int8     -> make_terminal_codecs "int8"
+  | R.Int16    -> make_terminal_codecs "int16"
+  | R.Int32    -> make_terminal_codecs "int32"
+  | R.Int64    -> make_terminal_codecs "int64"
+  | R.Uint8    -> make_terminal_codecs "uint8"
+  | R.Uint16   -> make_terminal_codecs "uint16"
+  | R.Uint32   -> make_terminal_codecs "uint32"
+  | R.Uint64   -> make_terminal_codecs "uint64"
+  | R.Float32  -> make_terminal_codecs "float32"
+  | R.Float64  -> make_terminal_codecs "float64"
+  | R.Text     -> make_terminal_codecs "text"
+  | R.Data     -> make_terminal_codecs "blob"
+  | R.Struct _ -> make_terminal_codecs "struct"
+  | R.List inner_list_def ->
       let inner_codecs_decl = generate_list_element_codecs ~nodes_table
          ~scope ~indent:(indent ^ "  ") inner_list_def
       in
@@ -362,7 +364,7 @@ let rec generate_list_element_codecs ~nodes_table ~scope ~indent list_def =
         "  BA_.ListCodecs.Pointer (decode, encode)";
         "in";
       ]
-  | PS.Type.Enum enum_def ->
+  | R.Enum enum_def ->
       let enum_getters =
         generate_enum_runtime_getters ~nodes_table ~scope ~mode:Mode.Builder
           ~indent:(indent ^ "  ") enum_def
@@ -377,11 +379,11 @@ let rec generate_list_element_codecs ~nodes_table ~scope ~indent list_def =
         "in";
       ] in
       apply_indent ~indent lines
-  | PS.Type.Interface _ ->
+  | R.Interface _ ->
       failwith "not implemented"
-  | PS.Type.AnyPointer ->
+  | R.AnyPointer ->
       failwith "not implemented"
-  | PS.Type.Undefined_ x ->
+  | R.Undefined_ x ->
        failwith (sprintf "Unknown Type union discriminant %d" x)
 
 
@@ -398,22 +400,23 @@ let generate_list_getter ~nodes_table ~scope ~list_type ~mode
         element_name;
     ]
   in
-  match PS.Type.unnamed_union_get list_type with
-  | PS.Type.Void     -> make_primitive_accessor "void"
-  | PS.Type.Bool     -> make_primitive_accessor "bit"
-  | PS.Type.Int8     -> make_primitive_accessor "int8"
-  | PS.Type.Int16    -> make_primitive_accessor "int16"
-  | PS.Type.Int32    -> make_primitive_accessor "int32"
-  | PS.Type.Int64    -> make_primitive_accessor "int64"
-  | PS.Type.Uint8    -> make_primitive_accessor "uint8"
-  | PS.Type.Uint16   -> make_primitive_accessor "uint16"
-  | PS.Type.Uint32   -> make_primitive_accessor "uint32"
-  | PS.Type.Uint64   -> make_primitive_accessor "uint64"
-  | PS.Type.Float32  -> make_primitive_accessor "float32"
-  | PS.Type.Float64  -> make_primitive_accessor "float64"
-  | PS.Type.Text     -> make_primitive_accessor "text"
-  | PS.Type.Data     -> make_primitive_accessor "blob"
-  | PS.Type.Struct struct_def ->
+  let open PS.Type in
+  match R.get list_type with
+  | R.Void     -> make_primitive_accessor "void"
+  | R.Bool     -> make_primitive_accessor "bit"
+  | R.Int8     -> make_primitive_accessor "int8"
+  | R.Int16    -> make_primitive_accessor "int16"
+  | R.Int32    -> make_primitive_accessor "int32"
+  | R.Int64    -> make_primitive_accessor "int64"
+  | R.Uint8    -> make_primitive_accessor "uint8"
+  | R.Uint16   -> make_primitive_accessor "uint16"
+  | R.Uint32   -> make_primitive_accessor "uint32"
+  | R.Uint64   -> make_primitive_accessor "uint64"
+  | R.Float32  -> make_primitive_accessor "float32"
+  | R.Float64  -> make_primitive_accessor "float64"
+  | R.Text     -> make_primitive_accessor "text"
+  | R.Data     -> make_primitive_accessor "blob"
+  | R.Struct struct_def ->
       begin match mode with
       | Mode.Reader -> [
           "let " ^ field_name ^ "_get x =";
@@ -422,12 +425,12 @@ let generate_list_getter ~nodes_table ~scope ~list_type ~mode
         ]
       | Mode.Builder ->
           let data_words, pointer_words =
-            let id = PS.Type.Struct.typeId_get struct_def in
+            let id = PS.Type.Struct.R.typeId_get struct_def in
             let node = Hashtbl.find_exn nodes_table id in
-            match PS.Node.unnamed_union_get node with
-            | PS.Node.Struct struct_def ->
-                (PS.Node.Struct.dataWordCount_get struct_def,
-                 PS.Node.Struct.pointerCount_get struct_def)
+            match PS.Node.R.get node with
+            | PS.Node.R.Struct struct_def ->
+                (PS.Node.Struct.R.dataWordCount_get struct_def,
+                 PS.Node.Struct.R.pointerCount_get struct_def)
             | _ ->
                 failwith
                   "Decoded non-struct node where struct node was expected."
@@ -440,7 +443,7 @@ let generate_list_getter ~nodes_table ~scope ~list_type ~mode
               pointer_words;
           ]
       end
-  | PS.Type.List list_def ->
+  | R.List list_def ->
       let decoder_declaration = generate_list_element_decoder
           ~nodes_table ~scope ~indent:"  " list_def
       in [
@@ -451,8 +454,8 @@ let generate_list_getter ~nodes_table ~scope ~list_type ~mode
           field_ofs
           api_module;
       ]
-  | PS.Type.Enum enum_def ->
-      let enum_id = PS.Type.Enum.typeId_get enum_def in
+  | R.Enum enum_def ->
+      let enum_id = Enum.R.typeId_get enum_def in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
       let decoder_lambda =
         generate_enum_decoder ~nodes_table ~scope ~enum_node
@@ -465,13 +468,13 @@ let generate_list_getter ~nodes_table ~scope ~list_type ~mode
           api_module field_ofs api_module;
         "    (RA_.ListDecoders.Bytes2 enum_decoder))";
         ]
-  | PS.Type.Interface _ -> [
+  | R.Interface _ -> [
         "let " ^ field_name ^ "_get x = failwith \"not implemented (type iface)\"";
       ]
-  | PS.Type.AnyPointer -> [
+  | R.AnyPointer -> [
         "let " ^ field_name ^ "_get x = failwith \"not implemented (type anyptr)\"";
       ]
-  | PS.Type.Undefined_ x ->
+  | R.Undefined_ x ->
        failwith (sprintf "Unknown Type union discriminant %d" x)
 
 
@@ -490,29 +493,30 @@ let generate_list_setters ~nodes_table ~scope ~list_type
       field_ofs
       element_name;
   ] in
-  match PS.Type.unnamed_union_get list_type with
-  | PS.Type.Void     -> make_primitive_setters "void"
-  | PS.Type.Bool     -> make_primitive_setters "bit"
-  | PS.Type.Int8     -> make_primitive_setters "int8"
-  | PS.Type.Int16    -> make_primitive_setters "int16"
-  | PS.Type.Int32    -> make_primitive_setters "int32"
-  | PS.Type.Int64    -> make_primitive_setters "int64"
-  | PS.Type.Uint8    -> make_primitive_setters "uint8"
-  | PS.Type.Uint16   -> make_primitive_setters "uint16"
-  | PS.Type.Uint32   -> make_primitive_setters "uint32"
-  | PS.Type.Uint64   -> make_primitive_setters "uint64"
-  | PS.Type.Float32  -> make_primitive_setters "float32"
-  | PS.Type.Float64  -> make_primitive_setters "float64"
-  | PS.Type.Text     -> make_primitive_setters "text"
-  | PS.Type.Data     -> make_primitive_setters "blob"
-  | PS.Type.Struct struct_def ->
+  let open PS.Type in
+  match R.get list_type with
+  | R.Void     -> make_primitive_setters "void"
+  | R.Bool     -> make_primitive_setters "bit"
+  | R.Int8     -> make_primitive_setters "int8"
+  | R.Int16    -> make_primitive_setters "int16"
+  | R.Int32    -> make_primitive_setters "int32"
+  | R.Int64    -> make_primitive_setters "int64"
+  | R.Uint8    -> make_primitive_setters "uint8"
+  | R.Uint16   -> make_primitive_setters "uint16"
+  | R.Uint32   -> make_primitive_setters "uint32"
+  | R.Uint64   -> make_primitive_setters "uint64"
+  | R.Float32  -> make_primitive_setters "float32"
+  | R.Float64  -> make_primitive_setters "float64"
+  | R.Text     -> make_primitive_setters "text"
+  | R.Data     -> make_primitive_setters "blob"
+  | R.Struct struct_def ->
       let data_words, pointer_words =
-        let id = PS.Type.Struct.typeId_get struct_def in
+        let id = PS.Type.Struct.R.typeId_get struct_def in
         let node = Hashtbl.find_exn nodes_table id in
-        match PS.Node.unnamed_union_get node with
-        | PS.Node.Struct struct_def ->
-            (PS.Node.Struct.dataWordCount_get struct_def,
-             PS.Node.Struct.pointerCount_get struct_def)
+        match PS.Node.R.get node with
+        | PS.Node.R.Struct struct_def ->
+            (PS.Node.Struct.R.dataWordCount_get struct_def,
+             PS.Node.Struct.R.pointerCount_get struct_def)
         | _ ->
             failwith
               "Decoded non-struct node where struct node was expected."
@@ -532,7 +536,7 @@ let generate_list_setters ~nodes_table ~scope ~list_type
           data_words
           pointer_words;
       ]
-  | PS.Type.List list_def ->
+  | R.List list_def ->
       let codecs_declaration = generate_list_element_codecs
           ~nodes_table ~scope ~indent:"  " list_def
       in [
@@ -547,8 +551,8 @@ let generate_list_setters ~nodes_table ~scope ~list_type
                   ~codecs n)"
           discr_str field_ofs;
       ]
-  | PS.Type.Enum enum_def ->
-      let enum_id = PS.Type.Enum.typeId_get enum_def in
+  | R.Enum enum_def ->
+      let enum_id = Enum.R.typeId_get enum_def in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
       let decoder_lambda =
         generate_enum_decoder ~nodes_table ~scope ~enum_node
@@ -576,22 +580,22 @@ let generate_list_setters ~nodes_table ~scope ~list_type
         "    ~storage_type:BA_.ListStorage.Bytes2 \
          ~codecs:(BA_.ListCodecs.Bytes2 (enum_decoder, enum_encoder)))";
       ]
-  | PS.Type.Interface _ -> [
+  | R.Interface _ -> [
         "let " ^ field_name ^ "_get x = failwith \"not implemented (type iface)\"";
       ]
-  | PS.Type.AnyPointer -> [
+  | R.AnyPointer -> [
         "let " ^ field_name ^ "_get x = failwith \"not implemented (type anyptr)\"";
       ]
-  | PS.Type.Undefined_ x ->
+  | R.Undefined_ x ->
        failwith (sprintf "Unknown Type union discriminant %d" x)
 
 
 let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
   let indent = String.make (2 * (List.length scope + 2)) ' ' in
   let api_module = api_of_mode mode in
-  let field_name = String.uncapitalize (PS.Field.name_get field) in
+  let field_name = String.uncapitalize (PS.Field.R.name_get field) in
   let discr_str =
-    let discriminant_value = PS.Field.discriminantValue_get field in
+    let discriminant_value = PS.Field.R.discriminantValue_get field in
     if discriminant_value = PS.Field.noDiscriminant then
       ""
     else
@@ -599,16 +603,17 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
         discriminant_value (discr_ofs * 2)
   in
   let (getters, setters) =
-    begin match PS.Field.unnamed_union_get field with
-    | PS.Field.Group group ->
+    let open PS.Field in
+    begin match PS.Field.R.get field with
+    | PS.Field.R.Group group ->
         let getters = [ "let " ^ field_name ^ "_get x = x" ] in
         (getters, [])
-    | PS.Field.Slot slot ->
-        let field_ofs = Uint32.to_int (PS.Field.Slot.offset_get slot) in
-        let tp = PS.Field.Slot.type_get slot in
-        let default = PS.Field.Slot.defaultValue_get slot in
-        begin match (PS.Type.unnamed_union_get tp, PS.Value.unnamed_union_get default) with
-        | (PS.Type.Void, PS.Value.Void) ->
+    | PS.Field.R.Slot slot ->
+        let field_ofs = Uint32.to_int (PS.Field.Slot.R.offset_get slot) in
+        let tp = PS.Field.Slot.R.type_get slot in
+        let default = PS.Field.Slot.R.defaultValue_get slot in
+        begin match (PS.Type.R.get tp, PS.Value.R.get default) with
+        | (PS.Type.R.Void, PS.Value.R.Void) ->
             let getters =
               [ "let " ^ field_name ^ "_get x = ()" ]
             in
@@ -617,7 +622,7 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
               sprintf "  BA_.get_data_field %sx ~f:BA_.set_void" discr_str;
             ] in
             (getters, setters)
-        | (PS.Type.Bool, PS.Value.Bool a) ->
+        | (PS.Type.R.Bool, PS.Value.R.Bool a) ->
             let getters = [
               "let " ^ field_name ^ "_get x =";
               sprintf "  %s.get_data_field x ~f:(%s.get_bit ~default:%s ~byte_ofs:%u \
@@ -638,7 +643,7 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
                 (field_ofs mod 8);
             ] in
             (getters, setters)
-        | (PS.Type.Int8, PS.Value.Int8 a) ->
+        | (PS.Type.R.Int8, PS.Value.R.Int8 a) ->
             let getters = [
               "let " ^ field_name ^ "_get x =";
               sprintf "  %s.get_data_field x ~f:(%s.get_int8 \
@@ -657,7 +662,7 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
                 field_ofs;
             ] in
             (getters, setters)
-        | (PS.Type.Int16, PS.Value.Int16 a) ->
+        | (PS.Type.R.Int16, PS.Value.R.Int16 a) ->
             let getters = [
               "let " ^ field_name ^ "_get x =";
               sprintf "  %s.get_data_field x ~f:(%s.get_int16 ~default:%d ~byte_ofs:%u)"
@@ -675,7 +680,7 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
                 (field_ofs * 2);
             ] in
             (getters, setters)
-        | (PS.Type.Int32, PS.Value.Int32 a) ->
+        | (PS.Type.R.Int32, PS.Value.R.Int32 a) ->
             let getters = [
               "let " ^ field_name ^ "_get x =";
               sprintf "  %s.get_data_field x ~f:(%s.get_int32 ~default:%sl ~byte_ofs:%u)"
@@ -697,7 +702,7 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
                 field_name ^ "_set x (Int32.of_int v)";
             ] in
             (getters, setters)
-        | (PS.Type.Int64, PS.Value.Int64 a) ->
+        | (PS.Type.R.Int64, PS.Value.R.Int64 a) ->
             let getters = [
               "let " ^ field_name ^ "_get x =";
               sprintf "  %s.get_data_field x ~f:(%s.get_int64 ~default:%sL ~byte_ofs:%u)"
@@ -719,7 +724,7 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
                 field_name ^ "_set x (Int64.of_int v)";
             ] in
             (getters, setters)
-        | (PS.Type.Uint8, PS.Value.Uint8 a) ->
+        | (PS.Type.R.Uint8, PS.Value.R.Uint8 a) ->
             let getters = [
               "let " ^ field_name ^ "_get x =";
               sprintf "  %s.get_data_field x ~f:(%s.get_uint8 \
@@ -738,7 +743,7 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
                 field_ofs;
             ] in
             (getters, setters)
-        | (PS.Type.Uint16, PS.Value.Uint16 a) ->
+        | (PS.Type.R.Uint16, PS.Value.R.Uint16 a) ->
             let getters = [
               "let " ^ field_name ^ "_get x =";
               sprintf "  %s.get_data_field x ~f:(%s.get_uint16 \
@@ -757,7 +762,7 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
                 (field_ofs * 2);
             ] in
             (getters, setters)
-        | (PS.Type.Uint32, PS.Value.Uint32 a) ->
+        | (PS.Type.R.Uint32, PS.Value.R.Uint32 a) ->
             let default =
               if Uint32.compare a Uint32.zero = 0 then
                 "Uint32.zero"
@@ -785,7 +790,7 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
                 field_name ^ "_set x (Uint32.of_int v)";
             ] in
             (getters, setters)
-        | (PS.Type.Uint64, PS.Value.Uint64 a) ->
+        | (PS.Type.R.Uint64, PS.Value.R.Uint64 a) ->
             let default =
               if Uint64.compare a Uint64.zero = 0 then
                 "Uint64.zero"
@@ -814,7 +819,7 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
                 field_name ^ "_set x (Uint64.of_int v)";
             ] in
             (getters, setters)
-        | (PS.Type.Float32, PS.Value.Float32 a) ->
+        | (PS.Type.R.Float32, PS.Value.R.Float32 a) ->
             let default = Int32.to_string (Int32.bits_of_float a) in
             let getters = [
               "let " ^ field_name ^ "_get x =";
@@ -834,7 +839,7 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
                 (field_ofs * 4);
             ] in
             (getters, setters)
-        | (PS.Type.Float64, PS.Value.Float64 a) ->
+        | (PS.Type.R.Float64, PS.Value.R.Float64 a) ->
             let default = Int64.to_string (Int64.bits_of_float a) in
             let getters = [
               "let " ^ field_name ^ "_get x =";
@@ -854,7 +859,7 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
                 (field_ofs * 8);
             ] in
             (getters, setters)
-        | (PS.Type.Text, PS.Value.Text a) ->
+        | (PS.Type.R.Text, PS.Value.R.Text a) ->
             let getters = [
               "let " ^ field_name ^ "_get x =";
               sprintf "  %s.get_pointer_field x %u ~f:(%s.get_text ~default:\"%s\")"
@@ -870,7 +875,7 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
                 field_ofs
             ] in
             (getters, setters)
-        | (PS.Type.Data, PS.Value.Data a) ->
+        | (PS.Type.R.Data, PS.Value.R.Data a) ->
             let getters = [
               "let " ^ field_name ^ "_get x =";
               sprintf "  %s.get_pointer_field x %u ~f:(%s.get_blob ~default:\"%s\")"
@@ -886,7 +891,7 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
                 field_ofs
             ] in
             (getters, setters)
-        | (PS.Type.List list_def, PS.Value.List pointer_slice_opt) ->
+        | (PS.Type.R.List list_def, PS.Value.R.List pointer_slice_opt) ->
             let has_trivial_default =
               begin match pointer_slice_opt with
               | Some pointer_slice ->
@@ -899,7 +904,7 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
               end
             in
             if has_trivial_default then
-              let list_type = PS.Type.List.elementType_get list_def in
+              let list_type = PS.Type.List.R.elementType_get list_def in
               let getters = generate_list_getter ~nodes_table ~scope ~list_type
                 ~mode ~field_name ~field_ofs
               in
@@ -909,8 +914,8 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
               (getters, setters)
             else
               failwith "Default values for lists are not implemented."
-        | (PS.Type.Enum enum_def, PS.Value.Enum val_uint16) ->
-            let enum_id = PS.Type.Enum.typeId_get enum_def in
+        | (PS.Type.R.Enum enum_def, PS.Value.R.Enum val_uint16) ->
+            let enum_id = PS.Type.Enum.R.typeId_get enum_def in
             let enum_node = Hashtbl.find_exn nodes_table enum_id in
             let getters = generate_enum_getter ~nodes_table ~scope ~enum_node
                 ~mode ~field_name ~field_ofs ~default:val_uint16
@@ -922,7 +927,7 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
                  ~field_name ~field_ofs ~default:val_uint16 ~discr_str)
             in
             (getters, setters)
-        | (PS.Type.Struct struct_def, PS.Value.Struct pointer_slice_opt) ->
+        | (PS.Type.R.Struct struct_def, PS.Value.R.Struct pointer_slice_opt) ->
             let has_trivial_default =
               begin match pointer_slice_opt with
               | Some pointer_slice ->
@@ -936,12 +941,12 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
             in
             if has_trivial_default then
               let data_words, pointer_words =
-                let id = PS.Type.Struct.typeId_get struct_def in
+                let id = PS.Type.Struct.R.typeId_get struct_def in
                 let node = Hashtbl.find_exn nodes_table id in
-                match PS.Node.unnamed_union_get node with
-                | PS.Node.Struct struct_def ->
-                    (PS.Node.Struct.dataWordCount_get struct_def,
-                     PS.Node.Struct.pointerCount_get struct_def)
+                match PS.Node.R.get node with
+                | PS.Node.R.Struct struct_def ->
+                    (PS.Node.Struct.R.dataWordCount_get struct_def,
+                     PS.Node.Struct.R.pointerCount_get struct_def)
                 | _ ->
                     failwith
                       "Decoded non-struct node where struct node was expected."
@@ -988,7 +993,7 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
               (getters, setters)
             else
               failwith "Default values for structs are not implemented."
-        | (PS.Type.Interface iface_def, PS.Value.Interface) ->
+        | (PS.Type.R.Interface iface_def, PS.Value.R.Interface) ->
             let getters = [
               "let " ^ field_name ^
                 "_get x = failwith \"not implemented (iface 2)\"";
@@ -998,7 +1003,7 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
                 "_set x v = failwith \"not implemented (iface 2)\"";
             ] in
             (getters, setters)
-        | (PS.Type.AnyPointer, PS.Value.AnyPointer pointer) ->
+        | (PS.Type.R.AnyPointer, PS.Value.R.AnyPointer pointer) ->
             let getters = [
               "let " ^ field_name ^ "_get x =";
               sprintf "  %s.get_pointer_field x %u ~f:(fun x -> x)"
@@ -1010,36 +1015,36 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
                 "_set x v = failwith \"not implemented\"";
             ] in
             (getters, setters)
-        | (PS.Type.Undefined_ x, _) ->
+        | (PS.Type.R.Undefined_ x, _) ->
             failwith (sprintf "Unknown Field union discriminant %u." x)
 
         (* All other cases represent an ill-formed default value in the plugin request *)
-        | (PS.Type.Void, _)
-        | (PS.Type.Bool, _)
-        | (PS.Type.Int8, _)
-        | (PS.Type.Int16, _)
-        | (PS.Type.Int32, _)
-        | (PS.Type.Int64, _)
-        | (PS.Type.Uint8, _)
-        | (PS.Type.Uint16, _)
-        | (PS.Type.Uint32, _)
-        | (PS.Type.Uint64, _)
-        | (PS.Type.Float32, _)
-        | (PS.Type.Float64, _)
-        | (PS.Type.Text, _)
-        | (PS.Type.Data, _)
-        | (PS.Type.List _, _)
-        | (PS.Type.Enum _, _)
-        | (PS.Type.Struct _, _)
-        | (PS.Type.Interface _, _)
-        | (PS.Type.AnyPointer, _) ->
+        | (PS.Type.R.Void, _)
+        | (PS.Type.R.Bool, _)
+        | (PS.Type.R.Int8, _)
+        | (PS.Type.R.Int16, _)
+        | (PS.Type.R.Int32, _)
+        | (PS.Type.R.Int64, _)
+        | (PS.Type.R.Uint8, _)
+        | (PS.Type.R.Uint16, _)
+        | (PS.Type.R.Uint32, _)
+        | (PS.Type.R.Uint64, _)
+        | (PS.Type.R.Float32, _)
+        | (PS.Type.R.Float64, _)
+        | (PS.Type.R.Text, _)
+        | (PS.Type.R.Data, _)
+        | (PS.Type.R.List _, _)
+        | (PS.Type.R.Enum _, _)
+        | (PS.Type.R.Struct _, _)
+        | (PS.Type.R.Interface _, _)
+        | (PS.Type.R.AnyPointer, _) ->
             let err_msg = sprintf
                 "The default value for field \"%s\" has an unexpected type."
                 field_name
             in
             failwith err_msg
         end
-    | PS.Field.Undefined_ x ->
+    | PS.Field.R.Undefined_ x ->
         failwith (sprintf "Unknown Field union discriminant %u." x)
     end
   in
@@ -1060,14 +1065,14 @@ let generate_union_getter ~nodes_table ~scope ~mode struct_def fields =
       let api_module = api_of_mode mode in
       let indent = String.make (2 * (List.length scope + 2)) ' ' in
       let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
-        let field_name = String.uncapitalize (PS.Field.name_get field) in
+        let field_name = String.uncapitalize (PS.Field.R.name_get field) in
         let ctor_name = String.capitalize field_name in
-        let field_value = PS.Field.discriminantValue_get field in
+        let field_value = PS.Field.R.discriminantValue_get field in
         let field_has_void_type =
-          match PS.Field.unnamed_union_get field with
-          | PS.Field.Slot slot ->
-              begin match PS.Type.unnamed_union_get (PS.Field.Slot.type_get slot) with
-              | PS.Type.Void -> true
+          match PS.Field.R.get field with
+          | PS.Field.R.Slot slot ->
+              begin match PS.Type.R.get (PS.Field.Slot.R.type_get slot) with
+              | PS.Type.R.Void -> true
               | _ -> false
               end
           | _ -> false
@@ -1088,7 +1093,7 @@ let generate_union_getter ~nodes_table ~scope ~mode struct_def fields =
                  ~f:(%s.get_uint16 ~default:0 ~byte_ofs:%u) with"
           api_module
           api_module
-          ((PS.Node.Struct.discriminantOffset_get_int_exn struct_def) * 2);
+          ((PS.Node.Struct.R.discriminantOffset_get_int_exn struct_def) * 2);
       ]
       in
       let footer = [ "  | v -> Undefined_ v" ] in
@@ -1101,7 +1106,7 @@ let generate_union_getter ~nodes_table ~scope ~mode struct_def fields =
  * regardless of whether or not the fields are packed into a union.  (Getters
  * for fields packed inside a union are not exposed in the module signature.) *)
 let generate_accessors ~nodes_table ~scope ~mode struct_def fields =
-  let discr_ofs = PS.Node.Struct.discriminantOffset_get_int_exn struct_def in
+  let discr_ofs = PS.Node.Struct.R.discriminantOffset_get_int_exn struct_def in
   List.fold_left fields ~init:[] ~f:(fun acc field ->
     let x = generate_field_accessor ~nodes_table ~scope ~mode
         ~discr_ofs field
@@ -1116,23 +1121,23 @@ let generate_accessors ~nodes_table ~scope ~mode struct_def fields =
  * Raises: Failure if the children of this node contain a cycle. *)
 let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_def =
   let unsorted_fields =
-    let fields_accessor = PS.Node.Struct.fields_get struct_def in
+    let fields_accessor = PS.Node.Struct.R.fields_get struct_def in
     let rec loop_fields acc i =
-      if i = R.Array.length fields_accessor then
+      if i = RT.Array.length fields_accessor then
         acc
       else
-        let field = R.Array.get fields_accessor i in
+        let field = RT.Array.get fields_accessor i in
         loop_fields (field :: acc) (i + 1)
     in
     loop_fields [] 0
   in
   (* Sorting in reverse code order allows us to avoid a List.rev *)
   let all_fields = List.sort unsorted_fields ~cmp:(fun x y ->
-    - (Int.compare (PS.Field.codeOrder_get x) (PS.Field.codeOrder_get y)))
+    - (Int.compare (PS.Field.R.codeOrder_get x) (PS.Field.R.codeOrder_get y)))
   in
   let union_fields, non_union_fields = List.partition_tf all_fields
       ~f:(fun field ->
-        (PS.Field.discriminantValue_get field) <> PS.Field.noDiscriminant)
+        (PS.Field.R.discriminantValue_get field) <> PS.Field.noDiscriminant)
   in
   let reader_non_union_accessors =
     generate_accessors ~nodes_table ~scope ~mode:Mode.Reader
@@ -1185,8 +1190,8 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
     ]
   in
   let builder =
-    let data_words = PS.Node.Struct.dataWordCount_get struct_def in
-    let pointer_words = PS.Node.Struct.pointerCount_get struct_def in [
+    let data_words    = PS.Node.Struct.R.dataWordCount_get struct_def in
+    let pointer_words = PS.Node.Struct.R.pointerCount_get  struct_def in [
       indent ^ "module B = struct";
       indent ^ "  type t = builder_t"; ] @
       builder_non_union_accessors @
@@ -1210,12 +1215,12 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
  * Raises: Failure if the children of this node contain a cycle. *)
 and generate_node
     ~(suppress_module_wrapper : bool)
-    ~(nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
+    ~(nodes_table : (Uint64.t, PS.Node.reader_t) Hashtbl.t)
     ~(scope : Uint64.t list)
     ~(node_name : string)
-    (node : PS.Node.t)
+    (node : PS.Node.reader_t)
 : string list =
-  let node_id = PS.Node.id_get node in
+  let node_id = PS.Node.R.id_get node in
   let indent = String.make (2 * (List.length scope)) ' ' in
   let generate_nested_modules () =
     match Topsort.topological_sort nodes_table
@@ -1223,21 +1228,21 @@ and generate_node
     | Some child_nodes ->
         List.concat_map child_nodes ~f:(fun child ->
           let child_name = GenCommon.get_unqualified_name ~parent:node ~child in
-          let child_node_id = PS.Node.id_get child in
+          let child_node_id = PS.Node.R.id_get child in
           generate_node ~suppress_module_wrapper:false ~nodes_table
             ~scope:(child_node_id :: scope) ~node_name:child_name child)
     | None ->
         let error_msg = sprintf
           "The children of node %s (%s) have a cyclic dependency."
           (Uint64.to_string node_id)
-          (PS.Node.displayName_get node)
+          (PS.Node.R.displayName_get node)
         in
         failwith error_msg
   in
-  match PS.Node.unnamed_union_get node with
-  | PS.Node.File ->
+  match PS.Node.R.get node with
+  | PS.Node.R.File ->
       generate_nested_modules ()
-  | PS.Node.Struct struct_def ->
+  | PS.Node.R.Struct struct_def ->
       let nested_modules = generate_nested_modules () in
       let body =
         generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_def
@@ -1248,7 +1253,7 @@ and generate_node
         [ indent ^ "module " ^ node_name ^ " = struct" ] @
           body @
           [ indent ^ "end" ]
-  | PS.Node.Enum enum_def ->
+  | PS.Node.R.Enum enum_def ->
       let nested_modules = generate_nested_modules () in
       let body =
         GenCommon.generate_enum_sig ~nodes_table ~scope ~nested_modules
@@ -1262,15 +1267,15 @@ and generate_node
         [ indent ^ "module " ^ node_name ^ " = struct" ] @
         body @
         [ indent ^ "end" ]
-  | PS.Node.Interface iface_def ->
+  | PS.Node.R.Interface iface_def ->
       generate_nested_modules ()
-  | PS.Node.Const const_def ->
+  | PS.Node.R.Const const_def ->
       apply_indent ~indent [
         "let " ^ (String.uncapitalize node_name) ^ " = " ^
           (GenCommon.generate_constant ~nodes_table ~scope const_def);
       ]
-  | PS.Node.Annotation annot_def ->
+  | PS.Node.R.Annotation annot_def ->
       generate_nested_modules ()
-  | PS.Node.Undefined_ x ->
+  | PS.Node.R.Undefined_ x ->
       failwith (sprintf "Unknown Node union discriminant %u" x)
 

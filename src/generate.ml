@@ -31,7 +31,7 @@
 open Core.Std
 
 module PS = GenCommon.PS
-module R  = Runtime
+module RT = Runtime
 
 
 let sig_s_header = [
@@ -104,20 +104,23 @@ let string_of_lines lines =
   (String.concat ~sep:"\n" lines) ^ "\n"
 
 
-let compile (request : PS.CodeGeneratorRequest.t) (dest_dir : string) : unit =
+let compile
+    (request : PS.CodeGeneratorRequest.reader_t)
+    (dest_dir : string)
+  : unit =
   let nodes_table = Hashtbl.Poly.create () in
-  let nodes = PS.CodeGeneratorRequest.nodes_get request in
-  for i = 0 to R.Array.length nodes - 1 do
-    let node = R.Array.get nodes i in
-    Hashtbl.replace nodes_table ~key:(PS.Node.id_get node) ~data:node
+  let nodes = PS.CodeGeneratorRequest.R.nodes_get request in
+  for i = 0 to RT.Array.length nodes - 1 do
+    let node = RT.Array.get nodes i in
+    Hashtbl.replace nodes_table ~key:(PS.Node.R.id_get node) ~data:node
   done;
-  let requested_files = PS.CodeGeneratorRequest.requestedFiles_get request in
-  for i = 0 to R.Array.length requested_files - 1 do
-    let requested_file = R.Array.get requested_files i in
+  let requested_files = PS.CodeGeneratorRequest.R.requestedFiles_get request in
+  for i = 0 to RT.Array.length requested_files - 1 do
+    let requested_file = RT.Array.get requested_files i in
     let open PS.CodeGeneratorRequest in
-    let requested_file_id = RequestedFile.id_get requested_file in
+    let requested_file_id = RequestedFile.R.id_get requested_file in
     let requested_file_node = Hashtbl.find_exn nodes_table requested_file_id in
-    let requested_filename = RequestedFile.filename_get requested_file in
+    let requested_filename = RequestedFile.R.filename_get requested_file in
     let sig_s =
       sig_s_header @
       (GenSignatures.generate_node ~suppress_module_wrapper:true ~nodes_table

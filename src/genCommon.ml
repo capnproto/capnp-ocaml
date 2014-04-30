@@ -31,9 +31,8 @@
 open Core.Std
 
 module M  = Message.Make(StrStorage)
-module PS_ = PluginSchema.Make(M)
-module PS = PS_.Reader
-module R  = Runtime
+module PS = PluginSchema.Make(M)
+module RT = Runtime
 
 let sprintf = Printf.sprintf
 
@@ -51,12 +50,13 @@ let apply_indent ~(indent : string) (lines : string list) : string list =
 
 
 let children_of
-    (nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
-    (parent : PS.Node.t)
-: PS.Node.t list =
-  let parent_id = PS.Node.id_get parent in
+    (nodes_table : (Uint64.t, PS.Node.reader_t) Hashtbl.t)
+    (parent : PS.Node.reader_t)
+: PS.Node.reader_t list =
+  let open PS.Node in
+  let parent_id = R.id_get parent in
   Hashtbl.fold nodes_table ~init:[] ~f:(fun ~key:id ~data:node acc ->
-    if Util.uint64_equal parent_id (PS.Node.scopeId_get node) then
+    if Util.uint64_equal parent_id (R.scopeId_get node) then
       node :: acc
     else
       acc)
@@ -69,18 +69,19 @@ let children_of
  * Raises: Failure if we can't find the node in its parent.  (This means that capnpc
  * emitted a schema that we don't fully understand...) *)
 let get_unqualified_name
-    ~(parent : PS.Node.t)
-    ~(child  : PS.Node.t)
+    ~(parent : PS.Node.reader_t)
+    ~(child  : PS.Node.reader_t)
 : string =
-  let child_id = PS.Node.id_get child in
-  let nested_nodes = PS.Node.nestedNodes_get parent in
+  let open PS.Node in
+  let child_id = R.id_get child in
+  let nested_nodes = R.nestedNodes_get parent in
   let rec loop_nested_nodes i =
-    if i = R.Array.length nested_nodes then
+    if i = RT.Array.length nested_nodes then
       None
     else
-      let nested_node = R.Array.get nested_nodes i in
-      if Util.uint64_equal child_id (PS.Node.NestedNode.id_get nested_node) then
-        Some (PS.Node.NestedNode.name_get nested_node)
+      let nested_node = RT.Array.get nested_nodes i in
+      if Util.uint64_equal child_id (NestedNode.R.id_get nested_node) then
+        Some (NestedNode.R.name_get nested_node)
       else
         loop_nested_nodes (i + 1)
   in
@@ -92,38 +93,38 @@ let get_unqualified_name
           "Unable to find unqualified name of child node %s (%s) \
            within parent node %s (%s)."
         (Uint64.to_string child_id)
-        (PS.Node.displayName_get child)
-        (Uint64.to_string (PS.Node.id_get parent))
-        (PS.Node.displayName_get parent)
+        (R.displayName_get child)
+        (Uint64.to_string (R.id_get parent))
+        (R.displayName_get parent)
       in
-      begin match PS.Node.unnamed_union_get parent with
-      | PS.Node.File
-      | PS.Node.Enum _
-      | PS.Node.Interface _
-      | PS.Node.Const _
-      | PS.Node.Annotation _ ->
+      begin match R.get parent with
+      | R.File
+      | R.Enum _
+      | R.Interface _
+      | R.Const _
+      | R.Annotation _ ->
           failwith error_msg
-      | PS.Node.Struct node_struct ->
-          let fields = PS.Node.Struct.fields_get node_struct in
+      | R.Struct node_struct ->
+          let fields = Struct.R.fields_get node_struct in
           let rec loop_fields i =
-            if i = R.Array.length fields then
+            if i = RT.Array.length fields then
               failwith error_msg
             else
-              let field = R.Array.get fields i in
-              match PS.Field.unnamed_union_get field with
-              | PS.Field.Slot _ ->
+              let field = RT.Array.get fields i in
+              match PS.Field.R.get field with
+              | PS.Field.R.Slot _ ->
                   loop_fields (i + 1)
-              | PS.Field.Group group ->
+              | PS.Field.R.Group group ->
                   if Util.uint64_equal child_id
-                      (PS.Field.Group.typeId_get group) then
-                    String.capitalize (PS.Field.name_get field)
+                      (PS.Field.Group.R.typeId_get group) then
+                    String.capitalize (PS.Field.R.name_get field)
                   else
                     loop_fields (i + 1)
-              | PS.Field.Undefined_ x ->
+              | PS.Field.R.Undefined_ x ->
                   failwith (sprintf "Unknown Field union discriminant %d" x)
           in
           loop_fields 0
-      | PS.Node.Undefined_ x ->
+      | PS.Node.R.Undefined_ x ->
           failwith (sprintf "Unknown Node union discriminant %d" x)
       end
 
@@ -133,14 +134,15 @@ let get_unqualified_name
  * which it defines.  The head of the list is at the outermost scope. *)
 let get_fully_qualified_name_components nodes_table node
   : (string * Uint64.t) list =
+  let open PS.Node in
   let rec loop acc curr_node =
-    let scope_id = PS.Node.scopeId_get curr_node in
+    let scope_id = R.scopeId_get curr_node in
     if Util.uint64_equal scope_id Uint64.zero then
       acc
     else
       let parent = Hashtbl.find_exn nodes_table scope_id in
       let node_name = get_unqualified_name ~parent ~child:curr_node in
-      let node_id = PS.Node.id_get curr_node in
+      let node_id = R.id_get curr_node in
       loop ((node_name, node_id) :: acc) parent
   in
   loop [] node
@@ -175,14 +177,14 @@ let get_scope_relative_name nodes_table (scope_stack : Uint64.t list) node
 
 let make_unique_typename ~(mode : Mode.t) ~nodes_table node =
   let uq_name = get_unqualified_name
-    ~parent:(Hashtbl.find_exn nodes_table (PS.Node.scopeId_get node)) ~child:node
+    ~parent:(Hashtbl.find_exn nodes_table (PS.Node.R.scopeId_get node)) ~child:node
   in
   let t_str =
     match mode with
     | Mode.Reader  -> "reader_t"
     | Mode.Builder -> "builder_t"
   in
-  sprintf "%s_%s_%s" t_str uq_name (Uint64.to_string (PS.Node.id_get node))
+  sprintf "%s_%s_%s" t_str uq_name (Uint64.to_string (PS.Node.R.id_get node))
 
 
 (* When modules refer to types defined in other modules, readability dictates that we use
@@ -218,7 +220,7 @@ let make_unique_typename ~(mode : Mode.t) ~nodes_table node =
  * unique ID for Foo. *)
 let make_disambiguated_type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
     ~nodes_table ~scope ~tp node =
-  let node_id = PS.Node.id_get node in
+  let node_id = PS.Node.R.id_get node in
   if List.mem scope node_id then
     (* The node of interest is a parent node of the node being generated.
        this is the case where an unambiguous type is emitted. *)
@@ -226,8 +228,8 @@ let make_disambiguated_type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
   else
     let module_name = get_scope_relative_name nodes_table scope node in
     let t_str =
-      match PS.Type.unnamed_union_get tp with
-      | PS.Type.Enum _ ->
+      match PS.Type.R.get tp with
+      | PS.Type.R.Enum _ ->
           (* Enum types are identical across reader and builder, no need
              to distinguish between them *)
           ".t"
@@ -246,68 +248,70 @@ let make_disambiguated_type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
    to be referenced within the scope of a Reader or a Builder. *)
 let rec type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
     nodes_table scope tp : string =
-  match PS.Type.unnamed_union_get tp with
-  | PS.Type.Void    -> "unit"
-  | PS.Type.Bool    -> "bool"
-  | PS.Type.Int8    -> "int"
-  | PS.Type.Int16   -> "int"
-  | PS.Type.Int32   -> "int32"
-  | PS.Type.Int64   -> "int64"
-  | PS.Type.Uint8   -> "int"
-  | PS.Type.Uint16  -> "int"
-  | PS.Type.Uint32  -> "Uint32.t"
-  | PS.Type.Uint64  -> "Uint64.t"
-  | PS.Type.Float32 -> "float"
-  | PS.Type.Float64 -> "float"
-  | PS.Type.Text    -> "string"
-  | PS.Type.Data    -> "string"
-  | PS.Type.List list_descr ->
-      let list_type = PS.Type.List.elementType_get list_descr in
+  let open PS.Type in
+  match R.get tp with
+  | R.Void    -> "unit"
+  | R.Bool    -> "bool"
+  | R.Int8    -> "int"
+  | R.Int16   -> "int"
+  | R.Int32   -> "int32"
+  | R.Int64   -> "int64"
+  | R.Uint8   -> "int"
+  | R.Uint16  -> "int"
+  | R.Uint32  -> "Uint32.t"
+  | R.Uint64  -> "Uint64.t"
+  | R.Float32 -> "float"
+  | R.Float64 -> "float"
+  | R.Text    -> "string"
+  | R.Data    -> "string"
+  | R.List list_descr ->
+      let list_type = List.R.elementType_get list_descr in
       sprintf "(%s, %s, %s) Runtime.Array.t"
         (if mode = Mode.Reader then "ro" else "rw")
         (type_name ~mode ~scope_mode nodes_table scope list_type)
         (if mode = Mode.Reader then "reader_array_t" else "builder_array_t")
-  | PS.Type.Enum enum_descr ->
-      let enum_id = PS.Type.Enum.typeId_get enum_descr in
+  | R.Enum enum_descr ->
+      let enum_id = Enum.R.typeId_get enum_descr in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
       make_disambiguated_type_name ~mode ~scope_mode ~nodes_table
         ~scope ~tp enum_node
-  | PS.Type.Struct struct_descr ->
-      let struct_id = PS.Type.Struct.typeId_get struct_descr in
+  | R.Struct struct_descr ->
+      let struct_id = Struct.R.typeId_get struct_descr in
       let struct_node = Hashtbl.find_exn nodes_table struct_id in
       make_disambiguated_type_name ~mode ~scope_mode ~nodes_table
         ~scope ~tp struct_node
-  | PS.Type.Interface iface_descr ->
-      let iface_id = PS.Type.Interface.typeId_get iface_descr in
+  | R.Interface iface_descr ->
+      let iface_id = Interface.R.typeId_get iface_descr in
       let iface_node = Hashtbl.find_exn nodes_table iface_id in
       make_disambiguated_type_name ~mode ~scope_mode ~nodes_table
         ~scope ~tp iface_node
-  | PS.Type.AnyPointer ->
+  | R.AnyPointer ->
       begin match mode with
       | Mode.Reader  -> "AnyPointer.reader_t"
       | Mode.Builder -> "AnyPointer.builder_t"
       end
-  | PS.Type.Undefined_ x ->
+  | R.Undefined_ x ->
       failwith (sprintf "Unknown Type union discriminant %d" x)
 
 
 let generate_union_type ~(mode : Mode.t) nodes_table scope fields =
+  let open PS.Field in
   let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
-    let field_name = String.capitalize (PS.Field.name_get field) in
-    match PS.Field.unnamed_union_get field with
-    | PS.Field.Slot slot ->
-        let field_type = PS.Field.Slot.type_get slot in
-        begin match PS.Type.unnamed_union_get field_type with
-        | PS.Type.Void ->
+    let field_name = String.capitalize (R.name_get field) in
+    match R.get field with
+    | R.Slot slot ->
+        let field_type = Slot.R.type_get slot in
+        begin match PS.Type.R.get field_type with
+        | PS.Type.R.Void ->
             ("  | " ^ field_name) :: acc
         | _ ->
             ("  | " ^ field_name ^ " of " ^
                (type_name ~mode ~scope_mode:mode nodes_table scope field_type))
             :: acc
         end
-    | PS.Field.Group group ->
+    | R.Group group ->
         let group_type_name =
-          let group_id = PS.Field.Group.typeId_get group in
+          let group_id = Group.R.typeId_get group in
           let group_node = Hashtbl.find_exn nodes_table group_id in
           let group_module_name =
             get_scope_relative_name nodes_table scope group_node
@@ -320,7 +324,7 @@ let generate_union_type ~(mode : Mode.t) nodes_table scope fields =
           group_module_name ^ t_str
         in
         ("  | " ^ field_name ^ " of " ^ group_type_name) :: acc
-    | PS.Field.Undefined_ x ->
+    | R.Undefined_ x ->
         failwith (sprintf "Unknown Field union discriminant %d" x))
   in
   let header = [ "type unnamed_union_t =" ] in
@@ -343,14 +347,14 @@ let generate_enum_sig ~nodes_table ~scope ~nested_modules
       [ indent ^ "type t =" ]
   in
   let variants =
-    let enumerants = PS.Node.Enum.enumerants_get enum_def in
+    let enumerants = PS.Node.Enum.R.enumerants_get enum_def in
     let footer = indent ^ "  | Undefined_ of int" in
     let rec loop acc i =
-      if i = R.Array.length enumerants then
+      if i = RT.Array.length enumerants then
         List.rev (footer :: acc)
       else
-        let enumerant = R.Array.get enumerants i in
-        let name = String.capitalize (PS.Enumerant.name_get enumerant) in
+        let enumerant = RT.Array.get enumerants i in
+        let name = String.capitalize (PS.Enumerant.R.name_get enumerant) in
         let match_case = indent ^ "  | " ^ name in
         loop (match_case :: acc) (i + 1)
     in
@@ -360,66 +364,67 @@ let generate_enum_sig ~nodes_table ~scope ~nested_modules
 
 
 let generate_constant ~nodes_table ~scope const_def =
-  let const_val = PS.Node.Const.value_get const_def in
-  match PS.Value.unnamed_union_get const_val with
-  | PS.Value.Void ->
+  let open PS.Value in
+  let const_val = PS.Node.Const.R.value_get const_def in
+  match R.get const_val with
+  | R.Void ->
       "()"
-  | PS.Value.Bool a ->
+  | R.Bool a ->
       if a then "true" else "false"
-  | PS.Value.Int8 a
-  | PS.Value.Int16 a
-  | PS.Value.Uint8 a
-  | PS.Value.Uint16 a ->
+  | R.Int8 a
+  | R.Int16 a
+  | R.Uint8 a
+  | R.Uint16 a ->
       Int.to_string a
-  | PS.Value.Int32 a ->
+  | R.Int32 a ->
       (Int32.to_string a) ^ "l"
-  | PS.Value.Int64 a ->
+  | R.Int64 a ->
       (Int64.to_string a) ^ "L"
-  | PS.Value.Uint32 a ->
+  | R.Uint32 a ->
       sprintf "(Uint32.of_string %s)" (Uint32.to_string a)
-  | PS.Value.Uint64 a ->
+  | R.Uint64 a ->
       sprintf "(Uint64.of_string %s)" (Uint64.to_string a)
-  | PS.Value.Float32 a ->
+  | R.Float32 a ->
       sprintf "(Int32.float_of_bits %sl)"
         (Int32.to_string (Int32.bits_of_float a))
-  | PS.Value.Float64 a ->
+  | R.Float64 a ->
       sprintf "(Int64.float_of_bits %sL)"
         (Int64.to_string (Int64.bits_of_float a))
-  | PS.Value.Text a
-  | PS.Value.Data a ->
+  | R.Text a
+  | R.Data a ->
       "\"" ^ (String.escaped a) ^ "\""
-  | PS.Value.List _ ->
+  | R.List _ ->
       failwith "List constants are not yet implemented."
-  | PS.Value.Enum enum_val ->
-      let const_type = PS.Node.Const.type_get const_def in
+  | R.Enum enum_val ->
+      let const_type = PS.Node.Const.R.type_get const_def in
       let enum_node =
-        match PS.Type.unnamed_union_get const_type with
-        | PS.Type.Enum enum_def ->
-            let enum_id = PS.Type.Enum.typeId_get enum_def in
+        match PS.Type.R.get const_type with
+        | PS.Type.R.Enum enum_def ->
+            let enum_id = PS.Type.Enum.R.typeId_get enum_def in
             Hashtbl.find_exn nodes_table enum_id
         | _ ->
             failwith "Decoded non-enum node where enum node was expected."
       in
       let enumerants =
-        match PS.Node.unnamed_union_get enum_node with
-        | PS.Node.Enum enum_group -> PS.Node.Enum.enumerants_get enum_group
+        match PS.Node.R.get enum_node with
+        | PS.Node.R.Enum enum_group -> PS.Node.Enum.R.enumerants_get enum_group
         | _ -> failwith "Decoded non-enum node where enum node was expected."
       in
       let scope_relative_name =
         get_scope_relative_name nodes_table scope enum_node in
-      if enum_val >= R.Array.length enumerants then
+      if enum_val >= RT.Array.length enumerants then
         sprintf "%s.Undefined_ %u" scope_relative_name enum_val
       else
-        let enumerant = R.Array.get enumerants enum_val in
+        let enumerant = RT.Array.get enumerants enum_val in
         sprintf "%s.%s"
           scope_relative_name
-          (String.capitalize (PS.Enumerant.name_get enumerant))
-  | PS.Value.Struct _ ->
+          (String.capitalize (PS.Enumerant.R.name_get enumerant))
+  | R.Struct _ ->
       failwith "Struct constants are not yet implemented."
-  | PS.Value.Interface ->
+  | R.Interface ->
       failwith "Interface constants are not yet implemented."
-  | PS.Value.AnyPointer _ ->
+  | R.AnyPointer _ ->
       failwith "AnyPointer constants are not yet implemented."
-  | PS.Value.Undefined_ x ->
+  | R.Undefined_ x ->
       failwith (sprintf "Unknown Value union discriminant %u." x)
 
