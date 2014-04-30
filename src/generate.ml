@@ -39,11 +39,13 @@ let sig_s_header = [
   "type rw = Message.rw";
   "";
   "module type S = sig";
+  "  type 'cap message_t";
   "  type reader_array_t";
   "  type builder_array_t";
   "";
   "  module AnyPointer : sig";
-  "    type t";
+  "    type reader_t";
+  "    type builder_t";
   "  end";
   "";
 ]
@@ -55,9 +57,9 @@ let sig_s_footer = [
 
 let functor_sig = [
   "module Make (MessageWrapper : Message.S) :";
-  "  (S with type Reader.message_t = Message.ro MessageWrapper.Message.t";
-  "    and type Builder.message_t = Message.rw MessageWrapper.Message.t";
-  "    and type Reader.AnyPointer.t = Message.ro MessageWrapper.Slice.t option)";
+  "  (S with type 'cap message_t = 'cap MessageWrapper.Message.t";
+  "    and type AnyPointer.reader_t = Message.ro MessageWrapper.Slice.t option";
+  "    and type AnyPointer.builder_t = Message.rw MessageWrapper.Slice.t)";
   "";
 ]
 
@@ -65,35 +67,22 @@ let mod_header = [
   "module Make (MessageWrapper : Message.S) = struct";
   "  let invalid_msg = Message.invalid_msg";
   "";
-  "  module Reader = struct";
-  "    module RuntimeReader_ = MessageReader.Make(MessageWrapper)";
-  "    open RuntimeReader_";
+  "  module RA_ = MessageReader.Make(MessageWrapper)";
+  "  module BA_ = MessageBuilder.Make(MessageWrapper)";
   "";
-  "    type message_t = ro RuntimeReader_.Message.t";
+  "  type 'cap message_t = 'cap MessageWrapper.Message.t";
   "";
-  "    module AnyPointer = struct";
-  "      type t = ro Slice.t option";
-  "    end";
+  "  type reader_array_t = ro RA_.ListStorage.t";
+  "  type builder_array_t = rw RA_.ListStorage.t";
   "";
-]
-
-let mod_divide_reader_builder = [
+  "  module AnyPointer = struct";
+  "    type reader_t = ro MessageWrapper.Slice.t option";
+  "    type builder_t = rw MessageWrapper.Slice.t";
   "  end";
-  "";
-  "  module Builder = struct";
-  "    module RuntimeBuilder_ = MessageBuilder.Make(MessageWrapper)";
-  "    open RuntimeBuilder_";
-  "";
-  "    type message_t = rw RuntimeBuilder_.Message.t";
-  "";
-  "    module AnyPointer = struct";
-  "      type t = rw Slice.t";
-  "    end";
   "";
 ]
 
 let mod_footer = [
-  "  end";
   "end";
   "";
 ]
@@ -142,10 +131,7 @@ let compile (request : PS.CodeGeneratorRequest.t) (dest_dir : string) : unit =
       string_of_lines (
         sig_s @
         mod_header @
-        (GenReader.generate_node ~suppress_module_wrapper:true ~nodes_table
-          ~scope:[] ~node_name:requested_filename requested_file_node) @
-        mod_divide_reader_builder @
-        (GenBuilder.generate_node ~suppress_module_wrapper:true ~nodes_table
+        (GenModules.generate_node ~suppress_module_wrapper:true ~nodes_table
           ~scope:[] ~node_name:requested_filename requested_file_node) @
         mod_footer)
     in

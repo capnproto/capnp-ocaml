@@ -46,8 +46,9 @@ let generate_union_getter ~nodes_table ~scope ~mode fields =
       []
   | _ ->
       let indent = String.make (2 * (List.length scope + 2)) ' ' in
-      (GenCommon.generate_union_type ~mode nodes_table scope fields) @
-        [ indent ^ "val get : t -> unnamed_union_t" ]
+      apply_indent ~indent (
+        (GenCommon.generate_union_type ~mode nodes_table scope fields) @
+          [ "val get : t -> unnamed_union_t" ])
 
 
 (* Generate accessors for retrieving a selected list of fields of a struct. *)
@@ -135,6 +136,10 @@ let generate_setters ~nodes_table ~scope fields =
       | PS.Field.Slot slot ->
           let tp = PS.Field.Slot.type_get slot in
           begin match PS.Type.unnamed_union_get tp with
+          | PS.Type.Int8 ->
+              [ indent ^ "val " ^ field_name ^ "_set_exn : t -> int -> unit"; ]
+          | PS.Type.Int16 ->
+              [ indent ^ "val " ^ field_name ^ "_set_exn : t -> int -> unit"; ]
           | PS.Type.Int32 ->
               apply_indent ~indent [
                 "val " ^ field_name ^ "_set : t -> int32 -> unit";
@@ -145,6 +150,10 @@ let generate_setters ~nodes_table ~scope fields =
                 "val " ^ field_name ^ "_set : t -> int64 -> unit";
                 "val " ^ field_name ^ "_set_int_exn : t -> int -> unit";
               ]
+          | PS.Type.Uint8 ->
+              [ indent ^ "val " ^ field_name ^ "_set_exn : t -> int -> unit"; ]
+          | PS.Type.Uint16 ->
+              [ indent ^ "val " ^ field_name ^ "_set_exn : t -> int -> unit"; ]
           | PS.Type.Uint32 ->
               apply_indent ~indent [
                 "val " ^ field_name ^ "_set : t -> Uint32.t -> unit";
@@ -188,22 +197,28 @@ let generate_setters ~nodes_table ~scope fields =
                   (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
                      nodes_table scope tp);
               ]
+          | PS.Type.Enum _ ->
+              apply_indent ~indent [
+                sprintf "val %s_set : t -> %s -> unit"
+                  field_name
+                  (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
+                     nodes_table scope tp);
+                sprintf "val %s_set_unsafe : t -> %s -> unit"
+                  field_name
+                  (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
+                     nodes_table scope tp);
+              ]
           | PS.Type.Bool
-          | PS.Type.Int8
-          | PS.Type.Int16
-          | PS.Type.Uint8
-          | PS.Type.Uint16
           | PS.Type.Float32
           | PS.Type.Float64
           | PS.Type.Text
           | PS.Type.Data
-          | PS.Type.Enum _
           | PS.Type.Interface _
           | PS.Type.AnyPointer ->
               apply_indent ~indent [
                 sprintf "val %s_set : t -> %s -> unit"
                 field_name
-                (GenCommon.type_name ~mode:Mode.Reader ~scope_mode:Mode.Builder
+                (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
                    nodes_table scope tp);
               ]
           | PS.Type.Void ->
@@ -240,8 +255,9 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules
   let all_fields = List.sort unsorted_fields ~cmp:(fun x y ->
     - (Int.compare (PS.Field.codeOrder_get x) (PS.Field.codeOrder_get y)))
   in
-  let union_fields, non_union_fields = List.partition_tf all_fields ~f:(fun field ->
-    (PS.Field.discriminantValue_get field) <> PS.Field.noDiscriminant)
+  let union_fields, non_union_fields = List.partition_tf all_fields
+      ~f:(fun field ->
+        (PS.Field.discriminantValue_get field) <> PS.Field.noDiscriminant)
   in
   let reader_union_accessors =
     generate_union_getter ~nodes_table ~scope ~mode:Mode.Reader union_fields
@@ -258,18 +274,20 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules
       (generate_setters ~nodes_table ~scope non_union_fields)
   in
   let indent = String.make (2 * (List.length scope + 1)) ' ' in
+  let unique_reader =
+    GenCommon.make_unique_typename ~mode:Mode.Reader ~nodes_table node
+  in
+  let unique_builder =
+    GenCommon.make_unique_typename ~mode:Mode.Builder ~nodes_table node
+  in
   let header = apply_indent ~indent [
     (* declare the primary types of the node *)
     "type reader_t";
     "type builder_t";
     (* declare schema-unique type aliases for these types, for use in
        submodules *)
-    "type " ^
-      (GenCommon.make_unique_typename ~mode:Mode.Reader ~nodes_table node) ^
-      " = reader_t";
-    "type " ^
-      (GenCommon.make_unique_typename ~mode:Mode.Builder ~nodes_table node) ^
-      " = builder_t";
+    "type " ^ unique_reader ^ " = reader_t";
+    "type " ^ unique_builder ^ " = builder_t";
   ] in
   let reader = [
     indent ^ "module R : sig";
@@ -277,7 +295,7 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules
       reader_union_accessors @
       reader_non_union_accessors @ [
       indent ^ "  val of_message : 'cap message_t -> t";
-      indent ^ "end"
+      indent ^ "end";
     ]
   in
   let builder = [
@@ -286,7 +304,7 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules
       builder_union_accessors @
       builder_non_union_accessors @ [
       indent ^ "  val of_message : rw message_t -> t";
-      indent ^ "end"
+      indent ^ "end";
     ]
   in
   header @

@@ -283,13 +283,15 @@ let rec type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
       make_disambiguated_type_name ~mode ~scope_mode ~nodes_table
         ~scope ~tp iface_node
   | PS.Type.AnyPointer ->
-      "AnyPointer.t"
+      begin match mode with
+      | Mode.Reader  -> "AnyPointer.reader_t"
+      | Mode.Builder -> "AnyPointer.builder_t"
+      end
   | PS.Type.Undefined_ x ->
       failwith (sprintf "Unknown Type union discriminant %d" x)
 
 
 let generate_union_type ~(mode : Mode.t) nodes_table scope fields =
-  let indent = String.make (2 * (List.length scope + 2)) ' ' in
   let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
     let field_name = String.capitalize (PS.Field.name_get field) in
     match PS.Field.unnamed_union_get field with
@@ -297,9 +299,9 @@ let generate_union_type ~(mode : Mode.t) nodes_table scope fields =
         let field_type = PS.Field.Slot.type_get slot in
         begin match PS.Type.unnamed_union_get field_type with
         | PS.Type.Void ->
-            (indent ^ "  | " ^ field_name) :: acc
+            ("  | " ^ field_name) :: acc
         | _ ->
-            (indent ^ "  | " ^ field_name ^ " of " ^
+            ("  | " ^ field_name ^ " of " ^
                (type_name ~mode ~scope_mode:mode nodes_table scope field_type))
             :: acc
         end
@@ -310,14 +312,19 @@ let generate_union_type ~(mode : Mode.t) nodes_table scope fields =
           let group_module_name =
             get_scope_relative_name nodes_table scope group_node
           in
-          group_module_name ^ ".t"
+          let t_str = 
+            match mode with
+            | Mode.Reader -> ".reader_t"
+            | Mode.Builder -> ".builder_t"
+          in
+          group_module_name ^ t_str
         in
-        (indent ^ "  | " ^ field_name ^ " of " ^ group_type_name) :: acc
+        ("  | " ^ field_name ^ " of " ^ group_type_name) :: acc
     | PS.Field.Undefined_ x ->
         failwith (sprintf "Unknown Field union discriminant %d" x))
   in
-  let header = [ indent ^ "type unnamed_union_t =" ] in
-  let footer = [ indent ^ "  | Undefined_ of int" ] in
+  let header = [ "type unnamed_union_t =" ] in
+  let footer = [ "  | Undefined_ of int" ] in
   (header @ cases @ footer)
 
 
