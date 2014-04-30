@@ -42,22 +42,22 @@ end
 
 module InnerArray = struct
   type ('cap, 'a, 'arr) t = {
-    length : unit -> int;
+    length : int;
     get_unsafe : int -> 'a;
     set_unsafe : int -> 'a -> unit;
     storage : 'arr option;
   }
 
-  let length x = x.length ()
+  let length x = x.length
 
   let get x i =
-    if i < 0 || i >= x.length () then
+    if i < 0 || i >= x.length then
       invalid_arg "index out of bounds"
     else
       x.get_unsafe i
 
   let set x i v =
-    if i < 0 || i >= x.length () then
+    if i < 0 || i >= x.length then
       invalid_arg "index out of bounds"
     else
       x.set_unsafe i v

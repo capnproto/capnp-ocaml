@@ -374,10 +374,9 @@ module Make (MessageWrapper : Message.S) = struct
     loop init (list_storage.ListStorage.num_elements - 1)
 
   let make_empty_array () =
-    let length () = 0 in
     let get_unsafe i = assert false in
     InnerArray.to_outer_array {
-      InnerArray.length;
+      InnerArray.length = 0;
       InnerArray.get_unsafe;
       InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
       InnerArray.storage = None
@@ -433,10 +432,8 @@ module Make (MessageWrapper : Message.S) = struct
         list_storage.ListStorage.storage.Slice.start + (i * byte_count);
       Slice.len = byte_count;
     } in
-    let length () =
-      list_storage.ListStorage.num_elements
-    in
-    let get_unsafe = 
+    let length = list_storage.ListStorage.num_elements in
+    let get_unsafe =
       match list_storage.ListStorage.storage_type with
       | ListStorage.Empty ->
           begin match decoders with
@@ -551,9 +548,7 @@ module Make (MessageWrapper : Message.S) = struct
         list_storage.ListStorage.storage.Slice.start + (i * byte_count);
       Slice.len = byte_count;
     } in
-    let length () =
-      list_storage.ListStorage.num_elements
-    in
+    let length = list_storage.ListStorage.num_elements in
     let get_unsafe, set_unsafe =
       match list_storage.ListStorage.storage_type with
       | ListStorage.Empty ->
