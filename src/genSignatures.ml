@@ -243,15 +243,7 @@ let generate_setters ~nodes_table ~scope fields =
 let rec generate_struct_node ~nodes_table ~scope ~nested_modules
     ~node struct_def : string list =
   let unsorted_fields =
-    let fields_accessor = PS.Node.Struct.R.fields_get struct_def in
-    let rec loop_fields acc i =
-      if i = RT.Array.length fields_accessor then
-        acc
-      else
-        let field = RT.Array.get fields_accessor i in
-        loop_fields (field :: acc) (i + 1)
-    in
-    loop_fields [] 0
+    RT.Array.to_list (PS.Node.Struct.R.fields_get struct_def)
   in
   (* Sorting in reverse code order allows us to avoid a List.rev *)
   let all_fields = List.sort unsorted_fields ~cmp:(fun x y ->

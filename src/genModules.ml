@@ -60,18 +60,12 @@ let generate_enum_decoder ~nodes_table ~scope ~enum_node ~indent =
       | _ ->
           failwith "Decoded non-enum node where enum node was expected."
     in
-    let rec loop_cases acc i =
-      if i = RT.Array.length enumerants then
-        List.rev acc
-      else
-        let enumerant = RT.Array.get enumerants i in
-        let case_str =
-          sprintf "  | %u -> %s.%s" i scope_relative_name
-            (String.capitalize (PS.Enumerant.R.name_get enumerant))
-        in
-        loop_cases (case_str :: acc) (i + 1)
-    in
-    loop_cases [] 0
+    RT.Array.foldi_right enumerants ~init:[] ~f:(fun i enumerant acc ->
+      let case_str =
+        sprintf "  | %u -> %s.%s" i scope_relative_name
+          (String.capitalize (PS.Enumerant.R.name_get enumerant))
+      in
+      case_str :: acc)
   in
   let footer = [ sprintf "  | v -> %s.Undefined_ v)" scope_relative_name ] in
   apply_indent ~indent (header @ match_cases @ footer)
@@ -94,20 +88,14 @@ let generate_enum_encoder ~(allow_undefined : bool) ~nodes_table ~scope
       | _ ->
           failwith "Decoded non-enum node where enum node was expected."
     in
-    let rec loop_cases acc i =
-      if i = RT.Array.length enumerants then
-        List.rev acc
-      else
-        let enumerant = RT.Array.get enumerants i in
-        let case_str =
-          sprintf "  | %s.%s -> %u"
-            scope_relative_name
-            (String.capitalize (PS.Enumerant.R.name_get enumerant))
-            i
-        in
-        loop_cases (case_str :: acc) (i + 1)
-    in
-    loop_cases [] 0
+    RT.Array.foldi_right enumerants ~init:[] ~f:(fun i enumerant acc ->
+      let case_str =
+        sprintf "  | %s.%s -> %u"
+          scope_relative_name
+          (String.capitalize (PS.Enumerant.R.name_get enumerant))
+          i
+      in
+      case_str :: acc)
   in
   let footer = 
     if allow_undefined then [
@@ -1121,15 +1109,7 @@ let generate_accessors ~nodes_table ~scope ~mode struct_def fields =
  * Raises: Failure if the children of this node contain a cycle. *)
 let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_def =
   let unsorted_fields =
-    let fields_accessor = PS.Node.Struct.R.fields_get struct_def in
-    let rec loop_fields acc i =
-      if i = RT.Array.length fields_accessor then
-        acc
-      else
-        let field = RT.Array.get fields_accessor i in
-        loop_fields (field :: acc) (i + 1)
-    in
-    loop_fields [] 0
+    RT.Array.to_list (PS.Node.Struct.R.fields_get struct_def)
   in
   (* Sorting in reverse code order allows us to avoid a List.rev *)
   let all_fields = List.sort unsorted_fields ~cmp:(fun x y ->

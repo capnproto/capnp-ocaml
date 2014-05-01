@@ -75,17 +75,14 @@ let get_unqualified_name
   let open PS.Node in
   let child_id = R.id_get child in
   let nested_nodes = R.nestedNodes_get parent in
-  let rec loop_nested_nodes i =
-    if i = RT.Array.length nested_nodes then
-      None
-    else
-      let nested_node = RT.Array.get nested_nodes i in
+  let matching_nested_node_name =
+    RT.Array.find_map nested_nodes ~f:(fun nested_node ->
       if Util.uint64_equal child_id (NestedNode.R.id_get nested_node) then
         Some (NestedNode.R.name_get nested_node)
       else
-        loop_nested_nodes (i + 1)
+        None)
   in
-  match loop_nested_nodes 0 with
+  match matching_nested_node_name with
   | Some s ->
       String.capitalize s
   | None ->
@@ -106,24 +103,24 @@ let get_unqualified_name
           failwith error_msg
       | R.Struct node_struct ->
           let fields = Struct.R.fields_get node_struct in
-          let rec loop_fields i =
-            if i = RT.Array.length fields then
-              failwith error_msg
-            else
-              let field = RT.Array.get fields i in
+          let matching_field_name =
+            RT.Array.find_map fields ~f:(fun field ->
               match PS.Field.R.get field with
               | PS.Field.R.Slot _ ->
-                  loop_fields (i + 1)
+                  None
               | PS.Field.R.Group group ->
                   if Util.uint64_equal child_id
                       (PS.Field.Group.R.typeId_get group) then
-                    String.capitalize (PS.Field.R.name_get field)
+                    Some (String.capitalize (PS.Field.R.name_get field))
                   else
-                    loop_fields (i + 1)
+                    None
               | PS.Field.R.Undefined_ x ->
-                  failwith (sprintf "Unknown Field union discriminant %d" x)
+                  failwith (sprintf "Unknown Field union discriminant %d" x))
           in
-          loop_fields 0
+          begin match matching_field_name with
+          | Some name -> name
+          | None      -> failwith error_msg
+          end
       | PS.Node.R.Undefined_ x ->
           failwith (sprintf "Unknown Node union discriminant %d" x)
       end
@@ -348,17 +345,11 @@ let generate_enum_sig ~nodes_table ~scope ~nested_modules
   in
   let variants =
     let enumerants = PS.Node.Enum.R.enumerants_get enum_def in
-    let footer = indent ^ "  | Undefined_ of int" in
-    let rec loop acc i =
-      if i = RT.Array.length enumerants then
-        List.rev (footer :: acc)
-      else
-        let enumerant = RT.Array.get enumerants i in
-        let name = String.capitalize (PS.Enumerant.R.name_get enumerant) in
-        let match_case = indent ^ "  | " ^ name in
-        loop (match_case :: acc) (i + 1)
-    in
-    loop [] 0
+    let footer = [ indent ^ "  | Undefined_ of int" ] in
+    RT.Array.fold_right enumerants ~init:footer ~f:(fun enumerant acc ->
+      let name = String.capitalize (PS.Enumerant.R.name_get enumerant) in
+      let match_case = indent ^ "  | " ^ name in
+      match_case :: acc)
   in
   nested_modules @ header @ variants
 

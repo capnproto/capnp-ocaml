@@ -110,13 +110,11 @@ let compile
   : unit =
   let nodes_table = Hashtbl.Poly.create () in
   let nodes = PS.CodeGeneratorRequest.R.nodes_get request in
-  for i = 0 to RT.Array.length nodes - 1 do
-    let node = RT.Array.get nodes i in
-    Hashtbl.replace nodes_table ~key:(PS.Node.R.id_get node) ~data:node
-  done;
+  let () = RT.Array.iter nodes ~f:(fun node ->
+      Hashtbl.replace nodes_table ~key:(PS.Node.R.id_get node) ~data:node)
+  in
   let requested_files = PS.CodeGeneratorRequest.R.requestedFiles_get request in
-  for i = 0 to RT.Array.length requested_files - 1 do
-    let requested_file = RT.Array.get requested_files i in
+  RT.Array.iter requested_files ~f:(fun requested_file ->
     let open PS.CodeGeneratorRequest in
     let requested_file_id = RequestedFile.R.id_get requested_file in
     let requested_file_node = Hashtbl.find_exn nodes_table requested_file_id in
@@ -144,7 +142,6 @@ let compile
     let () = Out_channel.with_file (ml_filename requested_filename)
         ~f:(fun chan -> Out_channel.output_string chan mod_file_content)
     in
-    ()
-  done
+    ())
 
 

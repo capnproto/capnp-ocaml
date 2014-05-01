@@ -43,15 +43,13 @@ let add_parentage_maps
   let node_id = R.id_get node in
   let rec add_children parent =
     let child_nodes = R.nestedNodes_get parent in
-    for i = 0 to RT.Array.length child_nodes - 1 do
-      let child_nested_node = RT.Array.get child_nodes i in
+    RT.Array.iter child_nodes ~f:(fun child_nested_node ->
       let child_node =
         Hashtbl.find_exn nodes_table (NestedNode.R.id_get child_nested_node)
       in
       let child_node_id = R.id_get child_node in
       let () = add_children child_node in
-      Hashtbl.replace parentage_table ~key:child_node_id ~data:node_id
-    done
+      Hashtbl.replace parentage_table ~key:child_node_id ~data:node_id)
   in
   let () = add_children node in
   (* Also adding an identity map for the parent node *)
@@ -137,13 +135,11 @@ let build_reference_graph
     in
     let () =
       let child_nodes = R.nestedNodes_get node in
-      for i = 0 to RT.Array.length child_nodes - 1 do
-        let child_nested_node = RT.Array.get child_nodes i in
+      RT.Array.iter child_nodes ~f:(fun child_nested_node ->
         let child_node = Hashtbl.find_exn nodes_table
             (NestedNode.R.id_get child_nested_node)
         in
-        add_edges ~parentage_table ~edges ~parent_id_opt:parent_id child_node;
-      done
+        add_edges ~parentage_table ~edges ~parent_id_opt:parent_id child_node)
     in
     match R.get node with
     | R.File
@@ -155,8 +151,7 @@ let build_reference_graph
         ()
     | R.Struct node_struct ->
         let fields = Struct.R.fields_get node_struct in
-        for j = 0 to RT.Array.length fields - 1 do
-          let field = RT.Array.get fields j in
+        RT.Array.iter fields ~f:(fun field ->
           match PS.Field.R.get field with
           | PS.Field.R.Slot slot ->
               register_type_reference ~parentage_table ~edges
@@ -168,17 +163,14 @@ let build_reference_graph
               add_edges ~parentage_table ~edges ~parent_id_opt:parent_id
                 group_node
           | PS.Field.R.Undefined_ x ->
-              failwith (Printf.sprintf "Unknown Field union discriminant %d" x)
-        done
+              failwith (Printf.sprintf "Unknown Field union discriminant %d" x))
     | R.Interface node_iface ->
         let methods = Interface.R.methods_get node_iface in
-        for j = 0 to RT.Array.length methods - 1 do
-          let meth = RT.Array.get methods j in
+        RT.Array.iter methods ~f:(fun meth ->
           register_reference ~parentage_table ~edges
             ~referrer:parent_id ~referee:(PS.Method.R.paramStructType_get meth);
           register_reference ~parentage_table ~edges
-            ~referrer:parent_id ~referee:(PS.Method.R.resultStructType_get meth)
-        done
+            ~referrer:parent_id ~referee:(PS.Method.R.resultStructType_get meth))
     | R.Const node_const ->
         register_type_reference ~parentage_table ~edges
           ~referrer:parent_id ~referee_type:(PS.Node.Const.R.type_get node_const)
