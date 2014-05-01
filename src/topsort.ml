@@ -79,7 +79,17 @@ let register_reference ~parentage_table ~edges ~referrer ~referee : unit =
            the child nodes which will be sorted out on a later pass. *)
         ()
       else
-        Hashtbl.add_multi edges ~key:parent_referee ~data:referrer
+        begin match Hashtbl.find edges parent_referee with
+        | Some referrer_list ->
+            if List.mem referrer_list referrer then
+              (* This reference is already present *)
+              ()
+            else
+              Hashtbl.replace edges ~key:parent_referee
+                ~data:(referrer :: referrer_list)
+        | None ->
+            Hashtbl.replace edges ~key:parent_referee ~data:[referrer]
+        end
   | None ->
       (* When recursing within node M, we may find reference to nodes which are
          not contained within node M.  These references will not be contained in
