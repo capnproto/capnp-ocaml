@@ -49,6 +49,29 @@ let apply_indent ~(indent : string) (lines : string list) : string list =
     if String.is_empty line then "" else indent ^ line)
 
 
+(* Mangle a name so that it doesn't collide with any of the names in the list. *)
+let mangle_ident (ident : string) (idents : string list) =
+  let rec loop mangled =
+    if List.mem idents mangled then
+      loop (mangled ^ "_")
+    else
+      mangled
+  in
+  loop ident
+
+
+let mangle_undefined reserved_names =
+  String.capitalize (mangle_ident "undefined" reserved_names)
+
+let mangle_enum_undefined (enumerants : ('a, 'b, 'c) RT.Array.t) =
+  let enumerant_names = RT.Array.map_list enumerants ~f:PS.Enumerant.R.name_get in
+  mangle_undefined enumerant_names
+
+let mangle_field_undefined (fields : 'a list) =
+  let field_names = List.rev_map fields ~f:PS.Field.R.name_get in
+  mangle_undefined field_names
+
+
 let children_of
     (nodes_table : (Uint64.t, PS.Node.reader_t) Hashtbl.t)
     (parent : PS.Node.reader_t)
@@ -114,14 +137,14 @@ let get_unqualified_name
                     Some (String.capitalize (PS.Field.R.name_get field))
                   else
                     None
-              | PS.Field.R.Undefined_ x ->
+              | PS.Field.R.Undefined x ->
                   failwith (sprintf "Unknown Field union discriminant %d" x))
           in
           begin match matching_field_name with
           | Some name -> name
           | None      -> failwith error_msg
           end
-      | PS.Node.R.Undefined_ x ->
+      | PS.Node.R.Undefined x ->
           failwith (sprintf "Unknown Node union discriminant %d" x)
       end
 
@@ -287,7 +310,7 @@ let rec type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
       | Mode.Reader  -> "AnyPointer.reader_t"
       | Mode.Builder -> "AnyPointer.builder_t"
       end
-  | R.Undefined_ x ->
+  | R.Undefined x ->
       failwith (sprintf "Unknown Type union discriminant %d" x)
 
 
@@ -321,11 +344,12 @@ let generate_union_type ~(mode : Mode.t) nodes_table scope fields =
           group_module_name ^ t_str
         in
         ("  | " ^ field_name ^ " of " ^ group_type_name) :: acc
-    | R.Undefined_ x ->
+    | R.Undefined x ->
         failwith (sprintf "Unknown Field union discriminant %d" x))
   in
+  let undefined_name = mangle_field_undefined fields in
   let header = [ "type unnamed_union_t =" ] in
-  let footer = [ "  | Undefined_ of int" ] in
+  let footer = [ sprintf "  | %s of int" (String.capitalize undefined_name) ] in
   (header @ cases @ footer)
 
 
@@ -345,7 +369,10 @@ let generate_enum_sig ~nodes_table ~scope ~nested_modules
   in
   let variants =
     let enumerants = PS.Node.Enum.R.enumerants_get enum_def in
-    let footer = [ indent ^ "  | Undefined_ of int" ] in
+    let undefined_name = mangle_enum_undefined enumerants in
+    let footer = [
+      sprintf "%s  | %s of int" indent (String.capitalize undefined_name)
+    ] in
     RT.Array.fold_right enumerants ~init:footer ~f:(fun enumerant acc ->
       let name = String.capitalize (PS.Enumerant.R.name_get enumerant) in
       let match_case = indent ^ "  | " ^ name in
@@ -401,10 +428,12 @@ let generate_constant ~nodes_table ~scope const_def =
         | PS.Node.R.Enum enum_group -> PS.Node.Enum.R.enumerants_get enum_group
         | _ -> failwith "Decoded non-enum node where enum node was expected."
       in
+      let undefined_name = mangle_enum_undefined enumerants in
       let scope_relative_name =
         get_scope_relative_name nodes_table scope enum_node in
       if enum_val >= RT.Array.length enumerants then
-        sprintf "%s.Undefined_ %u" scope_relative_name enum_val
+        sprintf "%s.%s %u" scope_relative_name
+          (String.capitalize undefined_name) enum_val
       else
         let enumerant = RT.Array.get enumerants enum_val in
         sprintf "%s.%s"
@@ -416,6 +445,6 @@ let generate_constant ~nodes_table ~scope const_def =
       failwith "Interface constants are not yet implemented."
   | R.AnyPointer _ ->
       failwith "AnyPointer constants are not yet implemented."
-  | R.Undefined_ x ->
+  | R.Undefined x ->
       failwith (sprintf "Unknown Value union discriminant %u." x)
 

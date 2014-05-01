@@ -21,7 +21,7 @@ module type S = sig
       | EightBytes
       | Pointer
       | InlineComposite
-      | Undefined_ of int
+      | Undefined of int
   end
   module Type : sig
     type reader_t
@@ -129,7 +129,7 @@ module type S = sig
         | Struct of Struct.reader_t
         | Interface of Interface.reader_t
         | AnyPointer
-        | Undefined_ of int
+        | Undefined of int
       val get : t -> unnamed_union_t
       val of_message : 'cap message_t -> t
     end
@@ -155,7 +155,7 @@ module type S = sig
         | Struct of Struct.builder_t
         | Interface of Interface.builder_t
         | AnyPointer
-        | Undefined_ of int
+        | Undefined of int
       val get : t -> unnamed_union_t
       val void_set : t -> unit
       val bool_set : t -> unit
@@ -202,7 +202,7 @@ module type S = sig
         | Struct of AnyPointer.reader_t
         | Interface
         | AnyPointer of AnyPointer.reader_t
-        | Undefined_ of int
+        | Undefined of int
       val get : t -> unnamed_union_t
       val of_message : 'cap message_t -> t
     end
@@ -228,7 +228,7 @@ module type S = sig
         | Struct of AnyPointer.builder_t
         | Interface
         | AnyPointer of AnyPointer.builder_t
-        | Undefined_ of int
+        | Undefined of int
       val get : t -> unnamed_union_t
       val void_set : t -> unit
       val bool_set : t -> bool -> unit
@@ -357,7 +357,7 @@ module type S = sig
         type unnamed_union_t =
           | Implicit
           | Explicit of int
-          | Undefined_ of int
+          | Undefined of int
         val get : t -> unnamed_union_t
         val of_message : 'cap message_t -> t
       end
@@ -366,7 +366,7 @@ module type S = sig
         type unnamed_union_t =
           | Implicit
           | Explicit of int
-          | Undefined_ of int
+          | Undefined of int
         val get : t -> unnamed_union_t
         val implicit_set : t -> unit
         val explicit_set_exn : t -> int -> unit
@@ -431,7 +431,7 @@ module type S = sig
       type unnamed_union_t =
         | Slot of Slot.reader_t
         | Group of Group.reader_t
-        | Undefined_ of int
+        | Undefined of int
       val get : t -> unnamed_union_t
       val name_get : t -> string
       val codeOrder_get : t -> int
@@ -445,7 +445,7 @@ module type S = sig
       type unnamed_union_t =
         | Slot of Slot.builder_t
         | Group of Group.builder_t
-        | Undefined_ of int
+        | Undefined of int
       val get : t -> unnamed_union_t
       val name_get : t -> string
       val codeOrder_get : t -> int
@@ -656,7 +656,7 @@ module type S = sig
         | Interface of Interface.reader_t
         | Const of Const.reader_t
         | Annotation of Annotation.reader_t
-        | Undefined_ of int
+        | Undefined of int
       val get : t -> unnamed_union_t
       val id_get : t -> Uint64.t
       val id_get_int_exn : t -> int
@@ -678,7 +678,7 @@ module type S = sig
         | Interface of Interface.builder_t
         | Const of Const.builder_t
         | Annotation of Annotation.builder_t
-        | Undefined_ of int
+        | Undefined of int
       val get : t -> unnamed_union_t
       val file_set : t -> unit
       val id_get : t -> Uint64.t

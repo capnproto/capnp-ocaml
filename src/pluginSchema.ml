@@ -21,7 +21,7 @@ module type S = sig
       | EightBytes
       | Pointer
       | InlineComposite
-      | Undefined_ of int
+      | Undefined of int
   end
   module Type : sig
     type reader_t
@@ -129,7 +129,7 @@ module type S = sig
         | Struct of Struct.reader_t
         | Interface of Interface.reader_t
         | AnyPointer
-        | Undefined_ of int
+        | Undefined of int
       val get : t -> unnamed_union_t
       val of_message : 'cap message_t -> t
     end
@@ -155,7 +155,7 @@ module type S = sig
         | Struct of Struct.builder_t
         | Interface of Interface.builder_t
         | AnyPointer
-        | Undefined_ of int
+        | Undefined of int
       val get : t -> unnamed_union_t
       val void_set : t -> unit
       val bool_set : t -> unit
@@ -202,7 +202,7 @@ module type S = sig
         | Struct of AnyPointer.reader_t
         | Interface
         | AnyPointer of AnyPointer.reader_t
-        | Undefined_ of int
+        | Undefined of int
       val get : t -> unnamed_union_t
       val of_message : 'cap message_t -> t
     end
@@ -228,7 +228,7 @@ module type S = sig
         | Struct of AnyPointer.builder_t
         | Interface
         | AnyPointer of AnyPointer.builder_t
-        | Undefined_ of int
+        | Undefined of int
       val get : t -> unnamed_union_t
       val void_set : t -> unit
       val bool_set : t -> bool -> unit
@@ -357,7 +357,7 @@ module type S = sig
         type unnamed_union_t =
           | Implicit
           | Explicit of int
-          | Undefined_ of int
+          | Undefined of int
         val get : t -> unnamed_union_t
         val of_message : 'cap message_t -> t
       end
@@ -366,7 +366,7 @@ module type S = sig
         type unnamed_union_t =
           | Implicit
           | Explicit of int
-          | Undefined_ of int
+          | Undefined of int
         val get : t -> unnamed_union_t
         val implicit_set : t -> unit
         val explicit_set_exn : t -> int -> unit
@@ -431,7 +431,7 @@ module type S = sig
       type unnamed_union_t =
         | Slot of Slot.reader_t
         | Group of Group.reader_t
-        | Undefined_ of int
+        | Undefined of int
       val get : t -> unnamed_union_t
       val name_get : t -> string
       val codeOrder_get : t -> int
@@ -445,7 +445,7 @@ module type S = sig
       type unnamed_union_t =
         | Slot of Slot.builder_t
         | Group of Group.builder_t
-        | Undefined_ of int
+        | Undefined of int
       val get : t -> unnamed_union_t
       val name_get : t -> string
       val codeOrder_get : t -> int
@@ -656,7 +656,7 @@ module type S = sig
         | Interface of Interface.reader_t
         | Const of Const.reader_t
         | Annotation of Annotation.reader_t
-        | Undefined_ of int
+        | Undefined of int
       val get : t -> unnamed_union_t
       val id_get : t -> Uint64.t
       val id_get_int_exn : t -> int
@@ -678,7 +678,7 @@ module type S = sig
         | Interface of Interface.builder_t
         | Const of Const.builder_t
         | Annotation of Annotation.builder_t
-        | Undefined_ of int
+        | Undefined of int
       val get : t -> unnamed_union_t
       val file_set : t -> unit
       val id_get : t -> Uint64.t
@@ -804,7 +804,7 @@ module Make (MessageWrapper : Message.S) = struct
       | EightBytes
       | Pointer
       | InlineComposite
-      | Undefined_ of int
+      | Undefined of int
   end
   module Type = struct
     type reader_t = ro RA_.StructStorage.t option
@@ -951,7 +951,7 @@ module Make (MessageWrapper : Message.S) = struct
         | Struct of Struct.reader_t
         | Interface of Interface.reader_t
         | AnyPointer
-        | Undefined_ of int
+        | Undefined of int
       let get x =
         match RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:0) with
         | 0 -> Void
@@ -973,7 +973,7 @@ module Make (MessageWrapper : Message.S) = struct
         | 16 -> Struct (struct_get x)
         | 17 -> Interface (interface_get x)
         | 18 -> AnyPointer
-        | v -> Undefined_ v
+        | v -> Undefined v
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
     end
     module B = struct
@@ -1047,7 +1047,7 @@ module Make (MessageWrapper : Message.S) = struct
         | Struct of Struct.builder_t
         | Interface of Interface.builder_t
         | AnyPointer
-        | Undefined_ of int
+        | Undefined of int
       let get x =
         match BA_.get_data_field x ~f:(BA_.get_uint16 ~default:0 ~byte_ofs:0) with
         | 0 -> Void
@@ -1069,7 +1069,7 @@ module Make (MessageWrapper : Message.S) = struct
         | 16 -> Struct (struct_get x)
         | 17 -> Interface (interface_get x)
         | 18 -> AnyPointer
-        | v -> Undefined_ v
+        | v -> Undefined v
       let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
     end
   end
@@ -1144,7 +1144,7 @@ module Make (MessageWrapper : Message.S) = struct
         | Struct of AnyPointer.reader_t
         | Interface
         | AnyPointer of AnyPointer.reader_t
-        | Undefined_ of int
+        | Undefined of int
       let get x =
         match RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:0) with
         | 0 -> Void
@@ -1166,7 +1166,7 @@ module Make (MessageWrapper : Message.S) = struct
         | 16 -> Struct (struct_get x)
         | 17 -> Interface
         | 18 -> AnyPointer (anyPointer_get x)
-        | v -> Undefined_ v
+        | v -> Undefined v
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
     end
     module B = struct
@@ -1274,7 +1274,7 @@ module Make (MessageWrapper : Message.S) = struct
         | Struct of AnyPointer.builder_t
         | Interface
         | AnyPointer of AnyPointer.builder_t
-        | Undefined_ of int
+        | Undefined of int
       let get x =
         match BA_.get_data_field x ~f:(BA_.get_uint16 ~default:0 ~byte_ofs:0) with
         | 0 -> Void
@@ -1296,7 +1296,7 @@ module Make (MessageWrapper : Message.S) = struct
         | 16 -> Struct (struct_get x)
         | 17 -> Interface
         | 18 -> AnyPointer (anyPointer_get x)
-        | v -> Undefined_ v
+        | v -> Undefined v
       let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
     end
   end
@@ -1444,12 +1444,12 @@ module Make (MessageWrapper : Message.S) = struct
         type unnamed_union_t =
           | Implicit
           | Explicit of int
-          | Undefined_ of int
+          | Undefined of int
         let get x =
           match RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:10) with
           | 0 -> Implicit
           | 1 -> Explicit (explicit_get x)
-          | v -> Undefined_ v
+          | v -> Undefined v
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       end
       module B = struct
@@ -1464,12 +1464,12 @@ module Make (MessageWrapper : Message.S) = struct
         type unnamed_union_t =
           | Implicit
           | Explicit of int
-          | Undefined_ of int
+          | Undefined of int
         let get x =
           match BA_.get_data_field x ~f:(BA_.get_uint16 ~default:0 ~byte_ofs:10) with
           | 0 -> Implicit
           | 1 -> Explicit (explicit_get x)
-          | v -> Undefined_ v
+          | v -> Undefined v
         let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:4 x
       end
     end
@@ -1565,12 +1565,12 @@ module Make (MessageWrapper : Message.S) = struct
       type unnamed_union_t =
         | Slot of Slot.reader_t
         | Group of Group.reader_t
-        | Undefined_ of int
+        | Undefined of int
       let get x =
         match RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:8) with
         | 0 -> Slot (slot_get x)
         | 1 -> Group (group_get x)
-        | v -> Undefined_ v
+        | v -> Undefined v
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
     end
     module B = struct
@@ -1599,12 +1599,12 @@ module Make (MessageWrapper : Message.S) = struct
       type unnamed_union_t =
         | Slot of Slot.builder_t
         | Group of Group.builder_t
-        | Undefined_ of int
+        | Undefined of int
       let get x =
         match BA_.get_data_field x ~f:(BA_.get_uint16 ~default:0 ~byte_ofs:8) with
         | 0 -> Slot (slot_get x)
         | 1 -> Group (group_get x)
-        | v -> Undefined_ v
+        | v -> Undefined v
       let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:4 x
     end
   end
@@ -1635,7 +1635,7 @@ module Make (MessageWrapper : Message.S) = struct
               | 5 -> ElementSize.EightBytes
               | 6 -> ElementSize.Pointer
               | 7 -> ElementSize.InlineComposite
-              | v -> ElementSize.Undefined_ v)
+              | v -> ElementSize.Undefined v)
           in
           let discr = RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:26) in
           decode discr
@@ -1672,7 +1672,7 @@ module Make (MessageWrapper : Message.S) = struct
               | 5 -> ElementSize.EightBytes
               | 6 -> ElementSize.Pointer
               | 7 -> ElementSize.InlineComposite
-              | v -> ElementSize.Undefined_ v)
+              | v -> ElementSize.Undefined v)
           in
           let discr = BA_.get_data_field x ~f:(BA_.get_uint16 ~default:0 ~byte_ofs:26) in
           decode discr
@@ -1687,7 +1687,7 @@ module Make (MessageWrapper : Message.S) = struct
               | ElementSize.EightBytes -> 5
               | ElementSize.Pointer -> 6
               | ElementSize.InlineComposite -> 7
-              | ElementSize.Undefined_ _ ->
+              | ElementSize.Undefined _ ->
                   invalid_msg "Cannot encode undefined enum value.")
           in
           BA_.get_data_field x ~f:(BA_.set_uint16 ~default:0 ~byte_ofs:26 (encode e))
@@ -1702,7 +1702,7 @@ module Make (MessageWrapper : Message.S) = struct
               | ElementSize.EightBytes -> 5
               | ElementSize.Pointer -> 6
               | ElementSize.InlineComposite -> 7
-             | ElementSize.Undefined_ x -> x)
+             | ElementSize.Undefined x -> x)
           in
           BA_.get_data_field x ~f:(BA_.set_uint16 ~default:0 ~byte_ofs:26 (encode e))
         let isGroup_get x =
@@ -1975,7 +1975,7 @@ module Make (MessageWrapper : Message.S) = struct
         | Interface of Interface.reader_t
         | Const of Const.reader_t
         | Annotation of Annotation.reader_t
-        | Undefined_ of int
+        | Undefined of int
       let get x =
         match RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:12) with
         | 0 -> File
@@ -1984,7 +1984,7 @@ module Make (MessageWrapper : Message.S) = struct
         | 3 -> Interface (interface_get x)
         | 4 -> Const (const_get x)
         | 5 -> Annotation (annotation_get x)
-        | v -> Undefined_ v
+        | v -> Undefined v
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
     end
     module B = struct
@@ -2041,7 +2041,7 @@ module Make (MessageWrapper : Message.S) = struct
         | Interface of Interface.builder_t
         | Const of Const.builder_t
         | Annotation of Annotation.builder_t
-        | Undefined_ of int
+        | Undefined of int
       let get x =
         match BA_.get_data_field x ~f:(BA_.get_uint16 ~default:0 ~byte_ofs:12) with
         | 0 -> File
@@ -2050,7 +2050,7 @@ module Make (MessageWrapper : Message.S) = struct
         | 3 -> Interface (interface_get x)
         | 4 -> Const (const_get x)
         | 5 -> Annotation (annotation_get x)
-        | v -> Undefined_ v
+        | v -> Undefined v
       let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
     end
   end

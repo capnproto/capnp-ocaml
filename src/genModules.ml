@@ -52,14 +52,14 @@ let generate_enum_decoder ~nodes_table ~scope ~enum_node ~indent =
   let scope_relative_name =
     GenCommon.get_scope_relative_name nodes_table scope enum_node
   in
+  let enumerants =
+    match PS.Node.R.get enum_node with
+    | PS.Node.R.Enum enum_group ->
+        PS.Node.Enum.R.enumerants_get enum_group
+    | _ ->
+        failwith "Decoded non-enum node where enum node was expected."
+  in
   let match_cases =
-    let enumerants =
-      match PS.Node.R.get enum_node with
-      | PS.Node.R.Enum enum_group ->
-          PS.Node.Enum.R.enumerants_get enum_group
-      | _ ->
-          failwith "Decoded non-enum node where enum node was expected."
-    in
     RT.Array.foldi_right enumerants ~init:[] ~f:(fun i enumerant acc ->
       let case_str =
         sprintf "  | %u -> %s.%s" i scope_relative_name
@@ -67,27 +67,30 @@ let generate_enum_decoder ~nodes_table ~scope ~enum_node ~indent =
       in
       case_str :: acc)
   in
-  let footer = [ sprintf "  | v -> %s.Undefined_ v)" scope_relative_name ] in
+  let undefined_name = GenCommon.mangle_enum_undefined enumerants in
+  let footer = [
+    sprintf "  | v -> %s.%s v)" scope_relative_name undefined_name
+  ] in
   apply_indent ~indent (header @ match_cases @ footer)
 
 
 (* Generate an encoder lambda for converting from an enum value to the associated
    uint16.  [allow_undefined] indicates whether or not to permit enum values which
-   use the [Undefined_] constructor. *)
+   use the [Undefined] constructor. *)
 let generate_enum_encoder ~(allow_undefined : bool) ~nodes_table ~scope
     ~enum_node ~indent =
   let header = [ "(fun enum -> match enum with" ] in
   let scope_relative_name =
     GenCommon.get_scope_relative_name nodes_table scope enum_node
   in
+  let enumerants =
+    match PS.Node.R.get enum_node with
+    | PS.Node.R.Enum enum_group ->
+        PS.Node.Enum.R.enumerants_get enum_group
+    | _ ->
+        failwith "Decoded non-enum node where enum node was expected."
+  in
   let match_cases =
-    let enumerants =
-      match PS.Node.R.get enum_node with
-      | PS.Node.R.Enum enum_group ->
-          PS.Node.Enum.R.enumerants_get enum_group
-      | _ ->
-          failwith "Decoded non-enum node where enum node was expected."
-    in
     RT.Array.foldi_right enumerants ~init:[] ~f:(fun i enumerant acc ->
       let case_str =
         sprintf "  | %s.%s -> %u"
@@ -98,11 +101,12 @@ let generate_enum_encoder ~(allow_undefined : bool) ~nodes_table ~scope
       case_str :: acc)
   in
   let footer = 
+    let undefined_name = GenCommon.mangle_enum_undefined enumerants in
     if allow_undefined then [
-      sprintf " | %s.Undefined_ x -> x)" scope_relative_name
+      sprintf " | %s.%s x -> x)" scope_relative_name undefined_name
     ] else [
-        sprintf "  | %s.Undefined_ _ ->" scope_relative_name;
-                "      invalid_msg \"Cannot encode undefined enum value.\")";
+      sprintf "  | %s.%s _ ->" scope_relative_name undefined_name;
+              "      invalid_msg \"Cannot encode undefined enum value.\")";
     ]
   in
   apply_indent ~indent (header @ match_cases @ footer)
@@ -306,7 +310,7 @@ let rec generate_list_element_decoder ~nodes_table ~scope ~indent list_def =
       failwith "not implemented"
   | R.AnyPointer ->
       failwith "not implemented"
-  | R.Undefined_ x ->
+  | R.Undefined x ->
        failwith (sprintf "Unknown Type union discriminant %d" x)
 
 
@@ -371,7 +375,7 @@ let rec generate_list_element_codecs ~nodes_table ~scope ~indent list_def =
       failwith "not implemented"
   | R.AnyPointer ->
       failwith "not implemented"
-  | R.Undefined_ x ->
+  | R.Undefined x ->
        failwith (sprintf "Unknown Type union discriminant %d" x)
 
 
@@ -462,7 +466,7 @@ let generate_list_getter ~nodes_table ~scope ~list_type ~mode
   | R.AnyPointer -> [
         "let " ^ field_name ^ "_get x = failwith \"not implemented (type anyptr)\"";
       ]
-  | R.Undefined_ x ->
+  | R.Undefined x ->
        failwith (sprintf "Unknown Type union discriminant %d" x)
 
 
@@ -574,7 +578,7 @@ let generate_list_setters ~nodes_table ~scope ~list_type
   | R.AnyPointer -> [
         "let " ^ field_name ^ "_get x = failwith \"not implemented (type anyptr)\"";
       ]
-  | R.Undefined_ x ->
+  | R.Undefined x ->
        failwith (sprintf "Unknown Type union discriminant %d" x)
 
 
@@ -1003,7 +1007,7 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
                 "_set x v = failwith \"not implemented\"";
             ] in
             (getters, setters)
-        | (PS.Type.R.Undefined_ x, _) ->
+        | (PS.Type.R.Undefined x, _) ->
             failwith (sprintf "Unknown Field union discriminant %u." x)
 
         (* All other cases represent an ill-formed default value in the plugin request *)
@@ -1032,7 +1036,7 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
             in
             failwith err_msg
         end
-    | PS.Field.R.Undefined_ x ->
+    | PS.Field.R.Undefined x ->
         failwith (sprintf "Unknown Field union discriminant %u." x)
     end
   in
@@ -1084,7 +1088,8 @@ let generate_union_getter ~nodes_table ~scope ~mode struct_def fields =
           ((PS.Node.Struct.R.discriminantOffset_get_int_exn struct_def) * 2);
       ]
       in
-      let footer = [ "  | v -> Undefined_ v" ] in
+      let undefined_name = GenCommon.mangle_field_undefined fields in
+      let footer = [ sprintf "  | v -> %s v" undefined_name ] in
       apply_indent ~indent (
         (GenCommon.generate_union_type ~mode nodes_table scope fields) @
         header @ cases @ footer)
@@ -1256,6 +1261,6 @@ and generate_node
       ]
   | PS.Node.R.Annotation annot_def ->
       generate_nested_modules ()
-  | PS.Node.R.Undefined_ x ->
+  | PS.Node.R.Undefined x ->
       failwith (sprintf "Unknown Node union discriminant %u" x)
 

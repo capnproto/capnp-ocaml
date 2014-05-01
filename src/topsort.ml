@@ -162,7 +162,7 @@ let build_reference_graph
               in
               add_edges ~parentage_table ~edges ~parent_id_opt:parent_id
                 group_node
-          | PS.Field.R.Undefined_ x ->
+          | PS.Field.R.Undefined x ->
               failwith (Printf.sprintf "Unknown Field union discriminant %d" x))
     | R.Interface node_iface ->
         let methods = Interface.R.methods_get node_iface in
@@ -174,7 +174,7 @@ let build_reference_graph
     | R.Const node_const ->
         register_type_reference ~parentage_table ~edges
           ~referrer:parent_id ~referee_type:(PS.Node.Const.R.type_get node_const)
-    | R.Undefined_ x ->
+    | R.Undefined x ->
         failwith (Printf.sprintf "Unknown Node union discriminant %d" x)
   in
   let parentage_table = build_parentage_table nodes_table nodes_to_graph in

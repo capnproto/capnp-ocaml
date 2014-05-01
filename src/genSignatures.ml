@@ -116,10 +116,10 @@ let generate_getters ~nodes_table ~scope ~mode fields =
                   field_name
                   (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp);
               ]
-          | R.Undefined_ x ->
+          | R.Undefined x ->
               failwith (sprintf "Unknown Type union discriminant %d" x)
           end
-      | PS.Field.R.Undefined_ x ->
+      | PS.Field.R.Undefined x ->
           failwith (sprintf "Unknown Field union discriminant %d" x)
     in
     (field_accessors @ acc))
@@ -226,10 +226,10 @@ let generate_setters ~nodes_table ~scope fields =
           | R.Void ->
               (* For void types, we suppress the argument *)
               [ indent ^ "val " ^ field_name ^ "_set : t -> unit" ]
-          | R.Undefined_ x ->
+          | R.Undefined x ->
               failwith (sprintf "Unknown Type union discriminant %d" x)
           end
-      | PS.Field.R.Undefined_ x ->
+      | PS.Field.R.Undefined x ->
           failwith (sprintf "Unknown Field union discriminant %d" x)
     in
     (field_accessors @ acc))
@@ -378,7 +378,7 @@ and generate_node
     ]
   | R.Annotation annot_def ->
       generate_nested_modules ()
-  | R.Undefined_ x ->
+  | R.Undefined x ->
       failwith (sprintf "Unknown Node union discriminant %u" x)
 
 
