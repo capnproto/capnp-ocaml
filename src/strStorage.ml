@@ -106,25 +106,28 @@ let unpack_single_frame (s : string) : ((string list * int), FramingError.t) Res
   else
     let segment_count_u32 = get_uint32 s 0 in
     begin try
-      let segment_count     = 1 + (Uint32.to_int segment_count_u32) in
-      let frame_header_size = (Util.ceil_int (4 * (segment_count + 1)) word_size) * word_size in
+      let segment_count = 1 + (Uint32.to_int segment_count_u32) in
+      let frame_header_size =
+        (Util.ceil_int (4 * (segment_count + 1)) word_size) * word_size
+      in
       if String.length s < frame_header_size then
         Result.Error FramingError.Incomplete
       else
         let arr = Res.Array.empty () in
-        let ofs = ref frame_header_size in
-        let () =
-          for i = 0 to segment_count - 1 do
+        let rec loop ofs i =
+          if i = segment_count then
+            Result.Ok (Res.Array.to_list arr, ofs)
+          else
             let segment_size_words_u32 = get_uint32 s (4 + (4 * i)) in
             let segment_size = word_size * (Uint32.to_int segment_size_words_u32) in
-            if !ofs + segment_size > String.length s then
-              invalid_arg "incomplete segment"
+            if ofs + segment_size > String.length s then
+              Result.Error FramingError.Incomplete
             else
-              let () = Res.Array.add_one arr (String.slice s !ofs (!ofs + segment_size)) in
-              ofs := !ofs + segment_size
-          done
+              let substring = String.slice s ofs (ofs + segment_size) in
+              let () = Res.Array.add_one arr substring in
+              loop (ofs + segment_size) (i + 1)
         in
-        Result.Ok (Res.Array.to_list arr, !ofs)
+        loop frame_header_size 0
     with Invalid_argument _ ->
       Result.Error FramingError.Unsupported
     end
