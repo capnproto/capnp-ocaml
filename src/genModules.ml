@@ -1184,6 +1184,12 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
       sprintf "%s  let of_message x = BA_.get_root_struct \
                ~data_words:%u ~pointer_words:%u x"
         indent data_words pointer_words;
+      indent ^ "  let to_message x = \
+                x.BA_.StructStorage.data.MessageWrapper.Slice.msg";
+      indent ^ "  let init_root ?message_size () =";
+      sprintf "%s     BA_.alloc_root_struct ?message_size \
+               ~data_words:%u ~pointer_words:%u ()"
+        indent data_words pointer_words;
       indent ^ "end";
     ]
   in

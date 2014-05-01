@@ -1815,14 +1815,20 @@ module Make (MessageWrapper : Message.S) = struct
      root struct with the specified struct layout.
      Returns: newly-allocated root struct storage *)
   let alloc_root_struct
+      ?(message_size : int option)
       ~(data_words : int)
       ~(pointer_words : int)
-      ~(message_size : int)
+      ()
     : rw StructStorage.t =
-    let message_size =
-      max message_size ((data_words + pointer_words + 1) * sizeof_uint64)
+    let act_message_size =
+      let requested_size =
+        match message_size with
+        | Some x -> x
+        | None   -> 8192
+      in
+      max requested_size ((data_words + pointer_words + 1) * sizeof_uint64)
     in
-    let message = Message.create message_size in
+    let message = Message.create act_message_size in
     (* Has the important side effect of reserving space in the message for
        the root struct pointer... *)
     let _ = Slice.alloc message sizeof_uint64 in

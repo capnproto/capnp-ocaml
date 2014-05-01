@@ -46,6 +46,8 @@ module type S = sig
         val typeId_set : t -> Uint64.t -> unit
         val typeId_set_int_exn : t -> int -> unit
         val of_message : rw message_t -> t
+        val to_message : t -> rw message_t
+        val init_root : ?message_size:int -> unit -> t
       end
     end
     module Interface : sig
@@ -66,6 +68,8 @@ module type S = sig
         val typeId_set : t -> Uint64.t -> unit
         val typeId_set_int_exn : t -> int -> unit
         val of_message : rw message_t -> t
+        val to_message : t -> rw message_t
+        val init_root : ?message_size:int -> unit -> t
       end
     end
     module List : sig
@@ -85,6 +89,8 @@ module type S = sig
         val elementType_set_builder : t -> builder_t_Type_15020482145304562784 -> builder_t_Type_15020482145304562784
         val elementType_init : t -> builder_t_Type_15020482145304562784
         val of_message : rw message_t -> t
+        val to_message : t -> rw message_t
+        val init_root : ?message_size:int -> unit -> t
       end
     end
     module Struct : sig
@@ -105,6 +111,8 @@ module type S = sig
         val typeId_set : t -> Uint64.t -> unit
         val typeId_set_int_exn : t -> int -> unit
         val of_message : rw message_t -> t
+        val to_message : t -> rw message_t
+        val init_root : ?message_size:int -> unit -> t
       end
     end
     module R : sig
@@ -173,6 +181,8 @@ module type S = sig
       val data_set : t -> unit
       val anyPointer_set : t -> unit
       val of_message : rw message_t -> t
+      val to_message : t -> rw message_t
+      val init_root : ?message_size:int -> unit -> t
     end
   end
   module Value : sig
@@ -254,6 +264,8 @@ module type S = sig
       val interface_set : t -> unit
       val anyPointer_set : t -> AnyPointer.builder_t -> unit
       val of_message : rw message_t -> t
+      val to_message : t -> rw message_t
+      val init_root : ?message_size:int -> unit -> t
     end
   end
   module Annotation : sig
@@ -279,6 +291,8 @@ module type S = sig
       val value_set_builder : t -> Value.builder_t -> Value.builder_t
       val value_init : t -> Value.builder_t
       val of_message : rw message_t -> t
+      val to_message : t -> rw message_t
+      val init_root : ?message_size:int -> unit -> t
     end
   end
   module Method : sig
@@ -315,6 +329,8 @@ module type S = sig
       val annotations_set : t -> (rw, Annotation.builder_t, builder_array_t) Runtime.Array.t -> (rw, Annotation.builder_t, builder_array_t) Runtime.Array.t
       val annotations_init : t -> int -> (rw, Annotation.builder_t, builder_array_t) Runtime.Array.t
       val of_message : rw message_t -> t
+      val to_message : t -> rw message_t
+      val init_root : ?message_size:int -> unit -> t
     end
   end
   module Enumerant : sig
@@ -339,6 +355,8 @@ module type S = sig
       val annotations_set : t -> (rw, Annotation.builder_t, builder_array_t) Runtime.Array.t -> (rw, Annotation.builder_t, builder_array_t) Runtime.Array.t
       val annotations_init : t -> int -> (rw, Annotation.builder_t, builder_array_t) Runtime.Array.t
       val of_message : rw message_t -> t
+      val to_message : t -> rw message_t
+      val init_root : ?message_size:int -> unit -> t
     end
   end
   module Field : sig
@@ -371,6 +389,8 @@ module type S = sig
         val implicit_set : t -> unit
         val explicit_set_exn : t -> int -> unit
         val of_message : rw message_t -> t
+        val to_message : t -> rw message_t
+        val init_root : ?message_size:int -> unit -> t
       end
     end
     module Group : sig
@@ -391,6 +411,8 @@ module type S = sig
         val typeId_set : t -> Uint64.t -> unit
         val typeId_set_int_exn : t -> int -> unit
         val of_message : rw message_t -> t
+        val to_message : t -> rw message_t
+        val init_root : ?message_size:int -> unit -> t
       end
     end
     module Slot : sig
@@ -424,6 +446,8 @@ module type S = sig
         val defaultValue_init : t -> Value.builder_t
         val hadExplicitDefault_set : t -> bool -> unit
         val of_message : rw message_t -> t
+        val to_message : t -> rw message_t
+        val init_root : ?message_size:int -> unit -> t
       end
     end
     module R : sig
@@ -458,6 +482,8 @@ module type S = sig
       val annotations_init : t -> int -> (rw, Annotation.builder_t, builder_array_t) Runtime.Array.t
       val discriminantValue_set_exn : t -> int -> unit
       val of_message : rw message_t -> t
+      val to_message : t -> rw message_t
+      val init_root : ?message_size:int -> unit -> t
     end
   end
   module Node : sig
@@ -503,6 +529,8 @@ module type S = sig
         val fields_set : t -> (rw, Field.builder_t, builder_array_t) Runtime.Array.t -> (rw, Field.builder_t, builder_array_t) Runtime.Array.t
         val fields_init : t -> int -> (rw, Field.builder_t, builder_array_t) Runtime.Array.t
         val of_message : rw message_t -> t
+        val to_message : t -> rw message_t
+        val init_root : ?message_size:int -> unit -> t
       end
     end
     module Enum : sig
@@ -521,6 +549,8 @@ module type S = sig
         val enumerants_set : t -> (rw, Enumerant.builder_t, builder_array_t) Runtime.Array.t -> (rw, Enumerant.builder_t, builder_array_t) Runtime.Array.t
         val enumerants_init : t -> int -> (rw, Enumerant.builder_t, builder_array_t) Runtime.Array.t
         val of_message : rw message_t -> t
+        val to_message : t -> rw message_t
+        val init_root : ?message_size:int -> unit -> t
       end
     end
     module Annotation : sig
@@ -576,6 +606,8 @@ module type S = sig
         val targetsParam_set : t -> bool -> unit
         val targetsAnnotation_set : t -> bool -> unit
         val of_message : rw message_t -> t
+        val to_message : t -> rw message_t
+        val init_root : ?message_size:int -> unit -> t
       end
     end
     module Const : sig
@@ -600,6 +632,8 @@ module type S = sig
         val value_set_builder : t -> Value.builder_t -> Value.builder_t
         val value_init : t -> Value.builder_t
         val of_message : rw message_t -> t
+        val to_message : t -> rw message_t
+        val init_root : ?message_size:int -> unit -> t
       end
     end
     module Interface : sig
@@ -622,6 +656,8 @@ module type S = sig
         val extends_set : t -> (rw, Uint64.t, builder_array_t) Runtime.Array.t -> (rw, Uint64.t, builder_array_t) Runtime.Array.t
         val extends_init : t -> int -> (rw, Uint64.t, builder_array_t) Runtime.Array.t
         val of_message : rw message_t -> t
+        val to_message : t -> rw message_t
+        val init_root : ?message_size:int -> unit -> t
       end
     end
     module NestedNode : sig
@@ -645,6 +681,8 @@ module type S = sig
         val id_set : t -> Uint64.t -> unit
         val id_set_int_exn : t -> int -> unit
         val of_message : rw message_t -> t
+        val to_message : t -> rw message_t
+        val init_root : ?message_size:int -> unit -> t
       end
     end
     module R : sig
@@ -702,6 +740,8 @@ module type S = sig
       val annotations_set : t -> (rw, Annotation.builder_t, builder_array_t) Runtime.Array.t -> (rw, Annotation.builder_t, builder_array_t) Runtime.Array.t
       val annotations_init : t -> int -> (rw, Annotation.builder_t, builder_array_t) Runtime.Array.t
       val of_message : rw message_t -> t
+      val to_message : t -> rw message_t
+      val init_root : ?message_size:int -> unit -> t
     end
   end
   module CodeGeneratorRequest : sig
@@ -735,6 +775,8 @@ module type S = sig
           val id_set_int_exn : t -> int -> unit
           val name_set : t -> string -> unit
           val of_message : rw message_t -> t
+          val to_message : t -> rw message_t
+          val init_root : ?message_size:int -> unit -> t
         end
       end
       module R : sig
@@ -757,6 +799,8 @@ module type S = sig
         val imports_set : t -> (rw, Import.builder_t, builder_array_t) Runtime.Array.t -> (rw, Import.builder_t, builder_array_t) Runtime.Array.t
         val imports_init : t -> int -> (rw, Import.builder_t, builder_array_t) Runtime.Array.t
         val of_message : rw message_t -> t
+        val to_message : t -> rw message_t
+        val init_root : ?message_size:int -> unit -> t
       end
     end
     module R : sig
@@ -774,6 +818,8 @@ module type S = sig
       val requestedFiles_set : t -> (rw, RequestedFile.builder_t, builder_array_t) Runtime.Array.t -> (rw, RequestedFile.builder_t, builder_array_t) Runtime.Array.t
       val requestedFiles_init : t -> int -> (rw, RequestedFile.builder_t, builder_array_t) Runtime.Array.t
       val of_message : rw message_t -> t
+      val to_message : t -> rw message_t
+      val init_root : ?message_size:int -> unit -> t
     end
   end
 end
@@ -834,6 +880,9 @@ module Make (MessageWrapper : Message.S) = struct
           BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:8 v)
         let typeId_set_int_exn x v = typeId_set x (Uint64.of_int v)
         let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
+        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let init_root ?message_size () =
+           BA_.alloc_root_struct ?message_size ~data_words:2 ~pointer_words:1 ()
       end
     end
     module Interface = struct
@@ -859,6 +908,9 @@ module Make (MessageWrapper : Message.S) = struct
           BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:8 v)
         let typeId_set_int_exn x v = typeId_set x (Uint64.of_int v)
         let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
+        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let init_root ?message_size () =
+           BA_.alloc_root_struct ?message_size ~data_words:2 ~pointer_words:1 ()
       end
     end
     module List = struct
@@ -883,6 +935,9 @@ module Make (MessageWrapper : Message.S) = struct
         let elementType_init x =
           BA_.get_pointer_field x 0 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1)
         let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
+        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let init_root ?message_size () =
+           BA_.alloc_root_struct ?message_size ~data_words:2 ~pointer_words:1 ()
       end
     end
     module Struct = struct
@@ -908,6 +963,9 @@ module Make (MessageWrapper : Message.S) = struct
           BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:8 v)
         let typeId_set_int_exn x v = typeId_set x (Uint64.of_int v)
         let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
+        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let init_root ?message_size () =
+           BA_.alloc_root_struct ?message_size ~data_words:2 ~pointer_words:1 ()
       end
     end
     module R = struct
@@ -1071,6 +1129,9 @@ module Make (MessageWrapper : Message.S) = struct
         | 18 -> AnyPointer
         | v -> Undefined v
       let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
+      let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+      let init_root ?message_size () =
+         BA_.alloc_root_struct ?message_size ~data_words:2 ~pointer_words:1 ()
     end
   end
   module Value = struct
@@ -1298,6 +1359,9 @@ module Make (MessageWrapper : Message.S) = struct
         | 18 -> AnyPointer (anyPointer_get x)
         | v -> Undefined v
       let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
+      let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+      let init_root ?message_size () =
+         BA_.alloc_root_struct ?message_size ~data_words:2 ~pointer_words:1 ()
     end
   end
   module Annotation = struct
@@ -1333,6 +1397,9 @@ module Make (MessageWrapper : Message.S) = struct
       let value_init x =
         BA_.get_pointer_field x 0 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1)
       let of_message x = BA_.get_root_struct ~data_words:1 ~pointer_words:1 x
+      let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+      let init_root ?message_size () =
+         BA_.alloc_root_struct ?message_size ~data_words:1 ~pointer_words:1 ()
     end
   end
   module Method = struct
@@ -1389,6 +1456,9 @@ module Make (MessageWrapper : Message.S) = struct
       let annotations_init x n =
         BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n)
       let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:2 x
+      let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+      let init_root ?message_size () =
+         BA_.alloc_root_struct ?message_size ~data_words:3 ~pointer_words:2 ()
     end
   end
   module Enumerant = struct
@@ -1423,6 +1493,9 @@ module Make (MessageWrapper : Message.S) = struct
       let annotations_init x n =
         BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n)
       let of_message x = BA_.get_root_struct ~data_words:1 ~pointer_words:2 x
+      let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+      let init_root ?message_size () =
+         BA_.alloc_root_struct ?message_size ~data_words:1 ~pointer_words:2 ()
     end
   end
   module Field = struct
@@ -1471,6 +1544,9 @@ module Make (MessageWrapper : Message.S) = struct
           | 1 -> Explicit (explicit_get x)
           | v -> Undefined v
         let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:4 x
+        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let init_root ?message_size () =
+           BA_.alloc_root_struct ?message_size ~data_words:3 ~pointer_words:4 ()
       end
     end
     module Group = struct
@@ -1496,6 +1572,9 @@ module Make (MessageWrapper : Message.S) = struct
           BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:16 v)
         let typeId_set_int_exn x v = typeId_set x (Uint64.of_int v)
         let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:4 x
+        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let init_root ?message_size () =
+           BA_.alloc_root_struct ?message_size ~data_words:3 ~pointer_words:4 ()
       end
     end
     module Slot = struct
@@ -1547,6 +1626,9 @@ module Make (MessageWrapper : Message.S) = struct
         let hadExplicitDefault_set x v =
           BA_.get_data_field x ~f:(BA_.set_bit ~default:false ~byte_ofs:16 ~bit_ofs:0 v)
         let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:4 x
+        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let init_root ?message_size () =
+           BA_.alloc_root_struct ?message_size ~data_words:3 ~pointer_words:4 ()
       end
     end
     module R = struct
@@ -1606,6 +1688,9 @@ module Make (MessageWrapper : Message.S) = struct
         | 1 -> Group (group_get x)
         | v -> Undefined v
       let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:4 x
+      let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+      let init_root ?message_size () =
+         BA_.alloc_root_struct ?message_size ~data_words:3 ~pointer_words:4 ()
     end
   end
   module Node = struct
@@ -1727,6 +1812,9 @@ module Make (MessageWrapper : Message.S) = struct
         let fields_init x n =
           BA_.get_pointer_field x 3 ~f:(BA_.init_struct_list ~data_words:3 ~pointer_words:4 n)
         let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
+        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let init_root ?message_size () =
+           BA_.alloc_root_struct ?message_size ~data_words:5 ~pointer_words:5 ()
       end
     end
     module Enum = struct
@@ -1749,6 +1837,9 @@ module Make (MessageWrapper : Message.S) = struct
         let enumerants_init x n =
           BA_.get_pointer_field x 3 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:2 n)
         let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
+        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let init_root ?message_size () =
+           BA_.alloc_root_struct ?message_size ~data_words:5 ~pointer_words:5 ()
       end
     end
     module Annotation = struct
@@ -1845,6 +1936,9 @@ module Make (MessageWrapper : Message.S) = struct
         let targetsAnnotation_set x v =
           BA_.get_data_field x ~f:(BA_.set_bit ~default:false ~byte_ofs:15 ~bit_ofs:3 v)
         let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
+        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let init_root ?message_size () =
+           BA_.alloc_root_struct ?message_size ~data_words:5 ~pointer_words:5 ()
       end
     end
     module Const = struct
@@ -1879,6 +1973,9 @@ module Make (MessageWrapper : Message.S) = struct
         let value_init x =
           BA_.get_pointer_field x 4 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1)
         let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
+        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let init_root ?message_size () =
+           BA_.alloc_root_struct ?message_size ~data_words:5 ~pointer_words:5 ()
       end
     end
     module Interface = struct
@@ -1909,6 +2006,9 @@ module Make (MessageWrapper : Message.S) = struct
         let extends_init x n =
           BA_.get_pointer_field x 4 ~f:(BA_.init_uint64_list n)
         let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
+        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let init_root ?message_size () =
+           BA_.alloc_root_struct ?message_size ~data_words:5 ~pointer_words:5 ()
       end
     end
     module NestedNode = struct
@@ -1940,6 +2040,9 @@ module Make (MessageWrapper : Message.S) = struct
           BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:0 v)
         let id_set_int_exn x v = id_set x (Uint64.of_int v)
         let of_message x = BA_.get_root_struct ~data_words:1 ~pointer_words:1 x
+        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let init_root ?message_size () =
+           BA_.alloc_root_struct ?message_size ~data_words:1 ~pointer_words:1 ()
       end
     end
     module R = struct
@@ -2052,6 +2155,9 @@ module Make (MessageWrapper : Message.S) = struct
         | 5 -> Annotation (annotation_get x)
         | v -> Undefined v
       let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
+      let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+      let init_root ?message_size () =
+         BA_.alloc_root_struct ?message_size ~data_words:5 ~pointer_words:5 ()
     end
   end
   module CodeGeneratorRequest = struct
@@ -2093,6 +2199,9 @@ module Make (MessageWrapper : Message.S) = struct
           let name_set x v =
             BA_.get_pointer_field x 0 ~f:(BA_.set_text v)
           let of_message x = BA_.get_root_struct ~data_words:1 ~pointer_words:1 x
+          let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+          let init_root ?message_size () =
+             BA_.alloc_root_struct ?message_size ~data_words:1 ~pointer_words:1 ()
         end
       end
       module R = struct
@@ -2127,6 +2236,9 @@ module Make (MessageWrapper : Message.S) = struct
         let imports_init x n =
           BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n)
         let of_message x = BA_.get_root_struct ~data_words:1 ~pointer_words:2 x
+        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let init_root ?message_size () =
+           BA_.alloc_root_struct ?message_size ~data_words:1 ~pointer_words:2 ()
       end
     end
     module R = struct
@@ -2152,6 +2264,9 @@ module Make (MessageWrapper : Message.S) = struct
       let requestedFiles_init x n =
         BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:2 n)
       let of_message x = BA_.get_root_struct ~data_words:0 ~pointer_words:2 x
+      let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+      let init_root ?message_size () =
+         BA_.alloc_root_struct ?message_size ~data_words:0 ~pointer_words:2 ()
     end
   end
 end

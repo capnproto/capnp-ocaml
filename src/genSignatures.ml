@@ -240,7 +240,7 @@ let generate_setters ~nodes_table ~scope fields =
  * out what module prefixes are required to properly qualify a type.
  *
  * Raises: Failure if the children of this node contain a cycle. *)
-let rec generate_struct_node ~nodes_table ~scope ~nested_modules
+let generate_struct_node ~nodes_table ~scope ~nested_modules
     ~node struct_def : string list =
   let unsorted_fields =
     RT.Array.to_list (PS.Node.Struct.R.fields_get struct_def)
@@ -298,6 +298,8 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules
       builder_union_accessors @
       builder_non_union_accessors @ [
       indent ^ "  val of_message : rw message_t -> t";
+      indent ^ "  val to_message : t -> rw message_t";
+      indent ^ "  val init_root : ?message_size:int -> unit -> t";
       indent ^ "end";
     ]
   in
@@ -312,7 +314,7 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules
  * what module prefixes are required to properly qualify a type.
  *
  * Raises: Failure if the children of this node contain a cycle. *)
-and generate_node
+let rec generate_node
     ~(suppress_module_wrapper : bool)
     ~(nodes_table : (Uint64.t, PS.Node.reader_t) Hashtbl.t)
     ~(scope : Uint64.t list)
