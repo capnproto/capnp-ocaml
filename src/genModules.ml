@@ -33,7 +33,7 @@ open Core.Std
 module PS        = GenCommon.PS
 module Mode      = GenCommon.Mode
 module RT        = Runtime
-module ReaderApi = MessageReader.Make(GenCommon.M)
+module ReaderApi = RuntimeReader.Make(GenCommon.M)
 
 let sprintf = Printf.sprintf
 let apply_indent = GenCommon.apply_indent

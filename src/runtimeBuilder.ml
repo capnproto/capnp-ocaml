@@ -37,7 +37,7 @@
 open Core.Std
 
 module Make (MessageWrapper : Message.S) = struct
-  module RReader = MessageReader.Make(MessageWrapper)
+  module RReader = RuntimeReader.Make(MessageWrapper)
   module RC = RuntimeCommon.Make(MessageWrapper)
   include RC
 

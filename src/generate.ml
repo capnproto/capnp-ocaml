@@ -75,8 +75,8 @@ let mod_header = [
   "module Make (MessageWrapper : Message.S) = struct";
   "  let invalid_msg = Message.invalid_msg";
   "";
-  "  module RA_ = MessageReader.Make(MessageWrapper)";
-  "  module BA_ = MessageBuilder.Make(MessageWrapper)";
+  "  module RA_ = RuntimeReader.Make(MessageWrapper)";
+  "  module BA_ = RuntimeBuilder.Make(MessageWrapper)";
   "";
   "  type 'cap message_t = 'cap MessageWrapper.Message.t";
   "";
