@@ -121,8 +121,9 @@ let compile
     let requested_filename = RequestedFile.R.filename_get requested_file in
     let sig_s =
       sig_s_header @
-      (GenSignatures.generate_node ~suppress_module_wrapper:true ~nodes_table
-         ~scope:[] ~node_name:requested_filename requested_file_node) @
+      (GenCommon.apply_indent ~indent:"  "
+        (GenSignatures.generate_node ~suppress_module_wrapper:true ~nodes_table
+           ~scope:[] ~node_name:requested_filename requested_file_node)) @
       sig_s_footer
     in
     let sig_file_content =
@@ -132,8 +133,9 @@ let compile
       string_of_lines (
         sig_s @
         mod_header @
-        (GenModules.generate_node ~suppress_module_wrapper:true ~nodes_table
-          ~scope:[] ~node_name:requested_filename requested_file_node) @
+        (GenCommon.apply_indent ~indent:"  "
+          (GenModules.generate_node ~suppress_module_wrapper:true ~nodes_table
+            ~scope:[] ~node_name:requested_filename requested_file_node)) @
         mod_footer)
     in
     let () = Out_channel.with_file (mli_filename requested_filename)

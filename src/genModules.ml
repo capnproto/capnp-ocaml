@@ -47,7 +47,7 @@ let api_of_mode mode =
 
 (* Generate a decoder lambda for converting from a uint16 to the
    associated enum value. *)
-let generate_enum_decoder ~nodes_table ~scope ~enum_node ~indent =
+let generate_enum_decoder ~nodes_table ~scope ~enum_node =
   let header = [ "(fun u16 -> match u16 with" ] in
   let scope_relative_name =
     GenCommon.get_scope_relative_name nodes_table scope enum_node
@@ -71,14 +71,14 @@ let generate_enum_decoder ~nodes_table ~scope ~enum_node ~indent =
   let footer = [
     sprintf "  | v -> %s.%s v)" scope_relative_name undefined_name
   ] in
-  apply_indent ~indent (header @ match_cases @ footer)
+  header @ match_cases @ footer
 
 
 (* Generate an encoder lambda for converting from an enum value to the associated
    uint16.  [allow_undefined] indicates whether or not to permit enum values which
    use the [Undefined] constructor. *)
 let generate_enum_encoder ~(allow_undefined : bool) ~nodes_table ~scope
-    ~enum_node ~indent =
+    ~enum_node =
   let header = [ "(fun enum -> match enum with" ] in
   let scope_relative_name =
     GenCommon.get_scope_relative_name nodes_table scope enum_node
@@ -103,21 +103,22 @@ let generate_enum_encoder ~(allow_undefined : bool) ~nodes_table ~scope
   let footer = 
     let undefined_name = GenCommon.mangle_enum_undefined enumerants in
     if allow_undefined then [
-      sprintf " | %s.%s x -> x)" scope_relative_name undefined_name
+      sprintf "  | %s.%s x -> x)" scope_relative_name undefined_name
     ] else [
       sprintf "  | %s.%s _ ->" scope_relative_name undefined_name;
               "      invalid_msg \"Cannot encode undefined enum value.\")";
     ]
   in
-  apply_indent ~indent (header @ match_cases @ footer)
+  header @ match_cases @ footer
 
 
 (* Generate an accessor for decoding an enum type. *)
 let generate_enum_getter ~nodes_table ~scope ~enum_node ~mode
     ~field_name ~field_ofs ~default =
   let api_module = api_of_mode mode in
-  let decoder_lambda = generate_enum_decoder ~nodes_table ~scope
-      ~enum_node ~indent:"    "
+  let decoder_lambda =
+    apply_indent ~indent:"    "
+      (generate_enum_decoder ~nodes_table ~scope ~enum_node)
   in [
     "let " ^ field_name ^ "_get x =";
     "  let decode ="; ] @ decoder_lambda @ [
@@ -135,9 +136,10 @@ let generate_enum_getter ~nodes_table ~scope ~enum_node ~mode
 (* Generate an accessor for setting the value of an enum. *)
 let generate_enum_safe_setter ~nodes_table ~scope ~enum_node ~field_name
     ~field_ofs ~default ~discr_str =
-  let encoder_lambda = generate_enum_encoder ~allow_undefined:false
-      ~nodes_table ~scope ~enum_node
-      ~indent:"    "
+  let encoder_lambda =
+    apply_indent ~indent:"    "
+      (generate_enum_encoder ~allow_undefined:false
+         ~nodes_table ~scope ~enum_node)
   in [
     "let " ^ field_name ^ "_set x e =";
     "  let encode =" ] @ encoder_lambda @ [
@@ -155,9 +157,10 @@ let generate_enum_safe_setter ~nodes_table ~scope ~enum_node ~field_name
    which are not defined in the schema. *)
 let generate_enum_unsafe_setter ~nodes_table ~scope ~enum_node
     ~field_name ~field_ofs ~default ~discr_str =
-  let encoder_lambda = generate_enum_encoder ~allow_undefined:true
-      ~nodes_table ~scope ~enum_node
-      ~indent:"    "
+  let encoder_lambda =
+    apply_indent ~indent:"    "
+      (generate_enum_encoder ~allow_undefined:true
+        ~nodes_table ~scope ~enum_node)
   in [
     "let " ^ field_name ^ "_set_unsafe x e =";
     "  let encode =" ] @ encoder_lambda @ [
@@ -174,17 +177,18 @@ let generate_enum_unsafe_setter ~nodes_table ~scope ~enum_node
 (* There is no get_enum() or get_enum_list() in the runtime API,
    because the enum values are schema-dependent.  This function
    will generate something appropriate for localized use. *)
-let generate_enum_runtime_getters ~nodes_table ~scope ~mode ~indent enum_def =
+let generate_enum_runtime_getters ~nodes_table ~scope ~mode enum_def =
   let api_module = api_of_mode mode in
   let enum_id = PS.Type.Enum.R.typeId_get enum_def in
   let enum_node = Hashtbl.find_exn nodes_table enum_id in
   let decoder_lambda =
-    generate_enum_decoder ~nodes_table ~scope ~enum_node
-      ~indent:(indent ^ "    ")
+    apply_indent ~indent:"    "
+      (generate_enum_decoder ~nodes_table ~scope ~enum_node)
   in
   let encoder_lambda =
-    generate_enum_encoder ~nodes_table ~scope ~enum_node
-      ~indent:(indent ^ "    ") ~allow_undefined:false
+    apply_indent ~indent:"    "
+      (generate_enum_encoder ~nodes_table ~scope ~enum_node
+         ~allow_undefined:false)
   in
   let get_enum_list =
     match mode with
@@ -210,32 +214,30 @@ let generate_enum_runtime_getters ~nodes_table ~scope ~mode ~indent enum_def =
         "  BA_.get_list ~storage_type:BA_.ListStorage.Bytes2 ~codecs pointer_bytes";
         "in";
       ]
-  in
-  let lines = [
+  in [
     "let get_enum ~byte_ofs data_opt =";
     "  let decode ="; ] @ decoder_lambda @ [
     "  in";
     "  decode (" ^ api_module ^ ".get_uint16 ~default:0 ~byte_ofs data_opt)";
     "in";
-  ] @ get_enum_list in
-  apply_indent ~indent lines
+  ] @ get_enum_list
 
 
 (* There is no set_enum() or set_enum_list() in the runtime API,
    because the enum values are schema-dependent.  This function
    will generate something appropriate for localized use. *)
-let generate_enum_runtime_setters ~nodes_table ~scope ~indent enum_def =
+let generate_enum_runtime_setters ~nodes_table ~scope enum_def =
   let enum_id = PS.Type.Enum.R.typeId_get enum_def in
   let enum_node = Hashtbl.find_exn nodes_table enum_id in
   let decoder_lambda =
-    (generate_enum_decoder ~nodes_table ~scope ~enum_node
-        ~indent:(indent ^ "    "))
+    apply_indent ~indent:"    "
+      (generate_enum_decoder ~nodes_table ~scope ~enum_node)
   in
   let encoder_lambda =
-    (generate_enum_encoder ~nodes_table ~scope ~enum_node
-        ~indent:(indent ^ "    ")) ~allow_undefined:false
-  in
-  let lines = [
+    apply_indent ~indent:"    "
+      (generate_enum_encoder ~nodes_table ~scope ~enum_node
+         ~allow_undefined:false)
+  in [
     "let set_enum ~byte_ofs value data =";
     "  let encode ="; ] @ encoder_lambda @ [
     "  in";
@@ -252,15 +254,14 @@ let generate_enum_runtime_setters ~nodes_table ~scope ~indent enum_def =
     "  in";
     "  BA_.set_list ~storage_type:BA_.ListStorage.Bytes2 ~codecs value pointer_bytes";
     "in";
-  ] in
-  apply_indent ~indent lines
+  ]
 
 
 (* Generate a set of decoder functions for reading elements from a Cap'n Proto
    List<T>.  The resulting decoders could be passed as an argument to
    [Reader.get_list] in order to generate a getter for a list field. *)
-let rec generate_list_element_decoder ~nodes_table ~scope ~indent list_def =
-  let make_terminal_decoder element_name = apply_indent ~indent [
+let rec generate_list_element_decoder ~nodes_table ~scope list_def =
+  let make_terminal_decoder element_name = [
       "let decoders = RA_.ListDecoders.Pointer (fun slice ->";
       "  RA_.get_" ^ element_name ^ "_list (Some slice))";
       "in";
@@ -285,27 +286,26 @@ let rec generate_list_element_decoder ~nodes_table ~scope ~indent list_def =
   | R.Data     -> make_terminal_decoder "blob"
   | R.Struct _ -> make_terminal_decoder "struct"
   | R.List inner_list_def ->
-      let inner_decoder_decl = generate_list_element_decoder ~nodes_table
-         ~scope ~indent:(indent ^ "  ") inner_list_def
-      in
-      apply_indent ~indent [
+      let inner_decoder_decl =
+        apply_indent ~indent:"  "
+          (generate_list_element_decoder ~nodes_table ~scope inner_list_def)
+      in [
         "let decoders = RA_.ListDecoders.Pointer (fun slice ->";
       ] @ inner_decoder_decl @ [
         "  RA_.get_list decoders (Some slice))";
       ]
   | R.Enum enum_def ->
       let enum_getters =
-        generate_enum_runtime_getters ~nodes_table ~scope ~mode:Mode.Reader
-          ~indent:(indent ^ "  ") enum_def
-      in
-      let lines = [
+        apply_indent ~indent:"  "
+          (generate_enum_runtime_getters ~nodes_table ~scope
+             ~mode:Mode.Reader enum_def)
+      in [
         "let decoders =";
       ] @ enum_getters @ [
         "  RA_.ListDecoders.Pointer (fun slice ->";
         "    get_enum_list (Some slice))";
         "in";
-      ] in
-      apply_indent ~indent lines
+      ]
   | R.Interface _ ->
       failwith "not implemented"
   | R.AnyPointer ->
@@ -318,8 +318,8 @@ let rec generate_list_element_decoder ~nodes_table ~scope ~indent list_def =
    elements from/to a Cap'n Proto List<T>.  The resulting codecs could
    be passed as an argument to [Builder.get_list] in order to generate
    a getter for a list field. *)
-let rec generate_list_element_codecs ~nodes_table ~scope ~indent list_def =
-  let make_terminal_codecs element_name = apply_indent ~indent [
+let rec generate_list_element_codecs ~nodes_table ~scope list_def =
+  let make_terminal_codecs element_name = [
       "let codecs =";
       "  let decode slice = BA_.get_" ^ element_name ^ "_list slice in";
       "  let encode v slice = BA_.set_" ^ element_name ^ "_list v slice in";
@@ -346,10 +346,10 @@ let rec generate_list_element_codecs ~nodes_table ~scope ~indent list_def =
   | R.Data     -> make_terminal_codecs "blob"
   | R.Struct _ -> make_terminal_codecs "struct"
   | R.List inner_list_def ->
-      let inner_codecs_decl = generate_list_element_codecs ~nodes_table
-         ~scope ~indent:(indent ^ "  ") inner_list_def
-      in
-      apply_indent ~indent [
+      let inner_codecs_decl =
+        apply_indent ~indent:"  "
+          (generate_list_element_codecs ~nodes_table ~scope inner_list_def)
+      in [
         "let codecs ="; ] @ inner_codecs_decl @ [
         "  let decode slice = BA_.get_list ~codecs slice in";
         "  let encode v slice = BA_.set_list ~codecs v slice in";
@@ -358,19 +358,18 @@ let rec generate_list_element_codecs ~nodes_table ~scope ~indent list_def =
       ]
   | R.Enum enum_def ->
       let enum_getters =
-        generate_enum_runtime_getters ~nodes_table ~scope ~mode:Mode.Builder
-          ~indent:(indent ^ "  ") enum_def
+        apply_indent ~indent:"  "
+          (generate_enum_runtime_getters ~nodes_table ~scope
+             ~mode:Mode.Builder enum_def)
       in
       let enum_setters =
-        generate_enum_runtime_setters ~nodes_table ~scope
-          ~indent:(indent ^ "  ") enum_def
-      in
-      let lines = [
+        apply_indent ~indent:"  "
+          (generate_enum_runtime_setters ~nodes_table ~scope enum_def)
+      in [
         "let codecs ="; ] @ enum_getters @ enum_setters @ [
         "  RA_.ListDecoders.Pointer (get_enum_list, set_enum_list)";
         "in";
-      ] in
-      apply_indent ~indent lines
+      ]
   | R.Interface _ ->
       failwith "not implemented"
   | R.AnyPointer ->
@@ -436,8 +435,9 @@ let generate_list_getter ~nodes_table ~scope ~list_type ~mode
           ]
       end
   | R.List list_def ->
-      let decoder_declaration = generate_list_element_decoder
-          ~nodes_table ~scope ~indent:"  " list_def
+      let decoder_declaration =
+        apply_indent ~indent:"  "
+          (generate_list_element_decoder ~nodes_table ~scope list_def)
       in [
         "let " ^ field_name ^ "_get x =";
       ] @ decoder_declaration @ [
@@ -450,8 +450,8 @@ let generate_list_getter ~nodes_table ~scope ~list_type ~mode
       let enum_id = Enum.R.typeId_get enum_def in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
       let decoder_lambda =
-        generate_enum_decoder ~nodes_table ~scope ~enum_node
-          ~indent:"    "
+        apply_indent ~indent:"  "
+          (generate_enum_decoder ~nodes_table ~scope ~enum_node)
       in [
         "let " ^ field_name ^ "_get x =";
         "  let enum_decoder ="; ] @ decoder_lambda @ [
@@ -529,8 +529,9 @@ let generate_list_setters ~nodes_table ~scope ~list_type
           pointer_words;
       ]
   | R.List list_def ->
-      let codecs_declaration = generate_list_element_codecs
-          ~nodes_table ~scope ~indent:"  " list_def
+      let codecs_declaration =
+        apply_indent ~indent:"  "
+          (generate_list_element_codecs ~nodes_table ~scope list_def)
       in [
         "let " ^ field_name ^ "_set x v =";
       ] @ codecs_declaration @ [
@@ -547,12 +548,13 @@ let generate_list_setters ~nodes_table ~scope ~list_type
       let enum_id = Enum.R.typeId_get enum_def in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
       let decoder_lambda =
-        generate_enum_decoder ~nodes_table ~scope ~enum_node
-          ~indent:"    "
+        apply_indent ~indent:"    "
+          (generate_enum_decoder ~nodes_table ~scope ~enum_node)
       in
       let encoder_lambda =
-        generate_enum_encoder ~nodes_table ~scope ~enum_node
-          ~indent:"    " ~allow_undefined:false
+        apply_indent ~indent:"    "
+          (generate_enum_encoder ~nodes_table ~scope ~enum_node
+             ~allow_undefined:false)
       in [
         "let " ^ field_name ^ "_set x v =";
         "  let enum_decoder ="; ] @ decoder_lambda @ [
@@ -583,7 +585,6 @@ let generate_list_setters ~nodes_table ~scope ~list_type
 
 
 let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
-  let indent = String.make (2 * (List.length scope + 2)) ' ' in
   let api_module = api_of_mode mode in
   let field_name = String.uncapitalize (PS.Field.R.name_get field) in
   let discr_str =
@@ -1040,11 +1041,10 @@ let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
         failwith (sprintf "Unknown Field union discriminant %u." x)
     end
   in
-  apply_indent ~indent
-    begin match mode with
-    | Mode.Reader  -> getters
-    | Mode.Builder -> getters @ setters
-    end
+  begin match mode with
+  | Mode.Reader  -> getters
+  | Mode.Builder -> getters @ setters
+  end
 
 
 (* Generate a function for unpacking a capnp union type as an OCaml variant. *)
@@ -1055,7 +1055,6 @@ let generate_union_getter ~nodes_table ~scope ~mode struct_def fields =
       []
   | _ ->
       let api_module = api_of_mode mode in
-      let indent = String.make (2 * (List.length scope + 2)) ' ' in
       let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
         let field_name = String.uncapitalize (PS.Field.R.name_get field) in
         let ctor_name = String.capitalize field_name in
@@ -1090,9 +1089,8 @@ let generate_union_getter ~nodes_table ~scope ~mode struct_def fields =
       in
       let undefined_name = GenCommon.mangle_field_undefined fields in
       let footer = [ sprintf "  | v -> %s v" undefined_name ] in
-      apply_indent ~indent (
-        (GenCommon.generate_union_type ~mode nodes_table scope fields) @
-        header @ cases @ footer)
+      (GenCommon.generate_union_type ~mode nodes_table scope fields) @
+        header @ cases @ footer
 
 
 (* Generate accessors for getting and setting a list of fields of a struct,
@@ -1125,72 +1123,74 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
         (PS.Field.R.discriminantValue_get field) <> PS.Field.noDiscriminant)
   in
   let reader_non_union_accessors =
-    generate_accessors ~nodes_table ~scope ~mode:Mode.Reader
-      struct_def non_union_fields
+    apply_indent ~indent:"  "
+      (generate_accessors ~nodes_table ~scope ~mode:Mode.Reader
+        struct_def non_union_fields)
   in
   let reader_union_accessors =
     (* Individual union field getters are required for the code emitted
        by [generate_union_getter].  These getters are suppressed in the module
        signature. *)
-    (generate_accessors ~nodes_table ~scope ~mode:Mode.Reader
-      struct_def union_fields) @
-    (generate_union_getter ~nodes_table ~scope ~mode:Mode.Reader
-      struct_def union_fields)
+    apply_indent ~indent:"  "
+      ((generate_accessors ~nodes_table ~scope ~mode:Mode.Reader
+        struct_def union_fields) @
+      (generate_union_getter ~nodes_table ~scope ~mode:Mode.Reader
+        struct_def union_fields))
   in
   let builder_non_union_accessors =
-    generate_accessors ~nodes_table ~scope ~mode:Mode.Builder
-      struct_def non_union_fields
+    apply_indent ~indent:"  "
+      (generate_accessors ~nodes_table ~scope ~mode:Mode.Builder
+        struct_def non_union_fields)
   in
   let builder_union_accessors =
     (* Individual union field getters are required for the code emitted
        by [generate_union_getter].  These getters are suppressed in the module
        signature, but the setters are not suppressed (this provides the method
        for setting the union discriminant). *)
-    (generate_accessors ~nodes_table ~scope ~mode:Mode.Builder
-       struct_def union_fields) @
-    (generate_union_getter ~nodes_table ~scope ~mode:Mode.Builder
-       struct_def union_fields)
+    apply_indent ~indent:"  "
+      ((generate_accessors ~nodes_table ~scope ~mode:Mode.Builder
+         struct_def union_fields) @
+      (generate_union_getter ~nodes_table ~scope ~mode:Mode.Builder
+         struct_def union_fields))
   in
-  let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let unique_reader =
     (GenCommon.make_unique_typename ~mode:Mode.Reader ~nodes_table node)
   in
   let unique_builder =
     (GenCommon.make_unique_typename ~mode:Mode.Builder ~nodes_table node)
   in
-  let header = apply_indent ~indent [
+  let header = [
     "type reader_t = ro RA_.StructStorage.t option";
     "type builder_t = rw RA_.StructStorage.t";
     "type " ^ unique_reader ^ " = reader_t";
     "type " ^ unique_builder ^ " = builder_t";
-    ] in
+  ] in
   let reader = [
-    indent ^ "module R = struct";
-    indent ^ "  type t = reader_t"; ] @
-      reader_non_union_accessors @
-      reader_union_accessors @ [
-      indent ^ "  let of_message x = RA_.get_root_struct \
-                (RA_.Message.readonly x)";
-      indent ^ "end";
+    "module R = struct";
+    "  type t = reader_t"; ] @
+    reader_non_union_accessors @
+    reader_union_accessors @ [
+    "  let of_message x = RA_.get_root_struct \
+     (RA_.Message.readonly x)";
+    "end";
     ]
   in
   let builder =
     let data_words    = PS.Node.Struct.R.dataWordCount_get struct_def in
     let pointer_words = PS.Node.Struct.R.pointerCount_get  struct_def in [
-      indent ^ "module B = struct";
-      indent ^ "  type t = builder_t"; ] @
+      "module B = struct";
+      "  type t = builder_t"; ] @
       builder_non_union_accessors @
       builder_union_accessors @ [
-      sprintf "%s  let of_message x = BA_.get_root_struct \
+      sprintf "  let of_message x = BA_.get_root_struct \
                ~data_words:%u ~pointer_words:%u x"
-        indent data_words pointer_words;
-      indent ^ "  let to_message x = \
-                x.BA_.StructStorage.data.MessageWrapper.Slice.msg";
-      indent ^ "  let init_root ?message_size () =";
-      sprintf "%s     BA_.alloc_root_struct ?message_size \
+        data_words pointer_words;
+      "  let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg";
+      "  let init_root ?message_size () =";
+      sprintf "     BA_.alloc_root_struct ?message_size \
                ~data_words:%u ~pointer_words:%u ()"
-        indent data_words pointer_words;
-      indent ^ "end";
+        data_words pointer_words;
+      "end";
     ]
   in
   header @
@@ -1212,7 +1212,6 @@ and generate_node
     (node : PS.Node.reader_t)
 : string list =
   let node_id = PS.Node.R.id_get node in
-  let indent = String.make (2 * (List.length scope)) ' ' in
   let generate_nested_modules () =
     match Topsort.topological_sort nodes_table
             (GenCommon.children_of nodes_table node) with
@@ -1241,9 +1240,9 @@ and generate_node
       if suppress_module_wrapper then
         body
       else
-        [ indent ^ "module " ^ node_name ^ " = struct" ] @
-          body @
-          [ indent ^ "end" ]
+        [ "module " ^ node_name ^ " = struct" ] @
+          (apply_indent ~indent:"  " body) @
+          [ "end" ]
   | PS.Node.R.Enum enum_def ->
       let nested_modules = generate_nested_modules () in
       let body =
@@ -1255,13 +1254,12 @@ and generate_node
       if suppress_module_wrapper then
         body
       else
-        [ indent ^ "module " ^ node_name ^ " = struct" ] @
-        body @
-        [ indent ^ "end" ]
+        [ "module " ^ node_name ^ " = struct" ] @
+          (apply_indent ~indent:"  " body) @
+          [ "end" ]
   | PS.Node.R.Interface iface_def ->
       generate_nested_modules ()
-  | PS.Node.R.Const const_def ->
-      apply_indent ~indent [
+  | PS.Node.R.Const const_def -> [
         "let " ^ (String.uncapitalize node_name) ^ " = " ^
           (GenCommon.generate_constant ~nodes_table ~scope const_def);
       ]

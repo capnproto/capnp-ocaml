@@ -356,26 +356,25 @@ let generate_union_type ~(mode : Mode.t) nodes_table scope fields =
 (* Generate the signature for an enum type. *)
 let generate_enum_sig ~nodes_table ~scope ~nested_modules
     ~mode ~node enum_def =
-  let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let is_builder = mode = Mode.Builder in
   let header =
     if is_builder then
       let reader_type_string =
         "Reader." ^ (get_fully_qualified_name nodes_table node) ^ ".t"
       in
-      [ indent ^ "type t = " ^ reader_type_string ^ " =" ]
+      [ "type t = " ^ reader_type_string ^ " =" ]
     else
-      [ indent ^ "type t =" ]
+      [ "type t =" ]
   in
   let variants =
     let enumerants = PS.Node.Enum.R.enumerants_get enum_def in
     let undefined_name = mangle_enum_undefined enumerants in
     let footer = [
-      sprintf "%s  | %s of int" indent (String.capitalize undefined_name)
+      sprintf "  | %s of int" (String.capitalize undefined_name)
     ] in
     RT.Array.fold_right enumerants ~init:footer ~f:(fun enumerant acc ->
       let name = String.capitalize (PS.Enumerant.R.name_get enumerant) in
-      let match_case = indent ^ "  | " ^ name in
+      let match_case = "  | " ^ name in
       match_case :: acc)
   in
   nested_modules @ header @ variants

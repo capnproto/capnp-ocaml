@@ -45,15 +45,12 @@ let generate_union_getter ~nodes_table ~scope ~mode fields =
       (* If there are no union fields, then suppress the union type *)
       []
   | _ ->
-      let indent = String.make (2 * (List.length scope + 2)) ' ' in
-      apply_indent ~indent (
-        (GenCommon.generate_union_type ~mode nodes_table scope fields) @
-          [ "val get : t -> unnamed_union_t" ])
+      (GenCommon.generate_union_type ~mode nodes_table scope fields) @
+        [ "val get : t -> unnamed_union_t" ]
 
 
 (* Generate accessors for retrieving a selected list of fields of a struct. *)
 let generate_getters ~nodes_table ~scope ~mode fields =
-  let indent = String.make (2 * (List.length scope + 2)) ' ' in
   List.fold_left fields ~init:[] ~f:(fun acc field ->
     let field_accessors : string list =
       let field_name = String.uncapitalize (PS.Field.R.name_get field) in
@@ -69,30 +66,26 @@ let generate_getters ~nodes_table ~scope ~mode fields =
             | Mode.Reader  -> "reader_t"
             | Mode.Builder -> "builder_t"
           in [
-            sprintf "%sval %s_get : t -> %s.%s"
-              indent field_name group_name type_name;
+            sprintf "val %s_get : t -> %s.%s"
+              field_name group_name type_name;
           ]
       | PS.Field.R.Slot slot ->
           let tp = PS.Field.Slot.R.type_get slot in
           let open PS.Type in
           begin match R.get tp with
-          | R.Int32 ->
-              apply_indent ~indent [
+          | R.Int32 -> [
                 "val " ^ field_name ^ "_get : t -> int32";
                 "val " ^ field_name ^ "_get_int_exn : t -> int";
               ]
-          | R.Int64 ->
-              apply_indent ~indent [
+          | R.Int64 -> [
                 "val " ^ field_name ^ "_get : t -> int64";
                 "val " ^ field_name ^ "_get_int_exn : t -> int";
               ]
-          | R.Uint32 ->
-              apply_indent ~indent [
+          | R.Uint32 -> [
                 "val " ^ field_name ^ "_get : t -> Uint32.t";
                 "val " ^ field_name ^ "_get_int_exn : t -> int";
               ]
-          | R.Uint64 ->
-              apply_indent ~indent [
+          | R.Uint64 -> [
                 "val " ^ field_name ^ "_get : t -> Uint64.t";
                 "val " ^ field_name ^ "_get_int_exn : t -> int";
               ]
@@ -110,8 +103,7 @@ let generate_getters ~nodes_table ~scope ~mode fields =
           | R.Enum _
           | R.Struct _
           | R.Interface _
-          | R.AnyPointer ->
-              apply_indent ~indent [
+          | R.AnyPointer -> [
                 sprintf "val %s_get : t -> %s"
                   field_name
                   (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp);
@@ -127,7 +119,6 @@ let generate_getters ~nodes_table ~scope ~mode fields =
 
 (* Generate accessors for setting a selected list of fields of a struct. *)
 let generate_setters ~nodes_table ~scope fields =
-  let indent = String.make (2 * (List.length scope + 2)) ' ' in
   List.fold_left fields ~init:[] ~f:(fun acc field ->
     let field_accessors : string list =
       let field_name = String.uncapitalize (PS.Field.R.name_get field) in
@@ -139,93 +130,85 @@ let generate_setters ~nodes_table ~scope fields =
           let open PS.Type in
           begin match R.get tp with
           | R.Int8 ->
-              [ indent ^ "val " ^ field_name ^ "_set_exn : t -> int -> unit"; ]
+              [ "val " ^ field_name ^ "_set_exn : t -> int -> unit"; ]
           | R.Int16 ->
-              [ indent ^ "val " ^ field_name ^ "_set_exn : t -> int -> unit"; ]
-          | R.Int32 ->
-              apply_indent ~indent [
+              [ "val " ^ field_name ^ "_set_exn : t -> int -> unit"; ]
+          | R.Int32 -> [
                 "val " ^ field_name ^ "_set : t -> int32 -> unit";
                 "val " ^ field_name ^ "_set_int_exn : t -> int -> unit";
               ]
-          | R.Int64 ->
-              apply_indent ~indent [
+          | R.Int64 -> [
                 "val " ^ field_name ^ "_set : t -> int64 -> unit";
                 "val " ^ field_name ^ "_set_int_exn : t -> int -> unit";
               ]
           | R.Uint8 ->
-              [ indent ^ "val " ^ field_name ^ "_set_exn : t -> int -> unit"; ]
+              [ "val " ^ field_name ^ "_set_exn : t -> int -> unit"; ]
           | R.Uint16 ->
-              [ indent ^ "val " ^ field_name ^ "_set_exn : t -> int -> unit"; ]
-          | R.Uint32 ->
-              apply_indent ~indent [
+              [ "val " ^ field_name ^ "_set_exn : t -> int -> unit"; ]
+          | R.Uint32 -> [
                 "val " ^ field_name ^ "_set : t -> Uint32.t -> unit";
                 "val " ^ field_name ^ "_set_int_exn : t -> int -> unit";
               ]
-          | R.Uint64 ->
-              apply_indent ~indent [
+          | R.Uint64 -> [
                 "val " ^ field_name ^ "_set : t -> Uint64.t -> unit";
                 "val " ^ field_name ^ "_set_int_exn : t -> int -> unit";
               ]
-          | R.List _ ->
-              apply_indent ~indent [
-                (* FIXME: should allow setting from a Reader *)
-                sprintf "val %s_set : t -> %s -> %s"
-                  field_name
-                  (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                     nodes_table scope tp)
-                  (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                     nodes_table scope tp);
-                sprintf "val %s_init : t -> int -> %s"
-                  field_name
-                  (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                     nodes_table scope tp);
-              ]
-          | R.Struct _ ->
-              apply_indent ~indent [
-                sprintf "val %s_set_reader : t -> %s -> %s"
-                  field_name
-                  (GenCommon.type_name ~mode:Mode.Reader ~scope_mode:Mode.Builder
-                     nodes_table scope tp)
-                  (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                     nodes_table scope tp);
-                sprintf "val %s_set_builder : t -> %s -> %s"
-                  field_name
-                  (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                     nodes_table scope tp)
-                  (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                     nodes_table scope tp);
-                sprintf "val %s_init : t -> %s"
-                  field_name
-                  (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                     nodes_table scope tp);
-              ]
-          | R.Enum _ ->
-              apply_indent ~indent [
-                sprintf "val %s_set : t -> %s -> unit"
-                  field_name
-                  (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                     nodes_table scope tp);
-                sprintf "val %s_set_unsafe : t -> %s -> unit"
-                  field_name
-                  (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                     nodes_table scope tp);
-              ]
+          | R.List _ -> [
+              (* FIXME: should allow setting from a Reader *)
+              sprintf "val %s_set : t -> %s -> %s"
+                field_name
+                (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
+                   nodes_table scope tp)
+                (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
+                   nodes_table scope tp);
+              sprintf "val %s_init : t -> int -> %s"
+                field_name
+                (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
+                   nodes_table scope tp);
+            ]
+          | R.Struct _ -> [
+              sprintf "val %s_set_reader : t -> %s -> %s"
+                field_name
+                (GenCommon.type_name ~mode:Mode.Reader ~scope_mode:Mode.Builder
+                   nodes_table scope tp)
+                (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
+                   nodes_table scope tp);
+              sprintf "val %s_set_builder : t -> %s -> %s"
+                field_name
+                (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
+                   nodes_table scope tp)
+                (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
+                   nodes_table scope tp);
+              sprintf "val %s_init : t -> %s"
+                field_name
+                (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
+                   nodes_table scope tp);
+            ]
+          | R.Enum _ -> [
+              sprintf "val %s_set : t -> %s -> unit"
+                field_name
+                (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
+                   nodes_table scope tp);
+              sprintf "val %s_set_unsafe : t -> %s -> unit"
+                field_name
+                (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
+                   nodes_table scope tp);
+            ]
           | R.Bool
           | R.Float32
           | R.Float64
           | R.Text
           | R.Data
           | R.Interface _
-          | R.AnyPointer ->
-              apply_indent ~indent [
-                sprintf "val %s_set : t -> %s -> unit"
-                field_name
-                (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                   nodes_table scope tp);
-              ]
+          | R.AnyPointer -> [
+              sprintf "val %s_set : t -> %s -> unit"
+              field_name
+              (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
+                 nodes_table scope tp);
+            ]
           | R.Void ->
               (* For void types, we suppress the argument *)
-              [ indent ^ "val " ^ field_name ^ "_set : t -> unit" ]
+              [ "val " ^ field_name ^ "_set : t -> unit" ]
           | R.Undefined x ->
               failwith (sprintf "Unknown Type union discriminant %d" x)
           end
@@ -254,27 +237,30 @@ let generate_struct_node ~nodes_table ~scope ~nested_modules
         (PS.Field.R.discriminantValue_get field) <> PS.Field.noDiscriminant)
   in
   let reader_union_accessors =
-    generate_union_getter ~nodes_table ~scope ~mode:Mode.Reader union_fields
+    apply_indent ~indent:"  "
+      (generate_union_getter ~nodes_table ~scope ~mode:Mode.Reader union_fields)
   in
   let reader_non_union_accessors =
-    generate_getters ~nodes_table ~scope ~mode:Mode.Reader non_union_fields
+    apply_indent ~indent:"  "
+      (generate_getters ~nodes_table ~scope ~mode:Mode.Reader non_union_fields)
   in
   let builder_union_accessors =
-    (generate_union_getter ~nodes_table ~scope ~mode:Mode.Builder union_fields) @
-      (generate_setters ~nodes_table ~scope union_fields)
+    apply_indent ~indent:"  " (
+      (generate_union_getter ~nodes_table ~scope ~mode:Mode.Builder union_fields) @
+        (generate_setters ~nodes_table ~scope union_fields))
   in
   let builder_non_union_accessors =
-    (generate_getters ~nodes_table ~scope ~mode:Mode.Builder non_union_fields) @
-      (generate_setters ~nodes_table ~scope non_union_fields)
+    apply_indent ~indent:"  " (
+      (generate_getters ~nodes_table ~scope ~mode:Mode.Builder non_union_fields) @
+        (generate_setters ~nodes_table ~scope non_union_fields))
   in
-  let indent = String.make (2 * (List.length scope + 1)) ' ' in
   let unique_reader =
     GenCommon.make_unique_typename ~mode:Mode.Reader ~nodes_table node
   in
   let unique_builder =
     GenCommon.make_unique_typename ~mode:Mode.Builder ~nodes_table node
   in
-  let header = apply_indent ~indent [
+  let header = [
     (* declare the primary types of the node *)
     "type reader_t";
     "type builder_t";
@@ -284,25 +270,24 @@ let generate_struct_node ~nodes_table ~scope ~nested_modules
     "type " ^ unique_builder ^ " = builder_t";
   ] in
   let reader = [
-    indent ^ "module R : sig";
-    indent ^ "  type t = reader_t"; ] @
-      reader_union_accessors @
-      reader_non_union_accessors @ [
-      indent ^ "  val of_message : 'cap message_t -> t";
-      indent ^ "end";
+    "module R : sig";
+    "  type t = reader_t"; ] @
+    reader_union_accessors @
+    reader_non_union_accessors @ [
+    "  val of_message : 'cap message_t -> t";
+    "end";
     ]
   in
   let builder = [
-    indent ^ "module B : sig";
-    indent ^ "  type t = builder_t"; ] @
-      builder_union_accessors @
-      builder_non_union_accessors @ [
-      indent ^ "  val of_message : rw message_t -> t";
-      indent ^ "  val to_message : t -> rw message_t";
-      indent ^ "  val init_root : ?message_size:int -> unit -> t";
-      indent ^ "end";
-    ]
-  in
+    "module B : sig";
+    "  type t = builder_t"; ] @
+    builder_union_accessors @
+    builder_non_union_accessors @ [
+    "  val of_message : rw message_t -> t";
+    "  val to_message : t -> rw message_t";
+    "  val init_root : ?message_size:int -> unit -> t";
+    "end";
+  ] in
   header @
     nested_modules @
     reader @
@@ -323,7 +308,6 @@ let rec generate_node
 : string list =
   let open PS.Node in
   let node_id = R.id_get node in
-  let indent = String.make (2 * (List.length scope)) ' ' in
   let generate_nested_modules () =
     match Topsort.topological_sort nodes_table
             (GenCommon.children_of nodes_table node) with
@@ -352,9 +336,9 @@ let rec generate_node
       if suppress_module_wrapper then
         body
       else
-        [ indent ^ "module " ^ node_name ^ " : sig" ] @
-          body @
-          [ indent ^ "end" ]
+        [ "module " ^ node_name ^ " : sig" ] @
+          (apply_indent ~indent:"  " body) @
+          [ "end" ]
   | R.Enum enum_def ->
       let nested_modules = generate_nested_modules () in
       let body =
@@ -366,14 +350,13 @@ let rec generate_node
       if suppress_module_wrapper then
         body
       else
-        [ indent ^ "module " ^ node_name ^ " : sig" ] @
-          body @
-          [ indent ^ "end" ]
+        [ "module " ^ node_name ^ " : sig" ] @
+          (apply_indent ~indent:"  " body) @
+          [ "end" ]
   | R.Interface iface_def ->
       generate_nested_modules ()
   | R.Const const_def -> [
-      sprintf "%sval %s : %s"
-        indent
+      sprintf "val %s : %s"
         (String.uncapitalize node_name)
         (GenCommon.type_name ~mode:Mode.Reader ~scope_mode:Mode.Reader
            nodes_table scope (Const.R.type_get const_def));
