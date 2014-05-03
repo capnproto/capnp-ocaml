@@ -179,7 +179,7 @@ let generate_enum_unsafe_setter ~nodes_table ~scope ~enum_node
    will generate something appropriate for localized use. *)
 let generate_enum_runtime_getters ~nodes_table ~scope ~mode enum_def =
   let api_module = api_of_mode mode in
-  let enum_id = PS.Type.Enum.typeId_get enum_def in
+  let enum_id = PS.Type.Enum.type_id_get enum_def in
   let enum_node = Hashtbl.find_exn nodes_table enum_id in
   let decoder_lambda =
     apply_indent ~indent:"    "
@@ -227,7 +227,7 @@ let generate_enum_runtime_getters ~nodes_table ~scope ~mode enum_def =
    because the enum values are schema-dependent.  This function
    will generate something appropriate for localized use. *)
 let generate_enum_runtime_setters ~nodes_table ~scope enum_def =
-  let enum_id = PS.Type.Enum.typeId_get enum_def in
+  let enum_id = PS.Type.Enum.type_id_get enum_def in
   let enum_node = Hashtbl.find_exn nodes_table enum_id in
   let decoder_lambda =
     apply_indent ~indent:"    "
@@ -268,7 +268,7 @@ let rec generate_list_element_decoder ~nodes_table ~scope list_def =
     ]
   in
   let open PS.Type in
-  let contained_type = List.elementType_get list_def in
+  let contained_type = List.element_type_get list_def in
   match get contained_type with
   | Void     -> make_terminal_decoder "void"
   | Bool     -> make_terminal_decoder "bit"
@@ -328,7 +328,7 @@ let rec generate_list_element_codecs ~nodes_table ~scope list_def =
     ]
   in
   let open PS.Type in
-  let contained_type = List.elementType_get list_def in
+  let contained_type = List.element_type_get list_def in
   match get contained_type with
   | Void     -> make_terminal_codecs "void"
   | Bool     -> make_terminal_codecs "bit"
@@ -416,12 +416,12 @@ let generate_list_getter ~nodes_table ~scope ~list_type ~mode
         ]
       | Mode.Builder ->
           let data_words, pointer_words =
-            let id = PS.Type.Struct.typeId_get struct_def in
+            let id = PS.Type.Struct.type_id_get struct_def in
             let node = Hashtbl.find_exn nodes_table id in
             match PS.Node.get node with
             | PS.Node.Struct struct_def ->
-                (PS.Node.Struct.dataWordCount_get struct_def,
-                 PS.Node.Struct.pointerCount_get struct_def)
+                (PS.Node.Struct.data_word_count_get struct_def,
+                 PS.Node.Struct.pointer_count_get struct_def)
             | _ ->
                 failwith
                   "Decoded non-struct node where struct node was expected."
@@ -447,7 +447,7 @@ let generate_list_getter ~nodes_table ~scope ~list_type ~mode
           api_module;
       ]
   | Enum enum_def ->
-      let enum_id = Enum.typeId_get enum_def in
+      let enum_id = Enum.type_id_get enum_def in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
       let decoder_lambda =
         apply_indent ~indent:"  "
@@ -503,12 +503,12 @@ let generate_list_setters ~nodes_table ~scope ~list_type
   | Data     -> make_primitive_setters "blob"
   | Struct struct_def ->
       let data_words, pointer_words =
-        let id = PS.Type.Struct.typeId_get struct_def in
+        let id = PS.Type.Struct.type_id_get struct_def in
         let node = Hashtbl.find_exn nodes_table id in
         match PS.Node.get node with
         | PS.Node.Struct struct_def ->
-            (PS.Node.Struct.dataWordCount_get struct_def,
-             PS.Node.Struct.pointerCount_get struct_def)
+            (PS.Node.Struct.data_word_count_get struct_def,
+             PS.Node.Struct.pointer_count_get struct_def)
         | _ ->
             failwith
               "Decoded non-struct node where struct node was expected."
@@ -545,7 +545,7 @@ let generate_list_setters ~nodes_table ~scope ~list_type
           discr_str field_ofs;
       ]
   | Enum enum_def ->
-      let enum_id = Enum.typeId_get enum_def in
+      let enum_id = Enum.type_id_get enum_def in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
       let decoder_lambda =
         apply_indent ~indent:"    "
@@ -586,10 +586,10 @@ let generate_list_setters ~nodes_table ~scope ~list_type
 
 let generate_one_field_accessors ~nodes_table ~scope ~mode ~discr_ofs field =
   let api_module = api_of_mode mode in
-  let field_name = String.uncapitalize (PS.Field.name_get field) in
+  let field_name = GenCommon.underscore_name (PS.Field.name_get field) in
   let discr_str =
-    let discriminant_value = PS.Field.discriminantValue_get field in
-    if discriminant_value = PS.Field.noDiscriminant then
+    let discriminant_value = PS.Field.discriminant_value_get field in
+    if discriminant_value = PS.Field.no_discriminant then
       ""
     else
       sprintf "~discr:{BA_.Discr.value=%u; BA_.Discr.byte_ofs=%u} "
@@ -604,7 +604,7 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode ~discr_ofs field =
     | PS.Field.Slot slot ->
         let field_ofs = Uint32.to_int (PS.Field.Slot.offset_get slot) in
         let tp = PS.Field.Slot.type_get slot in
-        let default = PS.Field.Slot.defaultValue_get slot in
+        let default = PS.Field.Slot.default_value_get slot in
         begin match (PS.Type.get tp, PS.Value.get default) with
         | (PS.Type.Void, PS.Value.Void) ->
             let getters =
@@ -897,7 +897,7 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode ~discr_ofs field =
               end
             in
             if has_trivial_default then
-              let list_type = PS.Type.List.elementType_get list_def in
+              let list_type = PS.Type.List.element_type_get list_def in
               let getters = generate_list_getter ~nodes_table ~scope ~list_type
                 ~mode ~field_name ~field_ofs
               in
@@ -908,7 +908,7 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode ~discr_ofs field =
             else
               failwith "Default values for lists are not implemented."
         | (PS.Type.Enum enum_def, PS.Value.Enum val_uint16) ->
-            let enum_id = PS.Type.Enum.typeId_get enum_def in
+            let enum_id = PS.Type.Enum.type_id_get enum_def in
             let enum_node = Hashtbl.find_exn nodes_table enum_id in
             let getters = generate_enum_getter ~nodes_table ~scope ~enum_node
                 ~mode ~field_name ~field_ofs ~default:val_uint16
@@ -934,12 +934,12 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode ~discr_ofs field =
             in
             if has_trivial_default then
               let data_words, pointer_words =
-                let id = PS.Type.Struct.typeId_get struct_def in
+                let id = PS.Type.Struct.type_id_get struct_def in
                 let node = Hashtbl.find_exn nodes_table id in
                 match PS.Node.get node with
                 | PS.Node.Struct struct_def ->
-                    (PS.Node.Struct.dataWordCount_get struct_def,
-                     PS.Node.Struct.pointerCount_get struct_def)
+                    (PS.Node.Struct.data_word_count_get struct_def,
+                     PS.Node.Struct.pointer_count_get struct_def)
                 | _ ->
                     failwith
                       "Decoded non-struct node where struct node was expected."
@@ -1056,9 +1056,10 @@ let generate_union_getter ~nodes_table ~scope ~mode struct_def fields =
   | _ ->
       let api_module = api_of_mode mode in
       let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
-        let field_name = String.uncapitalize (PS.Field.name_get field) in
+        let field_name = PS.Field.name_get field in
+        let us_field_name = GenCommon.underscore_name field_name in
         let ctor_name = String.capitalize field_name in
-        let field_value = PS.Field.discriminantValue_get field in
+        let field_value = PS.Field.discriminant_value_get field in
         let field_has_void_type =
           match PS.Field.get field with
           | PS.Field.Slot slot ->
@@ -1076,7 +1077,7 @@ let generate_union_getter ~nodes_table ~scope ~mode struct_def fields =
           (sprintf "  | %u -> %s (%s_get x)"
             field_value
             ctor_name
-            field_name) :: acc)
+            us_field_name) :: acc)
       in
       let header = [
         "let get x =";
@@ -1084,7 +1085,7 @@ let generate_union_getter ~nodes_table ~scope ~mode struct_def fields =
                  ~f:(%s.get_uint16 ~default:0 ~byte_ofs:%u) with"
           api_module
           api_module
-          ((PS.Node.Struct.discriminantOffset_get_int_exn struct_def) * 2);
+          ((PS.Node.Struct.discriminant_offset_get_int_exn struct_def) * 2);
       ]
       in
       let undefined_name = GenCommon.mangle_field_undefined fields in
@@ -1097,7 +1098,7 @@ let generate_union_getter ~nodes_table ~scope ~mode struct_def fields =
  * regardless of whether or not the fields are packed into a union.  (Getters
  * for fields packed inside a union are not exposed in the module signature.) *)
 let generate_accessors ~nodes_table ~scope ~mode struct_def fields =
-  let discr_ofs = PS.Node.Struct.discriminantOffset_get_int_exn struct_def in
+  let discr_ofs = PS.Node.Struct.discriminant_offset_get_int_exn struct_def in
   List.fold_left fields ~init:[] ~f:(fun acc field ->
     let x = generate_one_field_accessors ~nodes_table ~scope ~mode
         ~discr_ofs field
@@ -1117,11 +1118,11 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~mode
   in
   (* Sorting in reverse code order allows us to avoid a List.rev *)
   let all_fields = List.sort unsorted_fields ~cmp:(fun x y ->
-    - (Int.compare (PS.Field.codeOrder_get x) (PS.Field.codeOrder_get y)))
+    - (Int.compare (PS.Field.code_order_get x) (PS.Field.code_order_get y)))
   in
   let union_fields, non_union_fields = List.partition_tf all_fields
       ~f:(fun field ->
-        (PS.Field.discriminantValue_get field) <> PS.Field.noDiscriminant)
+        (PS.Field.discriminant_value_get field) <> PS.Field.no_discriminant)
   in
   let union_accessors =
     (* Emit accessor functions first, because they are required for the
@@ -1163,8 +1164,8 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~mode
         "let of_message x = RA_.get_root_struct (RA_.Message.readonly x)";
       ]
     | Mode.Builder -> 
-        let data_words    = PS.Node.Struct.dataWordCount_get struct_def in
-        let pointer_words = PS.Node.Struct.pointerCount_get  struct_def in [
+        let data_words    = PS.Node.Struct.data_word_count_get struct_def in
+        let pointer_words = PS.Node.Struct.pointer_count_get struct_def in [
           sprintf "  let of_message x = BA_.get_root_struct \
                    ~data_words:%u ~pointer_words:%u x"
             data_words pointer_words;
@@ -1209,7 +1210,7 @@ and generate_node
         let error_msg = sprintf
           "The children of node %s (%s) have a cyclic dependency."
           (Uint64.to_string node_id)
-          (PS.Node.displayName_get node)
+          (PS.Node.display_name_get node)
         in
         failwith error_msg
   in
@@ -1243,7 +1244,7 @@ and generate_node
   | PS.Node.Interface iface_def ->
       generate_nested_modules ()
   | PS.Node.Const const_def -> [
-        "let " ^ (String.uncapitalize node_name) ^ " = " ^
+        "let " ^ (GenCommon.underscore_name node_name) ^ " = " ^
           (GenCommon.generate_constant ~nodes_table ~scope const_def);
       ]
   | PS.Node.Annotation annot_def ->

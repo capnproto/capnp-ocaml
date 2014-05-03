@@ -30,8 +30,8 @@ module type S = sig
         type builder_t
         type t_Enum_11389172934837766057 = t
         type builder_t_Enum_11389172934837766057 = builder_t
-        val typeId_get : t -> Uint64.t
-        val typeId_get_int_exn : t -> int
+        val type_id_get : t -> Uint64.t
+        val type_id_get_int_exn : t -> int
         val of_message : 'cap message_t -> t
       end
       module Interface : sig
@@ -39,8 +39,8 @@ module type S = sig
         type builder_t
         type t_Interface_17116997365232503999 = t
         type builder_t_Interface_17116997365232503999 = builder_t
-        val typeId_get : t -> Uint64.t
-        val typeId_get_int_exn : t -> int
+        val type_id_get : t -> Uint64.t
+        val type_id_get_int_exn : t -> int
         val of_message : 'cap message_t -> t
       end
       module List : sig
@@ -48,7 +48,7 @@ module type S = sig
         type builder_t
         type t_List_9792858745991129751 = t
         type builder_t_List_9792858745991129751 = builder_t
-        val elementType_get : t -> t_Type_15020482145304562784
+        val element_type_get : t -> t_Type_15020482145304562784
         val of_message : 'cap message_t -> t
       end
       module Struct : sig
@@ -56,8 +56,8 @@ module type S = sig
         type builder_t
         type t_Struct_12410354185295152851 = t
         type builder_t_Struct_12410354185295152851 = builder_t
-        val typeId_get : t -> Uint64.t
-        val typeId_get_int_exn : t -> int
+        val type_id_get : t -> Uint64.t
+        val type_id_get_int_exn : t -> int
         val of_message : 'cap message_t -> t
       end
       type unnamed_union_t =
@@ -129,11 +129,11 @@ module type S = sig
       type t_Method_10736806783679155584 = t
       type builder_t_Method_10736806783679155584 = builder_t
       val name_get : t -> string
-      val codeOrder_get : t -> int
-      val paramStructType_get : t -> Uint64.t
-      val paramStructType_get_int_exn : t -> int
-      val resultStructType_get : t -> Uint64.t
-      val resultStructType_get_int_exn : t -> int
+      val code_order_get : t -> int
+      val param_struct_type_get : t -> Uint64.t
+      val param_struct_type_get_int_exn : t -> int
+      val result_struct_type_get : t -> Uint64.t
+      val result_struct_type_get_int_exn : t -> int
       val annotations_get : t -> (ro, Annotation.t, array_t) Runtime.Array.t
       val of_message : 'cap message_t -> t
     end
@@ -143,7 +143,7 @@ module type S = sig
       type t_Enumerant_10919677598968879693 = t
       type builder_t_Enumerant_10919677598968879693 = builder_t
       val name_get : t -> string
-      val codeOrder_get : t -> int
+      val code_order_get : t -> int
       val annotations_get : t -> (ro, Annotation.t, array_t) Runtime.Array.t
       val of_message : 'cap message_t -> t
     end
@@ -152,7 +152,7 @@ module type S = sig
       type builder_t
       type t_Field_11145653318641710175 = t
       type builder_t_Field_11145653318641710175 = builder_t
-      val noDiscriminant : int
+      val no_discriminant : int
       module Ordinal : sig
         type t
         type builder_t
@@ -170,8 +170,8 @@ module type S = sig
         type builder_t
         type t_Group_14626792032033250577 = t
         type builder_t_Group_14626792032033250577 = builder_t
-        val typeId_get : t -> Uint64.t
-        val typeId_get_int_exn : t -> int
+        val type_id_get : t -> Uint64.t
+        val type_id_get_int_exn : t -> int
         val of_message : 'cap message_t -> t
       end
       module Slot : sig
@@ -182,8 +182,8 @@ module type S = sig
         val offset_get : t -> Uint32.t
         val offset_get_int_exn : t -> int
         val type_get : t -> Type.t
-        val defaultValue_get : t -> Value.t
-        val hadExplicitDefault_get : t -> bool
+        val default_value_get : t -> Value.t
+        val had_explicit_default_get : t -> bool
         val of_message : 'cap message_t -> t
       end
       type unnamed_union_t =
@@ -192,9 +192,9 @@ module type S = sig
         | Undefined of int
       val get : t -> unnamed_union_t
       val name_get : t -> string
-      val codeOrder_get : t -> int
+      val code_order_get : t -> int
       val annotations_get : t -> (ro, Annotation.t, array_t) Runtime.Array.t
-      val discriminantValue_get : t -> int
+      val discriminant_value_get : t -> int
       val ordinal_get : t -> Ordinal.t
       val of_message : 'cap message_t -> t
     end
@@ -208,13 +208,13 @@ module type S = sig
         type builder_t
         type t_Struct_11430331134483579957 = t
         type builder_t_Struct_11430331134483579957 = builder_t
-        val dataWordCount_get : t -> int
-        val pointerCount_get : t -> int
-        val preferredListEncoding_get : t -> ElementSize.t
-        val isGroup_get : t -> bool
-        val discriminantCount_get : t -> int
-        val discriminantOffset_get : t -> Uint32.t
-        val discriminantOffset_get_int_exn : t -> int
+        val data_word_count_get : t -> int
+        val pointer_count_get : t -> int
+        val preferred_list_encoding_get : t -> ElementSize.t
+        val is_group_get : t -> bool
+        val discriminant_count_get : t -> int
+        val discriminant_offset_get : t -> Uint32.t
+        val discriminant_offset_get_int_exn : t -> int
         val fields_get : t -> (ro, Field.t, array_t) Runtime.Array.t
         val of_message : 'cap message_t -> t
       end
@@ -232,18 +232,18 @@ module type S = sig
         type t_Annotation_17011813041836786320 = t
         type builder_t_Annotation_17011813041836786320 = builder_t
         val type_get : t -> Type.t
-        val targetsFile_get : t -> bool
-        val targetsConst_get : t -> bool
-        val targetsEnum_get : t -> bool
-        val targetsEnumerant_get : t -> bool
-        val targetsStruct_get : t -> bool
-        val targetsField_get : t -> bool
-        val targetsUnion_get : t -> bool
-        val targetsGroup_get : t -> bool
-        val targetsInterface_get : t -> bool
-        val targetsMethod_get : t -> bool
-        val targetsParam_get : t -> bool
-        val targetsAnnotation_get : t -> bool
+        val targets_file_get : t -> bool
+        val targets_const_get : t -> bool
+        val targets_enum_get : t -> bool
+        val targets_enumerant_get : t -> bool
+        val targets_struct_get : t -> bool
+        val targets_field_get : t -> bool
+        val targets_union_get : t -> bool
+        val targets_group_get : t -> bool
+        val targets_interface_get : t -> bool
+        val targets_method_get : t -> bool
+        val targets_param_get : t -> bool
+        val targets_annotation_get : t -> bool
         val of_message : 'cap message_t -> t
       end
       module Const : sig
@@ -285,12 +285,12 @@ module type S = sig
       val get : t -> unnamed_union_t
       val id_get : t -> Uint64.t
       val id_get_int_exn : t -> int
-      val displayName_get : t -> string
-      val displayNamePrefixLength_get : t -> Uint32.t
-      val displayNamePrefixLength_get_int_exn : t -> int
-      val scopeId_get : t -> Uint64.t
-      val scopeId_get_int_exn : t -> int
-      val nestedNodes_get : t -> (ro, NestedNode.t, array_t) Runtime.Array.t
+      val display_name_get : t -> string
+      val display_name_prefix_length_get : t -> Uint32.t
+      val display_name_prefix_length_get_int_exn : t -> int
+      val scope_id_get : t -> Uint64.t
+      val scope_id_get_int_exn : t -> int
+      val nested_nodes_get : t -> (ro, NestedNode.t, array_t) Runtime.Array.t
       val annotations_get : t -> (ro, Annotation.t, array_t) Runtime.Array.t
       val of_message : 'cap message_t -> t
     end
@@ -321,7 +321,7 @@ module type S = sig
         val of_message : 'cap message_t -> t
       end
       val nodes_get : t -> (ro, Node.t, array_t) Runtime.Array.t
-      val requestedFiles_get : t -> (ro, RequestedFile.t, array_t) Runtime.Array.t
+      val requested_files_get : t -> (ro, RequestedFile.t, array_t) Runtime.Array.t
       val of_message : 'cap message_t -> t
     end
   end
@@ -352,10 +352,10 @@ module type S = sig
         type reader_t = Reader.Type.Enum.t
         type t_Enum_11389172934837766057 = t
         type reader_t_Enum_11389172934837766057 = reader_t
-        val typeId_get : t -> Uint64.t
-        val typeId_get_int_exn : t -> int
-        val typeId_set : t -> Uint64.t -> unit
-        val typeId_set_int_exn : t -> int -> unit
+        val type_id_get : t -> Uint64.t
+        val type_id_get_int_exn : t -> int
+        val type_id_set : t -> Uint64.t -> unit
+        val type_id_set_int_exn : t -> int -> unit
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
         val init_root : ?message_size:int -> unit -> t
@@ -365,10 +365,10 @@ module type S = sig
         type reader_t = Reader.Type.Interface.t
         type t_Interface_17116997365232503999 = t
         type reader_t_Interface_17116997365232503999 = reader_t
-        val typeId_get : t -> Uint64.t
-        val typeId_get_int_exn : t -> int
-        val typeId_set : t -> Uint64.t -> unit
-        val typeId_set_int_exn : t -> int -> unit
+        val type_id_get : t -> Uint64.t
+        val type_id_get_int_exn : t -> int
+        val type_id_set : t -> Uint64.t -> unit
+        val type_id_set_int_exn : t -> int -> unit
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
         val init_root : ?message_size:int -> unit -> t
@@ -378,10 +378,10 @@ module type S = sig
         type reader_t = Reader.Type.List.t
         type t_List_9792858745991129751 = t
         type reader_t_List_9792858745991129751 = reader_t
-        val elementType_get : t -> t_Type_15020482145304562784
-        val elementType_set_reader : t -> reader_t_Type_15020482145304562784 -> t_Type_15020482145304562784
-        val elementType_set_builder : t -> t_Type_15020482145304562784 -> t_Type_15020482145304562784
-        val elementType_init : t -> t_Type_15020482145304562784
+        val element_type_get : t -> t_Type_15020482145304562784
+        val element_type_set_reader : t -> reader_t_Type_15020482145304562784 -> t_Type_15020482145304562784
+        val element_type_set_builder : t -> t_Type_15020482145304562784 -> t_Type_15020482145304562784
+        val element_type_init : t -> t_Type_15020482145304562784
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
         val init_root : ?message_size:int -> unit -> t
@@ -391,10 +391,10 @@ module type S = sig
         type reader_t = Reader.Type.Struct.t
         type t_Struct_12410354185295152851 = t
         type reader_t_Struct_12410354185295152851 = reader_t
-        val typeId_get : t -> Uint64.t
-        val typeId_get_int_exn : t -> int
-        val typeId_set : t -> Uint64.t -> unit
-        val typeId_set_int_exn : t -> int -> unit
+        val type_id_get : t -> Uint64.t
+        val type_id_get_int_exn : t -> int
+        val type_id_set : t -> Uint64.t -> unit
+        val type_id_set_int_exn : t -> int -> unit
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
         val init_root : ?message_size:int -> unit -> t
@@ -435,7 +435,7 @@ module type S = sig
       val float64_set : t -> unit
       val text_set : t -> unit
       val data_set : t -> unit
-      val anyPointer_set : t -> unit
+      val any_pointer_set : t -> unit
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
       val init_root : ?message_size:int -> unit -> t
@@ -489,7 +489,7 @@ module type S = sig
       val enum_set_exn : t -> int -> unit
       val struct_set : t -> pointer_t -> unit
       val interface_set : t -> unit
-      val anyPointer_set : t -> pointer_t -> unit
+      val any_pointer_set : t -> pointer_t -> unit
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
       val init_root : ?message_size:int -> unit -> t
@@ -518,16 +518,16 @@ module type S = sig
       type reader_t_Method_10736806783679155584 = reader_t
       val name_get : t -> string
       val name_set : t -> string -> unit
-      val codeOrder_get : t -> int
-      val codeOrder_set_exn : t -> int -> unit
-      val paramStructType_get : t -> Uint64.t
-      val paramStructType_get_int_exn : t -> int
-      val paramStructType_set : t -> Uint64.t -> unit
-      val paramStructType_set_int_exn : t -> int -> unit
-      val resultStructType_get : t -> Uint64.t
-      val resultStructType_get_int_exn : t -> int
-      val resultStructType_set : t -> Uint64.t -> unit
-      val resultStructType_set_int_exn : t -> int -> unit
+      val code_order_get : t -> int
+      val code_order_set_exn : t -> int -> unit
+      val param_struct_type_get : t -> Uint64.t
+      val param_struct_type_get_int_exn : t -> int
+      val param_struct_type_set : t -> Uint64.t -> unit
+      val param_struct_type_set_int_exn : t -> int -> unit
+      val result_struct_type_get : t -> Uint64.t
+      val result_struct_type_get_int_exn : t -> int
+      val result_struct_type_set : t -> Uint64.t -> unit
+      val result_struct_type_set_int_exn : t -> int -> unit
       val annotations_get : t -> (rw, Annotation.t, array_t) Runtime.Array.t
       val annotations_set : t -> (rw, Annotation.t, array_t) Runtime.Array.t -> (rw, Annotation.t, array_t) Runtime.Array.t
       val annotations_init : t -> int -> (rw, Annotation.t, array_t) Runtime.Array.t
@@ -542,8 +542,8 @@ module type S = sig
       type reader_t_Enumerant_10919677598968879693 = reader_t
       val name_get : t -> string
       val name_set : t -> string -> unit
-      val codeOrder_get : t -> int
-      val codeOrder_set_exn : t -> int -> unit
+      val code_order_get : t -> int
+      val code_order_set_exn : t -> int -> unit
       val annotations_get : t -> (rw, Annotation.t, array_t) Runtime.Array.t
       val annotations_set : t -> (rw, Annotation.t, array_t) Runtime.Array.t -> (rw, Annotation.t, array_t) Runtime.Array.t
       val annotations_init : t -> int -> (rw, Annotation.t, array_t) Runtime.Array.t
@@ -556,7 +556,7 @@ module type S = sig
       type reader_t = Reader.Field.t
       type t_Field_11145653318641710175 = t
       type reader_t_Field_11145653318641710175 = reader_t
-      val noDiscriminant : int
+      val no_discriminant : int
       module Ordinal : sig
         type t = Reader.Field.Ordinal.builder_t
         type reader_t = Reader.Field.Ordinal.t
@@ -578,10 +578,10 @@ module type S = sig
         type reader_t = Reader.Field.Group.t
         type t_Group_14626792032033250577 = t
         type reader_t_Group_14626792032033250577 = reader_t
-        val typeId_get : t -> Uint64.t
-        val typeId_get_int_exn : t -> int
-        val typeId_set : t -> Uint64.t -> unit
-        val typeId_set_int_exn : t -> int -> unit
+        val type_id_get : t -> Uint64.t
+        val type_id_get_int_exn : t -> int
+        val type_id_set : t -> Uint64.t -> unit
+        val type_id_set_int_exn : t -> int -> unit
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
         val init_root : ?message_size:int -> unit -> t
@@ -599,12 +599,12 @@ module type S = sig
         val type_set_reader : t -> Type.reader_t -> Type.t
         val type_set_builder : t -> Type.t -> Type.t
         val type_init : t -> Type.t
-        val defaultValue_get : t -> Value.t
-        val defaultValue_set_reader : t -> Value.reader_t -> Value.t
-        val defaultValue_set_builder : t -> Value.t -> Value.t
-        val defaultValue_init : t -> Value.t
-        val hadExplicitDefault_get : t -> bool
-        val hadExplicitDefault_set : t -> bool -> unit
+        val default_value_get : t -> Value.t
+        val default_value_set_reader : t -> Value.reader_t -> Value.t
+        val default_value_set_builder : t -> Value.t -> Value.t
+        val default_value_init : t -> Value.t
+        val had_explicit_default_get : t -> bool
+        val had_explicit_default_set : t -> bool -> unit
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
         val init_root : ?message_size:int -> unit -> t
@@ -616,13 +616,13 @@ module type S = sig
       val get : t -> unnamed_union_t
       val name_get : t -> string
       val name_set : t -> string -> unit
-      val codeOrder_get : t -> int
-      val codeOrder_set_exn : t -> int -> unit
+      val code_order_get : t -> int
+      val code_order_set_exn : t -> int -> unit
       val annotations_get : t -> (rw, Annotation.t, array_t) Runtime.Array.t
       val annotations_set : t -> (rw, Annotation.t, array_t) Runtime.Array.t -> (rw, Annotation.t, array_t) Runtime.Array.t
       val annotations_init : t -> int -> (rw, Annotation.t, array_t) Runtime.Array.t
-      val discriminantValue_get : t -> int
-      val discriminantValue_set_exn : t -> int -> unit
+      val discriminant_value_get : t -> int
+      val discriminant_value_set_exn : t -> int -> unit
       val ordinal_get : t -> Ordinal.t
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
@@ -638,21 +638,21 @@ module type S = sig
         type reader_t = Reader.Node.Struct.t
         type t_Struct_11430331134483579957 = t
         type reader_t_Struct_11430331134483579957 = reader_t
-        val dataWordCount_get : t -> int
-        val dataWordCount_set_exn : t -> int -> unit
-        val pointerCount_get : t -> int
-        val pointerCount_set_exn : t -> int -> unit
-        val preferredListEncoding_get : t -> ElementSize.t
-        val preferredListEncoding_set : t -> ElementSize.t -> unit
-        val preferredListEncoding_set_unsafe : t -> ElementSize.t -> unit
-        val isGroup_get : t -> bool
-        val isGroup_set : t -> bool -> unit
-        val discriminantCount_get : t -> int
-        val discriminantCount_set_exn : t -> int -> unit
-        val discriminantOffset_get : t -> Uint32.t
-        val discriminantOffset_get_int_exn : t -> int
-        val discriminantOffset_set : t -> Uint32.t -> unit
-        val discriminantOffset_set_int_exn : t -> int -> unit
+        val data_word_count_get : t -> int
+        val data_word_count_set_exn : t -> int -> unit
+        val pointer_count_get : t -> int
+        val pointer_count_set_exn : t -> int -> unit
+        val preferred_list_encoding_get : t -> ElementSize.t
+        val preferred_list_encoding_set : t -> ElementSize.t -> unit
+        val preferred_list_encoding_set_unsafe : t -> ElementSize.t -> unit
+        val is_group_get : t -> bool
+        val is_group_set : t -> bool -> unit
+        val discriminant_count_get : t -> int
+        val discriminant_count_set_exn : t -> int -> unit
+        val discriminant_offset_get : t -> Uint32.t
+        val discriminant_offset_get_int_exn : t -> int
+        val discriminant_offset_set : t -> Uint32.t -> unit
+        val discriminant_offset_set_int_exn : t -> int -> unit
         val fields_get : t -> (rw, Field.t, array_t) Runtime.Array.t
         val fields_set : t -> (rw, Field.t, array_t) Runtime.Array.t -> (rw, Field.t, array_t) Runtime.Array.t
         val fields_init : t -> int -> (rw, Field.t, array_t) Runtime.Array.t
@@ -681,30 +681,30 @@ module type S = sig
         val type_set_reader : t -> Type.reader_t -> Type.t
         val type_set_builder : t -> Type.t -> Type.t
         val type_init : t -> Type.t
-        val targetsFile_get : t -> bool
-        val targetsFile_set : t -> bool -> unit
-        val targetsConst_get : t -> bool
-        val targetsConst_set : t -> bool -> unit
-        val targetsEnum_get : t -> bool
-        val targetsEnum_set : t -> bool -> unit
-        val targetsEnumerant_get : t -> bool
-        val targetsEnumerant_set : t -> bool -> unit
-        val targetsStruct_get : t -> bool
-        val targetsStruct_set : t -> bool -> unit
-        val targetsField_get : t -> bool
-        val targetsField_set : t -> bool -> unit
-        val targetsUnion_get : t -> bool
-        val targetsUnion_set : t -> bool -> unit
-        val targetsGroup_get : t -> bool
-        val targetsGroup_set : t -> bool -> unit
-        val targetsInterface_get : t -> bool
-        val targetsInterface_set : t -> bool -> unit
-        val targetsMethod_get : t -> bool
-        val targetsMethod_set : t -> bool -> unit
-        val targetsParam_get : t -> bool
-        val targetsParam_set : t -> bool -> unit
-        val targetsAnnotation_get : t -> bool
-        val targetsAnnotation_set : t -> bool -> unit
+        val targets_file_get : t -> bool
+        val targets_file_set : t -> bool -> unit
+        val targets_const_get : t -> bool
+        val targets_const_set : t -> bool -> unit
+        val targets_enum_get : t -> bool
+        val targets_enum_set : t -> bool -> unit
+        val targets_enumerant_get : t -> bool
+        val targets_enumerant_set : t -> bool -> unit
+        val targets_struct_get : t -> bool
+        val targets_struct_set : t -> bool -> unit
+        val targets_field_get : t -> bool
+        val targets_field_set : t -> bool -> unit
+        val targets_union_get : t -> bool
+        val targets_union_set : t -> bool -> unit
+        val targets_group_get : t -> bool
+        val targets_group_set : t -> bool -> unit
+        val targets_interface_get : t -> bool
+        val targets_interface_set : t -> bool -> unit
+        val targets_method_get : t -> bool
+        val targets_method_set : t -> bool -> unit
+        val targets_param_get : t -> bool
+        val targets_param_set : t -> bool -> unit
+        val targets_annotation_get : t -> bool
+        val targets_annotation_set : t -> bool -> unit
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
         val init_root : ?message_size:int -> unit -> t
@@ -770,19 +770,19 @@ module type S = sig
       val id_get_int_exn : t -> int
       val id_set : t -> Uint64.t -> unit
       val id_set_int_exn : t -> int -> unit
-      val displayName_get : t -> string
-      val displayName_set : t -> string -> unit
-      val displayNamePrefixLength_get : t -> Uint32.t
-      val displayNamePrefixLength_get_int_exn : t -> int
-      val displayNamePrefixLength_set : t -> Uint32.t -> unit
-      val displayNamePrefixLength_set_int_exn : t -> int -> unit
-      val scopeId_get : t -> Uint64.t
-      val scopeId_get_int_exn : t -> int
-      val scopeId_set : t -> Uint64.t -> unit
-      val scopeId_set_int_exn : t -> int -> unit
-      val nestedNodes_get : t -> (rw, NestedNode.t, array_t) Runtime.Array.t
-      val nestedNodes_set : t -> (rw, NestedNode.t, array_t) Runtime.Array.t -> (rw, NestedNode.t, array_t) Runtime.Array.t
-      val nestedNodes_init : t -> int -> (rw, NestedNode.t, array_t) Runtime.Array.t
+      val display_name_get : t -> string
+      val display_name_set : t -> string -> unit
+      val display_name_prefix_length_get : t -> Uint32.t
+      val display_name_prefix_length_get_int_exn : t -> int
+      val display_name_prefix_length_set : t -> Uint32.t -> unit
+      val display_name_prefix_length_set_int_exn : t -> int -> unit
+      val scope_id_get : t -> Uint64.t
+      val scope_id_get_int_exn : t -> int
+      val scope_id_set : t -> Uint64.t -> unit
+      val scope_id_set_int_exn : t -> int -> unit
+      val nested_nodes_get : t -> (rw, NestedNode.t, array_t) Runtime.Array.t
+      val nested_nodes_set : t -> (rw, NestedNode.t, array_t) Runtime.Array.t -> (rw, NestedNode.t, array_t) Runtime.Array.t
+      val nested_nodes_init : t -> int -> (rw, NestedNode.t, array_t) Runtime.Array.t
       val annotations_get : t -> (rw, Annotation.t, array_t) Runtime.Array.t
       val annotations_set : t -> (rw, Annotation.t, array_t) Runtime.Array.t -> (rw, Annotation.t, array_t) Runtime.Array.t
       val annotations_init : t -> int -> (rw, Annotation.t, array_t) Runtime.Array.t
@@ -831,9 +831,9 @@ module type S = sig
       val nodes_get : t -> (rw, Node.t, array_t) Runtime.Array.t
       val nodes_set : t -> (rw, Node.t, array_t) Runtime.Array.t -> (rw, Node.t, array_t) Runtime.Array.t
       val nodes_init : t -> int -> (rw, Node.t, array_t) Runtime.Array.t
-      val requestedFiles_get : t -> (rw, RequestedFile.t, array_t) Runtime.Array.t
-      val requestedFiles_set : t -> (rw, RequestedFile.t, array_t) Runtime.Array.t -> (rw, RequestedFile.t, array_t) Runtime.Array.t
-      val requestedFiles_init : t -> int -> (rw, RequestedFile.t, array_t) Runtime.Array.t
+      val requested_files_get : t -> (rw, RequestedFile.t, array_t) Runtime.Array.t
+      val requested_files_set : t -> (rw, RequestedFile.t, array_t) Runtime.Array.t -> (rw, RequestedFile.t, array_t) Runtime.Array.t
+      val requested_files_init : t -> int -> (rw, RequestedFile.t, array_t) Runtime.Array.t
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
       val init_root : ?message_size:int -> unit -> t

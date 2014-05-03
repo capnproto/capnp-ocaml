@@ -42,7 +42,7 @@ let add_parentage_maps
   let open PS.Node in
   let node_id = id_get node in
   let rec add_children parent =
-    let child_nodes = nestedNodes_get parent in
+    let child_nodes = nested_nodes_get parent in
     RT.Array.iter child_nodes ~f:(fun child_nested_node ->
       let child_node =
         Hashtbl.find_exn nodes_table (NestedNode.id_get child_nested_node)
@@ -107,18 +107,18 @@ let rec register_type_reference
   let open PS.Type in
   match get tp with
   | List x ->
-      let inner_type = List.elementType_get x in
+      let inner_type = List.element_type_get x in
       register_type_reference ~parentage_table ~edges
         ~referrer ~referee_type:inner_type
   | Enum x ->
       register_reference ~parentage_table ~edges ~referrer
-        ~referee:(Enum.typeId_get x)
+        ~referee:(Enum.type_id_get x)
   | Struct x ->
       register_reference ~parentage_table ~edges ~referrer
-        ~referee:(Struct.typeId_get x)
+        ~referee:(Struct.type_id_get x)
   | Interface x ->
       register_reference ~parentage_table ~edges ~referrer
-        ~referee:(Interface.typeId_get x)
+        ~referee:(Interface.type_id_get x)
   | _ ->
       ()
 
@@ -144,7 +144,7 @@ let build_reference_graph
           id
     in
     let () =
-      let child_nodes = nestedNodes_get node in
+      let child_nodes = nested_nodes_get node in
       RT.Array.iter child_nodes ~f:(fun child_nested_node ->
         let child_node = Hashtbl.find_exn nodes_table
             (NestedNode.id_get child_nested_node)
@@ -168,7 +168,7 @@ let build_reference_graph
                 ~referrer:parent_id ~referee_type:(PS.Field.Slot.type_get slot)
           | PS.Field.Group group ->
               let group_node =
-                Hashtbl.find_exn nodes_table (PS.Field.Group.typeId_get group)
+                Hashtbl.find_exn nodes_table (PS.Field.Group.type_id_get group)
               in
               add_edges ~parentage_table ~edges ~parent_id_opt:parent_id
                 group_node
@@ -178,9 +178,9 @@ let build_reference_graph
         let methods = Interface.methods_get node_iface in
         RT.Array.iter methods ~f:(fun meth ->
           register_reference ~parentage_table ~edges
-            ~referrer:parent_id ~referee:(PS.Method.paramStructType_get meth);
+            ~referrer:parent_id ~referee:(PS.Method.param_struct_type_get meth);
           register_reference ~parentage_table ~edges
-            ~referrer:parent_id ~referee:(PS.Method.resultStructType_get meth))
+            ~referrer:parent_id ~referee:(PS.Method.result_struct_type_get meth))
     | Const node_const ->
         register_type_reference ~parentage_table ~edges
           ~referrer:parent_id ~referee_type:(PS.Node.Const.type_get node_const)

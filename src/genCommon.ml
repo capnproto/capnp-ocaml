@@ -60,7 +60,6 @@ let mangle_ident (ident : string) (idents : string list) =
   in
   loop ident
 
-
 let mangle_undefined reserved_names =
   String.capitalize (mangle_ident "undefined" reserved_names)
 
@@ -73,6 +72,20 @@ let mangle_field_undefined (fields : 'a list) =
   mangle_undefined field_names
 
 
+let underscore_name (camelcase_name : string) : string =
+  let rev_chars : string list =
+    String.fold (String.uncapitalize camelcase_name) ~init:[] ~f:(fun acc c ->
+      let fragment =
+        if Char.is_uppercase c then
+          "_" ^ (String.of_char (Char.lowercase c))
+        else
+          String.of_char c
+      in
+      fragment :: acc)
+  in
+  String.concat ~sep:"" (List.rev rev_chars)
+
+
 let children_of
     (nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
     (parent : PS.Node.t)
@@ -80,7 +93,7 @@ let children_of
   let open PS.Node in
   let parent_id = id_get parent in
   Hashtbl.fold nodes_table ~init:[] ~f:(fun ~key:id ~data:node acc ->
-    if Util.uint64_equal parent_id (scopeId_get node) then
+    if Util.uint64_equal parent_id (scope_id_get node) then
       node :: acc
     else
       acc)
@@ -98,7 +111,7 @@ let get_unqualified_name
 : string =
   let open PS.Node in
   let child_id = id_get child in
-  let nested_nodes = nestedNodes_get parent in
+  let nested_nodes = nested_nodes_get parent in
   let matching_nested_node_name =
     RT.Array.find_map nested_nodes ~f:(fun nested_node ->
       if Util.uint64_equal child_id (NestedNode.id_get nested_node) then
@@ -114,9 +127,9 @@ let get_unqualified_name
           "Unable to find unqualified name of child node %s (%s) \
            within parent node %s (%s)."
         (Uint64.to_string child_id)
-        (displayName_get child)
+        (display_name_get child)
         (Uint64.to_string (id_get parent))
-        (displayName_get parent)
+        (display_name_get parent)
       in
       begin match get parent with
       | File
@@ -134,7 +147,7 @@ let get_unqualified_name
                   None
               | PS.Field.Group group ->
                   if Util.uint64_equal child_id
-                      (PS.Field.Group.typeId_get group) then
+                      (PS.Field.Group.type_id_get group) then
                     Some (String.capitalize (PS.Field.name_get field))
                   else
                     None
@@ -157,7 +170,7 @@ let get_fully_qualified_name_components nodes_table node
   : (string * Uint64.t) list =
   let open PS.Node in
   let rec loop acc curr_node =
-    let scope_id = scopeId_get curr_node in
+    let scope_id = scope_id_get curr_node in
     if Util.uint64_equal scope_id Uint64.zero then
       acc
     else
@@ -198,7 +211,7 @@ let get_scope_relative_name nodes_table (scope_stack : Uint64.t list) node
 
 let make_unique_typename ~(mode : Mode.t) ~(scope_mode : Mode.t) ~nodes_table node =
   let uq_name = get_unqualified_name
-    ~parent:(Hashtbl.find_exn nodes_table (PS.Node.scopeId_get node)) ~child:node
+    ~parent:(Hashtbl.find_exn nodes_table (PS.Node.scope_id_get node)) ~child:node
   in
   let t_str =
     match (mode, scope_mode) with
@@ -290,7 +303,7 @@ let rec type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
   | Text    -> "string"
   | Data    -> "string"
   | List list_descr ->
-      let list_type = List.elementType_get list_descr in
+      let list_type = List.element_type_get list_descr in
       sprintf "(%s, %s, %s) Runtime.Array.t"
         (if mode = Mode.Reader then "ro" else "rw")
         (type_name ~mode ~scope_mode nodes_table scope list_type)
@@ -304,17 +317,17 @@ let rec type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
             "builder_array_t"
         end
   | Enum enum_descr ->
-      let enum_id = Enum.typeId_get enum_descr in
+      let enum_id = Enum.type_id_get enum_descr in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
       make_disambiguated_type_name ~mode ~scope_mode ~nodes_table
         ~scope ~tp enum_node
   | Struct struct_descr ->
-      let struct_id = Struct.typeId_get struct_descr in
+      let struct_id = Struct.type_id_get struct_descr in
       let struct_node = Hashtbl.find_exn nodes_table struct_id in
       make_disambiguated_type_name ~mode ~scope_mode ~nodes_table
         ~scope ~tp struct_node
   | Interface iface_descr ->
-      let iface_id = Interface.typeId_get iface_descr in
+      let iface_id = Interface.type_id_get iface_descr in
       let iface_node = Hashtbl.find_exn nodes_table iface_id in
       make_disambiguated_type_name ~mode ~scope_mode ~nodes_table
         ~scope ~tp iface_node
@@ -349,7 +362,7 @@ let generate_union_type ~(mode : Mode.t) nodes_table scope fields =
         end
     | Group group ->
         let group_type_name =
-          let group_id = Group.typeId_get group in
+          let group_id = Group.type_id_get group in
           let group_node = Hashtbl.find_exn nodes_table group_id in
           let group_module_name =
             get_scope_relative_name nodes_table scope group_node
@@ -430,7 +443,7 @@ let generate_constant ~nodes_table ~scope const_def =
       let enum_node =
         match PS.Type.get const_type with
         | PS.Type.Enum enum_def ->
-            let enum_id = PS.Type.Enum.typeId_get enum_def in
+            let enum_id = PS.Type.Enum.type_id_get enum_def in
             Hashtbl.find_exn nodes_table enum_id
         | _ ->
             failwith "Decoded non-enum node where enum node was expected."

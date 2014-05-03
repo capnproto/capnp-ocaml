@@ -128,7 +128,7 @@ let compile
   let () = RT.Array.iter nodes ~f:(fun node ->
       Hashtbl.replace nodes_table ~key:(PS.Node.id_get node) ~data:node)
   in
-  let requested_files = PS.CodeGeneratorRequest.requestedFiles_get request in
+  let requested_files = PS.CodeGeneratorRequest.requested_files_get request in
   RT.Array.iter requested_files ~f:(fun requested_file ->
     let open PS.CodeGeneratorRequest in
     let requested_file_id = RequestedFile.id_get requested_file in

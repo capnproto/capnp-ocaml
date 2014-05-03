@@ -56,10 +56,10 @@ type accessor_t =
 
 let generate_one_field_accessors ~nodes_table ~scope ~mode field
   : accessor_t list =
-  let field_name = String.uncapitalize (PS.Field.name_get field) in
+  let field_name = GenCommon.underscore_name (PS.Field.name_get field) in
   match PS.Field.get field with
   | PS.Field.Group group ->
-      let group_id = PS.Field.Group.typeId_get group in
+      let group_id = PS.Field.Group.type_id_get group in
       let group_node = Hashtbl.find_exn nodes_table group_id in
       let group_name =
         GenCommon.get_scope_relative_name nodes_table scope group_node
@@ -224,11 +224,11 @@ let generate_struct_node ~nodes_table ~scope ~nested_modules
   in
   (* Sorting in reverse code order allows us to avoid a List.rev *)
   let all_fields = List.sort unsorted_fields ~cmp:(fun x y ->
-    - (Int.compare (PS.Field.codeOrder_get x) (PS.Field.codeOrder_get y)))
+    - (Int.compare (PS.Field.code_order_get x) (PS.Field.code_order_get y)))
   in
   let union_fields, non_union_fields = List.partition_tf all_fields
       ~f:(fun field ->
-        (PS.Field.discriminantValue_get field) <> PS.Field.noDiscriminant)
+        (PS.Field.discriminant_value_get field) <> PS.Field.no_discriminant)
   in
   let union_accessors =
     (generate_union_getter ~nodes_table ~scope ~mode union_fields) @
@@ -317,7 +317,7 @@ let rec generate_node
         let error_msg = sprintf
           "The children of node %s (%s) have a cyclic dependency."
           (Uint64.to_string node_id)
-          (displayName_get node)
+          (display_name_get node)
         in
         failwith error_msg
   in
@@ -352,7 +352,7 @@ let rec generate_node
       generate_nested_modules ()
   | Const const_def -> [
       sprintf "val %s : %s"
-        (String.uncapitalize node_name)
+        (GenCommon.underscore_name node_name)
         (GenCommon.type_name ~mode:Mode.Reader ~scope_mode:Mode.Reader
            nodes_table scope (Const.type_get const_def));
     ]

@@ -30,8 +30,8 @@ module type S = sig
         type builder_t
         type t_Enum_11389172934837766057 = t
         type builder_t_Enum_11389172934837766057 = builder_t
-        val typeId_get : t -> Uint64.t
-        val typeId_get_int_exn : t -> int
+        val type_id_get : t -> Uint64.t
+        val type_id_get_int_exn : t -> int
         val of_message : 'cap message_t -> t
       end
       module Interface : sig
@@ -39,8 +39,8 @@ module type S = sig
         type builder_t
         type t_Interface_17116997365232503999 = t
         type builder_t_Interface_17116997365232503999 = builder_t
-        val typeId_get : t -> Uint64.t
-        val typeId_get_int_exn : t -> int
+        val type_id_get : t -> Uint64.t
+        val type_id_get_int_exn : t -> int
         val of_message : 'cap message_t -> t
       end
       module List : sig
@@ -48,7 +48,7 @@ module type S = sig
         type builder_t
         type t_List_9792858745991129751 = t
         type builder_t_List_9792858745991129751 = builder_t
-        val elementType_get : t -> t_Type_15020482145304562784
+        val element_type_get : t -> t_Type_15020482145304562784
         val of_message : 'cap message_t -> t
       end
       module Struct : sig
@@ -56,8 +56,8 @@ module type S = sig
         type builder_t
         type t_Struct_12410354185295152851 = t
         type builder_t_Struct_12410354185295152851 = builder_t
-        val typeId_get : t -> Uint64.t
-        val typeId_get_int_exn : t -> int
+        val type_id_get : t -> Uint64.t
+        val type_id_get_int_exn : t -> int
         val of_message : 'cap message_t -> t
       end
       type unnamed_union_t =
@@ -129,11 +129,11 @@ module type S = sig
       type t_Method_10736806783679155584 = t
       type builder_t_Method_10736806783679155584 = builder_t
       val name_get : t -> string
-      val codeOrder_get : t -> int
-      val paramStructType_get : t -> Uint64.t
-      val paramStructType_get_int_exn : t -> int
-      val resultStructType_get : t -> Uint64.t
-      val resultStructType_get_int_exn : t -> int
+      val code_order_get : t -> int
+      val param_struct_type_get : t -> Uint64.t
+      val param_struct_type_get_int_exn : t -> int
+      val result_struct_type_get : t -> Uint64.t
+      val result_struct_type_get_int_exn : t -> int
       val annotations_get : t -> (ro, Annotation.t, array_t) Runtime.Array.t
       val of_message : 'cap message_t -> t
     end
@@ -143,7 +143,7 @@ module type S = sig
       type t_Enumerant_10919677598968879693 = t
       type builder_t_Enumerant_10919677598968879693 = builder_t
       val name_get : t -> string
-      val codeOrder_get : t -> int
+      val code_order_get : t -> int
       val annotations_get : t -> (ro, Annotation.t, array_t) Runtime.Array.t
       val of_message : 'cap message_t -> t
     end
@@ -152,7 +152,7 @@ module type S = sig
       type builder_t
       type t_Field_11145653318641710175 = t
       type builder_t_Field_11145653318641710175 = builder_t
-      val noDiscriminant : int
+      val no_discriminant : int
       module Ordinal : sig
         type t
         type builder_t
@@ -170,8 +170,8 @@ module type S = sig
         type builder_t
         type t_Group_14626792032033250577 = t
         type builder_t_Group_14626792032033250577 = builder_t
-        val typeId_get : t -> Uint64.t
-        val typeId_get_int_exn : t -> int
+        val type_id_get : t -> Uint64.t
+        val type_id_get_int_exn : t -> int
         val of_message : 'cap message_t -> t
       end
       module Slot : sig
@@ -182,8 +182,8 @@ module type S = sig
         val offset_get : t -> Uint32.t
         val offset_get_int_exn : t -> int
         val type_get : t -> Type.t
-        val defaultValue_get : t -> Value.t
-        val hadExplicitDefault_get : t -> bool
+        val default_value_get : t -> Value.t
+        val had_explicit_default_get : t -> bool
         val of_message : 'cap message_t -> t
       end
       type unnamed_union_t =
@@ -192,9 +192,9 @@ module type S = sig
         | Undefined of int
       val get : t -> unnamed_union_t
       val name_get : t -> string
-      val codeOrder_get : t -> int
+      val code_order_get : t -> int
       val annotations_get : t -> (ro, Annotation.t, array_t) Runtime.Array.t
-      val discriminantValue_get : t -> int
+      val discriminant_value_get : t -> int
       val ordinal_get : t -> Ordinal.t
       val of_message : 'cap message_t -> t
     end
@@ -208,13 +208,13 @@ module type S = sig
         type builder_t
         type t_Struct_11430331134483579957 = t
         type builder_t_Struct_11430331134483579957 = builder_t
-        val dataWordCount_get : t -> int
-        val pointerCount_get : t -> int
-        val preferredListEncoding_get : t -> ElementSize.t
-        val isGroup_get : t -> bool
-        val discriminantCount_get : t -> int
-        val discriminantOffset_get : t -> Uint32.t
-        val discriminantOffset_get_int_exn : t -> int
+        val data_word_count_get : t -> int
+        val pointer_count_get : t -> int
+        val preferred_list_encoding_get : t -> ElementSize.t
+        val is_group_get : t -> bool
+        val discriminant_count_get : t -> int
+        val discriminant_offset_get : t -> Uint32.t
+        val discriminant_offset_get_int_exn : t -> int
         val fields_get : t -> (ro, Field.t, array_t) Runtime.Array.t
         val of_message : 'cap message_t -> t
       end
@@ -232,18 +232,18 @@ module type S = sig
         type t_Annotation_17011813041836786320 = t
         type builder_t_Annotation_17011813041836786320 = builder_t
         val type_get : t -> Type.t
-        val targetsFile_get : t -> bool
-        val targetsConst_get : t -> bool
-        val targetsEnum_get : t -> bool
-        val targetsEnumerant_get : t -> bool
-        val targetsStruct_get : t -> bool
-        val targetsField_get : t -> bool
-        val targetsUnion_get : t -> bool
-        val targetsGroup_get : t -> bool
-        val targetsInterface_get : t -> bool
-        val targetsMethod_get : t -> bool
-        val targetsParam_get : t -> bool
-        val targetsAnnotation_get : t -> bool
+        val targets_file_get : t -> bool
+        val targets_const_get : t -> bool
+        val targets_enum_get : t -> bool
+        val targets_enumerant_get : t -> bool
+        val targets_struct_get : t -> bool
+        val targets_field_get : t -> bool
+        val targets_union_get : t -> bool
+        val targets_group_get : t -> bool
+        val targets_interface_get : t -> bool
+        val targets_method_get : t -> bool
+        val targets_param_get : t -> bool
+        val targets_annotation_get : t -> bool
         val of_message : 'cap message_t -> t
       end
       module Const : sig
@@ -285,12 +285,12 @@ module type S = sig
       val get : t -> unnamed_union_t
       val id_get : t -> Uint64.t
       val id_get_int_exn : t -> int
-      val displayName_get : t -> string
-      val displayNamePrefixLength_get : t -> Uint32.t
-      val displayNamePrefixLength_get_int_exn : t -> int
-      val scopeId_get : t -> Uint64.t
-      val scopeId_get_int_exn : t -> int
-      val nestedNodes_get : t -> (ro, NestedNode.t, array_t) Runtime.Array.t
+      val display_name_get : t -> string
+      val display_name_prefix_length_get : t -> Uint32.t
+      val display_name_prefix_length_get_int_exn : t -> int
+      val scope_id_get : t -> Uint64.t
+      val scope_id_get_int_exn : t -> int
+      val nested_nodes_get : t -> (ro, NestedNode.t, array_t) Runtime.Array.t
       val annotations_get : t -> (ro, Annotation.t, array_t) Runtime.Array.t
       val of_message : 'cap message_t -> t
     end
@@ -321,7 +321,7 @@ module type S = sig
         val of_message : 'cap message_t -> t
       end
       val nodes_get : t -> (ro, Node.t, array_t) Runtime.Array.t
-      val requestedFiles_get : t -> (ro, RequestedFile.t, array_t) Runtime.Array.t
+      val requested_files_get : t -> (ro, RequestedFile.t, array_t) Runtime.Array.t
       val of_message : 'cap message_t -> t
     end
   end
@@ -352,10 +352,10 @@ module type S = sig
         type reader_t = Reader.Type.Enum.t
         type t_Enum_11389172934837766057 = t
         type reader_t_Enum_11389172934837766057 = reader_t
-        val typeId_get : t -> Uint64.t
-        val typeId_get_int_exn : t -> int
-        val typeId_set : t -> Uint64.t -> unit
-        val typeId_set_int_exn : t -> int -> unit
+        val type_id_get : t -> Uint64.t
+        val type_id_get_int_exn : t -> int
+        val type_id_set : t -> Uint64.t -> unit
+        val type_id_set_int_exn : t -> int -> unit
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
         val init_root : ?message_size:int -> unit -> t
@@ -365,10 +365,10 @@ module type S = sig
         type reader_t = Reader.Type.Interface.t
         type t_Interface_17116997365232503999 = t
         type reader_t_Interface_17116997365232503999 = reader_t
-        val typeId_get : t -> Uint64.t
-        val typeId_get_int_exn : t -> int
-        val typeId_set : t -> Uint64.t -> unit
-        val typeId_set_int_exn : t -> int -> unit
+        val type_id_get : t -> Uint64.t
+        val type_id_get_int_exn : t -> int
+        val type_id_set : t -> Uint64.t -> unit
+        val type_id_set_int_exn : t -> int -> unit
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
         val init_root : ?message_size:int -> unit -> t
@@ -378,10 +378,10 @@ module type S = sig
         type reader_t = Reader.Type.List.t
         type t_List_9792858745991129751 = t
         type reader_t_List_9792858745991129751 = reader_t
-        val elementType_get : t -> t_Type_15020482145304562784
-        val elementType_set_reader : t -> reader_t_Type_15020482145304562784 -> t_Type_15020482145304562784
-        val elementType_set_builder : t -> t_Type_15020482145304562784 -> t_Type_15020482145304562784
-        val elementType_init : t -> t_Type_15020482145304562784
+        val element_type_get : t -> t_Type_15020482145304562784
+        val element_type_set_reader : t -> reader_t_Type_15020482145304562784 -> t_Type_15020482145304562784
+        val element_type_set_builder : t -> t_Type_15020482145304562784 -> t_Type_15020482145304562784
+        val element_type_init : t -> t_Type_15020482145304562784
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
         val init_root : ?message_size:int -> unit -> t
@@ -391,10 +391,10 @@ module type S = sig
         type reader_t = Reader.Type.Struct.t
         type t_Struct_12410354185295152851 = t
         type reader_t_Struct_12410354185295152851 = reader_t
-        val typeId_get : t -> Uint64.t
-        val typeId_get_int_exn : t -> int
-        val typeId_set : t -> Uint64.t -> unit
-        val typeId_set_int_exn : t -> int -> unit
+        val type_id_get : t -> Uint64.t
+        val type_id_get_int_exn : t -> int
+        val type_id_set : t -> Uint64.t -> unit
+        val type_id_set_int_exn : t -> int -> unit
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
         val init_root : ?message_size:int -> unit -> t
@@ -435,7 +435,7 @@ module type S = sig
       val float64_set : t -> unit
       val text_set : t -> unit
       val data_set : t -> unit
-      val anyPointer_set : t -> unit
+      val any_pointer_set : t -> unit
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
       val init_root : ?message_size:int -> unit -> t
@@ -489,7 +489,7 @@ module type S = sig
       val enum_set_exn : t -> int -> unit
       val struct_set : t -> pointer_t -> unit
       val interface_set : t -> unit
-      val anyPointer_set : t -> pointer_t -> unit
+      val any_pointer_set : t -> pointer_t -> unit
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
       val init_root : ?message_size:int -> unit -> t
@@ -518,16 +518,16 @@ module type S = sig
       type reader_t_Method_10736806783679155584 = reader_t
       val name_get : t -> string
       val name_set : t -> string -> unit
-      val codeOrder_get : t -> int
-      val codeOrder_set_exn : t -> int -> unit
-      val paramStructType_get : t -> Uint64.t
-      val paramStructType_get_int_exn : t -> int
-      val paramStructType_set : t -> Uint64.t -> unit
-      val paramStructType_set_int_exn : t -> int -> unit
-      val resultStructType_get : t -> Uint64.t
-      val resultStructType_get_int_exn : t -> int
-      val resultStructType_set : t -> Uint64.t -> unit
-      val resultStructType_set_int_exn : t -> int -> unit
+      val code_order_get : t -> int
+      val code_order_set_exn : t -> int -> unit
+      val param_struct_type_get : t -> Uint64.t
+      val param_struct_type_get_int_exn : t -> int
+      val param_struct_type_set : t -> Uint64.t -> unit
+      val param_struct_type_set_int_exn : t -> int -> unit
+      val result_struct_type_get : t -> Uint64.t
+      val result_struct_type_get_int_exn : t -> int
+      val result_struct_type_set : t -> Uint64.t -> unit
+      val result_struct_type_set_int_exn : t -> int -> unit
       val annotations_get : t -> (rw, Annotation.t, array_t) Runtime.Array.t
       val annotations_set : t -> (rw, Annotation.t, array_t) Runtime.Array.t -> (rw, Annotation.t, array_t) Runtime.Array.t
       val annotations_init : t -> int -> (rw, Annotation.t, array_t) Runtime.Array.t
@@ -542,8 +542,8 @@ module type S = sig
       type reader_t_Enumerant_10919677598968879693 = reader_t
       val name_get : t -> string
       val name_set : t -> string -> unit
-      val codeOrder_get : t -> int
-      val codeOrder_set_exn : t -> int -> unit
+      val code_order_get : t -> int
+      val code_order_set_exn : t -> int -> unit
       val annotations_get : t -> (rw, Annotation.t, array_t) Runtime.Array.t
       val annotations_set : t -> (rw, Annotation.t, array_t) Runtime.Array.t -> (rw, Annotation.t, array_t) Runtime.Array.t
       val annotations_init : t -> int -> (rw, Annotation.t, array_t) Runtime.Array.t
@@ -556,7 +556,7 @@ module type S = sig
       type reader_t = Reader.Field.t
       type t_Field_11145653318641710175 = t
       type reader_t_Field_11145653318641710175 = reader_t
-      val noDiscriminant : int
+      val no_discriminant : int
       module Ordinal : sig
         type t = Reader.Field.Ordinal.builder_t
         type reader_t = Reader.Field.Ordinal.t
@@ -578,10 +578,10 @@ module type S = sig
         type reader_t = Reader.Field.Group.t
         type t_Group_14626792032033250577 = t
         type reader_t_Group_14626792032033250577 = reader_t
-        val typeId_get : t -> Uint64.t
-        val typeId_get_int_exn : t -> int
-        val typeId_set : t -> Uint64.t -> unit
-        val typeId_set_int_exn : t -> int -> unit
+        val type_id_get : t -> Uint64.t
+        val type_id_get_int_exn : t -> int
+        val type_id_set : t -> Uint64.t -> unit
+        val type_id_set_int_exn : t -> int -> unit
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
         val init_root : ?message_size:int -> unit -> t
@@ -599,12 +599,12 @@ module type S = sig
         val type_set_reader : t -> Type.reader_t -> Type.t
         val type_set_builder : t -> Type.t -> Type.t
         val type_init : t -> Type.t
-        val defaultValue_get : t -> Value.t
-        val defaultValue_set_reader : t -> Value.reader_t -> Value.t
-        val defaultValue_set_builder : t -> Value.t -> Value.t
-        val defaultValue_init : t -> Value.t
-        val hadExplicitDefault_get : t -> bool
-        val hadExplicitDefault_set : t -> bool -> unit
+        val default_value_get : t -> Value.t
+        val default_value_set_reader : t -> Value.reader_t -> Value.t
+        val default_value_set_builder : t -> Value.t -> Value.t
+        val default_value_init : t -> Value.t
+        val had_explicit_default_get : t -> bool
+        val had_explicit_default_set : t -> bool -> unit
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
         val init_root : ?message_size:int -> unit -> t
@@ -616,13 +616,13 @@ module type S = sig
       val get : t -> unnamed_union_t
       val name_get : t -> string
       val name_set : t -> string -> unit
-      val codeOrder_get : t -> int
-      val codeOrder_set_exn : t -> int -> unit
+      val code_order_get : t -> int
+      val code_order_set_exn : t -> int -> unit
       val annotations_get : t -> (rw, Annotation.t, array_t) Runtime.Array.t
       val annotations_set : t -> (rw, Annotation.t, array_t) Runtime.Array.t -> (rw, Annotation.t, array_t) Runtime.Array.t
       val annotations_init : t -> int -> (rw, Annotation.t, array_t) Runtime.Array.t
-      val discriminantValue_get : t -> int
-      val discriminantValue_set_exn : t -> int -> unit
+      val discriminant_value_get : t -> int
+      val discriminant_value_set_exn : t -> int -> unit
       val ordinal_get : t -> Ordinal.t
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
@@ -638,21 +638,21 @@ module type S = sig
         type reader_t = Reader.Node.Struct.t
         type t_Struct_11430331134483579957 = t
         type reader_t_Struct_11430331134483579957 = reader_t
-        val dataWordCount_get : t -> int
-        val dataWordCount_set_exn : t -> int -> unit
-        val pointerCount_get : t -> int
-        val pointerCount_set_exn : t -> int -> unit
-        val preferredListEncoding_get : t -> ElementSize.t
-        val preferredListEncoding_set : t -> ElementSize.t -> unit
-        val preferredListEncoding_set_unsafe : t -> ElementSize.t -> unit
-        val isGroup_get : t -> bool
-        val isGroup_set : t -> bool -> unit
-        val discriminantCount_get : t -> int
-        val discriminantCount_set_exn : t -> int -> unit
-        val discriminantOffset_get : t -> Uint32.t
-        val discriminantOffset_get_int_exn : t -> int
-        val discriminantOffset_set : t -> Uint32.t -> unit
-        val discriminantOffset_set_int_exn : t -> int -> unit
+        val data_word_count_get : t -> int
+        val data_word_count_set_exn : t -> int -> unit
+        val pointer_count_get : t -> int
+        val pointer_count_set_exn : t -> int -> unit
+        val preferred_list_encoding_get : t -> ElementSize.t
+        val preferred_list_encoding_set : t -> ElementSize.t -> unit
+        val preferred_list_encoding_set_unsafe : t -> ElementSize.t -> unit
+        val is_group_get : t -> bool
+        val is_group_set : t -> bool -> unit
+        val discriminant_count_get : t -> int
+        val discriminant_count_set_exn : t -> int -> unit
+        val discriminant_offset_get : t -> Uint32.t
+        val discriminant_offset_get_int_exn : t -> int
+        val discriminant_offset_set : t -> Uint32.t -> unit
+        val discriminant_offset_set_int_exn : t -> int -> unit
         val fields_get : t -> (rw, Field.t, array_t) Runtime.Array.t
         val fields_set : t -> (rw, Field.t, array_t) Runtime.Array.t -> (rw, Field.t, array_t) Runtime.Array.t
         val fields_init : t -> int -> (rw, Field.t, array_t) Runtime.Array.t
@@ -681,30 +681,30 @@ module type S = sig
         val type_set_reader : t -> Type.reader_t -> Type.t
         val type_set_builder : t -> Type.t -> Type.t
         val type_init : t -> Type.t
-        val targetsFile_get : t -> bool
-        val targetsFile_set : t -> bool -> unit
-        val targetsConst_get : t -> bool
-        val targetsConst_set : t -> bool -> unit
-        val targetsEnum_get : t -> bool
-        val targetsEnum_set : t -> bool -> unit
-        val targetsEnumerant_get : t -> bool
-        val targetsEnumerant_set : t -> bool -> unit
-        val targetsStruct_get : t -> bool
-        val targetsStruct_set : t -> bool -> unit
-        val targetsField_get : t -> bool
-        val targetsField_set : t -> bool -> unit
-        val targetsUnion_get : t -> bool
-        val targetsUnion_set : t -> bool -> unit
-        val targetsGroup_get : t -> bool
-        val targetsGroup_set : t -> bool -> unit
-        val targetsInterface_get : t -> bool
-        val targetsInterface_set : t -> bool -> unit
-        val targetsMethod_get : t -> bool
-        val targetsMethod_set : t -> bool -> unit
-        val targetsParam_get : t -> bool
-        val targetsParam_set : t -> bool -> unit
-        val targetsAnnotation_get : t -> bool
-        val targetsAnnotation_set : t -> bool -> unit
+        val targets_file_get : t -> bool
+        val targets_file_set : t -> bool -> unit
+        val targets_const_get : t -> bool
+        val targets_const_set : t -> bool -> unit
+        val targets_enum_get : t -> bool
+        val targets_enum_set : t -> bool -> unit
+        val targets_enumerant_get : t -> bool
+        val targets_enumerant_set : t -> bool -> unit
+        val targets_struct_get : t -> bool
+        val targets_struct_set : t -> bool -> unit
+        val targets_field_get : t -> bool
+        val targets_field_set : t -> bool -> unit
+        val targets_union_get : t -> bool
+        val targets_union_set : t -> bool -> unit
+        val targets_group_get : t -> bool
+        val targets_group_set : t -> bool -> unit
+        val targets_interface_get : t -> bool
+        val targets_interface_set : t -> bool -> unit
+        val targets_method_get : t -> bool
+        val targets_method_set : t -> bool -> unit
+        val targets_param_get : t -> bool
+        val targets_param_set : t -> bool -> unit
+        val targets_annotation_get : t -> bool
+        val targets_annotation_set : t -> bool -> unit
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
         val init_root : ?message_size:int -> unit -> t
@@ -770,19 +770,19 @@ module type S = sig
       val id_get_int_exn : t -> int
       val id_set : t -> Uint64.t -> unit
       val id_set_int_exn : t -> int -> unit
-      val displayName_get : t -> string
-      val displayName_set : t -> string -> unit
-      val displayNamePrefixLength_get : t -> Uint32.t
-      val displayNamePrefixLength_get_int_exn : t -> int
-      val displayNamePrefixLength_set : t -> Uint32.t -> unit
-      val displayNamePrefixLength_set_int_exn : t -> int -> unit
-      val scopeId_get : t -> Uint64.t
-      val scopeId_get_int_exn : t -> int
-      val scopeId_set : t -> Uint64.t -> unit
-      val scopeId_set_int_exn : t -> int -> unit
-      val nestedNodes_get : t -> (rw, NestedNode.t, array_t) Runtime.Array.t
-      val nestedNodes_set : t -> (rw, NestedNode.t, array_t) Runtime.Array.t -> (rw, NestedNode.t, array_t) Runtime.Array.t
-      val nestedNodes_init : t -> int -> (rw, NestedNode.t, array_t) Runtime.Array.t
+      val display_name_get : t -> string
+      val display_name_set : t -> string -> unit
+      val display_name_prefix_length_get : t -> Uint32.t
+      val display_name_prefix_length_get_int_exn : t -> int
+      val display_name_prefix_length_set : t -> Uint32.t -> unit
+      val display_name_prefix_length_set_int_exn : t -> int -> unit
+      val scope_id_get : t -> Uint64.t
+      val scope_id_get_int_exn : t -> int
+      val scope_id_set : t -> Uint64.t -> unit
+      val scope_id_set_int_exn : t -> int -> unit
+      val nested_nodes_get : t -> (rw, NestedNode.t, array_t) Runtime.Array.t
+      val nested_nodes_set : t -> (rw, NestedNode.t, array_t) Runtime.Array.t -> (rw, NestedNode.t, array_t) Runtime.Array.t
+      val nested_nodes_init : t -> int -> (rw, NestedNode.t, array_t) Runtime.Array.t
       val annotations_get : t -> (rw, Annotation.t, array_t) Runtime.Array.t
       val annotations_set : t -> (rw, Annotation.t, array_t) Runtime.Array.t -> (rw, Annotation.t, array_t) Runtime.Array.t
       val annotations_init : t -> int -> (rw, Annotation.t, array_t) Runtime.Array.t
@@ -831,9 +831,9 @@ module type S = sig
       val nodes_get : t -> (rw, Node.t, array_t) Runtime.Array.t
       val nodes_set : t -> (rw, Node.t, array_t) Runtime.Array.t -> (rw, Node.t, array_t) Runtime.Array.t
       val nodes_init : t -> int -> (rw, Node.t, array_t) Runtime.Array.t
-      val requestedFiles_get : t -> (rw, RequestedFile.t, array_t) Runtime.Array.t
-      val requestedFiles_set : t -> (rw, RequestedFile.t, array_t) Runtime.Array.t -> (rw, RequestedFile.t, array_t) Runtime.Array.t
-      val requestedFiles_init : t -> int -> (rw, RequestedFile.t, array_t) Runtime.Array.t
+      val requested_files_get : t -> (rw, RequestedFile.t, array_t) Runtime.Array.t
+      val requested_files_set : t -> (rw, RequestedFile.t, array_t) Runtime.Array.t -> (rw, RequestedFile.t, array_t) Runtime.Array.t
+      val requested_files_init : t -> int -> (rw, RequestedFile.t, array_t) Runtime.Array.t
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
       val init_root : ?message_size:int -> unit -> t
@@ -875,10 +875,10 @@ module Make (MessageWrapper : Message.S) = struct
         type builder_t = rw RA_.StructStorage.t
         type t_Enum_11389172934837766057 = t
         type builder_t_Enum_11389172934837766057 = builder_t
-        let typeId_get x =
+        let type_id_get x =
           RA_.get_data_field x ~f:(RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:8)
-        let typeId_get_int_exn x =
-          Uint64.to_int (typeId_get x)
+        let type_id_get_int_exn x =
+          Uint64.to_int (type_id_get x)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       end
       module Interface = struct
@@ -886,10 +886,10 @@ module Make (MessageWrapper : Message.S) = struct
         type builder_t = rw RA_.StructStorage.t
         type t_Interface_17116997365232503999 = t
         type builder_t_Interface_17116997365232503999 = builder_t
-        let typeId_get x =
+        let type_id_get x =
           RA_.get_data_field x ~f:(RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:8)
-        let typeId_get_int_exn x =
-          Uint64.to_int (typeId_get x)
+        let type_id_get_int_exn x =
+          Uint64.to_int (type_id_get x)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       end
       module List = struct
@@ -897,7 +897,7 @@ module Make (MessageWrapper : Message.S) = struct
         type builder_t = rw RA_.StructStorage.t
         type t_List_9792858745991129751 = t
         type builder_t_List_9792858745991129751 = builder_t
-        let elementType_get x =
+        let element_type_get x =
           RA_.get_pointer_field x 0 ~f:RA_.get_struct
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       end
@@ -906,10 +906,10 @@ module Make (MessageWrapper : Message.S) = struct
         type builder_t = rw RA_.StructStorage.t
         type t_Struct_12410354185295152851 = t
         type builder_t_Struct_12410354185295152851 = builder_t
-        let typeId_get x =
+        let type_id_get x =
           RA_.get_data_field x ~f:(RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:8)
-        let typeId_get_int_exn x =
-          Uint64.to_int (typeId_get x)
+        let type_id_get_int_exn x =
+          Uint64.to_int (type_id_get x)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       end
       let void_get x = ()
@@ -930,7 +930,7 @@ module Make (MessageWrapper : Message.S) = struct
       let enum_get x = x
       let struct_get x = x
       let interface_get x = x
-      let anyPointer_get x = ()
+      let any_pointer_get x = ()
       type unnamed_union_t =
         | Void
         | Bool
@@ -1023,7 +1023,7 @@ module Make (MessageWrapper : Message.S) = struct
       let struct_get x =
         RA_.get_pointer_field x 0 ~f:(fun x -> x)
       let interface_get x = ()
-      let anyPointer_get x =
+      let any_pointer_get x =
         RA_.get_pointer_field x 0 ~f:(fun x -> x)
       type unnamed_union_t =
         | Void
@@ -1066,7 +1066,7 @@ module Make (MessageWrapper : Message.S) = struct
         | 15 -> Enum (enum_get x)
         | 16 -> Struct (struct_get x)
         | 17 -> Interface
-        | 18 -> AnyPointer (anyPointer_get x)
+        | 18 -> AnyPointer (any_pointer_get x)
         | v -> Undefined v
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
     end
@@ -1090,16 +1090,16 @@ module Make (MessageWrapper : Message.S) = struct
       type builder_t_Method_10736806783679155584 = builder_t
       let name_get x =
         RA_.get_pointer_field x 0 ~f:(RA_.get_text ~default:"")
-      let codeOrder_get x =
+      let code_order_get x =
         RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:0)
-      let paramStructType_get x =
+      let param_struct_type_get x =
         RA_.get_data_field x ~f:(RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:8)
-      let paramStructType_get_int_exn x =
-        Uint64.to_int (paramStructType_get x)
-      let resultStructType_get x =
+      let param_struct_type_get_int_exn x =
+        Uint64.to_int (param_struct_type_get x)
+      let result_struct_type_get x =
         RA_.get_data_field x ~f:(RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:16)
-      let resultStructType_get_int_exn x =
-        Uint64.to_int (resultStructType_get x)
+      let result_struct_type_get_int_exn x =
+        Uint64.to_int (result_struct_type_get x)
       let annotations_get x =
         RA_.get_pointer_field x 1 ~f:RA_.get_struct_list
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -1111,7 +1111,7 @@ module Make (MessageWrapper : Message.S) = struct
       type builder_t_Enumerant_10919677598968879693 = builder_t
       let name_get x =
         RA_.get_pointer_field x 0 ~f:(RA_.get_text ~default:"")
-      let codeOrder_get x =
+      let code_order_get x =
         RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:0)
       let annotations_get x =
         RA_.get_pointer_field x 1 ~f:RA_.get_struct_list
@@ -1122,7 +1122,7 @@ module Make (MessageWrapper : Message.S) = struct
       type builder_t = rw RA_.StructStorage.t
       type t_Field_11145653318641710175 = t
       type builder_t_Field_11145653318641710175 = builder_t
-      let noDiscriminant = 65535
+      let no_discriminant = 65535
       module Ordinal = struct
         type t = ro RA_.StructStorage.t option
         type builder_t = rw RA_.StructStorage.t
@@ -1147,10 +1147,10 @@ module Make (MessageWrapper : Message.S) = struct
         type builder_t = rw RA_.StructStorage.t
         type t_Group_14626792032033250577 = t
         type builder_t_Group_14626792032033250577 = builder_t
-        let typeId_get x =
+        let type_id_get x =
           RA_.get_data_field x ~f:(RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:16)
-        let typeId_get_int_exn x =
-          Uint64.to_int (typeId_get x)
+        let type_id_get_int_exn x =
+          Uint64.to_int (type_id_get x)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       end
       module Slot = struct
@@ -1164,9 +1164,9 @@ module Make (MessageWrapper : Message.S) = struct
           Uint32.to_int (offset_get x)
         let type_get x =
           RA_.get_pointer_field x 2 ~f:RA_.get_struct
-        let defaultValue_get x =
+        let default_value_get x =
           RA_.get_pointer_field x 3 ~f:RA_.get_struct
-        let hadExplicitDefault_get x =
+        let had_explicit_default_get x =
           RA_.get_data_field x ~f:(RA_.get_bit ~default:false ~byte_ofs:16 ~bit_ofs:0)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       end
@@ -1183,11 +1183,11 @@ module Make (MessageWrapper : Message.S) = struct
         | v -> Undefined v
       let name_get x =
         RA_.get_pointer_field x 0 ~f:(RA_.get_text ~default:"")
-      let codeOrder_get x =
+      let code_order_get x =
         RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:0)
       let annotations_get x =
         RA_.get_pointer_field x 1 ~f:RA_.get_struct_list
-      let discriminantValue_get x =
+      let discriminant_value_get x =
         RA_.get_data_field x ~f:(RA_.get_uint16 ~default:65535 ~byte_ofs:2)
       let ordinal_get x = x
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -1202,11 +1202,11 @@ module Make (MessageWrapper : Message.S) = struct
         type builder_t = rw RA_.StructStorage.t
         type t_Struct_11430331134483579957 = t
         type builder_t_Struct_11430331134483579957 = builder_t
-        let dataWordCount_get x =
+        let data_word_count_get x =
           RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:14)
-        let pointerCount_get x =
+        let pointer_count_get x =
           RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:24)
-        let preferredListEncoding_get x =
+        let preferred_list_encoding_get x =
           let decode =
             (fun u16 -> match u16 with
               | 0 -> ElementSize.Empty
@@ -1221,14 +1221,14 @@ module Make (MessageWrapper : Message.S) = struct
           in
           let discr = RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:26) in
           decode discr
-        let isGroup_get x =
+        let is_group_get x =
           RA_.get_data_field x ~f:(RA_.get_bit ~default:false ~byte_ofs:28 ~bit_ofs:0)
-        let discriminantCount_get x =
+        let discriminant_count_get x =
           RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:30)
-        let discriminantOffset_get x =
+        let discriminant_offset_get x =
           RA_.get_data_field x ~f:(RA_.get_uint32 ~default:Uint32.zero ~byte_ofs:32)
-        let discriminantOffset_get_int_exn x =
-          Uint32.to_int (discriminantOffset_get x)
+        let discriminant_offset_get_int_exn x =
+          Uint32.to_int (discriminant_offset_get x)
         let fields_get x =
           RA_.get_pointer_field x 3 ~f:RA_.get_struct_list
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -1249,29 +1249,29 @@ module Make (MessageWrapper : Message.S) = struct
         type builder_t_Annotation_17011813041836786320 = builder_t
         let type_get x =
           RA_.get_pointer_field x 3 ~f:RA_.get_struct
-        let targetsFile_get x =
+        let targets_file_get x =
           RA_.get_data_field x ~f:(RA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:0)
-        let targetsConst_get x =
+        let targets_const_get x =
           RA_.get_data_field x ~f:(RA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:1)
-        let targetsEnum_get x =
+        let targets_enum_get x =
           RA_.get_data_field x ~f:(RA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:2)
-        let targetsEnumerant_get x =
+        let targets_enumerant_get x =
           RA_.get_data_field x ~f:(RA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:3)
-        let targetsStruct_get x =
+        let targets_struct_get x =
           RA_.get_data_field x ~f:(RA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:4)
-        let targetsField_get x =
+        let targets_field_get x =
           RA_.get_data_field x ~f:(RA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:5)
-        let targetsUnion_get x =
+        let targets_union_get x =
           RA_.get_data_field x ~f:(RA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:6)
-        let targetsGroup_get x =
+        let targets_group_get x =
           RA_.get_data_field x ~f:(RA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:7)
-        let targetsInterface_get x =
+        let targets_interface_get x =
           RA_.get_data_field x ~f:(RA_.get_bit ~default:false ~byte_ofs:15 ~bit_ofs:0)
-        let targetsMethod_get x =
+        let targets_method_get x =
           RA_.get_data_field x ~f:(RA_.get_bit ~default:false ~byte_ofs:15 ~bit_ofs:1)
-        let targetsParam_get x =
+        let targets_param_get x =
           RA_.get_data_field x ~f:(RA_.get_bit ~default:false ~byte_ofs:15 ~bit_ofs:2)
-        let targetsAnnotation_get x =
+        let targets_annotation_get x =
           RA_.get_data_field x ~f:(RA_.get_bit ~default:false ~byte_ofs:15 ~bit_ofs:3)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       end
@@ -1337,17 +1337,17 @@ module Make (MessageWrapper : Message.S) = struct
         RA_.get_data_field x ~f:(RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:0)
       let id_get_int_exn x =
         Uint64.to_int (id_get x)
-      let displayName_get x =
+      let display_name_get x =
         RA_.get_pointer_field x 0 ~f:(RA_.get_text ~default:"")
-      let displayNamePrefixLength_get x =
+      let display_name_prefix_length_get x =
         RA_.get_data_field x ~f:(RA_.get_uint32 ~default:Uint32.zero ~byte_ofs:8)
-      let displayNamePrefixLength_get_int_exn x =
-        Uint32.to_int (displayNamePrefixLength_get x)
-      let scopeId_get x =
+      let display_name_prefix_length_get_int_exn x =
+        Uint32.to_int (display_name_prefix_length_get x)
+      let scope_id_get x =
         RA_.get_data_field x ~f:(RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:16)
-      let scopeId_get_int_exn x =
-        Uint64.to_int (scopeId_get x)
-      let nestedNodes_get x =
+      let scope_id_get_int_exn x =
+        Uint64.to_int (scope_id_get x)
+      let nested_nodes_get x =
         RA_.get_pointer_field x 1 ~f:RA_.get_struct_list
       let annotations_get x =
         RA_.get_pointer_field x 2 ~f:RA_.get_struct_list
@@ -1388,7 +1388,7 @@ module Make (MessageWrapper : Message.S) = struct
       end
       let nodes_get x =
         RA_.get_pointer_field x 0 ~f:RA_.get_struct_list
-      let requestedFiles_get x =
+      let requested_files_get x =
         RA_.get_pointer_field x 1 ~f:RA_.get_struct_list
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
     end
@@ -1421,13 +1421,13 @@ module Make (MessageWrapper : Message.S) = struct
         type reader_t = Reader.Type.Enum.t
         type t_Enum_11389172934837766057 = t
         type reader_t_Enum_11389172934837766057 = reader_t
-        let typeId_get x =
+        let type_id_get x =
           BA_.get_data_field x ~f:(BA_.get_uint64 ~default:Uint64.zero ~byte_ofs:8)
-        let typeId_get_int_exn x =
-          Uint64.to_int (typeId_get x)
-        let typeId_set x v =
+        let type_id_get_int_exn x =
+          Uint64.to_int (type_id_get x)
+        let type_id_set x v =
           BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:8 v)
-        let typeId_set_int_exn x v = typeId_set x (Uint64.of_int v)
+        let type_id_set_int_exn x v = type_id_set x (Uint64.of_int v)
           let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
         let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
         let init_root ?message_size () =
@@ -1438,13 +1438,13 @@ module Make (MessageWrapper : Message.S) = struct
         type reader_t = Reader.Type.Interface.t
         type t_Interface_17116997365232503999 = t
         type reader_t_Interface_17116997365232503999 = reader_t
-        let typeId_get x =
+        let type_id_get x =
           BA_.get_data_field x ~f:(BA_.get_uint64 ~default:Uint64.zero ~byte_ofs:8)
-        let typeId_get_int_exn x =
-          Uint64.to_int (typeId_get x)
-        let typeId_set x v =
+        let type_id_get_int_exn x =
+          Uint64.to_int (type_id_get x)
+        let type_id_set x v =
           BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:8 v)
-        let typeId_set_int_exn x v = typeId_set x (Uint64.of_int v)
+        let type_id_set_int_exn x v = type_id_set x (Uint64.of_int v)
           let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
         let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
         let init_root ?message_size () =
@@ -1455,13 +1455,13 @@ module Make (MessageWrapper : Message.S) = struct
         type reader_t = Reader.Type.List.t
         type t_List_9792858745991129751 = t
         type reader_t_List_9792858745991129751 = reader_t
-        let elementType_get x =
+        let element_type_get x =
           BA_.get_pointer_field x 0 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1)
-        let elementType_set_reader x v =
+        let element_type_set_reader x v =
           BA_.get_pointer_field x 0 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 v)
-        let elementType_set_builder x v =
+        let element_type_set_builder x v =
           BA_.get_pointer_field x 0 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (Some v))
-        let elementType_init x =
+        let element_type_init x =
           BA_.get_pointer_field x 0 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1)
           let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
         let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
@@ -1473,13 +1473,13 @@ module Make (MessageWrapper : Message.S) = struct
         type reader_t = Reader.Type.Struct.t
         type t_Struct_12410354185295152851 = t
         type reader_t_Struct_12410354185295152851 = reader_t
-        let typeId_get x =
+        let type_id_get x =
           BA_.get_data_field x ~f:(BA_.get_uint64 ~default:Uint64.zero ~byte_ofs:8)
-        let typeId_get_int_exn x =
-          Uint64.to_int (typeId_get x)
-        let typeId_set x v =
+        let type_id_get_int_exn x =
+          Uint64.to_int (type_id_get x)
+        let type_id_set x v =
           BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:8 v)
-        let typeId_set_int_exn x v = typeId_set x (Uint64.of_int v)
+        let type_id_set_int_exn x v = type_id_set x (Uint64.of_int v)
           let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
         let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
         let init_root ?message_size () =
@@ -1531,8 +1531,8 @@ module Make (MessageWrapper : Message.S) = struct
       let enum_get x = x
       let struct_get x = x
       let interface_get x = x
-      let anyPointer_get x = ()
-      let anyPointer_set x =
+      let any_pointer_get x = ()
+      let any_pointer_set x =
         BA_.get_data_field ~discr:{BA_.Discr.value=18; BA_.Discr.byte_ofs=0} x ~f:BA_.set_void
       type unnamed_union_t =
         | Void
@@ -1667,9 +1667,9 @@ module Make (MessageWrapper : Message.S) = struct
       let interface_get x = ()
       let interface_set x =
         BA_.get_data_field ~discr:{BA_.Discr.value=17; BA_.Discr.byte_ofs=0} x ~f:BA_.set_void
-      let anyPointer_get x =
+      let any_pointer_get x =
         BA_.get_pointer_field x 0 ~f:(fun x -> x)
-      let anyPointer_set x v = failwith "not implemented"
+      let any_pointer_set x v = failwith "not implemented"
       type unnamed_union_t =
         | Void
         | Bool of bool
@@ -1711,7 +1711,7 @@ module Make (MessageWrapper : Message.S) = struct
         | 15 -> Enum (enum_get x)
         | 16 -> Struct (struct_get x)
         | 17 -> Interface
-        | 18 -> AnyPointer (anyPointer_get x)
+        | 18 -> AnyPointer (any_pointer_get x)
         | v -> Undefined v
         let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
       let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
@@ -1752,24 +1752,24 @@ module Make (MessageWrapper : Message.S) = struct
         BA_.get_pointer_field x 0 ~f:(BA_.get_text ~default:"")
       let name_set x v =
         BA_.get_pointer_field x 0 ~f:(BA_.set_text v)
-      let codeOrder_get x =
+      let code_order_get x =
         BA_.get_data_field x ~f:(BA_.get_uint16 ~default:0 ~byte_ofs:0)
-      let codeOrder_set_exn x v =
+      let code_order_set_exn x v =
         BA_.get_data_field x ~f:(BA_.set_uint16 ~default:0 ~byte_ofs:0 v)
-      let paramStructType_get x =
+      let param_struct_type_get x =
         BA_.get_data_field x ~f:(BA_.get_uint64 ~default:Uint64.zero ~byte_ofs:8)
-      let paramStructType_get_int_exn x =
-        Uint64.to_int (paramStructType_get x)
-      let paramStructType_set x v =
+      let param_struct_type_get_int_exn x =
+        Uint64.to_int (param_struct_type_get x)
+      let param_struct_type_set x v =
         BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:8 v)
-      let paramStructType_set_int_exn x v = paramStructType_set x (Uint64.of_int v)
-      let resultStructType_get x =
+      let param_struct_type_set_int_exn x v = param_struct_type_set x (Uint64.of_int v)
+      let result_struct_type_get x =
         BA_.get_data_field x ~f:(BA_.get_uint64 ~default:Uint64.zero ~byte_ofs:16)
-      let resultStructType_get_int_exn x =
-        Uint64.to_int (resultStructType_get x)
-      let resultStructType_set x v =
+      let result_struct_type_get_int_exn x =
+        Uint64.to_int (result_struct_type_get x)
+      let result_struct_type_set x v =
         BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:16 v)
-      let resultStructType_set_int_exn x v = resultStructType_set x (Uint64.of_int v)
+      let result_struct_type_set_int_exn x v = result_struct_type_set x (Uint64.of_int v)
       let annotations_get x =
         BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1)
       let annotations_set x v =
@@ -1790,9 +1790,9 @@ module Make (MessageWrapper : Message.S) = struct
         BA_.get_pointer_field x 0 ~f:(BA_.get_text ~default:"")
       let name_set x v =
         BA_.get_pointer_field x 0 ~f:(BA_.set_text v)
-      let codeOrder_get x =
+      let code_order_get x =
         BA_.get_data_field x ~f:(BA_.get_uint16 ~default:0 ~byte_ofs:0)
-      let codeOrder_set_exn x v =
+      let code_order_set_exn x v =
         BA_.get_data_field x ~f:(BA_.set_uint16 ~default:0 ~byte_ofs:0 v)
       let annotations_get x =
         BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1)
@@ -1810,7 +1810,7 @@ module Make (MessageWrapper : Message.S) = struct
       type reader_t = Reader.Field.t
       type t_Field_11145653318641710175 = t
       type reader_t_Field_11145653318641710175 = reader_t
-      let noDiscriminant = 65535
+      let no_discriminant = 65535
       module Ordinal = struct
         type t = Reader.Field.Ordinal.builder_t
         type reader_t = Reader.Field.Ordinal.t
@@ -1842,13 +1842,13 @@ module Make (MessageWrapper : Message.S) = struct
         type reader_t = Reader.Field.Group.t
         type t_Group_14626792032033250577 = t
         type reader_t_Group_14626792032033250577 = reader_t
-        let typeId_get x =
+        let type_id_get x =
           BA_.get_data_field x ~f:(BA_.get_uint64 ~default:Uint64.zero ~byte_ofs:16)
-        let typeId_get_int_exn x =
-          Uint64.to_int (typeId_get x)
-        let typeId_set x v =
+        let type_id_get_int_exn x =
+          Uint64.to_int (type_id_get x)
+        let type_id_set x v =
           BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:16 v)
-        let typeId_set_int_exn x v = typeId_set x (Uint64.of_int v)
+        let type_id_set_int_exn x v = type_id_set x (Uint64.of_int v)
           let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:4 x
         let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
         let init_root ?message_size () =
@@ -1874,17 +1874,17 @@ module Make (MessageWrapper : Message.S) = struct
           BA_.get_pointer_field x 2 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (Some v))
         let type_init x =
           BA_.get_pointer_field x 2 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1)
-        let defaultValue_get x =
+        let default_value_get x =
           BA_.get_pointer_field x 3 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1)
-        let defaultValue_set_reader x v =
+        let default_value_set_reader x v =
           BA_.get_pointer_field x 3 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 v)
-        let defaultValue_set_builder x v =
+        let default_value_set_builder x v =
           BA_.get_pointer_field x 3 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (Some v))
-        let defaultValue_init x =
+        let default_value_init x =
           BA_.get_pointer_field x 3 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1)
-        let hadExplicitDefault_get x =
+        let had_explicit_default_get x =
           BA_.get_data_field x ~f:(BA_.get_bit ~default:false ~byte_ofs:16 ~bit_ofs:0)
-        let hadExplicitDefault_set x v =
+        let had_explicit_default_set x v =
           BA_.get_data_field x ~f:(BA_.set_bit ~default:false ~byte_ofs:16 ~bit_ofs:0 v)
           let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:4 x
         let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
@@ -1906,9 +1906,9 @@ module Make (MessageWrapper : Message.S) = struct
         BA_.get_pointer_field x 0 ~f:(BA_.get_text ~default:"")
       let name_set x v =
         BA_.get_pointer_field x 0 ~f:(BA_.set_text v)
-      let codeOrder_get x =
+      let code_order_get x =
         BA_.get_data_field x ~f:(BA_.get_uint16 ~default:0 ~byte_ofs:0)
-      let codeOrder_set_exn x v =
+      let code_order_set_exn x v =
         BA_.get_data_field x ~f:(BA_.set_uint16 ~default:0 ~byte_ofs:0 v)
       let annotations_get x =
         BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1)
@@ -1916,9 +1916,9 @@ module Make (MessageWrapper : Message.S) = struct
         BA_.get_pointer_field x 1 ~f:(BA_.set_struct_list ~data_words:1 ~pointer_words:1 v)
       let annotations_init x n =
         BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n)
-      let discriminantValue_get x =
+      let discriminant_value_get x =
         BA_.get_data_field x ~f:(BA_.get_uint16 ~default:65535 ~byte_ofs:2)
-      let discriminantValue_set_exn x v =
+      let discriminant_value_set_exn x v =
         BA_.get_data_field x ~f:(BA_.set_uint16 ~default:65535 ~byte_ofs:2 v)
       let ordinal_get x = x
         let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:4 x
@@ -1936,15 +1936,15 @@ module Make (MessageWrapper : Message.S) = struct
         type reader_t = Reader.Node.Struct.t
         type t_Struct_11430331134483579957 = t
         type reader_t_Struct_11430331134483579957 = reader_t
-        let dataWordCount_get x =
+        let data_word_count_get x =
           BA_.get_data_field x ~f:(BA_.get_uint16 ~default:0 ~byte_ofs:14)
-        let dataWordCount_set_exn x v =
+        let data_word_count_set_exn x v =
           BA_.get_data_field x ~f:(BA_.set_uint16 ~default:0 ~byte_ofs:14 v)
-        let pointerCount_get x =
+        let pointer_count_get x =
           BA_.get_data_field x ~f:(BA_.get_uint16 ~default:0 ~byte_ofs:24)
-        let pointerCount_set_exn x v =
+        let pointer_count_set_exn x v =
           BA_.get_data_field x ~f:(BA_.set_uint16 ~default:0 ~byte_ofs:24 v)
-        let preferredListEncoding_get x =
+        let preferred_list_encoding_get x =
           let decode =
             (fun u16 -> match u16 with
               | 0 -> ElementSize.Empty
@@ -1959,7 +1959,7 @@ module Make (MessageWrapper : Message.S) = struct
           in
           let discr = BA_.get_data_field x ~f:(BA_.get_uint16 ~default:0 ~byte_ofs:26) in
           decode discr
-        let preferredListEncoding_set x e =
+        let preferred_list_encoding_set x e =
           let encode =
             (fun enum -> match enum with
               | ElementSize.Empty -> 0
@@ -1974,7 +1974,7 @@ module Make (MessageWrapper : Message.S) = struct
                   invalid_msg "Cannot encode undefined enum value.")
           in
           BA_.get_data_field x ~f:(BA_.set_uint16 ~default:0 ~byte_ofs:26 (encode e))
-        let preferredListEncoding_set_unsafe x e =
+        let preferred_list_encoding_set_unsafe x e =
           let encode =
             (fun enum -> match enum with
               | ElementSize.Empty -> 0
@@ -1988,21 +1988,21 @@ module Make (MessageWrapper : Message.S) = struct
               | ElementSize.Undefined x -> x)
           in
           BA_.get_data_field x ~f:(BA_.set_uint16 ~default:0 ~byte_ofs:26 (encode e))
-        let isGroup_get x =
+        let is_group_get x =
           BA_.get_data_field x ~f:(BA_.get_bit ~default:false ~byte_ofs:28 ~bit_ofs:0)
-        let isGroup_set x v =
+        let is_group_set x v =
           BA_.get_data_field x ~f:(BA_.set_bit ~default:false ~byte_ofs:28 ~bit_ofs:0 v)
-        let discriminantCount_get x =
+        let discriminant_count_get x =
           BA_.get_data_field x ~f:(BA_.get_uint16 ~default:0 ~byte_ofs:30)
-        let discriminantCount_set_exn x v =
+        let discriminant_count_set_exn x v =
           BA_.get_data_field x ~f:(BA_.set_uint16 ~default:0 ~byte_ofs:30 v)
-        let discriminantOffset_get x =
+        let discriminant_offset_get x =
           BA_.get_data_field x ~f:(BA_.get_uint32 ~default:Uint32.zero ~byte_ofs:32)
-        let discriminantOffset_get_int_exn x =
-          Uint32.to_int (discriminantOffset_get x)
-        let discriminantOffset_set x v =
+        let discriminant_offset_get_int_exn x =
+          Uint32.to_int (discriminant_offset_get x)
+        let discriminant_offset_set x v =
           BA_.get_data_field x ~f:(BA_.set_uint32 ~default:Uint32.zero ~byte_ofs:32 v)
-        let discriminantOffset_set_int_exn x v = discriminantOffset_set x (Uint32.of_int v)
+        let discriminant_offset_set_int_exn x v = discriminant_offset_set x (Uint32.of_int v)
         let fields_get x =
           BA_.get_pointer_field x 3 ~f:(BA_.get_struct_list ~data_words:3 ~pointer_words:4)
         let fields_set x v =
@@ -2043,53 +2043,53 @@ module Make (MessageWrapper : Message.S) = struct
           BA_.get_pointer_field x 3 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (Some v))
         let type_init x =
           BA_.get_pointer_field x 3 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1)
-        let targetsFile_get x =
+        let targets_file_get x =
           BA_.get_data_field x ~f:(BA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:0)
-        let targetsFile_set x v =
+        let targets_file_set x v =
           BA_.get_data_field x ~f:(BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:0 v)
-        let targetsConst_get x =
+        let targets_const_get x =
           BA_.get_data_field x ~f:(BA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:1)
-        let targetsConst_set x v =
+        let targets_const_set x v =
           BA_.get_data_field x ~f:(BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:1 v)
-        let targetsEnum_get x =
+        let targets_enum_get x =
           BA_.get_data_field x ~f:(BA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:2)
-        let targetsEnum_set x v =
+        let targets_enum_set x v =
           BA_.get_data_field x ~f:(BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:2 v)
-        let targetsEnumerant_get x =
+        let targets_enumerant_get x =
           BA_.get_data_field x ~f:(BA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:3)
-        let targetsEnumerant_set x v =
+        let targets_enumerant_set x v =
           BA_.get_data_field x ~f:(BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:3 v)
-        let targetsStruct_get x =
+        let targets_struct_get x =
           BA_.get_data_field x ~f:(BA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:4)
-        let targetsStruct_set x v =
+        let targets_struct_set x v =
           BA_.get_data_field x ~f:(BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:4 v)
-        let targetsField_get x =
+        let targets_field_get x =
           BA_.get_data_field x ~f:(BA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:5)
-        let targetsField_set x v =
+        let targets_field_set x v =
           BA_.get_data_field x ~f:(BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:5 v)
-        let targetsUnion_get x =
+        let targets_union_get x =
           BA_.get_data_field x ~f:(BA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:6)
-        let targetsUnion_set x v =
+        let targets_union_set x v =
           BA_.get_data_field x ~f:(BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:6 v)
-        let targetsGroup_get x =
+        let targets_group_get x =
           BA_.get_data_field x ~f:(BA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:7)
-        let targetsGroup_set x v =
+        let targets_group_set x v =
           BA_.get_data_field x ~f:(BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:7 v)
-        let targetsInterface_get x =
+        let targets_interface_get x =
           BA_.get_data_field x ~f:(BA_.get_bit ~default:false ~byte_ofs:15 ~bit_ofs:0)
-        let targetsInterface_set x v =
+        let targets_interface_set x v =
           BA_.get_data_field x ~f:(BA_.set_bit ~default:false ~byte_ofs:15 ~bit_ofs:0 v)
-        let targetsMethod_get x =
+        let targets_method_get x =
           BA_.get_data_field x ~f:(BA_.get_bit ~default:false ~byte_ofs:15 ~bit_ofs:1)
-        let targetsMethod_set x v =
+        let targets_method_set x v =
           BA_.get_data_field x ~f:(BA_.set_bit ~default:false ~byte_ofs:15 ~bit_ofs:1 v)
-        let targetsParam_get x =
+        let targets_param_get x =
           BA_.get_data_field x ~f:(BA_.get_bit ~default:false ~byte_ofs:15 ~bit_ofs:2)
-        let targetsParam_set x v =
+        let targets_param_set x v =
           BA_.get_data_field x ~f:(BA_.set_bit ~default:false ~byte_ofs:15 ~bit_ofs:2 v)
-        let targetsAnnotation_get x =
+        let targets_annotation_get x =
           BA_.get_data_field x ~f:(BA_.get_bit ~default:false ~byte_ofs:15 ~bit_ofs:3)
-        let targetsAnnotation_set x v =
+        let targets_annotation_set x v =
           BA_.get_data_field x ~f:(BA_.set_bit ~default:false ~byte_ofs:15 ~bit_ofs:3 v)
           let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
         let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
@@ -2197,29 +2197,29 @@ module Make (MessageWrapper : Message.S) = struct
       let id_set x v =
         BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:0 v)
       let id_set_int_exn x v = id_set x (Uint64.of_int v)
-      let displayName_get x =
+      let display_name_get x =
         BA_.get_pointer_field x 0 ~f:(BA_.get_text ~default:"")
-      let displayName_set x v =
+      let display_name_set x v =
         BA_.get_pointer_field x 0 ~f:(BA_.set_text v)
-      let displayNamePrefixLength_get x =
+      let display_name_prefix_length_get x =
         BA_.get_data_field x ~f:(BA_.get_uint32 ~default:Uint32.zero ~byte_ofs:8)
-      let displayNamePrefixLength_get_int_exn x =
-        Uint32.to_int (displayNamePrefixLength_get x)
-      let displayNamePrefixLength_set x v =
+      let display_name_prefix_length_get_int_exn x =
+        Uint32.to_int (display_name_prefix_length_get x)
+      let display_name_prefix_length_set x v =
         BA_.get_data_field x ~f:(BA_.set_uint32 ~default:Uint32.zero ~byte_ofs:8 v)
-      let displayNamePrefixLength_set_int_exn x v = displayNamePrefixLength_set x (Uint32.of_int v)
-      let scopeId_get x =
+      let display_name_prefix_length_set_int_exn x v = display_name_prefix_length_set x (Uint32.of_int v)
+      let scope_id_get x =
         BA_.get_data_field x ~f:(BA_.get_uint64 ~default:Uint64.zero ~byte_ofs:16)
-      let scopeId_get_int_exn x =
-        Uint64.to_int (scopeId_get x)
-      let scopeId_set x v =
+      let scope_id_get_int_exn x =
+        Uint64.to_int (scope_id_get x)
+      let scope_id_set x v =
         BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:16 v)
-      let scopeId_set_int_exn x v = scopeId_set x (Uint64.of_int v)
-      let nestedNodes_get x =
+      let scope_id_set_int_exn x v = scope_id_set x (Uint64.of_int v)
+      let nested_nodes_get x =
         BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1)
-      let nestedNodes_set x v =
+      let nested_nodes_set x v =
         BA_.get_pointer_field x 1 ~f:(BA_.set_struct_list ~data_words:1 ~pointer_words:1 v)
-      let nestedNodes_init x n =
+      let nested_nodes_init x n =
         BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n)
       let annotations_get x =
         BA_.get_pointer_field x 2 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1)
@@ -2291,11 +2291,11 @@ module Make (MessageWrapper : Message.S) = struct
         BA_.get_pointer_field x 0 ~f:(BA_.set_struct_list ~data_words:5 ~pointer_words:5 v)
       let nodes_init x n =
         BA_.get_pointer_field x 0 ~f:(BA_.init_struct_list ~data_words:5 ~pointer_words:5 n)
-      let requestedFiles_get x =
+      let requested_files_get x =
         BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:2)
-      let requestedFiles_set x v =
+      let requested_files_set x v =
         BA_.get_pointer_field x 1 ~f:(BA_.set_struct_list ~data_words:1 ~pointer_words:2 v)
-      let requestedFiles_init x n =
+      let requested_files_init x n =
         BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:2 n)
         let of_message x = BA_.get_root_struct ~data_words:0 ~pointer_words:2 x
       let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
