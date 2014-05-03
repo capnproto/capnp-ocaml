@@ -120,20 +120,20 @@ let string_of_lines lines =
 
 
 let compile
-    (request : PS.CodeGeneratorRequest.reader_t)
+    (request : PS.CodeGeneratorRequest.t)
     (dest_dir : string)
   : unit =
   let nodes_table = Hashtbl.Poly.create () in
-  let nodes = PS.CodeGeneratorRequest.R.nodes_get request in
+  let nodes = PS.CodeGeneratorRequest.nodes_get request in
   let () = RT.Array.iter nodes ~f:(fun node ->
-      Hashtbl.replace nodes_table ~key:(PS.Node.R.id_get node) ~data:node)
+      Hashtbl.replace nodes_table ~key:(PS.Node.id_get node) ~data:node)
   in
-  let requested_files = PS.CodeGeneratorRequest.R.requestedFiles_get request in
+  let requested_files = PS.CodeGeneratorRequest.requestedFiles_get request in
   RT.Array.iter requested_files ~f:(fun requested_file ->
     let open PS.CodeGeneratorRequest in
-    let requested_file_id = RequestedFile.R.id_get requested_file in
+    let requested_file_id = RequestedFile.id_get requested_file in
     let requested_file_node = Hashtbl.find_exn nodes_table requested_file_id in
-    let requested_filename = RequestedFile.R.filename_get requested_file in
+    let requested_filename = RequestedFile.filename_get requested_file in
     let sig_s =
       sig_s_header @
       (GenCommon.apply_indent ~indent:"    "

@@ -46,7 +46,7 @@ let main () : int =
   | Result.Ok (segments, bytes_consumed) ->
       let open M in
       let message = Message.readonly (Message.of_storage segments) in
-      let request = PS.CodeGeneratorRequest.R.of_message message in
+      let request = PS.CodeGeneratorRequest.of_message message in
       begin try
         let () = Generate.compile request "dir_name" in
         ExitCode.success

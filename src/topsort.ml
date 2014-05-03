@@ -35,19 +35,19 @@ module RT = Runtime
 
 
 let add_parentage_maps
-    (nodes_table : (Uint64.t, PS.Node.reader_t) Hashtbl.t)
+    (nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
     (parentage_table : (Uint64.t, Uint64.t) Hashtbl.t)
-    (node : PS.Node.reader_t)
+    (node : PS.Node.t)
 : unit =
   let open PS.Node in
-  let node_id = R.id_get node in
+  let node_id = id_get node in
   let rec add_children parent =
-    let child_nodes = R.nestedNodes_get parent in
+    let child_nodes = nestedNodes_get parent in
     RT.Array.iter child_nodes ~f:(fun child_nested_node ->
       let child_node =
-        Hashtbl.find_exn nodes_table (NestedNode.R.id_get child_nested_node)
+        Hashtbl.find_exn nodes_table (NestedNode.id_get child_nested_node)
       in
-      let child_node_id = R.id_get child_node in
+      let child_node_id = id_get child_node in
       let () = add_children child_node in
       Hashtbl.replace parentage_table ~key:child_node_id ~data:node_id)
   in
@@ -57,8 +57,8 @@ let add_parentage_maps
 
 
 let build_parentage_table
-    (nodes_table : (Uint64.t, PS.Node.reader_t) Hashtbl.t)
-    (nodes : PS.Node.reader_t list)
+    (nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
+    (nodes : PS.Node.t list)
 : (Uint64.t, Uint64.t) Hashtbl.t =
   let parentage_table = Hashtbl.Poly.create () in
   let () =
@@ -102,23 +102,23 @@ let rec register_type_reference
     ~parentage_table
     ~edges
     ~referrer
-    ~referee_type:(tp : PS.Type.reader_t)
+    ~referee_type:(tp : PS.Type.t)
 : unit =
   let open PS.Type in
-  match R.get tp with
-  | R.List x ->
-      let inner_type = List.R.elementType_get x in
+  match get tp with
+  | List x ->
+      let inner_type = List.elementType_get x in
       register_type_reference ~parentage_table ~edges
         ~referrer ~referee_type:inner_type
-  | R.Enum x ->
+  | Enum x ->
       register_reference ~parentage_table ~edges ~referrer
-        ~referee:(Enum.R.typeId_get x)
-  | R.Struct x ->
+        ~referee:(Enum.typeId_get x)
+  | Struct x ->
       register_reference ~parentage_table ~edges ~referrer
-        ~referee:(Struct.R.typeId_get x)
-  | R.Interface x ->
+        ~referee:(Struct.typeId_get x)
+  | Interface x ->
       register_reference ~parentage_table ~edges ~referrer
-        ~referee:(Interface.R.typeId_get x)
+        ~referee:(Interface.typeId_get x)
   | _ ->
       ()
 
@@ -128,8 +128,8 @@ let rec register_type_reference
  * the generated code for node A must be instantiated prior to the generated
  * code for node B. *)
 let build_reference_graph
-    (nodes_table : (Uint64.t, PS.Node.reader_t) Hashtbl.t)
-    (nodes_to_graph : PS.Node.reader_t list)
+    (nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
+    (nodes_to_graph : PS.Node.t list)
 : (Uint64.t, Uint64.t list) Hashtbl.t =
   let open PS.Node in
   let rec add_edges ~parentage_table ~edges ?parent_id_opt node =
@@ -139,52 +139,52 @@ let build_reference_graph
     let parent_id =
       match parent_id_opt with
       | None -> (* i.e. current node is toplevel *)
-          R.id_get node
+          id_get node
       | Some id ->
           id
     in
     let () =
-      let child_nodes = R.nestedNodes_get node in
+      let child_nodes = nestedNodes_get node in
       RT.Array.iter child_nodes ~f:(fun child_nested_node ->
         let child_node = Hashtbl.find_exn nodes_table
-            (NestedNode.R.id_get child_nested_node)
+            (NestedNode.id_get child_nested_node)
         in
         add_edges ~parentage_table ~edges ~parent_id_opt:parent_id child_node)
     in
-    match R.get node with
-    | R.File
-    | R.Enum _
-    | R.Annotation _ ->
+    match get node with
+    | File
+    | Enum _
+    | Annotation _ ->
         (* Annotations are (typically) not reflected directly in the generated
            code, so at least for the present we ignore annotation types when
            determining the order in which to generate code. *)
         ()
-    | R.Struct node_struct ->
-        let fields = Struct.R.fields_get node_struct in
+    | Struct node_struct ->
+        let fields = Struct.fields_get node_struct in
         RT.Array.iter fields ~f:(fun field ->
-          match PS.Field.R.get field with
-          | PS.Field.R.Slot slot ->
+          match PS.Field.get field with
+          | PS.Field.Slot slot ->
               register_type_reference ~parentage_table ~edges
-                ~referrer:parent_id ~referee_type:(PS.Field.Slot.R.type_get slot)
-          | PS.Field.R.Group group ->
+                ~referrer:parent_id ~referee_type:(PS.Field.Slot.type_get slot)
+          | PS.Field.Group group ->
               let group_node =
-                Hashtbl.find_exn nodes_table (PS.Field.Group.R.typeId_get group)
+                Hashtbl.find_exn nodes_table (PS.Field.Group.typeId_get group)
               in
               add_edges ~parentage_table ~edges ~parent_id_opt:parent_id
                 group_node
-          | PS.Field.R.Undefined x ->
+          | PS.Field.Undefined x ->
               failwith (Printf.sprintf "Unknown Field union discriminant %d" x))
-    | R.Interface node_iface ->
-        let methods = Interface.R.methods_get node_iface in
+    | Interface node_iface ->
+        let methods = Interface.methods_get node_iface in
         RT.Array.iter methods ~f:(fun meth ->
           register_reference ~parentage_table ~edges
-            ~referrer:parent_id ~referee:(PS.Method.R.paramStructType_get meth);
+            ~referrer:parent_id ~referee:(PS.Method.paramStructType_get meth);
           register_reference ~parentage_table ~edges
-            ~referrer:parent_id ~referee:(PS.Method.R.resultStructType_get meth))
-    | R.Const node_const ->
+            ~referrer:parent_id ~referee:(PS.Method.resultStructType_get meth))
+    | Const node_const ->
         register_type_reference ~parentage_table ~edges
-          ~referrer:parent_id ~referee_type:(PS.Node.Const.R.type_get node_const)
-    | R.Undefined x ->
+          ~referrer:parent_id ~referee_type:(PS.Node.Const.type_get node_const)
+    | Undefined x ->
         failwith (Printf.sprintf "Unknown Node union discriminant %d" x)
   in
   let parentage_table = build_parentage_table nodes_table nodes_to_graph in
@@ -213,9 +213,9 @@ let has_incoming_edges reference_graph (node_id : Uint64.t) : bool =
  *
  * Returns None if there are cyclic references. *)
 let topological_sort
-    (nodes_table : (Uint64.t, PS.Node.reader_t) Hashtbl.t)
-    (nodes : PS.Node.reader_t list)
-: PS.Node.reader_t list option =
+    (nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
+    (nodes : PS.Node.t list)
+: PS.Node.t list option =
   (* [priority_nodes] is a list of nodes without any incoming edges.  Such a node
    * can be emitted immediately, because it doesn't depend on anything else. *)
   let rec kahn_sort ~reference_graph ~sorted_output_ids ~priority_node_ids =
@@ -243,7 +243,7 @@ let topological_sort
               ~priority_node_ids:other_priority_node_ids
         end
   in
-  let node_ids = List.map nodes ~f:PS.Node.R.id_get in
+  let node_ids = List.map nodes ~f:PS.Node.id_get in
   let reference_graph = build_reference_graph nodes_table nodes in
   let priority_node_ids = List.filter node_ids ~f:(fun id ->
     not (has_incoming_edges reference_graph id))

@@ -56,10 +56,10 @@ type accessor_t =
 
 let generate_one_field_accessors ~nodes_table ~scope ~mode field
   : accessor_t list =
-  let field_name = String.uncapitalize (PS.Field.R.name_get field) in
-  match PS.Field.R.get field with
-  | PS.Field.R.Group group ->
-      let group_id = PS.Field.Group.R.typeId_get group in
+  let field_name = String.uncapitalize (PS.Field.name_get field) in
+  match PS.Field.get field with
+  | PS.Field.Group group ->
+      let group_id = PS.Field.Group.typeId_get group in
       let group_node = Hashtbl.find_exn nodes_table group_id in
       let group_name =
         GenCommon.get_scope_relative_name nodes_table scope group_node
@@ -69,53 +69,53 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode field
             field_name group_name;
         ];
       ]
-  | PS.Field.R.Slot slot ->
-      let tp = PS.Field.Slot.R.type_get slot in
+  | PS.Field.Slot slot ->
+      let tp = PS.Field.Slot.type_get slot in
       let open PS.Type in
-      begin match R.get tp with
-      | R.Int8
-      | R.Int16
-      | R.Uint8
-      | R.Uint16 -> [
+      begin match get tp with
+      | Int8
+      | Int16
+      | Uint8
+      | Uint16 -> [
           Getter [ "val " ^ field_name ^ "_get : t -> int"; ];
           Setter [ "val " ^ field_name ^ "_set_exn : t -> int -> unit"; ];
         ]
-      | R.Int32 -> [
+      | Int32 -> [
           Getter ["val " ^ field_name ^ "_get : t -> int32"; ];
           Getter ["val " ^ field_name ^ "_get_int_exn : t -> int"; ];
           Setter [ "val " ^ field_name ^ "_set : t -> int32 -> unit"; ];
           Setter [ "val " ^ field_name ^ "_set_int_exn : t -> int -> unit"; ]
         ]
-      | R.Int64 -> [
+      | Int64 -> [
           Getter [ "val " ^ field_name ^ "_get : t -> int64"; ];
           Getter [ "val " ^ field_name ^ "_get_int_exn : t -> int"; ];
           Setter [ "val " ^ field_name ^ "_set : t -> int64 -> unit"; ];
           Setter [ "val " ^ field_name ^ "_set_int_exn : t -> int -> unit"; ];
         ]
-      | R.Uint32 -> [
+      | Uint32 -> [
           Getter [ "val " ^ field_name ^ "_get : t -> Uint32.t"; ];
           Getter [ "val " ^ field_name ^ "_get_int_exn : t -> int"; ];
           Setter [ "val " ^ field_name ^ "_set : t -> Uint32.t -> unit"; ];
           Setter [ "val " ^ field_name ^ "_set_int_exn : t -> int -> unit"; ]
         ]
-      | R.Uint64 -> [
+      | Uint64 -> [
           Getter [ "val " ^ field_name ^ "_get : t -> Uint64.t"; ];
           Getter [ "val " ^ field_name ^ "_get_int_exn : t -> int"; ];
           Setter [ "val " ^ field_name ^ "_set : t -> Uint64.t -> unit"; ];
           Setter [ "val " ^ field_name ^ "_set_int_exn : t -> int -> unit"; ];
         ]
-      | R.Void -> [
+      | Void -> [
           Getter [ "val " ^ field_name ^ "_get : t -> unit"; ];
           (* For void types, we suppress extra the setter argument *)
           Setter [ "val " ^ field_name ^ "_set : t -> unit"; ];
         ]
-      | R.Bool
-      | R.Float32
-      | R.Float64
-      | R.Text
-      | R.Data
-      | R.Interface _
-      | R.AnyPointer -> [
+      | Bool
+      | Float32
+      | Float64
+      | Text
+      | Data
+      | Interface _
+      | AnyPointer -> [
           Getter [
             sprintf "val %s_get : t -> %s"
               field_name
@@ -125,7 +125,7 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode field
               field_name
               (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
         ]
-      | R.List _ -> [
+      | List _ -> [
           Getter [
             sprintf "val %s_get : t -> %s"
               field_name
@@ -144,7 +144,7 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode field
               (GenCommon.type_name ~mode ~scope_mode:mode
                  nodes_table scope tp); ];
         ]
-      | R.Enum _ -> [
+      | Enum _ -> [
           Getter [
             sprintf "val %s_get : t -> %s"
               field_name
@@ -160,7 +160,7 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode field
               (GenCommon.type_name ~mode ~scope_mode:mode
                  nodes_table scope tp); ];
         ]
-      | R.Struct _ -> [
+      | Struct _ -> [
           Getter [
             sprintf "val %s_get : t -> %s"
               field_name
@@ -185,10 +185,10 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode field
               (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
                  nodes_table scope tp); ];
         ]
-      | R.Undefined x ->
+      | Undefined x ->
           failwith (sprintf "Unknown Type union discriminant %d" x)
       end
-  | PS.Field.R.Undefined x ->
+  | PS.Field.Undefined x ->
       failwith (sprintf "Unknown Field union discriminant %d" x)
 
 
@@ -220,15 +220,15 @@ let generate_accessors ~nodes_table ~scope ~mode
 let generate_struct_node ~nodes_table ~scope ~nested_modules
     ~mode ~node struct_def : string list =
   let unsorted_fields =
-    RT.Array.to_list (PS.Node.Struct.R.fields_get struct_def)
+    RT.Array.to_list (PS.Node.Struct.fields_get struct_def)
   in
   (* Sorting in reverse code order allows us to avoid a List.rev *)
   let all_fields = List.sort unsorted_fields ~cmp:(fun x y ->
-    - (Int.compare (PS.Field.R.codeOrder_get x) (PS.Field.R.codeOrder_get y)))
+    - (Int.compare (PS.Field.codeOrder_get x) (PS.Field.codeOrder_get y)))
   in
   let union_fields, non_union_fields = List.partition_tf all_fields
       ~f:(fun field ->
-        (PS.Field.R.discriminantValue_get field) <> PS.Field.noDiscriminant)
+        (PS.Field.discriminantValue_get field) <> PS.Field.noDiscriminant)
   in
   let union_accessors =
     (generate_union_getter ~nodes_table ~scope ~mode union_fields) @
@@ -296,35 +296,35 @@ let generate_struct_node ~nodes_table ~scope ~nested_modules
  * Raises: Failure if the children of this node contain a cycle. *)
 let rec generate_node
     ~(suppress_module_wrapper : bool)
-    ~(nodes_table : (Uint64.t, PS.Node.reader_t) Hashtbl.t)
+    ~(nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
     ~(scope : Uint64.t list)
     ~(mode : Mode.t)
     ~(node_name : string)
-    (node : PS.Node.reader_t)
+    (node : PS.Node.t)
 : string list =
   let open PS.Node in
-  let node_id = R.id_get node in
+  let node_id = id_get node in
   let generate_nested_modules () =
     match Topsort.topological_sort nodes_table
             (GenCommon.children_of nodes_table node) with
     | Some child_nodes ->
         List.concat_map child_nodes ~f:(fun child ->
           let child_name = GenCommon.get_unqualified_name ~parent:node ~child in
-          let child_node_id = R.id_get child in
+          let child_node_id = id_get child in
           generate_node ~suppress_module_wrapper:false ~nodes_table
             ~scope:(child_node_id :: scope) ~mode ~node_name:child_name child)
     | None ->
         let error_msg = sprintf
           "The children of node %s (%s) have a cyclic dependency."
           (Uint64.to_string node_id)
-          (R.displayName_get node)
+          (displayName_get node)
         in
         failwith error_msg
   in
-  match R.get node with
-  | R.File ->
+  match get node with
+  | File ->
       generate_nested_modules ()
-  | R.Struct struct_def ->
+  | Struct struct_def ->
       let nested_modules = generate_nested_modules () in
       let body =
         generate_struct_node ~nodes_table ~scope ~nested_modules ~mode 
@@ -336,7 +336,7 @@ let rec generate_node
         [ "module " ^ node_name ^ " : sig" ] @
           (apply_indent ~indent:"  " body) @
           [ "end" ]
-  | R.Enum enum_def ->
+  | Enum enum_def ->
       let nested_modules = generate_nested_modules () in
       let body =
         GenCommon.generate_enum_sig ~nodes_table ~scope ~nested_modules
@@ -348,17 +348,17 @@ let rec generate_node
         [ "module " ^ node_name ^ " : sig" ] @
           (apply_indent ~indent:"  " body) @
           [ "end" ]
-  | R.Interface iface_def ->
+  | Interface iface_def ->
       generate_nested_modules ()
-  | R.Const const_def -> [
+  | Const const_def -> [
       sprintf "val %s : %s"
         (String.uncapitalize node_name)
         (GenCommon.type_name ~mode:Mode.Reader ~scope_mode:Mode.Reader
-           nodes_table scope (Const.R.type_get const_def));
+           nodes_table scope (Const.type_get const_def));
     ]
-  | R.Annotation annot_def ->
+  | Annotation annot_def ->
       generate_nested_modules ()
-  | R.Undefined x ->
+  | Undefined x ->
       failwith (sprintf "Unknown Node union discriminant %u" x)
 
 
