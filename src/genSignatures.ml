@@ -49,173 +49,167 @@ let generate_union_getter ~nodes_table ~scope ~mode fields =
         [ "val get : t -> unnamed_union_t" ]
 
 
-(* Generate accessors for retrieving a selected list of fields of a struct. *)
-let generate_getters ~nodes_table ~scope ~mode fields =
-  List.fold_left fields ~init:[] ~f:(fun acc field ->
-    let field_accessors : string list =
-      let field_name = String.uncapitalize (PS.Field.R.name_get field) in
-      match PS.Field.R.get field with
-      | PS.Field.R.Group group ->
-          let group_id = PS.Field.Group.R.typeId_get group in
-          let group_node = Hashtbl.find_exn nodes_table group_id in
-          let group_name =
-            GenCommon.get_scope_relative_name nodes_table scope group_node
-          in
-          let type_name =
-            match mode with
-            | Mode.Reader  -> "reader_t"
-            | Mode.Builder -> "builder_t"
-          in [
-            sprintf "val %s_get : t -> %s.%s"
-              field_name group_name type_name;
-          ]
-      | PS.Field.R.Slot slot ->
-          let tp = PS.Field.Slot.R.type_get slot in
-          let open PS.Type in
-          begin match R.get tp with
-          | R.Int32 -> [
-                "val " ^ field_name ^ "_get : t -> int32";
-                "val " ^ field_name ^ "_get_int_exn : t -> int";
-              ]
-          | R.Int64 -> [
-                "val " ^ field_name ^ "_get : t -> int64";
-                "val " ^ field_name ^ "_get_int_exn : t -> int";
-              ]
-          | R.Uint32 -> [
-                "val " ^ field_name ^ "_get : t -> Uint32.t";
-                "val " ^ field_name ^ "_get_int_exn : t -> int";
-              ]
-          | R.Uint64 -> [
-                "val " ^ field_name ^ "_get : t -> Uint64.t";
-                "val " ^ field_name ^ "_get_int_exn : t -> int";
-              ]
-          | R.Void
-          | R.Bool
-          | R.Int8
-          | R.Int16
-          | R.Uint8
-          | R.Uint16
-          | R.Float32
-          | R.Float64
-          | R.Text
-          | R.Data
-          | R.List _
-          | R.Enum _
-          | R.Struct _
-          | R.Interface _
-          | R.AnyPointer -> [
-                sprintf "val %s_get : t -> %s"
-                  field_name
-                  (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp);
-              ]
-          | R.Undefined x ->
-              failwith (sprintf "Unknown Type union discriminant %d" x)
-          end
-      | PS.Field.R.Undefined x ->
-          failwith (sprintf "Unknown Field union discriminant %d" x)
-    in
-    (field_accessors @ acc))
+type accessor_t =
+  | Getter of string list
+  | Setter of string list
 
 
-(* Generate accessors for setting a selected list of fields of a struct. *)
-let generate_setters ~nodes_table ~scope fields =
-  List.fold_left fields ~init:[] ~f:(fun acc field ->
-    let field_accessors : string list =
-      let field_name = String.uncapitalize (PS.Field.R.name_get field) in
-      match PS.Field.R.get field with
-      | PS.Field.R.Group group ->
-          []
-      | PS.Field.R.Slot slot ->
-          let tp = PS.Field.Slot.R.type_get slot in
-          let open PS.Type in
-          begin match R.get tp with
-          | R.Int8 ->
-              [ "val " ^ field_name ^ "_set_exn : t -> int -> unit"; ]
-          | R.Int16 ->
-              [ "val " ^ field_name ^ "_set_exn : t -> int -> unit"; ]
-          | R.Int32 -> [
-                "val " ^ field_name ^ "_set : t -> int32 -> unit";
-                "val " ^ field_name ^ "_set_int_exn : t -> int -> unit";
-              ]
-          | R.Int64 -> [
-                "val " ^ field_name ^ "_set : t -> int64 -> unit";
-                "val " ^ field_name ^ "_set_int_exn : t -> int -> unit";
-              ]
-          | R.Uint8 ->
-              [ "val " ^ field_name ^ "_set_exn : t -> int -> unit"; ]
-          | R.Uint16 ->
-              [ "val " ^ field_name ^ "_set_exn : t -> int -> unit"; ]
-          | R.Uint32 -> [
-                "val " ^ field_name ^ "_set : t -> Uint32.t -> unit";
-                "val " ^ field_name ^ "_set_int_exn : t -> int -> unit";
-              ]
-          | R.Uint64 -> [
-                "val " ^ field_name ^ "_set : t -> Uint64.t -> unit";
-                "val " ^ field_name ^ "_set_int_exn : t -> int -> unit";
-              ]
-          | R.List _ -> [
-              (* FIXME: should allow setting from a Reader *)
-              sprintf "val %s_set : t -> %s -> %s"
-                field_name
-                (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                   nodes_table scope tp)
-                (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                   nodes_table scope tp);
-              sprintf "val %s_init : t -> int -> %s"
-                field_name
-                (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                   nodes_table scope tp);
-            ]
-          | R.Struct _ -> [
-              sprintf "val %s_set_reader : t -> %s -> %s"
-                field_name
-                (GenCommon.type_name ~mode:Mode.Reader ~scope_mode:Mode.Builder
-                   nodes_table scope tp)
-                (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                   nodes_table scope tp);
-              sprintf "val %s_set_builder : t -> %s -> %s"
-                field_name
-                (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                   nodes_table scope tp)
-                (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                   nodes_table scope tp);
-              sprintf "val %s_init : t -> %s"
-                field_name
-                (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                   nodes_table scope tp);
-            ]
-          | R.Enum _ -> [
-              sprintf "val %s_set : t -> %s -> unit"
-                field_name
-                (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                   nodes_table scope tp);
-              sprintf "val %s_set_unsafe : t -> %s -> unit"
-                field_name
-                (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                   nodes_table scope tp);
-            ]
-          | R.Bool
-          | R.Float32
-          | R.Float64
-          | R.Text
-          | R.Data
-          | R.Interface _
-          | R.AnyPointer -> [
-              sprintf "val %s_set : t -> %s -> unit"
+let generate_one_field_accessors ~nodes_table ~scope ~mode field
+  : accessor_t list =
+  let field_name = String.uncapitalize (PS.Field.R.name_get field) in
+  match PS.Field.R.get field with
+  | PS.Field.R.Group group ->
+      let group_id = PS.Field.Group.R.typeId_get group in
+      let group_node = Hashtbl.find_exn nodes_table group_id in
+      let group_name =
+        GenCommon.get_scope_relative_name nodes_table scope group_node
+      in [
+        Getter [
+          sprintf "val %s_get : t -> %s.t"
+            field_name group_name;
+        ];
+      ]
+  | PS.Field.R.Slot slot ->
+      let tp = PS.Field.Slot.R.type_get slot in
+      let open PS.Type in
+      begin match R.get tp with
+      | R.Int8
+      | R.Int16
+      | R.Uint8
+      | R.Uint16 -> [
+          Getter [ "val " ^ field_name ^ "_get : t -> int"; ];
+          Setter [ "val " ^ field_name ^ "_set_exn : t -> int -> unit"; ];
+        ]
+      | R.Int32 -> [
+          Getter ["val " ^ field_name ^ "_get : t -> int32"; ];
+          Getter ["val " ^ field_name ^ "_get_int_exn : t -> int"; ];
+          Setter [ "val " ^ field_name ^ "_set : t -> int32 -> unit"; ];
+          Setter [ "val " ^ field_name ^ "_set_int_exn : t -> int -> unit"; ]
+        ]
+      | R.Int64 -> [
+          Getter [ "val " ^ field_name ^ "_get : t -> int64"; ];
+          Getter [ "val " ^ field_name ^ "_get_int_exn : t -> int"; ];
+          Setter [ "val " ^ field_name ^ "_set : t -> int64 -> unit"; ];
+          Setter [ "val " ^ field_name ^ "_set_int_exn : t -> int -> unit"; ];
+        ]
+      | R.Uint32 -> [
+          Getter [ "val " ^ field_name ^ "_get : t -> Uint32.t"; ];
+          Getter [ "val " ^ field_name ^ "_get_int_exn : t -> int"; ];
+          Setter [ "val " ^ field_name ^ "_set : t -> Uint32.t -> unit"; ];
+          Setter [ "val " ^ field_name ^ "_set_int_exn : t -> int -> unit"; ]
+        ]
+      | R.Uint64 -> [
+          Getter [ "val " ^ field_name ^ "_get : t -> Uint64.t"; ];
+          Getter [ "val " ^ field_name ^ "_get_int_exn : t -> int"; ];
+          Setter [ "val " ^ field_name ^ "_set : t -> Uint64.t -> unit"; ];
+          Setter [ "val " ^ field_name ^ "_set_int_exn : t -> int -> unit"; ];
+        ]
+      | R.Void -> [
+          Getter [ "val " ^ field_name ^ "_get : t -> unit"; ];
+          (* For void types, we suppress extra the setter argument *)
+          Setter [ "val " ^ field_name ^ "_set : t -> unit"; ];
+        ]
+      | R.Bool
+      | R.Float32
+      | R.Float64
+      | R.Text
+      | R.Data
+      | R.Interface _
+      | R.AnyPointer -> [
+          Getter [
+            sprintf "val %s_get : t -> %s"
+              field_name
+              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+          Setter [
+            sprintf "val %s_set : t -> %s -> unit"
+              field_name
+              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+        ]
+      | R.List _ -> [
+          Getter [
+            sprintf "val %s_get : t -> %s"
+              field_name
+              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+          Setter [
+            (* FIXME: should allow setting from a Reader *)
+            sprintf "val %s_set : t -> %s -> %s"
+              field_name
+              (GenCommon.type_name ~mode ~scope_mode:mode
+                 nodes_table scope tp)
+              (GenCommon.type_name ~mode ~scope_mode:mode
+                 nodes_table scope tp); ];
+          Setter [
+            sprintf "val %s_init : t -> int -> %s"
+              field_name
+              (GenCommon.type_name ~mode ~scope_mode:mode
+                 nodes_table scope tp); ];
+        ]
+      | R.Enum _ -> [
+          Getter [
+            sprintf "val %s_get : t -> %s"
+              field_name
+              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+          Setter [
+            sprintf "val %s_set : t -> %s -> unit"
+              field_name
+              (GenCommon.type_name ~mode ~scope_mode:mode
+                 nodes_table scope tp); ];
+          Setter [
+            sprintf "val %s_set_unsafe : t -> %s -> unit"
+              field_name
+              (GenCommon.type_name ~mode ~scope_mode:mode
+                 nodes_table scope tp); ];
+        ]
+      | R.Struct _ -> [
+          Getter [
+            sprintf "val %s_get : t -> %s"
+              field_name
+              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+          Setter [
+            sprintf "val %s_set_reader : t -> %s -> %s"
+              field_name
+              (GenCommon.type_name ~mode:Mode.Reader ~scope_mode:Mode.Builder
+                 nodes_table scope tp)
+              (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
+                 nodes_table scope tp); ];
+          Setter [
+            sprintf "val %s_set_builder : t -> %s -> %s"
               field_name
               (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                 nodes_table scope tp);
-            ]
-          | R.Void ->
-              (* For void types, we suppress the argument *)
-              [ "val " ^ field_name ^ "_set : t -> unit" ]
-          | R.Undefined x ->
-              failwith (sprintf "Unknown Type union discriminant %d" x)
-          end
-      | PS.Field.R.Undefined x ->
-          failwith (sprintf "Unknown Field union discriminant %d" x)
+                 nodes_table scope tp)
+              (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
+                 nodes_table scope tp); ];
+          Setter [
+            sprintf "val %s_init : t -> %s"
+              field_name
+              (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
+                 nodes_table scope tp); ];
+        ]
+      | R.Undefined x ->
+          failwith (sprintf "Unknown Type union discriminant %d" x)
+      end
+  | PS.Field.R.Undefined x ->
+      failwith (sprintf "Unknown Field union discriminant %d" x)
+
+
+(* Generate accessors for getting or setting the selected fields.  The specified
+   filter function allows the caller to restrict the result to getter or setter
+   functions. *)
+let generate_accessors ~nodes_table ~scope ~mode
+    ~(f : accessor_t -> bool) fields
+  : string list =
+  List.fold_left fields ~init:[] ~f:(fun acc field ->
+    let accessors = generate_one_field_accessors ~nodes_table ~scope ~mode field in
+    let filtered_accessors = List.fold_left accessors ~init:[]
+        ~f:(fun acc accessor ->
+          if f accessor then
+            match accessor with
+            | Getter x
+            | Setter x -> acc @ x
+          else
+            acc)
     in
-    (field_accessors @ acc))
+    filtered_accessors @ acc)
 
 
 (* Generate the OCaml type signature corresponding to a struct definition.  [scope] is a
@@ -224,7 +218,7 @@ let generate_setters ~nodes_table ~scope fields =
  *
  * Raises: Failure if the children of this node contain a cycle. *)
 let generate_struct_node ~nodes_table ~scope ~nested_modules
-    ~node struct_def : string list =
+    ~mode ~node struct_def : string list =
   let unsorted_fields =
     RT.Array.to_list (PS.Node.Struct.R.fields_get struct_def)
   in
@@ -236,62 +230,63 @@ let generate_struct_node ~nodes_table ~scope ~nested_modules
       ~f:(fun field ->
         (PS.Field.R.discriminantValue_get field) <> PS.Field.noDiscriminant)
   in
-  let reader_union_accessors =
-    apply_indent ~indent:"  "
-      (generate_union_getter ~nodes_table ~scope ~mode:Mode.Reader union_fields)
+  let union_accessors =
+    (generate_union_getter ~nodes_table ~scope ~mode union_fields) @
+       begin match mode with
+       | Mode.Reader ->
+           []
+       | Mode.Builder ->
+           generate_accessors ~nodes_table ~scope ~mode
+             ~f:(function Getter _ -> false | Setter _ -> true) union_fields
+       end
   in
-  let reader_non_union_accessors =
-    apply_indent ~indent:"  "
-      (generate_getters ~nodes_table ~scope ~mode:Mode.Reader non_union_fields)
-  in
-  let builder_union_accessors =
-    apply_indent ~indent:"  " (
-      (generate_union_getter ~nodes_table ~scope ~mode:Mode.Builder union_fields) @
-        (generate_setters ~nodes_table ~scope union_fields))
-  in
-  let builder_non_union_accessors =
-    apply_indent ~indent:"  " (
-      (generate_getters ~nodes_table ~scope ~mode:Mode.Builder non_union_fields) @
-        (generate_setters ~nodes_table ~scope non_union_fields))
+  let non_union_accessors =
+    let selector =
+      match mode with
+      | Mode.Reader  -> (function Getter _ -> true | Setter _ -> false)
+      | Mode.Builder -> (fun x -> true)
+    in
+    generate_accessors ~nodes_table ~scope ~mode ~f:selector non_union_fields
   in
   let unique_reader =
-    GenCommon.make_unique_typename ~mode:Mode.Reader ~nodes_table node
+    GenCommon.make_unique_typename ~mode:Mode.Reader ~scope_mode:mode ~nodes_table node
   in
   let unique_builder =
-    GenCommon.make_unique_typename ~mode:Mode.Builder ~nodes_table node
+    GenCommon.make_unique_typename ~mode:Mode.Builder ~scope_mode:mode ~nodes_table node
   in
-  let header = [
-    (* declare the primary types of the node *)
-    "type reader_t";
-    "type builder_t";
-    (* declare schema-unique type aliases for these types, for use in
-       submodules *)
-    "type " ^ unique_reader ^ " = reader_t";
-    "type " ^ unique_builder ^ " = builder_t";
-  ] in
-  let reader = [
-    "module R : sig";
-    "  type t = reader_t"; ] @
-    reader_union_accessors @
-    reader_non_union_accessors @ [
-    "  val of_message : 'cap message_t -> t";
-    "end";
-    ]
+  let header =
+    match mode with
+    | Mode.Reader -> [
+        "type t";
+        "type builder_t";
+        "type " ^ unique_reader ^ " = t";
+        "type " ^ unique_builder ^ " = builder_t";
+      ] 
+    | Mode.Builder -> [
+        "type t = Reader." ^
+          (GenCommon.get_fully_qualified_name nodes_table node) ^ ".builder_t";
+        "type reader_t = Reader." ^
+          (GenCommon.get_fully_qualified_name nodes_table node) ^ ".t";
+        "type " ^ unique_builder ^ " = t";
+        "type " ^ unique_reader ^ " = reader_t";
+      ]
   in
-  let builder = [
-    "module B : sig";
-    "  type t = builder_t"; ] @
-    builder_union_accessors @
-    builder_non_union_accessors @ [
-    "  val of_message : rw message_t -> t";
-    "  val to_message : t -> rw message_t";
-    "  val init_root : ?message_size:int -> unit -> t";
-    "end";
-  ] in
+  let footer =
+    match mode with
+    | Mode.Reader -> [
+        "val of_message : 'cap message_t -> t";
+      ]
+    | Mode.Builder -> [
+        "val of_message : rw message_t -> t";
+        "val to_message : t -> rw message_t";
+        "val init_root : ?message_size:int -> unit -> t";
+      ]
+  in
   header @
     nested_modules @
-    reader @
-    builder
+    union_accessors @
+    non_union_accessors @
+    footer
 
 
 (* Generate the OCaml type signature corresponding to a node.  [scope] is
@@ -303,6 +298,7 @@ let rec generate_node
     ~(suppress_module_wrapper : bool)
     ~(nodes_table : (Uint64.t, PS.Node.reader_t) Hashtbl.t)
     ~(scope : Uint64.t list)
+    ~(mode : Mode.t)
     ~(node_name : string)
     (node : PS.Node.reader_t)
 : string list =
@@ -316,7 +312,7 @@ let rec generate_node
           let child_name = GenCommon.get_unqualified_name ~parent:node ~child in
           let child_node_id = R.id_get child in
           generate_node ~suppress_module_wrapper:false ~nodes_table
-            ~scope:(child_node_id :: scope) ~node_name:child_name child)
+            ~scope:(child_node_id :: scope) ~mode ~node_name:child_name child)
     | None ->
         let error_msg = sprintf
           "The children of node %s (%s) have a cyclic dependency."
@@ -331,7 +327,8 @@ let rec generate_node
   | R.Struct struct_def ->
       let nested_modules = generate_nested_modules () in
       let body =
-        generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_def
+        generate_struct_node ~nodes_table ~scope ~nested_modules ~mode 
+          ~node struct_def
       in
       if suppress_module_wrapper then
         body
@@ -343,9 +340,7 @@ let rec generate_node
       let nested_modules = generate_nested_modules () in
       let body =
         GenCommon.generate_enum_sig ~nodes_table ~scope ~nested_modules
-          (* FIXME: hack *)
-          ~mode:Mode.Reader
-          ~node enum_def
+          ~mode ~node enum_def
       in
       if suppress_module_wrapper then
         body

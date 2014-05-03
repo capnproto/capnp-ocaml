@@ -32,6 +32,7 @@ open Core.Std
 
 module PS = GenCommon.PS
 module RT = Runtime
+module Mode = GenCommon.Mode
 
 
 let sig_s_header = [
@@ -40,26 +41,33 @@ let sig_s_header = [
   "";
   "module type S = sig";
   "  type 'cap message_t";
-  "  type reader_array_t";
-  "  type builder_array_t";
   "";
-  "  module AnyPointer : sig";
-  "    type reader_t";
-  "    type builder_t";
+  "  module Reader : sig";
+  "    type array_t";
+  "    type builder_array_t";
+  "    type pointer_t";
+]
+
+let sig_s_divide_reader_builder = [
   "  end";
   "";
+  "  module Builder : sig";
+  "    type array_t = Reader.builder_array_t";
+  "    type reader_array_t = Reader.array_t";
+  "    type pointer_t";
 ]
 
 let sig_s_footer = [
+  "  end";
   "end";
-  "";
 ]
+
 
 let functor_sig = [
   "module Make (MessageWrapper : Message.S) :";
   "  (S with type 'cap message_t = 'cap MessageWrapper.Message.t";
-  "    and type AnyPointer.reader_t = Message.ro MessageWrapper.Slice.t option";
-  "    and type AnyPointer.builder_t = Message.rw MessageWrapper.Slice.t)";
+  "    and type Reader.pointer_t = Message.ro MessageWrapper.Slice.t option";
+  "    and type Builder.pointer_t = Message.rw MessageWrapper.Slice.t)";
   "";
 ]
 
@@ -72,19 +80,26 @@ let mod_header = [
   "";
   "  type 'cap message_t = 'cap MessageWrapper.Message.t";
   "";
-  "  type reader_array_t = ro RA_.ListStorage.t";
-  "  type builder_array_t = rw RA_.ListStorage.t";
+  "  module Reader = struct";
+  "    type array_t = ro RA_.ListStorage.t";
+  "    type builder_array_t = rw RA_.ListStorage.t";
+  "    type pointer_t = ro MessageWrapper.Slice.t option";
   "";
-  "  module AnyPointer = struct";
-  "    type reader_t = ro MessageWrapper.Slice.t option";
-  "    type builder_t = rw MessageWrapper.Slice.t";
+]
+
+let mod_divide_reader_builder = [
   "  end";
+  "";
+  "  module Builder = struct";
+  "    type array_t = Reader.builder_array_t";
+  "    type reader_array_t = Reader.array_t";
+  "    type pointer_t = rw MessageWrapper.Slice.t";
   "";
 ]
 
 let mod_footer = [
+  "  end";
   "end";
-  "";
 ]
 
 
@@ -121,9 +136,15 @@ let compile
     let requested_filename = RequestedFile.R.filename_get requested_file in
     let sig_s =
       sig_s_header @
-      (GenCommon.apply_indent ~indent:"  "
+      (GenCommon.apply_indent ~indent:"    "
         (GenSignatures.generate_node ~suppress_module_wrapper:true ~nodes_table
-           ~scope:[] ~node_name:requested_filename requested_file_node)) @
+           ~scope:[] ~mode:Mode.Reader ~node_name:requested_filename
+           requested_file_node)) @
+      sig_s_divide_reader_builder @
+      (GenCommon.apply_indent ~indent:"    "
+        (GenSignatures.generate_node ~suppress_module_wrapper:true ~nodes_table
+           ~scope:[] ~mode:Mode.Builder ~node_name:requested_filename
+           requested_file_node)) @
       sig_s_footer
     in
     let sig_file_content =
@@ -133,9 +154,15 @@ let compile
       string_of_lines (
         sig_s @
         mod_header @
-        (GenCommon.apply_indent ~indent:"  "
+        (GenCommon.apply_indent ~indent:"    "
           (GenModules.generate_node ~suppress_module_wrapper:true ~nodes_table
-            ~scope:[] ~node_name:requested_filename requested_file_node)) @
+             ~scope:[] ~mode:Mode.Reader ~node_name:requested_filename
+             requested_file_node)) @
+        mod_divide_reader_builder @
+        (GenCommon.apply_indent ~indent:"    "
+          (GenModules.generate_node ~suppress_module_wrapper:true ~nodes_table
+             ~scope:[] ~mode:Mode.Builder ~node_name:requested_filename
+             requested_file_node)) @
         mod_footer)
     in
     let () = Out_channel.with_file (mli_filename requested_filename)

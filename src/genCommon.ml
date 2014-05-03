@@ -195,14 +195,19 @@ let get_scope_relative_name nodes_table (scope_stack : Uint64.t list) node
   String.concat ~sep:"." (List.map rel_name ~f:fst)
 
 
-let make_unique_typename ~(mode : Mode.t) ~nodes_table node =
+let make_unique_typename ~(mode : Mode.t) ~(scope_mode : Mode.t) ~nodes_table node =
   let uq_name = get_unqualified_name
     ~parent:(Hashtbl.find_exn nodes_table (PS.Node.R.scopeId_get node)) ~child:node
   in
   let t_str =
-    match mode with
-    | Mode.Reader  -> "reader_t"
-    | Mode.Builder -> "builder_t"
+    match (mode, scope_mode) with
+    | (Mode.Reader, Mode.Reader)
+    | (Mode.Builder, Mode.Builder) ->
+        "t"
+    | (Mode.Reader, Mode.Builder) ->
+        "reader_t"
+    | (Mode.Builder, Mode.Reader) ->
+        "builder_t"
   in
   sprintf "%s_%s_%s" t_str uq_name (Uint64.to_string (PS.Node.R.id_get node))
 
@@ -244,7 +249,7 @@ let make_disambiguated_type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
   if List.mem scope node_id then
     (* The node of interest is a parent node of the node being generated.
        this is the case where an unambiguous type is emitted. *)
-    make_unique_typename ~mode ~nodes_table node
+    make_unique_typename ~mode ~scope_mode ~nodes_table node
   else
     let module_name = get_scope_relative_name nodes_table scope node in
     let t_str =
@@ -254,9 +259,14 @@ let make_disambiguated_type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
              to distinguish between them *)
           ".t"
       | _ ->
-          begin match mode with
-          | Mode.Reader  -> ".reader_t"
-          | Mode.Builder -> ".builder_t"
+          begin match (mode, scope_mode) with
+          | (Mode.Reader, Mode.Reader)
+          | (Mode.Builder, Mode.Builder) ->
+              ".t"
+          | (Mode.Reader, Mode.Builder) ->
+              ".reader_t"
+          | (Mode.Builder, Mode.Reader) ->
+              ".builder_t"
           end
     in
     module_name ^ t_str
@@ -289,7 +299,15 @@ let rec type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
       sprintf "(%s, %s, %s) Runtime.Array.t"
         (if mode = Mode.Reader then "ro" else "rw")
         (type_name ~mode ~scope_mode nodes_table scope list_type)
-        (if mode = Mode.Reader then "reader_array_t" else "builder_array_t")
+        begin match (mode, scope_mode) with
+        | (Mode.Reader, Mode.Reader)
+        | (Mode.Builder, Mode.Builder) ->
+            "array_t"
+        | (Mode.Reader, Mode.Builder) ->
+            "reader_array_t"
+        | (Mode.Builder, Mode.Reader) ->
+            "builder_array_t"
+        end
   | R.Enum enum_descr ->
       let enum_id = Enum.R.typeId_get enum_descr in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
@@ -306,9 +324,14 @@ let rec type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
       make_disambiguated_type_name ~mode ~scope_mode ~nodes_table
         ~scope ~tp iface_node
   | R.AnyPointer ->
-      begin match mode with
-      | Mode.Reader  -> "AnyPointer.reader_t"
-      | Mode.Builder -> "AnyPointer.builder_t"
+      begin match (mode, scope_mode) with
+      | (Mode.Reader, Mode.Reader)
+      | (Mode.Builder, Mode.Builder) ->
+          "pointer_t"
+      | (Mode.Reader, Mode.Builder) ->
+          "Reader.pointer_t"
+      | (Mode.Builder, Mode.Reader) ->
+          "Builder.pointer_t"
       end
   | R.Undefined x ->
       failwith (sprintf "Unknown Type union discriminant %d" x)
@@ -336,12 +359,7 @@ let generate_union_type ~(mode : Mode.t) nodes_table scope fields =
           let group_module_name =
             get_scope_relative_name nodes_table scope group_node
           in
-          let t_str = 
-            match mode with
-            | Mode.Reader -> ".reader_t"
-            | Mode.Builder -> ".builder_t"
-          in
-          group_module_name ^ t_str
+          group_module_name ^ ".t"
         in
         ("  | " ^ field_name ^ " of " ^ group_type_name) :: acc
     | R.Undefined x ->

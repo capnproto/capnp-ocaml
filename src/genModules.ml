@@ -584,7 +584,7 @@ let generate_list_setters ~nodes_table ~scope ~list_type
        failwith (sprintf "Unknown Type union discriminant %d" x)
 
 
-let generate_field_accessor ~nodes_table ~scope ~mode ~discr_ofs field =
+let generate_one_field_accessors ~nodes_table ~scope ~mode ~discr_ofs field =
   let api_module = api_of_mode mode in
   let field_name = String.uncapitalize (PS.Field.R.name_get field) in
   let discr_str =
@@ -1099,7 +1099,7 @@ let generate_union_getter ~nodes_table ~scope ~mode struct_def fields =
 let generate_accessors ~nodes_table ~scope ~mode struct_def fields =
   let discr_ofs = PS.Node.Struct.R.discriminantOffset_get_int_exn struct_def in
   List.fold_left fields ~init:[] ~f:(fun acc field ->
-    let x = generate_field_accessor ~nodes_table ~scope ~mode
+    let x = generate_one_field_accessors ~nodes_table ~scope ~mode
         ~discr_ofs field
     in
     x @ acc)
@@ -1110,7 +1110,8 @@ let generate_accessors ~nodes_table ~scope ~mode struct_def fields =
  * out what module prefixes are required to properly qualify a type.
  *
  * Raises: Failure if the children of this node contain a cycle. *)
-let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_def =
+let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~mode
+    ~node struct_def =
   let unsorted_fields =
     RT.Array.to_list (PS.Node.Struct.R.fields_get struct_def)
   in
@@ -1122,81 +1123,63 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_de
       ~f:(fun field ->
         (PS.Field.R.discriminantValue_get field) <> PS.Field.noDiscriminant)
   in
-  let reader_non_union_accessors =
-    apply_indent ~indent:"  "
-      (generate_accessors ~nodes_table ~scope ~mode:Mode.Reader
-        struct_def non_union_fields)
+  let union_accessors =
+    (* Emit accessor functions first, because they are required for the
+       variant-based code emitted by [generate_union_getter]. *)
+    (generate_accessors ~nodes_table ~scope ~mode struct_def union_fields) @
+      (generate_union_getter ~nodes_table ~scope ~mode struct_def union_fields)
   in
-  let reader_union_accessors =
-    (* Individual union field getters are required for the code emitted
-       by [generate_union_getter].  These getters are suppressed in the module
-       signature. *)
-    apply_indent ~indent:"  "
-      ((generate_accessors ~nodes_table ~scope ~mode:Mode.Reader
-        struct_def union_fields) @
-      (generate_union_getter ~nodes_table ~scope ~mode:Mode.Reader
-        struct_def union_fields))
-  in
-  let builder_non_union_accessors =
-    apply_indent ~indent:"  "
-      (generate_accessors ~nodes_table ~scope ~mode:Mode.Builder
-        struct_def non_union_fields)
-  in
-  let builder_union_accessors =
-    (* Individual union field getters are required for the code emitted
-       by [generate_union_getter].  These getters are suppressed in the module
-       signature, but the setters are not suppressed (this provides the method
-       for setting the union discriminant). *)
-    apply_indent ~indent:"  "
-      ((generate_accessors ~nodes_table ~scope ~mode:Mode.Builder
-         struct_def union_fields) @
-      (generate_union_getter ~nodes_table ~scope ~mode:Mode.Builder
-         struct_def union_fields))
+  let non_union_accessors =
+    generate_accessors ~nodes_table ~scope ~mode struct_def non_union_fields
   in
   let unique_reader =
-    (GenCommon.make_unique_typename ~mode:Mode.Reader ~nodes_table node)
+    GenCommon.make_unique_typename ~mode:Mode.Reader ~scope_mode:mode
+      ~nodes_table node
   in
   let unique_builder =
-    (GenCommon.make_unique_typename ~mode:Mode.Builder ~nodes_table node)
+    GenCommon.make_unique_typename ~mode:Mode.Builder ~scope_mode:mode
+      ~nodes_table node
   in
-  let header = [
-    "type reader_t = ro RA_.StructStorage.t option";
-    "type builder_t = rw RA_.StructStorage.t";
-    "type " ^ unique_reader ^ " = reader_t";
-    "type " ^ unique_builder ^ " = builder_t";
-  ] in
-  let reader = [
-    "module R = struct";
-    "  type t = reader_t"; ] @
-    reader_non_union_accessors @
-    reader_union_accessors @ [
-    "  let of_message x = RA_.get_root_struct \
-     (RA_.Message.readonly x)";
-    "end";
-    ]
+  let header =
+    match mode with
+    | Mode.Reader -> [
+        "type t = ro RA_.StructStorage.t option";
+        "type builder_t = rw RA_.StructStorage.t";
+        "type " ^ unique_reader ^ " = t";
+        "type " ^ unique_builder ^ " = builder_t";
+      ]
+    | Mode.Builder -> [
+        "type t = Reader." ^
+          (GenCommon.get_fully_qualified_name nodes_table node) ^ ".builder_t";
+        "type reader_t = Reader." ^
+          (GenCommon.get_fully_qualified_name nodes_table node) ^ ".t";
+        "type " ^ unique_builder ^ " = t";
+        "type " ^ unique_reader ^ " = reader_t";
+      ]
   in
-  let builder =
-    let data_words    = PS.Node.Struct.R.dataWordCount_get struct_def in
-    let pointer_words = PS.Node.Struct.R.pointerCount_get  struct_def in [
-      "module B = struct";
-      "  type t = builder_t"; ] @
-      builder_non_union_accessors @
-      builder_union_accessors @ [
-      sprintf "  let of_message x = BA_.get_root_struct \
-               ~data_words:%u ~pointer_words:%u x"
-        data_words pointer_words;
-      "  let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg";
-      "  let init_root ?message_size () =";
-      sprintf "     BA_.alloc_root_struct ?message_size \
-               ~data_words:%u ~pointer_words:%u ()"
-        data_words pointer_words;
-      "end";
-    ]
+  let footer =
+    match mode with
+    | Mode.Reader -> [
+        "let of_message x = RA_.get_root_struct (RA_.Message.readonly x)";
+      ]
+    | Mode.Builder -> 
+        let data_words    = PS.Node.Struct.R.dataWordCount_get struct_def in
+        let pointer_words = PS.Node.Struct.R.pointerCount_get  struct_def in [
+          sprintf "  let of_message x = BA_.get_root_struct \
+                   ~data_words:%u ~pointer_words:%u x"
+            data_words pointer_words;
+          "let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg";
+          "let init_root ?message_size () =";
+          sprintf "  BA_.alloc_root_struct ?message_size \
+                   ~data_words:%u ~pointer_words:%u ()"
+            data_words pointer_words;
+        ]
   in
   header @
     nested_modules @
-    reader @
-    builder
+    union_accessors @
+    non_union_accessors @
+    footer
 
 
 (* Generate the OCaml module and type signature corresponding to a node.  [scope] is
@@ -1208,6 +1191,7 @@ and generate_node
     ~(suppress_module_wrapper : bool)
     ~(nodes_table : (Uint64.t, PS.Node.reader_t) Hashtbl.t)
     ~(scope : Uint64.t list)
+    ~(mode : Mode.t)
     ~(node_name : string)
     (node : PS.Node.reader_t)
 : string list =
@@ -1220,7 +1204,7 @@ and generate_node
           let child_name = GenCommon.get_unqualified_name ~parent:node ~child in
           let child_node_id = PS.Node.R.id_get child in
           generate_node ~suppress_module_wrapper:false ~nodes_table
-            ~scope:(child_node_id :: scope) ~node_name:child_name child)
+            ~scope:(child_node_id :: scope) ~mode ~node_name:child_name child)
     | None ->
         let error_msg = sprintf
           "The children of node %s (%s) have a cyclic dependency."
@@ -1235,7 +1219,8 @@ and generate_node
   | PS.Node.R.Struct struct_def ->
       let nested_modules = generate_nested_modules () in
       let body =
-        generate_struct_node ~nodes_table ~scope ~nested_modules ~node struct_def
+        generate_struct_node ~nodes_table ~scope ~nested_modules ~mode
+          ~node struct_def
       in
       if suppress_module_wrapper then
         body
@@ -1247,9 +1232,7 @@ and generate_node
       let nested_modules = generate_nested_modules () in
       let body =
         GenCommon.generate_enum_sig ~nodes_table ~scope ~nested_modules
-          (* FIXME *)
-          ~mode:GenCommon.Mode.Reader
-          ~node enum_def
+          ~mode ~node enum_def
       in
       if suppress_module_wrapper then
         body
