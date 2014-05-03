@@ -1,0 +1,21 @@
+RUNTIME_MODULES =     \
+  farPointer          \
+  listPointer         \
+  message             \
+  messageStorage      \
+  pointer             \
+  runtime             \
+  runtimeBuilder      \
+  runtimeCommon       \
+  runtimeReader       \
+  strStorage          \
+  structPointer       \
+  util
+
+OCamlLibrary(capnp, $(RUNTIME_MODULES))
+
+.PHONY: runtime-clean
+
+runtime-clean:
+	rm -f *.cmi *.cmo *.cma *.cmx *.cmxa *.a *.o
+

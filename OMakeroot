@@ -1,0 +1,4 @@
+open build/OCaml
+DefineCommandVars()
+.SUBDIRS: .
+

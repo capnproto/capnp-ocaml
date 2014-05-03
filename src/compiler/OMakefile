@@ -1,0 +1,25 @@
+OCAMLINCLUDES += ../runtime
+OCAML_LIBS[] += ../runtime/capnp
+
+COMP_MODULES =      \
+  genCommon         \
+  genModules        \
+  genSignatures     \
+  generate          \
+  main              \
+  pluginSchema      \
+  topsort
+
+OCamlProgram(capnpc-ocaml, $(COMP_MODULES))
+
+PROGRAM = capnpc-ocaml
+
+.DEFAULT: $(PROGRAM)$(EXE)
+
+.PHONY: compiler-clean
+
+compiler-clean:
+	rm -f $(PROGRAM)$(EXE) $(PROGRAM).opt $(PROGRAM).byte \
+	    *.cmi *.cmo *.cma *.cmx *.cmxa *.a *.o
+
+

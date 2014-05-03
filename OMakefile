@@ -1,0 +1,18 @@
+USE_OCAMLFIND = true
+
+OCAMLFLAGS += -thread -short-paths
+
+OCAMLPACKS[] =  \
+  core          \
+  uint          \
+  res           \
+  ocplib-endian
+
+NATIVE_ENABLED = true
+BYTE_ENABLED   = true
+
+.SUBDIRS: src
+
+.PHONY: clean
+clean: runtime-clean compiler-clean
+
