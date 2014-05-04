@@ -1,2 +1,7 @@
 .SUBDIRS: runtime compiler
 
+.PHONY: src-distclean
+
+src-distclean:
+	rm -f *.omc
+

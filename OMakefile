@@ -13,6 +13,9 @@ BYTE_ENABLED   = true
 
 .SUBDIRS: src
 
-.PHONY: clean
+.PHONY: clean distclean
 clean: runtime-clean compiler-clean
+
+distclean: clean src-distclean runtime-distclean compiler-distclean
+	rm -f *.omc .omakedb .omakedb.lock
 

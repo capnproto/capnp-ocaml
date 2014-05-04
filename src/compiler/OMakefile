@@ -16,10 +16,12 @@ PROGRAM = capnpc-ocaml
 
 .DEFAULT: $(PROGRAM)$(EXE)
 
-.PHONY: compiler-clean
+.PHONY: compiler-clean compiler-distclean
 
 compiler-clean:
 	rm -f $(PROGRAM)$(EXE) $(PROGRAM).opt $(PROGRAM).byte \
 	    *.cmi *.cmo *.cma *.cmx *.cmxa *.a *.o
 
+compiler-distclean: compiler-clean
+	rm -f *.omc
 

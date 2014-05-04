@@ -14,8 +14,11 @@ RUNTIME_MODULES =     \
 
 OCamlLibrary(capnp, $(RUNTIME_MODULES))
 
-.PHONY: runtime-clean
+.PHONY: runtime-clean runtime-distclean
 
 runtime-clean:
 	rm -f *.cmi *.cmo *.cma *.cmx *.cmxa *.a *.o
+
+runtime-distclean: runtime-clean
+	rm -f *.omc
 
