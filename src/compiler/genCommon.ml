@@ -33,10 +33,10 @@ open Core.Std
 module M   = Capnp.Message.Make(Capnp.StrStorage)
 module PS_ = PluginSchema.Make(M)
 module PS  = PS_.Reader
-module RT  = Capnp.Runtime
+module C   = Capnp
 
 let sprintf = Printf.sprintf
-let uint64_equal = Capnp.Util.uint64_equal
+let uint64_equal = C.Runtime.Util.uint64_equal
 
 
 (* Modes in which code generation can be run *)
@@ -65,8 +65,8 @@ let mangle_ident (ident : string) (idents : string list) =
 let mangle_undefined reserved_names =
   String.capitalize (mangle_ident "undefined" reserved_names)
 
-let mangle_enum_undefined (enumerants : ('a, 'b, 'c) RT.Array.t) =
-  let enumerant_names = RT.Array.map_list enumerants ~f:PS.Enumerant.name_get in
+let mangle_enum_undefined (enumerants : ('a, 'b, 'c) C.Array.t) =
+  let enumerant_names = C.Array.map_list enumerants ~f:PS.Enumerant.name_get in
   mangle_undefined enumerant_names
 
 let mangle_field_undefined (fields : 'a list) =
@@ -115,7 +115,7 @@ let get_unqualified_name
   let child_id = id_get child in
   let nested_nodes = nested_nodes_get parent in
   let matching_nested_node_name =
-    RT.Array.find_map nested_nodes ~f:(fun nested_node ->
+    C.Array.find_map nested_nodes ~f:(fun nested_node ->
       if uint64_equal child_id (NestedNode.id_get nested_node) then
         Some (NestedNode.name_get nested_node)
       else
@@ -143,7 +143,7 @@ let get_unqualified_name
       | Struct node_struct ->
           let fields = Struct.fields_get node_struct in
           let matching_field_name =
-            RT.Array.find_map fields ~f:(fun field ->
+            C.Array.find_map fields ~f:(fun field ->
               match PS.Field.get field with
               | PS.Field.Slot _ ->
                   None
@@ -306,7 +306,7 @@ let rec type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
   | Data    -> "string"
   | List list_descr ->
       let list_type = List.element_type_get list_descr in
-      sprintf "(%s, %s, %s) Capnp.Runtime.Array.t"
+      sprintf "(%s, %s, %s) Capnp.Array.t"
         (if mode = Mode.Reader then "ro" else "rw")
         (type_name ~mode ~scope_mode nodes_table scope list_type)
         begin match (mode, scope_mode) with
@@ -400,7 +400,7 @@ let generate_enum_sig ~nodes_table ~scope ~nested_modules
     let footer = [
       sprintf "  | %s of int" (String.capitalize undefined_name)
     ] in
-    RT.Array.fold_right enumerants ~init:footer ~f:(fun enumerant acc ->
+    C.Array.fold_right enumerants ~init:footer ~f:(fun enumerant acc ->
       let name = String.capitalize (PS.Enumerant.name_get enumerant) in
       let match_case = "  | " ^ name in
       match_case :: acc)
@@ -458,11 +458,11 @@ let generate_constant ~nodes_table ~scope const_def =
       let undefined_name = mangle_enum_undefined enumerants in
       let scope_relative_name =
         get_scope_relative_name nodes_table scope enum_node in
-      if enum_val >= RT.Array.length enumerants then
+      if enum_val >= C.Array.length enumerants then
         sprintf "%s.%s %u" scope_relative_name
           (String.capitalize undefined_name) enum_val
       else
-        let enumerant = RT.Array.get enumerants enum_val in
+        let enumerant = C.Array.get enumerants enum_val in
         sprintf "%s.%s"
           scope_relative_name
           (String.capitalize (PS.Enumerant.name_get enumerant))

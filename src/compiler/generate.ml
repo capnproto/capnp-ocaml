@@ -31,7 +31,7 @@
 open Core.Std
 
 module PS   = GenCommon.PS
-module RT   = Capnp.Runtime
+module C    = Capnp
 module Mode = GenCommon.Mode
 
 
@@ -73,12 +73,12 @@ let functor_sig = [
 
 let mod_header = [
   "module Make (MessageWrapper : Capnp.Message.S) = struct";
-	"  open Capnp";
-	"";
+  "  open Capnp";
+  "";
   "  let invalid_msg = Message.invalid_msg";
   "";
-  "  module RA_ = RuntimeReader.Make(MessageWrapper)";
-  "  module BA_ = RuntimeBuilder.Make(MessageWrapper)";
+  "  module RA_ = Runtime.Reader.Make(MessageWrapper)";
+  "  module BA_ = Runtime.Builder.Make(MessageWrapper)";
   "";
   "  type 'cap message_t = 'cap MessageWrapper.Message.t";
   "";
@@ -127,11 +127,11 @@ let compile
   : unit =
   let nodes_table = Hashtbl.Poly.create () in
   let nodes = PS.CodeGeneratorRequest.nodes_get request in
-  let () = RT.Array.iter nodes ~f:(fun node ->
+  let () = C.Array.iter nodes ~f:(fun node ->
       Hashtbl.replace nodes_table ~key:(PS.Node.id_get node) ~data:node)
   in
   let requested_files = PS.CodeGeneratorRequest.requested_files_get request in
-  RT.Array.iter requested_files ~f:(fun requested_file ->
+  C.Array.iter requested_files ~f:(fun requested_file ->
     let open PS.CodeGeneratorRequest in
     let requested_file_id = RequestedFile.id_get requested_file in
     let requested_file_node = Hashtbl.find_exn nodes_table requested_file_id in

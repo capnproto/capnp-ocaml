@@ -1,19 +1,21 @@
-RUNTIME_MODULES =     \
-  farPointer          \
-  listPointer         \
-  message             \
-  messageStorage      \
-  pointer             \
-  runtime             \
-  runtimeBuilder      \
-  runtimeCommon       \
-  runtimeReader       \
-  strStorage          \
-  structPointer       \
+
+RUNTIME_MODULES =   \
+  builder           \
+  cArray            \
+  common            \
+  farPointer        \
+  innerArray        \
+  listPointer       \
+  message           \
+  messageStorage    \
+  pointer           \
+  reader            \
+  strStorage        \
+  structPointer     \
   util
 
-OCamlPackage(capnp, $(RUNTIME_MODULES))
-OCAMLFLAGS += -for-pack Capnp
+OCamlPackage(capnpRuntime, $(RUNTIME_MODULES))
+OCAMLFLAGS += -for-pack CapnpRuntime
 
 .PHONY: runtime-clean runtime-distclean
 

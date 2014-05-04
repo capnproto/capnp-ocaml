@@ -34,7 +34,7 @@
 open Core.Std
 
 module Make (MessageWrapper : Message.S) = struct
-  module RC = RuntimeCommon.Make(MessageWrapper)
+  module RC = Common.Make(MessageWrapper)
   include RC
 
 
@@ -320,7 +320,7 @@ module Make (MessageWrapper : Message.S) = struct
       ?(default : ro ListStorage.t option)
       (decoders : ('cap, 'a) ListDecoders.t)
       (pointer_opt : 'cap Slice.t option)
-    : (ro, 'a, 'cap ListStorage.t) Runtime.Array.t =
+    : (ro, 'a, 'cap ListStorage.t) InnerArray.t =
     let make_default () =
       begin match default with
       | Some default_storage ->
@@ -343,75 +343,75 @@ module Make (MessageWrapper : Message.S) = struct
   let get_void_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
-    : (ro, unit, 'cap ListStorage.t) Runtime.Array.t =
+    : (ro, unit, 'cap ListStorage.t) InnerArray.t =
     get_list ?default (ListDecoders.Empty (fun (x : unit) -> x)) pointer_opt
 
   let get_bit_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
-    : (ro, bool, 'cap ListStorage.t) Runtime.Array.t =
+    : (ro, bool, 'cap ListStorage.t) InnerArray.t =
     get_list ?default (ListDecoders.Bit (fun (x : bool) -> x)) pointer_opt
 
   let get_int8_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
-    : (ro, int, 'cap ListStorage.t) Runtime.Array.t =
+    : (ro, int, 'cap ListStorage.t) InnerArray.t =
     get_list ?default (ListDecoders.Bytes1 (fun slice -> Slice.get_int8 slice 0))
       pointer_opt
 
   let get_int16_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
-    : (ro, int, 'cap ListStorage.t) Runtime.Array.t =
+    : (ro, int, 'cap ListStorage.t) InnerArray.t =
     get_list ?default (ListDecoders.Bytes2 (fun slice -> Slice.get_int16 slice 0))
       pointer_opt
 
   let get_int32_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
-    : (ro, int32, 'cap ListStorage.t) Runtime.Array.t =
+    : (ro, int32, 'cap ListStorage.t) InnerArray.t =
     get_list ?default (ListDecoders.Bytes4 (fun slice -> Slice.get_int32 slice 0))
       pointer_opt
 
   let get_int64_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
-    : (ro, int64, 'cap ListStorage.t) Runtime.Array.t =
+    : (ro, int64, 'cap ListStorage.t) InnerArray.t =
     get_list ?default (ListDecoders.Bytes8 (fun slice -> Slice.get_int64 slice 0))
       pointer_opt
 
   let get_uint8_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
-    : (ro, int, 'cap ListStorage.t) Runtime.Array.t =
+    : (ro, int, 'cap ListStorage.t) InnerArray.t =
     get_list ?default (ListDecoders.Bytes1 (fun slice -> Slice.get_uint8 slice 0))
       pointer_opt
 
   let get_uint16_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
-    : (ro, int, 'cap ListStorage.t) Runtime.Array.t =
+    : (ro, int, 'cap ListStorage.t) InnerArray.t =
     get_list ?default (ListDecoders.Bytes2 (fun slice -> Slice.get_uint16 slice 0))
       pointer_opt
 
   let get_uint32_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
-    : (ro, Uint32.t, 'cap ListStorage.t) Runtime.Array.t =
+    : (ro, Uint32.t, 'cap ListStorage.t) InnerArray.t =
     get_list ?default (ListDecoders.Bytes4 (fun slice -> Slice.get_uint32 slice 0))
       pointer_opt
 
   let get_uint64_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
-    : (ro, Uint64.t, 'cap ListStorage.t) Runtime.Array.t =
+    : (ro, Uint64.t, 'cap ListStorage.t) InnerArray.t =
     get_list ?default (ListDecoders.Bytes8 (fun slice -> Slice.get_uint64 slice 0))
       pointer_opt
 
   let get_float32_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
-    : (ro, float, 'cap ListStorage.t) Runtime.Array.t =
+    : (ro, float, 'cap ListStorage.t) InnerArray.t =
     get_list ?default (ListDecoders.Bytes4
         (fun slice -> Int32.float_of_bits (Slice.get_int32 slice 0)))
       pointer_opt
@@ -419,7 +419,7 @@ module Make (MessageWrapper : Message.S) = struct
   let get_float64_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
-    : (ro, float, 'cap ListStorage.t) Runtime.Array.t =
+    : (ro, float, 'cap ListStorage.t) InnerArray.t =
     get_list ?default (ListDecoders.Bytes4
         (fun slice -> Int64.float_of_bits (Slice.get_int64 slice 0)))
       pointer_opt
@@ -427,7 +427,7 @@ module Make (MessageWrapper : Message.S) = struct
   let get_text_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
-    : (ro, string, 'cap ListStorage.t) Runtime.Array.t =
+    : (ro, string, 'cap ListStorage.t) InnerArray.t =
     let decoders =
       ListDecoders.Pointer (fun slice ->
         match deref_list_pointer slice with
@@ -441,7 +441,7 @@ module Make (MessageWrapper : Message.S) = struct
   let get_blob_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
-    : (ro, string, 'cap ListStorage.t) Runtime.Array.t =
+    : (ro, string, 'cap ListStorage.t) InnerArray.t =
     let decoders =
       ListDecoders.Pointer (fun slice ->
         match deref_list_pointer slice with
@@ -455,7 +455,7 @@ module Make (MessageWrapper : Message.S) = struct
   let get_struct_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
-    : (ro, 'cap StructStorage.t option, 'cap ListStorage.t) Runtime.Array.t =
+    : (ro, 'cap StructStorage.t option, 'cap ListStorage.t) InnerArray.t =
     let decoders =
       let struct_decoders =
         let bytes slice = Some {

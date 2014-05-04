@@ -37,8 +37,6 @@ module Make (MessageWrapper : Message.S) = struct
   type rw = Message.rw
   include MessageWrapper
 
-  module InnerArray = Runtime.InnerArray
-
   let sizeof_uint32 = 4
   let sizeof_uint64 = 8
 
@@ -374,8 +372,7 @@ module Make (MessageWrapper : Message.S) = struct
     loop init (list_storage.ListStorage.num_elements - 1)
 
   let make_empty_array () =
-    let get_unsafe i = assert false in
-    InnerArray.to_outer_array {
+    let get_unsafe i = assert false in {
       InnerArray.length = 0;
       InnerArray.get_unsafe;
       InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
@@ -425,7 +422,7 @@ module Make (MessageWrapper : Message.S) = struct
   let make_array_readonly
       (list_storage : 'cap ListStorage.t)
       (decoders : ('cap, 'a) ListDecoders.t)
-    : (ro, 'a, 'cap ListStorage.t) Runtime.Array.t =
+    : (ro, 'a, 'cap ListStorage.t) InnerArray.t =
     let make_element_slice i byte_count = {
       list_storage.ListStorage.storage with
       Slice.start =
@@ -529,8 +526,7 @@ module Make (MessageWrapper : Message.S) = struct
               invalid_msg
                 "decoded List<composite> where a different list type was expected"
           end
-    in
-    InnerArray.to_outer_array {
+    in {
       InnerArray.length;
       InnerArray.get_unsafe;
       InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
@@ -541,7 +537,7 @@ module Make (MessageWrapper : Message.S) = struct
   let make_array_readwrite
       (list_storage : rw ListStorage.t)
       (codecs : 'a ListCodecs.t)
-    : (rw, 'a, rw ListStorage.t) Runtime.Array.t =
+    : (rw, 'a, rw ListStorage.t) InnerArray.t =
     let make_element_slice i byte_count = {
       list_storage.ListStorage.storage with
       Slice.start =
@@ -674,8 +670,7 @@ module Make (MessageWrapper : Message.S) = struct
               invalid_msg
                 "decoded List<composite> a different list type was expected"
           end
-    in
-    InnerArray.to_outer_array {
+    in {
       InnerArray.length;
       InnerArray.get_unsafe;
       InnerArray.set_unsafe;

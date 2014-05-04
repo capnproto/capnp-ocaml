@@ -31,9 +31,9 @@
 open Core.Std
 
 module PS = GenCommon.PS
-module RT = Capnp.Runtime
+module C  = Capnp
 
-let uint64_equal = Capnp.Util.uint64_equal
+let uint64_equal = C.Runtime.Util.uint64_equal
 
 
 let add_parentage_maps
@@ -45,7 +45,7 @@ let add_parentage_maps
   let node_id = id_get node in
   let rec add_children parent =
     let child_nodes = nested_nodes_get parent in
-    RT.Array.iter child_nodes ~f:(fun child_nested_node ->
+    C.Array.iter child_nodes ~f:(fun child_nested_node ->
       let child_node =
         Hashtbl.find_exn nodes_table (NestedNode.id_get child_nested_node)
       in
@@ -147,7 +147,7 @@ let build_reference_graph
     in
     let () =
       let child_nodes = nested_nodes_get node in
-      RT.Array.iter child_nodes ~f:(fun child_nested_node ->
+      C.Array.iter child_nodes ~f:(fun child_nested_node ->
         let child_node = Hashtbl.find_exn nodes_table
             (NestedNode.id_get child_nested_node)
         in
@@ -163,7 +163,7 @@ let build_reference_graph
         ()
     | Struct node_struct ->
         let fields = Struct.fields_get node_struct in
-        RT.Array.iter fields ~f:(fun field ->
+        C.Array.iter fields ~f:(fun field ->
           match PS.Field.get field with
           | PS.Field.Slot slot ->
               register_type_reference ~parentage_table ~edges
@@ -178,7 +178,7 @@ let build_reference_graph
               failwith (Printf.sprintf "Unknown Field union discriminant %d" x))
     | Interface node_iface ->
         let methods = Interface.methods_get node_iface in
-        RT.Array.iter methods ~f:(fun meth ->
+        C.Array.iter methods ~f:(fun meth ->
           register_reference ~parentage_table ~edges
             ~referrer:parent_id ~referee:(PS.Method.param_struct_type_get meth);
           register_reference ~parentage_table ~edges

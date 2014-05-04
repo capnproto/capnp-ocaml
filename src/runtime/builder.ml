@@ -37,8 +37,8 @@
 open Core.Std
 
 module Make (MessageWrapper : Message.S) = struct
-  module RReader = RuntimeReader.Make(MessageWrapper)
-  module RC = RuntimeCommon.Make(MessageWrapper)
+  module RReader = Reader.Make(MessageWrapper)
+  module RC = Common.Make(MessageWrapper)
   include RC
 
 
@@ -1323,7 +1323,7 @@ module Make (MessageWrapper : Message.S) = struct
       ~(storage_type : ListStorage.storage_type_t)
       ~(codecs : 'a ListCodecs.t)
       (pointer_bytes : rw Slice.t)
-    : (rw, 'a, rw ListStorage.t) Runtime.Array.t =
+    : (rw, 'a, rw ListStorage.t) InnerArray.t =
     let create_default message =
       match default with
       | Some default_storage ->
@@ -1339,98 +1339,98 @@ module Make (MessageWrapper : Message.S) = struct
   let get_void_list
       ?(default : ro ListStorage.t option)
       (pointer_bytes : rw Slice.t)
-    : (rw, unit, rw ListStorage.t) Runtime.Array.t =
+    : (rw, unit, rw ListStorage.t) InnerArray.t =
     get_list ?default ~storage_type:ListStorage.Empty
       ~codecs:void_list_codecs pointer_bytes
 
   let get_bit_list
       ?(default : ro ListStorage.t option)
       (pointer_bytes : rw Slice.t)
-    : (rw, bool, rw ListStorage.t) Runtime.Array.t =
+    : (rw, bool, rw ListStorage.t) InnerArray.t =
     get_list ?default ~storage_type:ListStorage.Bit
       ~codecs:bit_list_codecs pointer_bytes
 
   let get_int8_list
       ?(default : ro ListStorage.t option)
       (pointer_bytes : rw Slice.t)
-    : (rw, int, rw ListStorage.t) Runtime.Array.t =
+    : (rw, int, rw ListStorage.t) InnerArray.t =
     get_list ?default ~storage_type:ListStorage.Bytes1
       ~codecs:int8_list_codecs pointer_bytes
 
   let get_int16_list
       ?(default : ro ListStorage.t option)
       (pointer_bytes : rw Slice.t)
-    : (rw, int, rw ListStorage.t) Runtime.Array.t =
+    : (rw, int, rw ListStorage.t) InnerArray.t =
     get_list ?default ~storage_type:ListStorage.Bytes2
       ~codecs:int16_list_codecs pointer_bytes
 
   let get_int32_list
       ?(default : ro ListStorage.t option)
       (pointer_bytes : rw Slice.t)
-    : (rw, int32, rw ListStorage.t) Runtime.Array.t =
+    : (rw, int32, rw ListStorage.t) InnerArray.t =
     get_list ?default ~storage_type:ListStorage.Bytes4
       ~codecs:int32_list_codecs pointer_bytes
 
   let get_int64_list
       ?(default : ro ListStorage.t option)
       (pointer_bytes : rw Slice.t)
-    : (rw, int64, rw ListStorage.t) Runtime.Array.t =
+    : (rw, int64, rw ListStorage.t) InnerArray.t =
     get_list ?default ~storage_type:ListStorage.Bytes8
       ~codecs:int64_list_codecs pointer_bytes
 
   let get_uint8_list
       ?(default : ro ListStorage.t option)
       (pointer_bytes : rw Slice.t)
-    : (rw, int, rw ListStorage.t) Runtime.Array.t =
+    : (rw, int, rw ListStorage.t) InnerArray.t =
     get_list ?default ~storage_type:ListStorage.Bytes1
       ~codecs:uint8_list_codecs pointer_bytes
 
   let get_uint16_list
       ?(default : ro ListStorage.t option)
       (pointer_bytes : rw Slice.t)
-    : (rw, int, rw ListStorage.t) Runtime.Array.t =
+    : (rw, int, rw ListStorage.t) InnerArray.t =
     get_list ?default ~storage_type:ListStorage.Bytes2
       ~codecs:uint16_list_codecs pointer_bytes
 
   let get_uint32_list
       ?(default : ro ListStorage.t option)
       (pointer_bytes : rw Slice.t)
-    : (rw, Uint32.t, rw ListStorage.t) Runtime.Array.t =
+    : (rw, Uint32.t, rw ListStorage.t) InnerArray.t =
     get_list ?default ~storage_type:ListStorage.Bytes4
       ~codecs:uint32_list_codecs pointer_bytes
 
   let get_uint64_list
       ?(default : ro ListStorage.t option)
       (pointer_bytes : rw Slice.t)
-    : (rw, Uint64.t, rw ListStorage.t) Runtime.Array.t =
+    : (rw, Uint64.t, rw ListStorage.t) InnerArray.t =
     get_list ?default ~storage_type:ListStorage.Bytes8
       ~codecs:uint64_list_codecs pointer_bytes
 
   let get_float32_list
       ?(default : ro ListStorage.t option)
       (pointer_bytes : rw Slice.t)
-    : (rw, float, rw ListStorage.t) Runtime.Array.t =
+    : (rw, float, rw ListStorage.t) InnerArray.t =
     get_list ?default ~storage_type:ListStorage.Bytes4
       ~codecs:float32_list_codecs pointer_bytes
 
   let get_float64_list
       ?(default : ro ListStorage.t option)
       (pointer_bytes : rw Slice.t)
-    : (rw, float, rw ListStorage.t) Runtime.Array.t =
+    : (rw, float, rw ListStorage.t) InnerArray.t =
     get_list ?default ~storage_type:ListStorage.Bytes8
       ~codecs:float64_list_codecs pointer_bytes
 
   let get_text_list
       ?(default : ro ListStorage.t option)
       (pointer_bytes : rw Slice.t)
-    : (rw, string, rw ListStorage.t) Runtime.Array.t =
+    : (rw, string, rw ListStorage.t) InnerArray.t =
     get_list ?default ~storage_type:ListStorage.Pointer
       ~codecs:text_list_codecs pointer_bytes
 
   let get_blob_list
       ?(default : ro ListStorage.t option)
       (pointer_bytes : rw Slice.t)
-    : (rw, string, rw ListStorage.t) Runtime.Array.t =
+    : (rw, string, rw ListStorage.t) InnerArray.t =
     get_list ?default ~storage_type:ListStorage.Pointer
       ~codecs:blob_list_codecs pointer_bytes
 
@@ -1439,7 +1439,7 @@ module Make (MessageWrapper : Message.S) = struct
       ~(data_words : int)
       ~(pointer_words : int)
       (pointer_bytes : rw Slice.t)
-    : (rw, rw StructStorage.t, rw ListStorage.t) Runtime.Array.t =
+    : (rw, rw StructStorage.t, rw ListStorage.t) InnerArray.t =
     get_list ~struct_sizes:{ StructSizes.data_words; StructSizes.pointer_words }
       ?default ~storage_type:(ListStorage.Composite (data_words, pointer_words))
       ~codecs:struct_list_codecs pointer_bytes
@@ -1493,7 +1493,7 @@ module Make (MessageWrapper : Message.S) = struct
       ~(codecs : 'a ListCodecs.t)
       (value : 'cap ListStorage.t option)
       (pointer_bytes : rw Slice.t)
-    : (rw, 'a, rw ListStorage.t) Runtime.Array.t =
+    : (rw, 'a, rw ListStorage.t) InnerArray.t =
     let dest_storage =
       match value with
       | Some src_storage ->
@@ -1510,108 +1510,108 @@ module Make (MessageWrapper : Message.S) = struct
       ?(struct_sizes : StructSizes.t option)
       ~(storage_type : ListStorage.storage_type_t)
       ~(codecs : 'a ListCodecs.t)
-      (value : ('cap1, 'a, 'cap2 ListStorage.t) Runtime.Array.t)
+      (value : ('cap1, 'a, 'cap2 ListStorage.t) InnerArray.t)
       (pointer_bytes : rw Slice.t)
-    : (rw, 'a, rw ListStorage.t) Runtime.Array.t =
+    : (rw, 'a, rw ListStorage.t) InnerArray.t =
     set_list_from_storage ?struct_sizes ~storage_type ~codecs
-      (InnerArray.to_storage (InnerArray.of_outer_array value))
+      (InnerArray.to_storage value)
       pointer_bytes
 
   let set_void_list
-      (value : ('cap1, unit, 'cap2 ListStorage.t) Runtime.Array.t)
+      (value : ('cap1, unit, 'cap2 ListStorage.t) InnerArray.t)
       (pointer_bytes : rw Slice.t)
-    : (rw, unit, rw ListStorage.t) Runtime.Array.t =
+    : (rw, unit, rw ListStorage.t) InnerArray.t =
     set_list ~storage_type:ListStorage.Empty ~codecs:void_list_codecs
       value pointer_bytes
 
   let set_bit_list
-      (value : ('cap1, bool, 'cap2 ListStorage.t) Runtime.Array.t)
+      (value : ('cap1, bool, 'cap2 ListStorage.t) InnerArray.t)
       (pointer_bytes : rw Slice.t)
-    : (rw, bool, rw ListStorage.t) Runtime.Array.t =
+    : (rw, bool, rw ListStorage.t) InnerArray.t =
     set_list ~storage_type:ListStorage.Bit ~codecs:bit_list_codecs
       value pointer_bytes
 
   let set_int8_list
-      (value : ('cap1, int, 'cap2 ListStorage.t) Runtime.Array.t)
+      (value : ('cap1, int, 'cap2 ListStorage.t) InnerArray.t)
       (pointer_bytes : rw Slice.t)
-    : (rw, int, 'cap ListStorage.t) Runtime.Array.t =
+    : (rw, int, 'cap ListStorage.t) InnerArray.t =
     set_list ~storage_type:ListStorage.Bytes1 ~codecs:int8_list_codecs
       value pointer_bytes
 
   let set_int16_list
-      (value : ('cap1, int, 'cap2 ListStorage.t) Runtime.Array.t)
+      (value : ('cap1, int, 'cap2 ListStorage.t) InnerArray.t)
       (pointer_bytes : rw Slice.t)
-    : (rw, int, 'cap ListStorage.t) Runtime.Array.t =
+    : (rw, int, 'cap ListStorage.t) InnerArray.t =
     set_list ~storage_type:ListStorage.Bytes2 ~codecs:int16_list_codecs
       value pointer_bytes
 
   let set_int32_list
-      (value : ('cap1, int32, 'cap ListStorage.t) Runtime.Array.t)
+      (value : ('cap1, int32, 'cap ListStorage.t) InnerArray.t)
       (pointer_bytes : rw Slice.t)
-    : (rw, int32, rw ListStorage.t) Runtime.Array.t =
+    : (rw, int32, rw ListStorage.t) InnerArray.t =
     set_list ~storage_type:ListStorage.Bytes4 ~codecs:int32_list_codecs
       value pointer_bytes
 
   let set_int64_list
-      (value : ('cap1, int64, 'cap2 ListStorage.t) Runtime.Array.t)
+      (value : ('cap1, int64, 'cap2 ListStorage.t) InnerArray.t)
       (pointer_bytes : rw Slice.t)
-    : (rw, int64, rw ListStorage.t) Runtime.Array.t =
+    : (rw, int64, rw ListStorage.t) InnerArray.t =
     set_list ~storage_type:ListStorage.Bytes8 ~codecs:int64_list_codecs
       value pointer_bytes
 
   let set_uint8_list
-      (value : ('cap1, int, 'cap2 ListStorage.t) Runtime.Array.t)
+      (value : ('cap1, int, 'cap2 ListStorage.t) InnerArray.t)
       (pointer_bytes : rw Slice.t)
-    : (rw, int, rw ListStorage.t) Runtime.Array.t =
+    : (rw, int, rw ListStorage.t) InnerArray.t =
     set_list ~storage_type:ListStorage.Bytes1 ~codecs:uint8_list_codecs
       value pointer_bytes
 
   let set_uint16_list
-      (value : ('cap1, int, 'cap2 ListStorage.t) Runtime.Array.t)
+      (value : ('cap1, int, 'cap2 ListStorage.t) InnerArray.t)
       (pointer_bytes : rw Slice.t)
-    : (rw, int, rw ListStorage.t) Runtime.Array.t =
+    : (rw, int, rw ListStorage.t) InnerArray.t =
     set_list ~storage_type:ListStorage.Bytes2 ~codecs:uint16_list_codecs
       value pointer_bytes
 
   let set_uint32_list
-      (value : ('cap1, Uint32.t, 'cap2 ListStorage.t) Runtime.Array.t)
+      (value : ('cap1, Uint32.t, 'cap2 ListStorage.t) InnerArray.t)
       (pointer_bytes : rw Slice.t)
-    : (rw, Uint32.t, rw ListStorage.t) Runtime.Array.t =
+    : (rw, Uint32.t, rw ListStorage.t) InnerArray.t =
     set_list ~storage_type:ListStorage.Bytes4 ~codecs:uint32_list_codecs
       value pointer_bytes
 
   let set_uint64_list
-      (value : ('cap1, Uint64.t, 'cap2 ListStorage.t) Runtime.Array.t)
+      (value : ('cap1, Uint64.t, 'cap2 ListStorage.t) InnerArray.t)
       (pointer_bytes : rw Slice.t)
-    : (rw, Uint64.t, rw ListStorage.t) Runtime.Array.t =
+    : (rw, Uint64.t, rw ListStorage.t) InnerArray.t =
     set_list ~storage_type:ListStorage.Bytes8 ~codecs:uint64_list_codecs
       value pointer_bytes
 
   let set_float32_list
-      (value : ('cap1, float, 'cap2 ListStorage.t) Runtime.Array.t)
+      (value : ('cap1, float, 'cap2 ListStorage.t) InnerArray.t)
       (pointer_bytes : rw Slice.t)
-    : (rw, float, rw ListStorage.t) Runtime.Array.t =
+    : (rw, float, rw ListStorage.t) InnerArray.t =
     set_list ~storage_type:ListStorage.Bytes4 ~codecs:float32_list_codecs
       value pointer_bytes
 
   let set_float64_list
-      (value : ('cap1, float, 'cap2 ListStorage.t) Runtime.Array.t)
+      (value : ('cap1, float, 'cap2 ListStorage.t) InnerArray.t)
       (pointer_bytes : rw Slice.t)
-    : (rw, float, rw ListStorage.t) Runtime.Array.t =
+    : (rw, float, rw ListStorage.t) InnerArray.t =
     set_list ~storage_type:ListStorage.Bytes8 ~codecs:float64_list_codecs
       value pointer_bytes
 
   let set_text_list
-      (value : ('cap1, string, 'cap2 ListStorage.t) Runtime.Array.t)
+      (value : ('cap1, string, 'cap2 ListStorage.t) InnerArray.t)
       (pointer_bytes : rw Slice.t)
-    : (rw, string, rw ListStorage.t) Runtime.Array.t =
+    : (rw, string, rw ListStorage.t) InnerArray.t =
     set_list ~storage_type:ListStorage.Pointer ~codecs:text_list_codecs
       value pointer_bytes
 
   let set_blob_list
-      (value : ('cap1, string, 'cap2 ListStorage.t) Runtime.Array.t)
+      (value : ('cap1, string, 'cap2 ListStorage.t) InnerArray.t)
       (pointer_bytes : rw Slice.t)
-    : (rw, string, rw ListStorage.t) Runtime.Array.t =
+    : (rw, string, rw ListStorage.t) InnerArray.t =
     set_list ~storage_type:ListStorage.Pointer ~codecs:blob_list_codecs
       value pointer_bytes
 
@@ -1619,9 +1619,9 @@ module Make (MessageWrapper : Message.S) = struct
       ~(data_words : int)
       ~(pointer_words : int)
       (* FIXME: this won't allow assignment from Reader struct lists *)
-      (value : ('cap1, 'cap2 StructStorage.t, 'cap2 ListStorage.t) Runtime.Array.t)
+      (value : ('cap1, 'cap2 StructStorage.t, 'cap2 ListStorage.t) InnerArray.t)
       (pointer_bytes : rw Slice.t)
-    : (rw, rw StructStorage.t, rw ListStorage.t) Runtime.Array.t =
+    : (rw, rw StructStorage.t, rw ListStorage.t) InnerArray.t =
     set_list ~struct_sizes:{ StructSizes.data_words; StructSizes.pointer_words }
       ~storage_type:(ListStorage.Composite (data_words, pointer_words))
       ~codecs:struct_list_codecs value pointer_bytes
@@ -1661,7 +1661,7 @@ module Make (MessageWrapper : Message.S) = struct
       ~(codecs : 'a ListCodecs.t)
       (num_elements : int)
       (pointer_bytes : rw Slice.t)
-    : (rw, 'a, rw ListStorage.t) Runtime.Array.t =
+    : (rw, 'a, rw ListStorage.t) InnerArray.t =
     let () = deep_zero_pointer pointer_bytes in
     let message = pointer_bytes.Slice.msg in
     let list_storage = alloc_list_storage message storage_type num_elements in
@@ -1671,98 +1671,98 @@ module Make (MessageWrapper : Message.S) = struct
   let init_void_list
       (num_elements : int)
       (pointer_bytes : rw Slice.t)
-    : (rw, unit, rw ListStorage.t) Runtime.Array.t =
+    : (rw, unit, rw ListStorage.t) InnerArray.t =
     init_list ~storage_type:ListStorage.Empty ~codecs:void_list_codecs
       num_elements pointer_bytes
 
   let init_bit_list
       (num_elements : int)
       (pointer_bytes : rw Slice.t)
-    : (rw, bool, rw ListStorage.t) Runtime.Array.t =
+    : (rw, bool, rw ListStorage.t) InnerArray.t =
     init_list ~storage_type:ListStorage.Bit ~codecs:bit_list_codecs
       num_elements pointer_bytes
 
   let init_int8_list
       (num_elements : int)
       (pointer_bytes : rw Slice.t)
-    : (rw, int, rw ListStorage.t) Runtime.Array.t =
+    : (rw, int, rw ListStorage.t) InnerArray.t =
     init_list ~storage_type:ListStorage.Bytes1 ~codecs:int8_list_codecs
       num_elements pointer_bytes
 
   let init_int16_list
       (num_elements : int)
       (pointer_bytes : rw Slice.t)
-    : (rw, int, rw ListStorage.t) Runtime.Array.t =
+    : (rw, int, rw ListStorage.t) InnerArray.t =
     init_list ~storage_type:ListStorage.Bytes2 ~codecs:int16_list_codecs
       num_elements pointer_bytes
 
   let init_int32_list
       (num_elements : int)
       (pointer_bytes : rw Slice.t)
-    : (rw, int32, rw ListStorage.t) Runtime.Array.t =
+    : (rw, int32, rw ListStorage.t) InnerArray.t =
     init_list ~storage_type:ListStorage.Bytes4 ~codecs:int32_list_codecs
       num_elements pointer_bytes
 
   let init_int64_list
       (num_elements : int)
       (pointer_bytes : rw Slice.t)
-    : (rw, int64, rw ListStorage.t) Runtime.Array.t =
+    : (rw, int64, rw ListStorage.t) InnerArray.t =
     init_list ~storage_type:ListStorage.Bytes8 ~codecs:int64_list_codecs
       num_elements pointer_bytes
 
   let init_uint8_list
       (num_elements : int)
       (pointer_bytes : rw Slice.t)
-    : (rw, int, rw ListStorage.t) Runtime.Array.t =
+    : (rw, int, rw ListStorage.t) InnerArray.t =
     init_list ~storage_type:ListStorage.Bytes1 ~codecs:uint8_list_codecs
       num_elements pointer_bytes
 
   let init_uint16_list
       (num_elements : int)
       (pointer_bytes : rw Slice.t)
-    : (rw, int, rw ListStorage.t) Runtime.Array.t =
+    : (rw, int, rw ListStorage.t) InnerArray.t =
     init_list ~storage_type:ListStorage.Bytes2 ~codecs:uint16_list_codecs
       num_elements pointer_bytes
 
   let init_uint32_list
       (num_elements : int)
       (pointer_bytes : rw Slice.t)
-    : (rw, Uint32.t, rw ListStorage.t) Runtime.Array.t =
+    : (rw, Uint32.t, rw ListStorage.t) InnerArray.t =
     init_list ~storage_type:ListStorage.Bytes4 ~codecs:uint32_list_codecs
       num_elements pointer_bytes
 
   let init_uint64_list
       (num_elements : int)
       (pointer_bytes : rw Slice.t)
-    : (rw, Uint64.t, rw ListStorage.t) Runtime.Array.t =
+    : (rw, Uint64.t, rw ListStorage.t) InnerArray.t =
     init_list ~storage_type:ListStorage.Bytes8 ~codecs:uint64_list_codecs
       num_elements pointer_bytes
 
   let init_float32_list
       (num_elements : int)
       (pointer_bytes : rw Slice.t)
-    : (rw, float, rw ListStorage.t) Runtime.Array.t =
+    : (rw, float, rw ListStorage.t) InnerArray.t =
     init_list ~storage_type:ListStorage.Bytes4 ~codecs:float32_list_codecs
       num_elements pointer_bytes
 
   let init_float64_list
       (num_elements : int)
       (pointer_bytes : rw Slice.t)
-    : (rw, float, rw ListStorage.t) Runtime.Array.t =
+    : (rw, float, rw ListStorage.t) InnerArray.t =
     init_list ~storage_type:ListStorage.Bytes8 ~codecs:float64_list_codecs
       num_elements pointer_bytes
 
   let init_text_list
       (num_elements : int)
       (pointer_bytes : rw Slice.t)
-    : (rw, string, rw ListStorage.t) Runtime.Array.t =
+    : (rw, string, rw ListStorage.t) InnerArray.t =
     init_list ~storage_type:ListStorage.Pointer ~codecs:text_list_codecs
       num_elements pointer_bytes
 
   let init_blob_list
       (num_elements : int)
       (pointer_bytes : rw Slice.t)
-    : (rw, string, rw ListStorage.t) Runtime.Array.t =
+    : (rw, string, rw ListStorage.t) InnerArray.t =
     init_list ~storage_type:ListStorage.Pointer ~codecs:blob_list_codecs
       num_elements pointer_bytes
 
@@ -1771,7 +1771,7 @@ module Make (MessageWrapper : Message.S) = struct
       ~(pointer_words : int)
       (num_elements : int)
       (pointer_bytes : rw Slice.t)
-    : (rw, rw StructStorage.t, rw ListStorage.t) Runtime.Array.t =
+    : (rw, rw StructStorage.t, rw ListStorage.t) InnerArray.t =
     init_list ~storage_type:(ListStorage.Composite (data_words, pointer_words))
       ~codecs:struct_list_codecs num_elements pointer_bytes
 

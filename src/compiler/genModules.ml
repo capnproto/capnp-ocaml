@@ -32,8 +32,8 @@ open Core.Std
 
 module PS        = GenCommon.PS
 module Mode      = GenCommon.Mode
-module RT        = Capnp.Runtime
-module ReaderApi = Capnp.RuntimeReader.Make(GenCommon.M)
+module C         = Capnp
+module ReaderApi = C.Runtime.Reader.Make(GenCommon.M)
 
 let sprintf = Printf.sprintf
 let apply_indent = GenCommon.apply_indent
@@ -60,7 +60,7 @@ let generate_enum_decoder ~nodes_table ~scope ~enum_node =
         failwith "Decoded non-enum node where enum node was expected."
   in
   let match_cases =
-    RT.Array.foldi_right enumerants ~init:[] ~f:(fun i enumerant acc ->
+    C.Array.foldi_right enumerants ~init:[] ~f:(fun i enumerant acc ->
       let case_str =
         sprintf "  | %u -> %s.%s" i scope_relative_name
           (String.capitalize (PS.Enumerant.name_get enumerant))
@@ -91,7 +91,7 @@ let generate_enum_encoder ~(allow_undefined : bool) ~nodes_table ~scope
         failwith "Decoded non-enum node where enum node was expected."
   in
   let match_cases =
-    RT.Array.foldi_right enumerants ~init:[] ~f:(fun i enumerant acc ->
+    C.Array.foldi_right enumerants ~init:[] ~f:(fun i enumerant acc ->
       let case_str =
         sprintf "  | %s.%s -> %u"
           scope_relative_name
@@ -889,7 +889,7 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode ~discr_ofs field =
               begin match pointer_slice_opt with
               | Some pointer_slice ->
                   begin match ReaderApi.decode_pointer pointer_slice with
-                  | Capnp.Pointer.Null -> true
+                  | Capnp.Runtime.Pointer.Null -> true
                   | _ -> false
                   end
               | None ->
@@ -925,7 +925,7 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode ~discr_ofs field =
               begin match pointer_slice_opt with
               | Some pointer_slice ->
                   begin match ReaderApi.decode_pointer pointer_slice with
-                  | Capnp.Pointer.Null -> true
+                  | Capnp.Runtime.Pointer.Null -> true
                   | _ -> false
                   end
               | None ->
@@ -1114,7 +1114,7 @@ let generate_accessors ~nodes_table ~scope ~mode struct_def fields =
 let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~mode
     ~node struct_def =
   let unsorted_fields =
-    RT.Array.to_list (PS.Node.Struct.fields_get struct_def)
+    C.Array.to_list (PS.Node.Struct.fields_get struct_def)
   in
   (* Sorting in reverse code order allows us to avoid a List.rev *)
   let all_fields = List.sort unsorted_fields ~cmp:(fun x y ->

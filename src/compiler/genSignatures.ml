@@ -32,7 +32,7 @@ open Core.Std
 
 module PS   = GenCommon.PS
 module Mode = GenCommon.Mode
-module RT   = Capnp.Runtime
+module C    = Capnp
 
 let sprintf = Printf.sprintf
 let apply_indent = GenCommon.apply_indent
@@ -220,7 +220,7 @@ let generate_accessors ~nodes_table ~scope ~mode
 let generate_struct_node ~nodes_table ~scope ~nested_modules
     ~mode ~node struct_def : string list =
   let unsorted_fields =
-    RT.Array.to_list (PS.Node.Struct.fields_get struct_def)
+    C.Array.to_list (PS.Node.Struct.fields_get struct_def)
   in
   (* Sorting in reverse code order allows us to avoid a List.rev *)
   let all_fields = List.sort unsorted_fields ~cmp:(fun x y ->

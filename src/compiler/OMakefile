@@ -1,13 +1,14 @@
 OCAMLINCLUDES += ../runtime
 
-COMP_MODULES =      \
-  genCommon         \
-  genModules        \
-  genSignatures     \
-  generate          \
-  main              \
-  pluginSchema      \
-  topsort           \
+COMP_MODULES =            \
+  genCommon               \
+  genModules              \
+  genSignatures           \
+  generate                \
+  main                    \
+  pluginSchema            \
+  topsort                 \
+  ../runtime/capnpRuntime \
   ../runtime/capnp
 
 OCamlProgram(capnpc-ocaml, $(COMP_MODULES))
