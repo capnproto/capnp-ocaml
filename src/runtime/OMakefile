@@ -12,7 +12,8 @@ RUNTIME_MODULES =     \
   structPointer       \
   util
 
-OCamlLibrary(capnp, $(RUNTIME_MODULES))
+OCamlPackage(capnp, $(RUNTIME_MODULES))
+OCAMLFLAGS += -for-pack Capnp
 
 .PHONY: runtime-clean runtime-distclean
 

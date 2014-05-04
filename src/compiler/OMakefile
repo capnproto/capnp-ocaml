@@ -1,5 +1,4 @@
 OCAMLINCLUDES += ../runtime
-OCAML_LIBS[] += ../runtime/capnp
 
 COMP_MODULES =      \
   genCommon         \
@@ -8,7 +7,8 @@ COMP_MODULES =      \
   generate          \
   main              \
   pluginSchema      \
-  topsort
+  topsort           \
+  ../runtime/capnp
 
 OCamlProgram(capnpc-ocaml, $(COMP_MODULES))
 

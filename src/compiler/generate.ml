@@ -30,14 +30,14 @@
 
 open Core.Std
 
-module PS = GenCommon.PS
-module RT = Runtime
+module PS   = GenCommon.PS
+module RT   = Capnp.Runtime
 module Mode = GenCommon.Mode
 
 
 let sig_s_header = [
-  "type ro = Message.ro";
-  "type rw = Message.rw";
+  "type ro = Capnp.Message.ro";
+  "type rw = Capnp.Message.rw";
   "";
   "module type S = sig";
   "  type 'cap message_t";
@@ -64,15 +64,17 @@ let sig_s_footer = [
 
 
 let functor_sig = [
-  "module Make (MessageWrapper : Message.S) :";
+  "module Make (MessageWrapper : Capnp.Message.S) :";
   "  (S with type 'cap message_t = 'cap MessageWrapper.Message.t";
-  "    and type Reader.pointer_t = Message.ro MessageWrapper.Slice.t option";
-  "    and type Builder.pointer_t = Message.rw MessageWrapper.Slice.t)";
+  "    and type Reader.pointer_t = ro MessageWrapper.Slice.t option";
+  "    and type Builder.pointer_t = rw MessageWrapper.Slice.t)";
   "";
 ]
 
 let mod_header = [
-  "module Make (MessageWrapper : Message.S) = struct";
+  "module Make (MessageWrapper : Capnp.Message.S) = struct";
+	"  open Capnp";
+	"";
   "  let invalid_msg = Message.invalid_msg";
   "";
   "  module RA_ = RuntimeReader.Make(MessageWrapper)";

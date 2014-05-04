@@ -29,6 +29,7 @@
 
 
 open Core.Std
+open Capnp
 
 module M  = GenCommon.M
 module PS = GenCommon.PS

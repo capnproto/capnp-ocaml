@@ -30,12 +30,14 @@
 
 open Core.Std
 
-module M   = Message.Make(StrStorage)
+module M   = Capnp.Message.Make(Capnp.StrStorage)
 module PS_ = PluginSchema.Make(M)
 module PS  = PS_.Reader
-module RT  = Runtime
+module RT  = Capnp.Runtime
 
 let sprintf = Printf.sprintf
+let uint64_equal = Capnp.Util.uint64_equal
+
 
 (* Modes in which code generation can be run *)
 module Mode = struct
@@ -93,7 +95,7 @@ let children_of
   let open PS.Node in
   let parent_id = id_get parent in
   Hashtbl.fold nodes_table ~init:[] ~f:(fun ~key:id ~data:node acc ->
-    if Util.uint64_equal parent_id (scope_id_get node) then
+    if uint64_equal parent_id (scope_id_get node) then
       node :: acc
     else
       acc)
@@ -114,7 +116,7 @@ let get_unqualified_name
   let nested_nodes = nested_nodes_get parent in
   let matching_nested_node_name =
     RT.Array.find_map nested_nodes ~f:(fun nested_node ->
-      if Util.uint64_equal child_id (NestedNode.id_get nested_node) then
+      if uint64_equal child_id (NestedNode.id_get nested_node) then
         Some (NestedNode.name_get nested_node)
       else
         None)
@@ -146,7 +148,7 @@ let get_unqualified_name
               | PS.Field.Slot _ ->
                   None
               | PS.Field.Group group ->
-                  if Util.uint64_equal child_id
+                  if uint64_equal child_id
                       (PS.Field.Group.type_id_get group) then
                     Some (String.capitalize (PS.Field.name_get field))
                   else
@@ -171,7 +173,7 @@ let get_fully_qualified_name_components nodes_table node
   let open PS.Node in
   let rec loop acc curr_node =
     let scope_id = scope_id_get curr_node in
-    if Util.uint64_equal scope_id Uint64.zero then
+    if uint64_equal scope_id Uint64.zero then
       acc
     else
       let parent = Hashtbl.find_exn nodes_table scope_id in
@@ -197,7 +199,7 @@ let get_scope_relative_name nodes_table (scope_stack : Uint64.t list) node
     match components, scope with
     | ( (component_name, component_scope_id) ::
           other_components, scope_id :: scope_ids) ->
-        if Util.uint64_equal component_scope_id scope_id then
+        if uint64_equal component_scope_id scope_id then
           pop_components other_components scope_ids
         else
           components
@@ -304,7 +306,7 @@ let rec type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
   | Data    -> "string"
   | List list_descr ->
       let list_type = List.element_type_get list_descr in
-      sprintf "(%s, %s, %s) Runtime.Array.t"
+      sprintf "(%s, %s, %s) Capnp.Runtime.Array.t"
         (if mode = Mode.Reader then "ro" else "rw")
         (type_name ~mode ~scope_mode nodes_table scope list_type)
         begin match (mode, scope_mode) with

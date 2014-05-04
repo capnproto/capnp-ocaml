@@ -32,8 +32,8 @@ open Core.Std
 
 module PS        = GenCommon.PS
 module Mode      = GenCommon.Mode
-module RT        = Runtime
-module ReaderApi = RuntimeReader.Make(GenCommon.M)
+module RT        = Capnp.Runtime
+module ReaderApi = Capnp.RuntimeReader.Make(GenCommon.M)
 
 let sprintf = Printf.sprintf
 let apply_indent = GenCommon.apply_indent
@@ -889,7 +889,7 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode ~discr_ofs field =
               begin match pointer_slice_opt with
               | Some pointer_slice ->
                   begin match ReaderApi.decode_pointer pointer_slice with
-                  | Pointer.Null -> true
+                  | Capnp.Pointer.Null -> true
                   | _ -> false
                   end
               | None ->
@@ -925,7 +925,7 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode ~discr_ofs field =
               begin match pointer_slice_opt with
               | Some pointer_slice ->
                   begin match ReaderApi.decode_pointer pointer_slice with
-                  | Pointer.Null -> true
+                  | Capnp.Pointer.Null -> true
                   | _ -> false
                   end
               | None ->

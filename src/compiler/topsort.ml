@@ -31,7 +31,9 @@
 open Core.Std
 
 module PS = GenCommon.PS
-module RT = Runtime
+module RT = Capnp.Runtime
+
+let uint64_equal = Capnp.Util.uint64_equal
 
 
 let add_parentage_maps
@@ -71,7 +73,7 @@ let build_parentage_table
 let register_reference ~parentage_table ~edges ~referrer ~referee : unit =
   match Hashtbl.find parentage_table referee with
   | Some parent_referee ->
-      if Util.uint64_equal parent_referee referrer then
+      if uint64_equal parent_referee referrer then
         (* This would be be a reference from a child node to one of its
            grandparents, or a reference between two child nodes.  In the first
            case, this reference is not important for the purpose of topological
@@ -205,7 +207,7 @@ let dump_reference_graph reference_graph =
 
 let has_incoming_edges reference_graph (node_id : Uint64.t) : bool =
   Hashtbl.exists reference_graph ~f:(fun referee_node_ids ->
-    List.mem ~equal:Util.uint64_equal referee_node_ids node_id)
+    List.mem ~equal:uint64_equal referee_node_ids node_id)
 
 
 (* Sort a list of nodes in such a way that the generated ocaml modules will be
