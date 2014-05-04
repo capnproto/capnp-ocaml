@@ -10,7 +10,7 @@ RUNTIME_MODULES =   \
   messageStorage    \
   pointer           \
   reader            \
-  strStorage        \
+  stringStorage     \
   structPointer     \
   util
 

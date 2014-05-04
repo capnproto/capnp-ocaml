@@ -43,7 +43,7 @@ end
 let main () : int =
   let () = In_channel.set_binary_mode In_channel.stdin true in
   let bytes = In_channel.input_all In_channel.stdin in
-  match StrStorage.unpack_single_frame bytes with
+  match StringStorage.unpack_single_frame bytes with
   | Result.Ok (segments, bytes_consumed) ->
       let open M in
       let message = Message.readonly (Message.of_storage segments) in
@@ -58,10 +58,10 @@ let main () : int =
         let () = prerr_endline bs in
         ExitCode.general_error
       end
-  | Result.Error StrStorage.FramingError.Incomplete ->
+  | Result.Error StringStorage.FramingError.Incomplete ->
       let () = Printf.printf "incomplete message\n" in
       ExitCode.general_error
-  | Result.Error StrStorage.FramingError.Unsupported ->
+  | Result.Error StringStorage.FramingError.Unsupported ->
       let () = Printf.printf "unsupported message\n" in
       ExitCode.general_error
 

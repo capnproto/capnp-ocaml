@@ -30,7 +30,7 @@
 
 open Core.Std
 
-module M   = Capnp.Message.Make(Capnp.StrStorage)
+module M   = Capnp.Message.Make(Capnp.StringStorage)
 module PS_ = PluginSchema.Make(M)
 module PS  = PS_.Reader
 module C   = Capnp
