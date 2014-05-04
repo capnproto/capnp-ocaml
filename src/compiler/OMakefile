@@ -27,8 +27,9 @@ compiler-distclean: compiler-clean
 	rm -f *.omc
 
 compiler-install: $(PROGRAM)$(EXE)
-	install --target-directory=$(DESTDIR)/bin $(PROGRAM)$(EXE)
+	mkdir -p $(DESTDIR)$(PREFIX)/bin
+	install --target-directory=$(DESTDIR)$(PREFIX)/bin $(PROGRAM)$(EXE)
 
 compiler-uninstall:
-	rm -f $(DESTDIR)/bin/$(PROGRAM)$(EXE)
+	rm -f $(DESTDIR)$(PREFIX)/bin/$(PROGRAM)$(EXE)
 

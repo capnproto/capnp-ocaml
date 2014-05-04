@@ -11,7 +11,14 @@ OCAMLPACKS[] =  \
 NATIVE_ENABLED = true
 BYTE_ENABLED   = true
 
-DESTDIR = $(getenv DESTDIR, /usr/local)
+PREFIX = $(getenv PREFIX,/usr/local)
+
+if $(defined-env DESTDIR)
+  DESTDIR = $(getenv DESTDIR)/
+  export
+else
+  DESTDIR = $(EMPTY)
+  export
 
 .SUBDIRS: src
 
