@@ -28,46 +28,35 @@
  ******************************************************************************)
 
 
-open Core.Std
-open Capnp
-
-module M  = GenCommon.M
-module PS = GenCommon.PS
-
-module ExitCode = struct
-  let success       = 0
-  let general_error = 1
-  let syntax_error  = 2
+module FramingError : sig
+  type t =
+    | Incomplete    (** less than a full frame is available *)
+    | Unsupported   (** frame header describes a segment count or segment size that
+                        is too large for the implementation *)
 end
 
-let main () : int =
-  let () = In_channel.set_binary_mode In_channel.stdin true in
-  let bytes = In_channel.input_all In_channel.stdin in
-  let module FS = Codecs.FramedStream in
-  let stream = FS.of_string bytes in
-  match FS.get_next_frame stream with
-  | Result.Ok segments ->
-      let () = assert (FS.is_empty stream) in
-      let open M in
-      let message = Message.readonly (Message.of_storage segments) in
-      let request = PS.CodeGeneratorRequest.of_message message in
-      begin try
-        let () = Generate.compile request "dir_name" in
-        ExitCode.success
-      with (Failure msg) as e ->
-        let bs = Exn.backtrace () in
-        let es = Exn.to_string e in
-        let () = prerr_endline es in
-        let () = prerr_endline bs in
-        ExitCode.general_error
-      end
-  | Result.Error Codecs.FramingError.Incomplete ->
-      let () = Printf.printf "incomplete message\n" in
-      ExitCode.general_error
-  | Result.Error Codecs.FramingError.Unsupported ->
-      let () = Printf.printf "unsupported message\n" in
-      ExitCode.general_error
+module FramedStream : sig
+  (** The type of streams containing framed messages. *)
+  type t
 
+  (** [empty ()] returns a new stream containing no data. *)
+  val empty : unit -> t
 
-let () = Pervasives.exit (main ())
+  (** [of_string buf] returns a new stream which is filled with the contents
+      of the given buffer. *)
+  val of_string : string -> t
 
+  (** [add_fragment stream fragment] adds a new fragment to the stream for
+      decoding.  Fragments are processed in FIFO order. *)
+  val add_fragment : t -> string -> unit
+
+  (** [is_empty stream] determines whether or not the stream contains any
+      data which has not yet been fully decoded. *)
+  val is_empty : t -> bool
+
+  (** [get_next_frame] attempts to decode the next frame from the stream.
+      A successful decode removes the data from the stream and returns the
+      frame as a [string list] with one list element for every segment within
+      the message. *)
+  val get_next_frame : t -> (string list, FramingError.t) Core.Std.Result.t
+end

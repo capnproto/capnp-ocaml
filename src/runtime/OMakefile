@@ -2,6 +2,7 @@
 RUNTIME_MODULES =   \
   builder           \
   cArray            \
+  codecs            \
   common            \
   farPointer        \
   innerArray        \
@@ -25,6 +26,7 @@ INSTALL_FILES = \
   libcapnp.cmxa \
   libcapnp.cmxs \
   libcapnp.a \
+  codecs.mli \
   cArray.mli \
   message.mli \
   messageStorage.ml \
