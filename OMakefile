@@ -11,11 +11,18 @@ OCAMLPACKS[] =  \
 NATIVE_ENABLED = true
 BYTE_ENABLED   = true
 
+DESTDIR = $(getenv DESTDIR, /usr/local)
+
 .SUBDIRS: src
 
-.PHONY: clean distclean
+.PHONY: clean distclean install uninstall
+
 clean: runtime-clean compiler-clean
 
 distclean: clean src-distclean runtime-distclean compiler-distclean
 	rm -f *.omc .omakedb .omakedb.lock
+
+install: compiler-install runtime-install
+
+uninstall: compiler-uninstall runtime-uninstall
 

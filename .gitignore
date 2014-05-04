@@ -5,7 +5,9 @@
 *.cmi
 *.cmo
 *.cmx
+*.cma
 *.cmxa
+*.cmxs
 *.byte
 *.native
 *.opt

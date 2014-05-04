@@ -1,4 +1,5 @@
 OCAMLINCLUDES += ../runtime
+OCAML_LIBS += ../runtime/libcapnp
 
 COMP_MODULES =            \
   genCommon               \
@@ -7,22 +8,27 @@ COMP_MODULES =            \
   generate                \
   main                    \
   pluginSchema            \
-  topsort                 \
-  ../runtime/capnpRuntime \
-  ../runtime/capnp
+  topsort
 
-OCamlProgram(capnpc-ocaml, $(COMP_MODULES))
 
 PROGRAM = capnpc-ocaml
 
+OCamlProgram($(PROGRAM), $(COMP_MODULES))
+
 .DEFAULT: $(PROGRAM)$(EXE)
 
-.PHONY: compiler-clean compiler-distclean
+.PHONY: compiler-clean compiler-distclean compiler-install compiler-uninstall
 
 compiler-clean:
 	rm -f $(PROGRAM)$(EXE) $(PROGRAM).opt $(PROGRAM).byte \
-	    *.cmi *.cmo *.cma *.cmx *.cmxa *.a *.o
+	    *.cmi *.cmo *.cmx *.cma *.cmxa *.cmxs *.a *.o
 
 compiler-distclean: compiler-clean
 	rm -f *.omc
+
+compiler-install: $(PROGRAM)$(EXE)
+	install --target-directory=$(DESTDIR)/bin $(PROGRAM)$(EXE)
+
+compiler-uninstall:
+	rm -f $(DESTDIR)/bin/$(PROGRAM)$(EXE)
 

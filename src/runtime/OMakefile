@@ -14,14 +14,41 @@ RUNTIME_MODULES =   \
   structPointer     \
   util
 
+INSTALL_FILES = \
+  capnpRuntime.cmi \
+  capnpRuntime.cmo \
+  capnpRuntime.cmx \
+  capnp.cmi \
+  capnp.cmo \
+  capnp.cmx \
+  libcapnp.cma  \
+  libcapnp.cmxa \
+  libcapnp.cmxs \
+  libcapnp.a \
+  cArray.mli \
+  message.mli \
+  messageStorage.ml \
+  META
+
+libcapnp.cmxs: libcapnp.cmxa
+	ocamlfind ocamlopt -shared -linkall -o $@ $<
+
+OCamlLibrary(libcapnp, capnp capnpRuntime)
+
 OCamlPackage(capnpRuntime, $(RUNTIME_MODULES))
 OCAMLFLAGS += -for-pack CapnpRuntime
 
-.PHONY: runtime-clean runtime-distclean
+.PHONY: runtime-clean runtime-distclean runtime-install runtime-uninstall
 
 runtime-clean:
-	rm -f *.cmi *.cmo *.cma *.cmx *.cmxa *.a *.o
+	rm -f *.cmi *.cmo *.cmx *.cma *.cmxa *.cmxs *.a *.o
 
 runtime-distclean: runtime-clean
 	rm -f *.omc
+
+runtime-install: $(INSTALL_FILES)
+	ocamlfind install capnp $(INSTALL_FILES)
+
+runtime-uninstall:
+	ocamlfind remove capnp
 
