@@ -94,3 +94,17 @@ val serialize_iter : string list -> f:(string -> unit) -> unit
     with a standard serialization framing header. *)
 val serialize : string list -> string
 
+(** [pack_fold message ~init f] generates an ordered sequence of
+    string fragments corresponding to a packed Cap'n Proto message.
+    The return value is the result of folding [f] across the resulting
+    sequence of fragments. *)
+val pack_fold : string list -> init:'acc -> f:('acc -> string -> 'acc) -> 'acc
+
+(** [pack_iter message ~f] generates an ordered sequence of string
+    fragments corresponding to a packed Cap'n Proto message.  [f] is applied
+    to each fragment in turn. *)
+val pack_iter : string list -> f:(string -> unit) -> unit
+
+(** [pack message] constructs a string containing a packed Cap'n Proto message. *)
+val pack : string list -> string
+
