@@ -420,4 +420,41 @@ module PackedStream = struct
 end
 
 
+let make_header message =
+  let buf = Buffer.create 8 in
+  let () = List.iter message ~f:(fun segment ->
+      let size_buf = String.create 4 in
+      let () = StringStorage.set_uint32 size_buf 0
+          (Uint32.of_int (String.length segment))
+      in
+      Buffer.add_string buf size_buf)
+  in
+  let segment_sizes = Buffer.contents buf in
+  let segment_count = (String.length segment_sizes) / 4 in
+  if segment_count = 0 then
+    invalid_arg "make_header requires nonempty message"
+  else
+    let count_buf = String.create 4 in
+    let () = StringStorage.set_uint32 count_buf 0
+        (Uint32.of_int (segment_count - 1))
+    in
+    (* pad out to a word boundary *)
+    if segment_count mod 2 = 0 then
+      count_buf ^ segment_sizes ^ (String.make 4 '\x00')
+    else
+      count_buf ^ segment_sizes
+
+
+let serialize_fold message ~init ~f =
+  let header = make_header message in
+  List.fold_left message ~init:(f init header) ~f
+
+
+let serialize_iter message ~f =
+  serialize_fold message ~init:() ~f:(fun () s -> f s)
+
+
+let serialize message =
+  (make_header message) ^ (String.concat ~sep:"" message)
+
 

@@ -65,9 +65,32 @@ end
 
 module FramedStream : sig
   include DECODER
+
+  (** A streaming decoder for the Cap'n Proto "standard serialization"
+      (non-packed message segments prefixed by framing information). *)
 end
+
 
 module PackedStream : sig
   include DECODER
+
+  (** A streaming decoder for "packed" messages (i.e. messages encoded
+      using "standard serialization" and then compressed with the
+      standard packing method). *)
 end
+
+(** [serialize_fold message ~init f] generates an ordered sequence of
+    string fragments corresponding to a Cap'n Proto framed message
+    using the standard serialization.  The return value is the result
+    of folding [f] across the resulting sequence of fragments. *)
+val serialize_fold : string list -> init:'acc -> f:('acc -> string -> 'acc) -> 'acc
+
+(** [serialize_iter message ~f] generates an ordered sequence of string
+    fragments corresponding to a Cap'n Proto framed message using the standard
+    serialization.  [f] is applied to each fragment in turn. *)
+val serialize_iter : string list -> f:(string -> unit) -> unit
+
+(** [serialize message] constructs a string containing the [message] segments
+    with a standard serialization framing header. *)
+val serialize : string list -> string
 
