@@ -35,7 +35,8 @@ module FramingError : sig
                         is too large for the implementation *)
 end
 
-module FramedStream : sig
+
+module type DECODER = sig
   (** The type of streams containing framed messages. *)
   type t
 
@@ -60,3 +61,13 @@ module FramedStream : sig
       the message. *)
   val get_next_frame : t -> (string list, FramingError.t) Core.Std.Result.t
 end
+
+
+module FramedStream : sig
+  include DECODER
+end
+
+module PackedStream : sig
+  include DECODER
+end
+

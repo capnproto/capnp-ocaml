@@ -60,3 +60,26 @@ let round_up_mult_8 (x : int) : int =
   (x + 7) land (lnot 7)
 
 
+(* I think the semantics of Core_string.slice are kind of dangerous.
+   stop=0 is special-cased in a way which could lead to bugs:
+   [Core_string.slice s 0 0] will return a copy of s, when the user
+   may have intended to generate an empty string.
+
+   This variant parallels the behavior of Python's slicing operator. *)
+let str_slice ?(start : int option) ?(stop : int option) (s : string)
+  : string =
+  let norm s i = Core.Ordered_collection_common.normalize
+      ~length_fun:String.length s i
+  in
+  let real_start =
+    match start with
+    | Some x -> norm s x
+    | None   -> 0
+  in
+  let real_stop =
+    match stop with
+    | Some x -> norm s x
+    | None   -> String.length s
+  in
+  String.sub s real_start (real_stop - real_start)
+
