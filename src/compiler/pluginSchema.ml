@@ -1431,7 +1431,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
           BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:8 v)
         let type_id_set_int_exn x v = type_id_set x (Uint64.of_int v)
           let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
-        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:2 ~pointer_words:1 ()
       end
@@ -1448,7 +1448,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
           BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:8 v)
         let type_id_set_int_exn x v = type_id_set x (Uint64.of_int v)
           let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
-        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:2 ~pointer_words:1 ()
       end
@@ -1466,7 +1466,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         let element_type_init x =
           BA_.get_pointer_field x 0 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1)
           let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
-        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:2 ~pointer_words:1 ()
       end
@@ -1483,7 +1483,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
           BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:8 v)
         let type_id_set_int_exn x v = type_id_set x (Uint64.of_int v)
           let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
-        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:2 ~pointer_words:1 ()
       end
@@ -1580,7 +1580,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         | 18 -> AnyPointer
         | v -> Undefined v
         let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
-      let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+      let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
       let init_root ?message_size () =
         BA_.alloc_root_struct ?message_size ~data_words:2 ~pointer_words:1 ()
     end
@@ -1716,7 +1716,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         | 18 -> AnyPointer (any_pointer_get x)
         | v -> Undefined v
         let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
-      let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+      let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
       let init_root ?message_size () =
         BA_.alloc_root_struct ?message_size ~data_words:2 ~pointer_words:1 ()
     end
@@ -1741,7 +1741,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       let value_init x =
         BA_.get_pointer_field x 0 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1)
         let of_message x = BA_.get_root_struct ~data_words:1 ~pointer_words:1 x
-      let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+      let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
       let init_root ?message_size () =
         BA_.alloc_root_struct ?message_size ~data_words:1 ~pointer_words:1 ()
     end
@@ -1779,7 +1779,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       let annotations_init x n =
         BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n)
         let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:2 x
-      let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+      let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
       let init_root ?message_size () =
         BA_.alloc_root_struct ?message_size ~data_words:3 ~pointer_words:2 ()
     end
@@ -1803,7 +1803,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       let annotations_init x n =
         BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n)
         let of_message x = BA_.get_root_struct ~data_words:1 ~pointer_words:2 x
-      let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+      let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
       let init_root ?message_size () =
         BA_.alloc_root_struct ?message_size ~data_words:1 ~pointer_words:2 ()
     end
@@ -1835,7 +1835,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
           | 1 -> Explicit (explicit_get x)
           | v -> Undefined v
           let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:4 x
-        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:3 ~pointer_words:4 ()
       end
@@ -1852,7 +1852,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
           BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:16 v)
         let type_id_set_int_exn x v = type_id_set x (Uint64.of_int v)
           let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:4 x
-        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:3 ~pointer_words:4 ()
       end
@@ -1889,7 +1889,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         let had_explicit_default_set x v =
           BA_.get_data_field x ~f:(BA_.set_bit ~default:false ~byte_ofs:16 ~bit_ofs:0 v)
           let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:4 x
-        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:3 ~pointer_words:4 ()
       end
@@ -1924,7 +1924,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         BA_.get_data_field x ~f:(BA_.set_uint16 ~default:65535 ~byte_ofs:2 v)
       let ordinal_get x = x
         let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:4 x
-      let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+      let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
       let init_root ?message_size () =
         BA_.alloc_root_struct ?message_size ~data_words:3 ~pointer_words:4 ()
     end
@@ -2012,7 +2012,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         let fields_init x n =
           BA_.get_pointer_field x 3 ~f:(BA_.init_struct_list ~data_words:3 ~pointer_words:4 n)
           let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
-        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:5 ~pointer_words:5 ()
       end
@@ -2028,7 +2028,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         let enumerants_init x n =
           BA_.get_pointer_field x 3 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:2 n)
           let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
-        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:5 ~pointer_words:5 ()
       end
@@ -2094,7 +2094,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         let targets_annotation_set x v =
           BA_.get_data_field x ~f:(BA_.set_bit ~default:false ~byte_ofs:15 ~bit_ofs:3 v)
           let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
-        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:5 ~pointer_words:5 ()
       end
@@ -2120,7 +2120,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         let value_init x =
           BA_.get_pointer_field x 4 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1)
           let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
-        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:5 ~pointer_words:5 ()
       end
@@ -2142,7 +2142,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         let extends_init x n =
           BA_.get_pointer_field x 4 ~f:(BA_.init_uint64_list n)
           let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
-        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:5 ~pointer_words:5 ()
       end
@@ -2163,7 +2163,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
           BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:0 v)
         let id_set_int_exn x v = id_set x (Uint64.of_int v)
           let of_message x = BA_.get_root_struct ~data_words:1 ~pointer_words:1 x
-        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:1 ~pointer_words:1 ()
       end
@@ -2230,7 +2230,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       let annotations_init x n =
         BA_.get_pointer_field x 2 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n)
         let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
-      let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+      let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
       let init_root ?message_size () =
         BA_.alloc_root_struct ?message_size ~data_words:5 ~pointer_words:5 ()
     end
@@ -2261,7 +2261,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
           let name_set x v =
             BA_.get_pointer_field x 0 ~f:(BA_.set_text v)
             let of_message x = BA_.get_root_struct ~data_words:1 ~pointer_words:1 x
-          let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+          let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
           let init_root ?message_size () =
             BA_.alloc_root_struct ?message_size ~data_words:1 ~pointer_words:1 ()
         end
@@ -2283,7 +2283,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         let imports_init x n =
           BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n)
           let of_message x = BA_.get_root_struct ~data_words:1 ~pointer_words:2 x
-        let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:1 ~pointer_words:2 ()
       end
@@ -2300,7 +2300,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       let requested_files_init x n =
         BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:2 n)
         let of_message x = BA_.get_root_struct ~data_words:0 ~pointer_words:2 x
-      let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg
+      let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
       let init_root ?message_size () =
         BA_.alloc_root_struct ?message_size ~data_words:0 ~pointer_words:2 ()
     end
