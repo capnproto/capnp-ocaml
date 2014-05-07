@@ -234,7 +234,7 @@ module FramedStream = struct
           let segment_count = 1 + (Uint32.to_int segment_count_u32) in
           let frame_header_size =
             let word_size = 8 in
-            (Util.ceil_int (4 * (segment_count + 1)) word_size) * word_size
+            (Util.ceil_ratio (4 * (segment_count + 1)) word_size) * word_size
           in
           (* Now we know the full header, so try to get the whole thing *)
           begin match FragmentBuffer.remove_exact stream.fragment_buffer

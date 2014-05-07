@@ -33,6 +33,8 @@
 
 open Core.Std
 
+let sizeof_uint64 = Common.sizeof_uint64
+
 module Make (MessageWrapper : Message.S) = struct
   module RC = Common.Make(MessageWrapper)
   include RC

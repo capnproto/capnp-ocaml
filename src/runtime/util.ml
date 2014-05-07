@@ -50,7 +50,8 @@ let encode_signed n num =
     (1 lsl (n - 1)) + num
 
 
-let ceil_int num denom = (num + denom - 1) / denom
+(* [ceil_ratio n m] computes ceiling(n/m) *)
+let ceil_ratio num denom = (num + denom - 1) / denom
 
 
 let uint64_equal a b : bool = Uint64.compare a b = 0

@@ -1,6 +1,7 @@
 
 RUNTIME_MODULES =   \
   builder           \
+  builderOps        \
   cArray            \
   codecs            \
   common            \
