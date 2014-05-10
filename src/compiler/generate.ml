@@ -60,6 +60,7 @@ let sig_s_divide_reader_builder = [
 let sig_s_footer = [
   "  end";
   "end";
+  "";
 ]
 
 
@@ -81,6 +82,10 @@ let mod_header = [
   "  module BA_ = Runtime.Builder.Make(MessageWrapper)";
   "";
   "  type 'cap message_t = 'cap MessageWrapper.Message.t";
+  "";
+]
+
+let mod_reader_header = [
   "";
   "  module Reader = struct";
   "    type array_t = ro RA_.ListStorage.t";
@@ -153,18 +158,30 @@ let compile
       string_of_lines (sig_s @ functor_sig)
     in
     let mod_file_content =
-      string_of_lines (
-        sig_s @
-        mod_header @
-        (GenCommon.apply_indent ~indent:"    "
+      let defaults_context =
+        GenModules.build_defaults_context ~nodes_table requested_file_node
+      in
+      let reader_body =
+        GenCommon.apply_indent ~indent:"    "
           (GenModules.generate_node ~suppress_module_wrapper:true ~nodes_table
              ~scope:[] ~mode:Mode.Reader ~node_name:requested_filename
-             requested_file_node)) @
-        mod_divide_reader_builder @
-        (GenCommon.apply_indent ~indent:"    "
+             requested_file_node)
+      in
+      let builder_body =
+        GenCommon.apply_indent ~indent:"    "
           (GenModules.generate_node ~suppress_module_wrapper:true ~nodes_table
              ~scope:[] ~mode:Mode.Builder ~node_name:requested_filename
-             requested_file_node)) @
+             requested_file_node)
+      in
+      let builder_defaults = Defaults.gen_builder_defaults defaults_context in
+      string_of_lines (
+        sig_s @
+        builder_defaults @
+        mod_header @
+        mod_reader_header @
+        reader_body @
+        mod_divide_reader_builder @
+        builder_body @
         mod_footer)
     in
     let () = Out_channel.with_file (mli_filename requested_filename)

@@ -2,6 +2,7 @@ OCAMLINCLUDES += ../runtime
 OCAML_LIBS += ../runtime/libcapnp
 
 COMP_MODULES =            \
+  defaults                \
   genCommon               \
   genModules              \
   genSignatures           \

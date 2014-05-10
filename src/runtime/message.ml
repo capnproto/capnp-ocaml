@@ -177,6 +177,9 @@ module type SLICE = sig
   (** [get_end slice] computes [slice.start] + [slice.len]. *)
   val get_end : 'cap t -> int
 
+  (** [readonly s] obtains a view of slice [s] which is read-only qualified. *)
+  val readonly : 'cap t -> ro t
+
   (** [get_uintXX s ofs] reads an unsigned integer of the specified width,
       starting at byte offset [ofs] within the [slice]. *)
 

@@ -33,7 +33,8 @@ open Core.Std
 module PS        = GenCommon.PS
 module Mode      = GenCommon.Mode
 module C         = Capnp
-module ReaderApi = C.Runtime.Common.Make(GenCommon.M)
+module RC        = C.Runtime.Common.Make(GenCommon.M)
+module ReaderApi = C.Runtime.Reader.Make(GenCommon.M)
 
 let sprintf = Printf.sprintf
 let apply_indent = GenCommon.apply_indent
@@ -888,7 +889,7 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode ~discr_ofs field =
             let has_trivial_default =
               begin match pointer_slice_opt with
               | Some pointer_slice ->
-                  begin match ReaderApi.decode_pointer pointer_slice with
+                  begin match RC.decode_pointer pointer_slice with
                   | Capnp.Runtime.Pointer.Null -> true
                   | _ -> false
                   end
@@ -921,71 +922,72 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode ~discr_ofs field =
             in
             (getters, setters)
         | (PS.Type.Struct struct_def, PS.Value.Struct pointer_slice_opt) ->
-            let has_trivial_default =
-              begin match pointer_slice_opt with
+            let reader_default_str, builder_default_str  =
+              match pointer_slice_opt with
               | Some pointer_slice ->
-                  begin match ReaderApi.decode_pointer pointer_slice with
-                  | Capnp.Runtime.Pointer.Null -> true
-                  | _ -> false
+                  begin match ReaderApi.deref_struct_pointer pointer_slice with
+                  | Some default_storage ->
+                      let node_id = PS.Type.Struct.type_id_get struct_def in
+                      let ident = Defaults.make_ident node_id field_name in
+                      ("", " ~default:" ^ (Defaults.builder_string_of_ident ident))
+                  | None ->
+                      ("", "")
                   end
               | None ->
-                  true
-              end
+                  ("", "")
             in
-            if has_trivial_default then
-              let data_words, pointer_words =
-                let id = PS.Type.Struct.type_id_get struct_def in
-                let node = Hashtbl.find_exn nodes_table id in
-                match PS.Node.get node with
-                | PS.Node.Struct struct_def ->
-                    (PS.Node.Struct.data_word_count_get struct_def,
-                     PS.Node.Struct.pointer_count_get struct_def)
-                | _ ->
-                    failwith
-                      "Decoded non-struct node where struct node was expected."
-              in
-              let getters =
-                match mode with
-                | Mode.Reader -> [
-                    "let " ^ field_name ^ "_get x =";
-                    sprintf "  RA_.get_pointer_field x %u ~f:RA_.get_struct"
-                      field_ofs;
-                  ]
-                | Mode.Builder -> [
-                    "let " ^ field_name ^ "_get x =";
-                    sprintf "  BA_.get_pointer_field x %u \
-                             ~f:(BA_.get_struct ~data_words:%u ~pointer_words:%u)"
-                      field_ofs
-                      data_words
-                      pointer_words;
-                  ]
-              in
-              let setters = [
-                "let " ^ field_name ^ "_set_reader x v =";
-                sprintf "  BA_.get_pointer_field %sx %u \
-                         ~f:(BA_.set_struct ~data_words:%u ~pointer_words:%u v)"
-                  discr_str
-                  field_ofs
-                  data_words
-                  pointer_words;
-                "let " ^ field_name ^ "_set_builder x v =";
-                sprintf "  BA_.get_pointer_field %sx %u \
-                         ~f:(BA_.set_struct ~data_words:%u ~pointer_words:%u (Some v))"
-                  discr_str
-                  field_ofs
-                  data_words
-                  pointer_words;
-                "let " ^ field_name ^ "_init x =";
-                sprintf "  BA_.get_pointer_field %sx %u \
-                         ~f:(BA_.init_struct ~data_words:%u ~pointer_words:%u)"
-                  discr_str
-                  field_ofs
-                  data_words
-                  pointer_words;
-              ] in
-              (getters, setters)
-            else
-              failwith "Default values for structs are not implemented."
+            let data_words, pointer_words =
+              let id = PS.Type.Struct.type_id_get struct_def in
+              let node = Hashtbl.find_exn nodes_table id in
+              match PS.Node.get node with
+              | PS.Node.Struct struct_def ->
+                  (PS.Node.Struct.data_word_count_get struct_def,
+                   PS.Node.Struct.pointer_count_get struct_def)
+              | _ ->
+                  failwith
+                    "Decoded non-struct node where struct node was expected."
+            in
+            let getters =
+              match mode with
+              | Mode.Reader -> [
+                  "let " ^ field_name ^ "_get x =";
+                  sprintf "  RA_.get_pointer_field x %u ~f:(RA_.get_struct%s)"
+                    field_ofs reader_default_str;
+                ]
+              | Mode.Builder -> [
+                  "let " ^ field_name ^ "_get x =";
+                  sprintf "  BA_.get_pointer_field x %u \
+                           ~f:(BA_.get_struct%s ~data_words:%u ~pointer_words:%u)"
+                    field_ofs
+                    builder_default_str
+                    data_words
+                    pointer_words;
+                ]
+            in
+            let setters = [
+              "let " ^ field_name ^ "_set_reader x v =";
+              sprintf "  BA_.get_pointer_field %sx %u \
+                       ~f:(BA_.set_struct ~data_words:%u ~pointer_words:%u v)"
+                discr_str
+                field_ofs
+                data_words
+                pointer_words;
+              "let " ^ field_name ^ "_set_builder x v =";
+              sprintf "  BA_.get_pointer_field %sx %u \
+                       ~f:(BA_.set_struct ~data_words:%u ~pointer_words:%u (Some v))"
+                discr_str
+                field_ofs
+                data_words
+                pointer_words;
+              "let " ^ field_name ^ "_init x =";
+              sprintf "  BA_.get_pointer_field %sx %u \
+                       ~f:(BA_.init_struct ~data_words:%u ~pointer_words:%u)"
+                discr_str
+                field_ofs
+                data_words
+                pointer_words;
+            ] in
+            (getters, setters)
         | (PS.Type.Interface iface_def, PS.Value.Interface) ->
             let getters = [
               "let " ^ field_name ^
@@ -1100,9 +1102,7 @@ let generate_union_getter ~nodes_table ~scope ~mode struct_def fields =
 let generate_accessors ~nodes_table ~scope ~mode struct_def fields =
   let discr_ofs = PS.Node.Struct.discriminant_offset_get_int_exn struct_def in
   List.fold_left fields ~init:[] ~f:(fun acc field ->
-    let x = generate_one_field_accessors ~nodes_table ~scope ~mode
-        ~discr_ofs field
-    in
+    let x = generate_one_field_accessors ~nodes_table ~scope ~mode ~discr_ofs field in
     x @ acc)
 
 
@@ -1169,7 +1169,7 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~mode
           sprintf "  let of_message x = BA_.get_root_struct \
                    ~data_words:%u ~pointer_words:%u x"
             data_words pointer_words;
-          "let to_message x = x.BA_.StructStorage.data.MessageWrapper.Slice.msg";
+          "let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg";
           "let init_root ?message_size () =";
           sprintf "  BA_.alloc_root_struct ?message_size \
                    ~data_words:%u ~pointer_words:%u ()"
@@ -1251,4 +1251,72 @@ and generate_node
       generate_nested_modules ()
   | PS.Node.Undefined x ->
       failwith (sprintf "Unknown Node union discriminant %u" x)
+
+
+(* Update the default-value context with default values associated with
+   the specified struct. *)
+let update_defaults_context ~nodes_table ~context ~node ~struct_def =
+  let fields = PS.Node.Struct.fields_get struct_def in
+  C.Array.iter fields ~f:(fun field ->
+    let field_name = GenCommon.underscore_name (PS.Field.name_get field) in
+    let open PS.Field in
+    match PS.Field.get field with
+    | PS.Field.Group group ->
+        ()
+    | PS.Field.Slot slot ->
+        let tp = PS.Field.Slot.type_get slot in
+        let default = PS.Field.Slot.default_value_get slot in
+        begin match (PS.Type.get tp, PS.Value.get default) with
+        | (PS.Type.Struct struct_def, PS.Value.Struct pointer_slice_opt) ->
+            begin match pointer_slice_opt with
+            | Some pointer_slice ->
+                begin match ReaderApi.deref_struct_pointer pointer_slice with
+                | Some default_storage ->
+                    let node_id = PS.Type.Struct.type_id_get struct_def in
+                    let ident = Defaults.make_ident node_id field_name in
+                    Defaults.add_struct context ident default_storage
+                | None ->
+                    ()
+                end
+            | None ->
+                ()
+            end
+        | _ ->
+            ()
+        end
+    | PS.Field.Undefined x ->
+        failwith (sprintf "Unknown Field union discriminant %u." x))
+
+
+(* Construct new context for managing struct and list default values,
+   and fill the context with all the default values associated with the
+   node (recursively). *)
+let rec build_defaults_context
+    ?(context : Defaults.t option)
+    ~(nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
+    (node : PS.Node.t)
+  : Defaults.t =
+  let ctx =
+    match context with
+    | Some x -> x
+    | None -> Defaults.create ()
+  in
+  let child_nodes = GenCommon.children_of nodes_table node in
+  let () = List.iter child_nodes ~f:(fun child_node ->
+    let _ = build_defaults_context ~context:ctx ~nodes_table child_node in ())
+  in
+  match PS.Node.get node with
+  | PS.Node.Struct struct_def ->
+      let () = update_defaults_context ~nodes_table ~context:ctx ~node ~struct_def in
+      ctx
+  | PS.Node.File
+  | PS.Node.Enum _
+  | PS.Node.Interface _
+  | PS.Node.Const _
+  | PS.Node.Annotation _ ->
+      ctx
+  | PS.Node.Undefined x ->
+      failwith (sprintf "Unknown Node union discriminant %u" x)
+
+
 

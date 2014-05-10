@@ -68,6 +68,18 @@ module ListStorageType = struct
     | Pointer -> 8
     | Composite (data_words, pointer_words) ->
         (data_words + pointer_words) * sizeof_uint64
+
+  let to_string storage_type =
+    match storage_type with
+    | Empty   -> "ListStorageType.Empty"
+    | Bit     -> "ListStorageType.Bit"
+    | Bytes1  -> "ListStorageType.Bytes1"
+    | Bytes2  -> "ListStorageType.Bytes2"
+    | Bytes4  -> "ListStorageType.Bytes4"
+    | Bytes8  -> "ListStorageType.Bytes8"
+    | Pointer -> "ListStorageType.Pointer"
+    | Composite (dw, pw) ->
+        Printf.sprintf "(ListStorageType.Composite (%u, %u))" dw pw
 end
 
 
