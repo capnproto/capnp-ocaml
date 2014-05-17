@@ -840,6 +840,7 @@ module type S = sig
     end
   end
 end
+
 module Make (MessageWrapper : Capnp.Message.S) :
   (S with type 'cap message_t = 'cap MessageWrapper.Message.t
     and type Reader.pointer_t = ro MessageWrapper.Slice.t option

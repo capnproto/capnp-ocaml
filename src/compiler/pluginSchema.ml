@@ -840,6 +840,21 @@ module type S = sig
     end
   end
 end
+
+module DefaultsMessage_ = Capnp.Runtime.Builder.DefaultsMessage
+module DefaultsCommon_  = Capnp.Runtime.Builder.DC
+
+let _builder_defaults_message =
+  let message_segments = [
+    "\
+    \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
+    \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
+    \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
+    \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+  ] in
+  DefaultsMessage_.Message.readonly
+    (DefaultsMessage_.Message.of_storage message_segments)
+
 module Make (MessageWrapper : Capnp.Message.S) = struct
   open Capnp
 
@@ -850,10 +865,18 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
 
   type 'cap message_t = 'cap MessageWrapper.Message.t
 
+
   module Reader = struct
     type array_t = ro RA_.ListStorage.t
     type builder_array_t = rw RA_.ListStorage.t
     type pointer_t = ro MessageWrapper.Slice.t option
+
+    module DefaultsCopier_ =
+      Runtime.BuilderOps.Make(Runtime.Builder.DefaultsMessage)(MessageWrapper)
+
+    let _reader_defaults_message =
+      MessageWrapper.Message.create
+        (DefaultsMessage_.Message.total_size _builder_defaults_message)
 
     module ElementSize = struct
       type t =
@@ -900,7 +923,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         type t_List_9792858745991129751 = t
         type builder_t_List_9792858745991129751 = builder_t
         let element_type_get x =
-          RA_.get_pointer_field x 0 ~f:RA_.get_struct
+          RA_.get_pointer_field x 0 ~f:(RA_.get_struct)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       end
       module Struct = struct
@@ -1082,7 +1105,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       let id_get_int_exn x =
         Uint64.to_int (id_get x)
       let value_get x =
-        RA_.get_pointer_field x 0 ~f:RA_.get_struct
+        RA_.get_pointer_field x 0 ~f:(RA_.get_struct)
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
     end
     module Method = struct
@@ -1165,9 +1188,9 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         let offset_get_int_exn x =
           Uint32.to_int (offset_get x)
         let type_get x =
-          RA_.get_pointer_field x 2 ~f:RA_.get_struct
+          RA_.get_pointer_field x 2 ~f:(RA_.get_struct)
         let default_value_get x =
-          RA_.get_pointer_field x 3 ~f:RA_.get_struct
+          RA_.get_pointer_field x 3 ~f:(RA_.get_struct)
         let had_explicit_default_get x =
           RA_.get_data_field x ~f:(RA_.get_bit ~default:false ~byte_ofs:16 ~bit_ofs:0)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -1250,7 +1273,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         type t_Annotation_17011813041836786320 = t
         type builder_t_Annotation_17011813041836786320 = builder_t
         let type_get x =
-          RA_.get_pointer_field x 3 ~f:RA_.get_struct
+          RA_.get_pointer_field x 3 ~f:(RA_.get_struct)
         let targets_file_get x =
           RA_.get_data_field x ~f:(RA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:0)
         let targets_const_get x =
@@ -1283,9 +1306,9 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         type t_Const_12793219851699983392 = t
         type builder_t_Const_12793219851699983392 = builder_t
         let type_get x =
-          RA_.get_pointer_field x 3 ~f:RA_.get_struct
+          RA_.get_pointer_field x 3 ~f:(RA_.get_struct)
         let value_get x =
-          RA_.get_pointer_field x 4 ~f:RA_.get_struct
+          RA_.get_pointer_field x 4 ~f:(RA_.get_struct)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       end
       module Interface = struct
