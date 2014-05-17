@@ -131,6 +131,11 @@ module Make (MessageWrapper : Message.S) = struct
       else
         None
 
+    let readonly (struct_storage : 'cap t) : ro t = {
+      data     = Slice.readonly struct_storage.data;
+      pointers = Slice.readonly struct_storage.pointers;
+    }
+
   end
 
 
@@ -140,6 +145,12 @@ module Make (MessageWrapper : Message.S) = struct
       storage      : 'cap Slice.t;      (** Range of bytes used to hold list elements *)
       storage_type : ListStorageType.t; (** Describes the list packing format *)
       num_elements : int;               (** Number of list elements *)
+    }
+
+    let readonly (list_storage : 'cap t) : ro t = {
+      storage      = Slice.readonly list_storage.storage;
+      storage_type = list_storage.storage_type;
+      num_elements = list_storage.num_elements;
     }
   end
 

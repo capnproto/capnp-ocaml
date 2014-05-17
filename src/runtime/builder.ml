@@ -42,18 +42,18 @@ let invalid_msg = Message.invalid_msg
 
 let sizeof_uint64 = Common.sizeof_uint64
 
+(* "DefaultsMessage" meaning "the type of messages that store default values" *)
+module DefaultsMessage = Message.Make(StringStorage)
+module DC = Common.Make(DefaultsMessage)
+
 (* NM == "native message" *)
 module Make (NM : Message.S) = struct
   module RReader = Reader.Make(NM)
   module NC = Common.Make(NM)
 
-  (* "DefaultMessage" meaning "the type of messages that store default values" *)
-  module DefaultMessage = Message.Make(StringStorage)
-  module DC = Common.Make(DefaultMessage)
-
-  (* DefaultCopier will provide algorithms for making deep copies of default
-     data from DefaultMessage storage into native storage *)
-  module DefaultCopier = BuilderOps.Make(DefaultMessage)(NM)
+  (* DefaultsCopier will provide algorithms for making deep copies of default
+     data from DefaultsMessage storage into native storage *)
+  module DefaultsCopier = BuilderOps.Make(DefaultsMessage)(NM)
 
   (* Most of the Builder operations need to copy from native storage back into
      native storage *)
@@ -503,7 +503,7 @@ module Make (NM : Message.S) = struct
     let create_default message =
       match default with
       | Some default_storage ->
-          DefaultCopier.deep_copy_list ?struct_sizes
+          DefaultsCopier.deep_copy_list ?struct_sizes
             ~src:default_storage ~dest_message:message ()
       | None ->
           BOps.alloc_list_storage message storage_type 0
@@ -633,7 +633,7 @@ module Make (NM : Message.S) = struct
     let create_default message =
       match default with
       | Some default_storage ->
-          DefaultCopier.deep_copy_struct ~src:default_storage ~dest_message:message
+          DefaultsCopier.deep_copy_struct ~src:default_storage ~dest_message:message
             ~data_words ~pointer_words
       | None ->
           BOps.alloc_struct_storage message ~data_words ~pointer_words

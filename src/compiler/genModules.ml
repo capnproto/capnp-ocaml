@@ -929,7 +929,8 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode ~discr_ofs field =
                   | Some default_storage ->
                       let node_id = PS.Type.Struct.type_id_get struct_def in
                       let ident = Defaults.make_ident node_id field_name in
-                      ("", " ~default:" ^ (Defaults.builder_string_of_ident ident))
+                      (" ~default:" ^ (Defaults.reader_string_of_ident ident),
+                       " ~default:" ^ (Defaults.builder_string_of_ident ident))
                   | None ->
                       ("", "")
                   end

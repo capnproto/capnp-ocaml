@@ -124,6 +124,10 @@ module type MESSAGE = sig
   (** [num_segments m] obtains the number of segments associated with message [m]. *)
   val num_segments : 'cap t -> int
 
+  (** [total_size m] gets the total size of the message, in bytes, across all
+      segments. *)
+  val total_size : 'cap t -> int
+
   (** [get_segment m i] gets zero-indexed segment [i] associated with message [m].
       @raise [Invalid_argument] if the index is out of bounds. *)
   val get_segment : 'cap t -> int -> 'cap segment_t
@@ -174,6 +178,9 @@ module type SLICE = sig
 
   (** [get_end slice] computes [slice.start] + [slice.len]. *)
   val get_end : 'cap t -> int
+
+  (** [readonly s] obtains a view of slice [s] which is read-only qualified. *)
+  val readonly : 'cap t -> ro t
 
   (** [get_uintXX s ofs] reads an unsigned integer of the specified width,
       starting at byte offset [ofs] within the [slice]. *)

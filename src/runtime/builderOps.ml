@@ -47,7 +47,7 @@ end
 (* ROM == "Read-Only Message"
    RWM == "Read/Write Message"
 
-   Most of the builder operations are tied to the DM types.  The exceptional
+   Most of the builder operations are tied to the RWM types.  The exceptional
    cases are functions that make a copy from a source to a destination. *)
 module Make (ROM : Message.S) (RWM : Message.S) = struct
   module ROC = Common.Make(ROM)

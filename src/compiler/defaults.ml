@@ -157,7 +157,7 @@ let emit_literal_seg (segment : string) (wrap : int) : string list =
 
 (* Generate appropriate code for instantiating a message which contains
    all the struct and list default values. *)
-let emit_instantiate_message message : string list =
+let emit_instantiate_builder_message message : string list =
   let message_segment_literals =
     let strings = M.Message.to_storage message in
     (* 64 characters works out to 16 bytes per line. *)
@@ -165,14 +165,14 @@ let emit_instantiate_message message : string list =
     List.fold_left (List.rev strings) ~init:[] ~f:(fun acc seg ->
       (emit_literal_seg seg wrap_chars) @ acc)
   in [
-    "module DefaultsMessage_ = Capnp.Message.Make(Capnp.StringStorage)";
-    "module DefaultsCommon_  = Capnp.Runtime.Common.Make(DefaultsMessage_)";
+    "module DefaultsMessage_ = Capnp.Runtime.Builder.DefaultsMessage";
+    "module DefaultsCommon_  = Capnp.Runtime.Builder.DC";
     "";
     "let _builder_defaults_message =";
     "  let message_segments = ["; ] @
     (GenCommon.apply_indent ~indent:"    " message_segment_literals) @ [
     "  ] in";
-    "  DefaultsMessage_.Message.readonly ";
+    "  DefaultsMessage_.Message.readonly";
     "    (DefaultsMessage_.Message.of_storage message_segments)";
     "";
   ]
@@ -180,7 +180,7 @@ let emit_instantiate_message message : string list =
 
 (* Generate code which instantiates struct descriptors for struct defaults
    stored in the message. *)
-let emit_instantiate_structs struct_array : string list =
+let emit_instantiate_builder_structs struct_array : string list =
   Res.Array.fold_right (fun (ident, struct_storage) acc ->
     let open DC.StructStorage in [
       "let " ^ (builder_string_of_ident ident) ^ " = {";
@@ -211,7 +211,7 @@ let emit_instantiate_structs struct_array : string list =
 
 (* Generate code which instantiates list descriptors for list defaults
    stored in the message. *)
-let emit_instantiate_lists list_array : string list =
+let emit_instantiate_builder_lists list_array : string list =
   Res.Array.fold_right (fun (ident, list_storage) acc ->
     let open DC.ListStorage in [
       "let " ^ (builder_string_of_ident ident) ^ " = {";
@@ -235,10 +235,60 @@ let emit_instantiate_lists list_array : string list =
 
 
 let gen_builder_defaults defaults =
-  (emit_instantiate_message defaults.message) @
-    (emit_instantiate_structs defaults.structs) @
-    (emit_instantiate_lists defaults.lists)
+  (emit_instantiate_builder_message defaults.message) @
+    (emit_instantiate_builder_structs defaults.structs) @
+    (emit_instantiate_builder_lists defaults.lists)
 
 
-let gen_reader_defaults defaults = []
+(* Generate code for instantiating a defaults storage message
+   using the same native storage type as the functor parameter. *)
+let emit_instantiate_reader_message () = [
+  "module DefaultsCopier_ =";
+  "  Runtime.BuilderOps.Make(Runtime.Builder.DefaultsMessage)(MessageWrapper)";
+  "";
+  "let _reader_defaults_message =";
+  "  MessageWrapper.Message.create";
+  "    (DefaultsMessage_.Message.total_size _builder_defaults_message)";
+  "";
+]
+
+
+let emit_instantiate_reader_structs struct_array =
+  Res.Array.fold_left (fun acc (ident, struct_storage) -> [
+      "let " ^ (reader_string_of_ident ident) ^ " =";
+      "  let data_words =";
+      "    let def = " ^ (builder_string_of_ident ident) ^ " in";
+      "    let data_slice = def.DefaultsCommon_.StructStorage.data in";
+      "    data_slice.DefaultsMessage_.Slice.len / 8";
+      "  in";
+      "  let pointer_words =";
+      "    let def = " ^ (builder_string_of_ident ident) ^ " in";
+      "    let pointers_slice = def.DefaultsCommon_.StructStorage.pointers in";
+      "    pointers_slice.DefaultsMessage_.Slice.len / 8";
+      "  in";
+      "  DefaultsCopier_.RWC.StructStorage.readonly";
+      "    (DefaultsCopier_.deep_copy_struct ~src:" ^ (builder_string_of_ident ident);
+      "    ~dest_message:_reader_defaults_message ~data_words ~pointer_words)";
+      "";
+    ] @ acc)
+    []
+    struct_array
+
+
+let emit_instantiate_reader_lists list_array =
+  Res.Array.fold_left (fun acc (ident, list_storage) -> [
+      "let " ^ (reader_string_of_ident ident) ^ " =";
+      "  DefaultsCopier_.RWC.ListStorage.readonly";
+      "    (DefaultsCopier_.deep_copy_list ~src:" ^ (builder_string_of_ident ident);
+      "    ~dest_message:_reader_defaults_message)";
+      "";
+    ] @ acc)
+    []
+    list_array
+
+
+let gen_reader_defaults defaults =
+  (emit_instantiate_reader_message ()) @
+    (emit_instantiate_reader_structs defaults.structs) @
+    (emit_instantiate_reader_lists defaults.lists)
 

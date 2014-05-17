@@ -126,6 +126,10 @@ module type MESSAGE = sig
   (** [num_segments m] obtains the number of segments associated with message [m]. *)
   val num_segments : 'cap t -> int
 
+  (** [total_size m] gets the total size of the message, in bytes, across all
+      segments. *)
+  val total_size : 'cap t -> int
+
   (** [get_segment m i] gets zero-indexed segment [i] associated with message [m].
       @raise [Invalid_argument] if the index is out of bounds. *)
   val get_segment : 'cap t -> int -> 'cap segment_t
@@ -176,6 +180,9 @@ module type SLICE = sig
 
   (** [get_end slice] computes [slice.start] + [slice.len]. *)
   val get_end : 'cap t -> int
+ 
+  (** [readonly s] obtains a view of slice [s] which is read-only qualified. *)
+  val readonly : 'cap t -> ro t
 
   (** [readonly s] obtains a view of slice [s] which is read-only qualified. *)
   val readonly : 'cap t -> ro t
@@ -298,6 +305,9 @@ module Make (Storage : MessageStorage.S) = struct
 
     let num_segments = Res.Array.length
 
+    let total_size m =
+      Res.Array.fold_left (fun acc x -> acc + (Segment.length x.segment)) 0 m
+
     let get_segment m i = (Res.Array.get m i).segment
 
     (** [get_size m] computes the aggregate size of the message, in bytes. *)
@@ -391,6 +401,11 @@ module Make (Storage : MessageStorage.S) = struct
     let get_segment slice = Message.get_segment slice.msg slice.segment_id
 
     let get_end slice = slice.start + slice.len
+
+    let readonly slice = {
+      slice with
+      msg = Message.readonly slice.msg;
+    }
 
     let get_uint8 slice i =
       if i < 0 || i > slice.len - 1 then
