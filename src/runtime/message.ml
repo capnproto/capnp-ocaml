@@ -345,6 +345,7 @@ module Make (Storage : MessageStorage.S) = struct
          last segment, with no attempt to go back and do best-fit on previous
          segments.  This wastes memory, but unallocated regions will pack
          very efficiently. *)
+      let size = Util.round_up_mult_8 size in
       let segment_id, segment_descr =
         let last_seg_id = Res.Array.length m - 1 in
         let last_seg_descr = Res.Array.get m last_seg_id in
@@ -370,13 +371,14 @@ module Make (Storage : MessageStorage.S) = struct
       } in
       let () = Res.Array.set m segment_id
         { segment_descr with
-          Message.free_start = Util.round_up_mult_8 (slice.start + slice.len) }
+          Message.free_start = slice.start + slice.len }
       in
       (* Allocations should be eight-byte aligned *)
       let () = assert ((slice.start land 7) = 0) in
       slice
 
     let alloc_in_segment m segment_id size =
+      let size = Util.round_up_mult_8 size in
       let seg_descr = Res.Array.get m segment_id in
       let bytes_avail = Storage.length seg_descr.Message.segment -
           seg_descr.Message.free_start
@@ -390,7 +392,7 @@ module Make (Storage : MessageStorage.S) = struct
         } in
         let () = Res.Array.set m segment_id
           { seg_descr with
-            Message.free_start = Util.round_up_mult_8 (slice.start + slice.len) }
+            Message.free_start = slice.start + slice.len }
         in
         (* Allocations should be eight-byte aligned *)
         let () = assert ((slice.start land 7) = 0) in
