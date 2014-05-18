@@ -381,15 +381,17 @@ let rec generate_list_element_codecs ~nodes_table ~scope list_def =
 
 (* Generate an accessor for retrieving a list of the given type. *)
 let generate_list_getter ~nodes_table ~scope ~list_type ~mode
-    ~field_name ~field_ofs =
+    ~field_name ~field_ofs ~default_str =
   let api_module = api_of_mode mode in
   let make_primitive_accessor element_name = [
       "let " ^ field_name ^ "_get x =";
-      sprintf "  %s.get_pointer_field x %u ~f:%s.get_%s_list"
+      sprintf "  %s.get_pointer_field x %u ~f:(%s.get_%s_list%s)"
         api_module
         field_ofs
         api_module
-        element_name;
+        element_name
+        default_str
+      ;
     ]
   in
   let open PS.Type in
@@ -412,8 +414,8 @@ let generate_list_getter ~nodes_table ~scope ~list_type ~mode
       begin match mode with
       | Mode.Reader -> [
           "let " ^ field_name ^ "_get x =";
-          sprintf "  RA_.get_pointer_field x %u ~f:RA_.get_struct_list"
-            field_ofs;
+          sprintf "  RA_.get_pointer_field x %u ~f:(RA_.get_struct_list%s)"
+            field_ofs default_str;
         ]
       | Mode.Builder ->
           let data_words, pointer_words =
@@ -429,8 +431,9 @@ let generate_list_getter ~nodes_table ~scope ~list_type ~mode
           in [
             "let " ^ field_name ^ "_get x =";
             sprintf "  BA_.get_pointer_field x %u \
-                     ~f:(BA_.get_struct_list ~data_words:%u ~pointer_words:%u)"
+                     ~f:(BA_.get_struct_list%s ~data_words:%u ~pointer_words:%u)"
               field_ofs
+              default_str
               data_words
               pointer_words;
           ]
@@ -442,10 +445,11 @@ let generate_list_getter ~nodes_table ~scope ~list_type ~mode
       in [
         "let " ^ field_name ^ "_get x =";
       ] @ decoder_declaration @ [
-        sprintf "  %s.get_pointer_field x %u ~f:(%s.get_list decoders)"
+        sprintf "  %s.get_pointer_field x %u ~f:(%s.get_list%s decoders)"
           api_module
           field_ofs
-          api_module;
+          api_module
+          default_str;
       ]
   | Enum enum_def ->
       let enum_id = Enum.type_id_get enum_def in
@@ -457,8 +461,8 @@ let generate_list_getter ~nodes_table ~scope ~list_type ~mode
         "let " ^ field_name ^ "_get x =";
         "  let enum_decoder ="; ] @ decoder_lambda @ [
         "  in";
-        sprintf "  %s.get_pointer_field x %u f:(%s.get_list "
-          api_module field_ofs api_module;
+        sprintf "  %s.get_pointer_field x %u f:(%s.get_list%s "
+          api_module field_ofs api_module default_str;
         "    (RA_.ListDecoders.Bytes2 enum_decoder))";
         ]
   | Interface _ -> [
@@ -585,7 +589,8 @@ let generate_list_setters ~nodes_table ~scope ~list_type
        failwith (sprintf "Unknown Type union discriminant %d" x)
 
 
-let generate_one_field_accessors ~nodes_table ~scope ~mode ~discr_ofs field =
+let generate_one_field_accessors ~nodes_table ~node_id ~scope
+    ~mode ~discr_ofs field =
   let api_module = api_of_mode mode in
   let field_name = GenCommon.underscore_name (PS.Field.name_get field) in
   let discr_str =
@@ -886,28 +891,32 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode ~discr_ofs field =
             ] in
             (getters, setters)
         | (PS.Type.List list_def, PS.Value.List pointer_slice_opt) ->
-            let has_trivial_default =
-              begin match pointer_slice_opt with
+            let default_str =
+              match pointer_slice_opt with
               | Some pointer_slice ->
-                  begin match RC.decode_pointer pointer_slice with
-                  | Capnp.Runtime.Pointer.Null -> true
-                  | _ -> false
+                  begin match ReaderApi.deref_list_pointer pointer_slice with
+                  | Some default_storage ->
+                      let ident = Defaults.make_ident node_id field_name in
+                      begin match mode with
+                      | Mode.Reader ->
+                          " ~default:" ^ (Defaults.reader_string_of_ident ident)
+                      | Mode.Builder ->
+                          " ~default:" ^ (Defaults.builder_string_of_ident ident)
+                      end
+                  | None ->
+                      ""
                   end
               | None ->
-                  true
-              end
+                  ""
             in
-            if has_trivial_default then
-              let list_type = PS.Type.List.element_type_get list_def in
-              let getters = generate_list_getter ~nodes_table ~scope ~list_type
-                ~mode ~field_name ~field_ofs
-              in
-              let setters = generate_list_setters ~nodes_table ~scope ~list_type
-                ~discr_str ~field_name ~field_ofs
-              in
-              (getters, setters)
-            else
-              failwith "Default values for lists are not implemented."
+            let list_type = PS.Type.List.element_type_get list_def in
+            let getters = generate_list_getter ~nodes_table ~scope ~list_type
+              ~mode ~field_name ~field_ofs ~default_str
+            in
+            let setters = generate_list_setters ~nodes_table ~scope ~list_type
+              ~discr_str ~field_name ~field_ofs
+            in
+            (getters, setters)
         | (PS.Type.Enum enum_def, PS.Value.Enum val_uint16) ->
             let enum_id = PS.Type.Enum.type_id_get enum_def in
             let enum_node = Hashtbl.find_exn nodes_table enum_id in
@@ -922,12 +931,11 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode ~discr_ofs field =
             in
             (getters, setters)
         | (PS.Type.Struct struct_def, PS.Value.Struct pointer_slice_opt) ->
-            let reader_default_str, builder_default_str  =
+            let reader_default_str, builder_default_str =
               match pointer_slice_opt with
               | Some pointer_slice ->
                   begin match ReaderApi.deref_struct_pointer pointer_slice with
                   | Some default_storage ->
-                      let node_id = PS.Type.Struct.type_id_get struct_def in
                       let ident = Defaults.make_ident node_id field_name in
                       (" ~default:" ^ (Defaults.reader_string_of_ident ident),
                        " ~default:" ^ (Defaults.builder_string_of_ident ident))
@@ -1100,10 +1108,12 @@ let generate_union_getter ~nodes_table ~scope ~mode struct_def fields =
 (* Generate accessors for getting and setting a list of fields of a struct,
  * regardless of whether or not the fields are packed into a union.  (Getters
  * for fields packed inside a union are not exposed in the module signature.) *)
-let generate_accessors ~nodes_table ~scope ~mode struct_def fields =
+let generate_accessors ~nodes_table ~node ~scope ~mode struct_def fields =
   let discr_ofs = PS.Node.Struct.discriminant_offset_get_int_exn struct_def in
+  let node_id = PS.Node.id_get node in
   List.fold_left fields ~init:[] ~f:(fun acc field ->
-    let x = generate_one_field_accessors ~nodes_table ~scope ~mode ~discr_ofs field in
+    let x = generate_one_field_accessors ~nodes_table ~node_id ~scope
+        ~mode ~discr_ofs field in
     x @ acc)
 
 
@@ -1128,11 +1138,11 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~mode
   let union_accessors =
     (* Emit accessor functions first, because they are required for the
        variant-based code emitted by [generate_union_getter]. *)
-    (generate_accessors ~nodes_table ~scope ~mode struct_def union_fields) @
+    (generate_accessors ~nodes_table ~node ~scope ~mode struct_def union_fields) @
       (generate_union_getter ~nodes_table ~scope ~mode struct_def union_fields)
   in
   let non_union_accessors =
-    generate_accessors ~nodes_table ~scope ~mode struct_def non_union_fields
+    generate_accessors ~nodes_table ~node ~scope ~mode struct_def non_union_fields
   in
   let unique_reader =
     GenCommon.make_unique_typename ~mode:Mode.Reader ~scope_mode:mode
@@ -1260,6 +1270,7 @@ let update_defaults_context ~nodes_table ~context ~node ~struct_def =
   let fields = PS.Node.Struct.fields_get struct_def in
   C.Array.iter fields ~f:(fun field ->
     let field_name = GenCommon.underscore_name (PS.Field.name_get field) in
+    let node_id = PS.Node.id_get node in
     let open PS.Field in
     match PS.Field.get field with
     | PS.Field.Group group ->
@@ -1268,14 +1279,26 @@ let update_defaults_context ~nodes_table ~context ~node ~struct_def =
         let tp = PS.Field.Slot.type_get slot in
         let default = PS.Field.Slot.default_value_get slot in
         begin match (PS.Type.get tp, PS.Value.get default) with
-        | (PS.Type.Struct struct_def, PS.Value.Struct pointer_slice_opt) ->
+        | (PS.Type.Struct _, PS.Value.Struct pointer_slice_opt) ->
             begin match pointer_slice_opt with
             | Some pointer_slice ->
                 begin match ReaderApi.deref_struct_pointer pointer_slice with
                 | Some default_storage ->
-                    let node_id = PS.Type.Struct.type_id_get struct_def in
                     let ident = Defaults.make_ident node_id field_name in
                     Defaults.add_struct context ident default_storage
+                | None ->
+                    ()
+                end
+            | None ->
+                ()
+            end
+        | (PS.Type.List _, PS.Value.List pointer_slice_opt) ->
+            begin match pointer_slice_opt with
+            | Some pointer_slice ->
+                begin match ReaderApi.deref_list_pointer pointer_slice with
+                | Some default_storage ->
+                    let ident = Defaults.make_ident node_id field_name in
+                    Defaults.add_list context ident default_storage
                 | None ->
                     ()
                 end

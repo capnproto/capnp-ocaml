@@ -280,7 +280,7 @@ let emit_instantiate_reader_lists list_array =
       "let " ^ (reader_string_of_ident ident) ^ " =";
       "  DefaultsCopier_.RWC.ListStorage.readonly";
       "    (DefaultsCopier_.deep_copy_list ~src:" ^ (builder_string_of_ident ident);
-      "    ~dest_message:_reader_defaults_message)";
+      "    ~dest_message:_reader_defaults_message ())";
       "";
     ] @ acc)
     []
