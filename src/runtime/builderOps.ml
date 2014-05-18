@@ -284,8 +284,8 @@ module Make (ROM : Message.S) (RWM : Message.S) = struct
       pointer_bytes.RWM.Slice.segment_id)
     in
     let pointer_descr = {
-      StructPointer.offset = struct_storage.RWC.StructStorage.data.RWM.Slice.start -
-          RWM.Slice.get_end pointer_bytes;
+      StructPointer.offset = (struct_storage.RWC.StructStorage.data.RWM.Slice.start -
+          RWM.Slice.get_end pointer_bytes) / 8;
       StructPointer.data_words =
         struct_storage.RWC.StructStorage.data.RWM.Slice.len / 8;
       StructPointer.pointer_words =
