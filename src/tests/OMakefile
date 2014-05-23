@@ -1,0 +1,19 @@
+OCAMLINCLUDES += ../runtime
+OCAML_LIBS += ../runtime/libcapnp
+
+TEST_MODULES = \
+  testStringStorage
+
+PROGRAM = test
+
+OCamlProgram($(PROGRAM), $(TEST_MODULES))
+
+.PHONY: test-clean test-distclean
+
+test-clean:
+	rm -f $(PROGRAM)$(EXE) $(PROGRAM).opt $(PROGRAM).byte \
+		*.cmi *.cmo *.cmx *.cma *.cmxa *.cmxs *.a *.o
+
+test-distclean: test-clean
+	rm -f *.omc
+

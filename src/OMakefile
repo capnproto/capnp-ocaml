@@ -1,4 +1,4 @@
-.SUBDIRS: runtime compiler
+.SUBDIRS: runtime compiler tests
 
 .PHONY: src-distclean
 
