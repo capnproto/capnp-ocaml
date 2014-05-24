@@ -174,15 +174,15 @@ let compile
              requested_file_node)
       in
       let builder_defaults = Defaults.gen_builder_defaults defaults_context in
-      let reader_defaults = GenCommon.apply_indent ~indent:"    "
+      let reader_defaults = GenCommon.apply_indent ~indent:"  "
           (Defaults.gen_reader_defaults defaults_context)
       in
       string_of_lines (
         sig_s @
         builder_defaults @
         mod_header @
-        mod_reader_header @
         reader_defaults @
+        mod_reader_header @
         reader_body @
         mod_divide_reader_builder @
         builder_body @

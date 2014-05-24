@@ -1117,6 +1117,68 @@ let generate_accessors ~nodes_table ~node ~scope ~mode struct_def fields =
     x @ acc)
 
 
+(* FIXME: clean up redundant logic with [generate_list_element_decoder] *)
+let generate_list_constant ~nodes_table ~scope ~node_id ~list_name list_def =
+  let declare_decoders element_name = [
+    "let decoders = RA_." ^ element_name ^ "_list_decoders in";
+    ]
+  in
+  let decoders =
+    let open PS.Type in
+    let contained_type = List.element_type_get list_def in
+    match get contained_type with
+    | Void     -> declare_decoders "void"
+    | Bool     -> declare_decoders "bit"
+    | Int8     -> declare_decoders "int8"
+    | Int16    -> declare_decoders "int16"
+    | Int32    -> declare_decoders "int32"
+    | Int64    -> declare_decoders "int64"
+    | Uint8    -> declare_decoders "uint8"
+    | Uint16   -> declare_decoders "uint16"
+    | Uint32   -> declare_decoders "uint32"
+    | Uint64   -> declare_decoders "uint64"
+    | Float32  -> declare_decoders "float32"
+    | Float64  -> declare_decoders "float64"
+    | Text     -> declare_decoders "text"
+    | Data     -> declare_decoders "blob"
+    | Struct _ -> declare_decoders "struct"
+    | List inner_list_def ->
+        let inner_decoder_decl =
+          apply_indent ~indent:"  "
+            (generate_list_element_decoder ~nodes_table ~scope inner_list_def)
+        in [
+          "let decoders = RA_.ListDecoders.Pointer (fun slice ->";
+        ] @ inner_decoder_decl @ [
+          "  decoders)";
+        ]
+    | Enum enum_def ->
+        let decoder_lambda =
+          let enum_id = PS.Type.Enum.type_id_get enum_def in
+          let enum_node = Hashtbl.find_exn nodes_table enum_id in
+          apply_indent ~indent:"    "
+            (generate_enum_decoder ~nodes_table ~scope ~enum_node)
+        in [
+          "let decoders =";
+          "  let decode =";
+        ] @ decoder_lambda @ [
+          "  in";
+          "  RA_.ListDecoders.Bytes2 (fun slice ->";
+          "    decode (Slice.get_uint16 slice 0))";
+        ]
+    | Interface _ ->
+        failwith "not implemented"
+    | AnyPointer ->
+        failwith "not implemented"
+    | Undefined x ->
+        failwith (sprintf "Unknown Type union discriminant %d" x)
+  in
+  decoders @ [
+    "RA_.make_array_readonly " ^
+      (Defaults.reader_string_of_ident (Defaults.make_ident node_id list_name)) ^
+      " decoders";
+  ]
+
+
 (* Generate a definition for a constant. *)
 let generate_constant ~nodes_table ~scope ~node ~node_name const_def =
   let const_type = PS.Node.Const.type_get const_def in
@@ -1124,33 +1186,35 @@ let generate_constant ~nodes_table ~scope ~node ~node_name const_def =
   let open PS in
   match (Type.get const_type, Value.get const_val) with
   | (Type.Void, Value.Void) ->
-      "()"
+      [ "()" ]
   | (Type.Bool, Value.Bool a) ->
-      if a then "true" else "false"
+      if a then [ "true" ] else [ "false" ]
   | (Type.Int8, Value.Int8 a)
   | (Type.Int16, Value.Int16 a)
   | (Type.Uint8, Value.Uint8 a)
   | (Type.Uint16, Value.Uint16 a) ->
-      Int.to_string a
+      [ Int.to_string a ]
   | (Type.Int32, Value.Int32 a) ->
-      (Int32.to_string a) ^ "l"
+      [ (Int32.to_string a) ^ "l" ]
   | (Type.Int64, Value.Int64 a) ->
-      (Int64.to_string a) ^ "L"
+      [ (Int64.to_string a) ^ "L" ]
   | (Type.Uint32, Value.Uint32 a) ->
-      sprintf "(Uint32.of_string %s)" (Uint32.to_string a)
+      [ sprintf "(Uint32.of_string %s)" (Uint32.to_string a) ]
   | (Type.Uint64, Value.Uint64 a) ->
-      sprintf "(Uint64.of_string %s)" (Uint64.to_string a)
+      [ sprintf "(Uint64.of_string %s)" (Uint64.to_string a) ]
   | (Type.Float32, Value.Float32 a) ->
-      sprintf "(Int32.float_of_bits %sl)"
-        (Int32.to_string (Int32.bits_of_float a))
+      [ sprintf "(Int32.float_of_bits %sl)"
+          (Int32.to_string (Int32.bits_of_float a)) ]
   | (Type.Float64, Value.Float64 a) ->
-      sprintf "(Int64.float_of_bits %sL)"
-        (Int64.to_string (Int64.bits_of_float a))
+      [ sprintf "(Int64.float_of_bits %sL)"
+          (Int64.to_string (Int64.bits_of_float a)) ]
   | (Type.Text, Value.Text a)
   | (Type.Data, Value.Data a) ->
-      "\"" ^ (String.escaped a) ^ "\""
-  | (Type.List list_def, Value.List pointer_slice_opt) ->
-      failwith "List constants are not yet implemented."
+      [ "\"" ^ (String.escaped a) ^ "\"" ]
+  | (Type.List list_def, Value.List _) ->
+      let node_id = PS.Node.id_get node in
+      let list_name = GenCommon.underscore_name node_name in
+      generate_list_constant ~nodes_table ~scope ~node_id ~list_name list_def
   | (Type.Enum _, Value.Enum enum_val) ->
       let const_type = PS.Node.Const.type_get const_def in
       let enum_node =
@@ -1170,28 +1234,18 @@ let generate_constant ~nodes_table ~scope ~node ~node_name const_def =
       let scope_relative_name =
         GenCommon.get_scope_relative_name nodes_table scope enum_node in
       if enum_val >= C.Array.length enumerants then
-        sprintf "%s.%s %u" scope_relative_name
-          (String.capitalize undefined_name) enum_val
+        [ sprintf "%s.%s %u" scope_relative_name
+            (String.capitalize undefined_name) enum_val ]
       else
         let enumerant = C.Array.get enumerants enum_val in
-        sprintf "%s.%s"
-          scope_relative_name
-          (String.capitalize (PS.Enumerant.name_get enumerant))
-  | (Type.Struct _, Value.Struct pointer_slice_opt) ->
-      begin match pointer_slice_opt with
-      | Some pointer_slice ->
-          begin match ReaderApi.deref_struct_pointer pointer_slice with
-          | Some _ ->
-              let node_id = PS.Node.id_get node in
-              let name = GenCommon.underscore_name node_name in
-              Defaults.reader_string_of_ident (Defaults.make_ident node_id name)
-          | None ->
-              failwith (sprintf "Struct constant \"%s\" is null."
-                  node_name)
-          end
-      | None ->
-          assert false
-      end
+        [ sprintf "%s.%s"
+            scope_relative_name
+            (String.capitalize (PS.Enumerant.name_get enumerant)) ]
+  | (Type.Struct _, Value.Struct _) ->
+      let node_id = PS.Node.id_get node in
+      let name = GenCommon.underscore_name node_name in
+      [ "Some " ^
+          (Defaults.reader_string_of_ident (Defaults.make_ident node_id name)) ]
   | (Type.Interface _, Value.Interface) ->
       failwith "Interface constants are not yet implemented."
   | (Type.AnyPointer, Value.AnyPointer pointer) ->
@@ -1283,7 +1337,7 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~mode
     | Mode.Reader -> [
         "let of_message x = RA_.get_root_struct (RA_.Message.readonly x)";
       ]
-    | Mode.Builder -> 
+    | Mode.Builder ->
         let data_words    = PS.Node.Struct.data_word_count_get struct_def in
         let pointer_words = PS.Node.Struct.pointer_count_get struct_def in [
           sprintf "  let of_message x = BA_.get_root_struct \
@@ -1364,9 +1418,9 @@ and generate_node
   | PS.Node.Interface iface_def ->
       generate_nested_modules ()
   | PS.Node.Const const_def -> [
-        "let " ^ (GenCommon.underscore_name node_name) ^ " = " ^
-          (generate_constant ~nodes_table ~scope ~node ~node_name const_def);
-      ]
+      "let " ^ (GenCommon.underscore_name node_name) ^ " =";
+    ] @ (apply_indent ~indent:"  "
+          (generate_constant ~nodes_table ~scope ~node ~node_name const_def))
   | PS.Node.Annotation annot_def ->
       generate_nested_modules ()
   | PS.Node.Undefined x ->
@@ -1426,6 +1480,7 @@ let update_defaults_context_struct ~nodes_table ~context ~node ~struct_def =
 let update_defaults_context_constant ~nodes_table ~context
     ~node ~node_name ~const_def =
   let node_id = PS.Node.id_get node in
+  let name = GenCommon.underscore_name node_name in
   let open PS.Value in
   let const_val = PS.Node.Const.value_get const_def in
   match get const_val with
@@ -1434,14 +1489,15 @@ let update_defaults_context_constant ~nodes_table ~context
       | Some pointer_slice ->
           begin match ReaderApi.deref_struct_pointer pointer_slice with
           | Some default_storage ->
-              let name = GenCommon.underscore_name node_name in
               let ident = Defaults.make_ident node_id name in
               Defaults.add_struct context ident default_storage
           | None ->
-              ()
+              failwith (sprintf
+                  "Struct constant \"%s\" has unexpected type."
+                  name)
           end
       | None ->
-          ()
+          assert false
       end
   | List pointer_slice_opt ->
       begin match pointer_slice_opt with
@@ -1452,10 +1508,12 @@ let update_defaults_context_constant ~nodes_table ~context
               let ident = Defaults.make_ident node_id name in
               Defaults.add_list context ident default_storage
           | None ->
-              ()
+              failwith (sprintf
+                  "List constant \"%s\" has unexpected type."
+                  name)
           end
       | None ->
-          ()
+          assert false
       end
   | _ ->
       ()

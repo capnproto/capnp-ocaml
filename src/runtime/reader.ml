@@ -39,7 +39,6 @@ module Make (MessageWrapper : Message.S) = struct
   module RC = Common.Make(MessageWrapper)
   include RC
 
-
   (* Given a pointer which is expected to be a list pointer, compute the
      corresponding list storage descriptor.  Returns None if the pointer is
      null. *)
@@ -66,6 +65,84 @@ module Make (MessageWrapper : Message.S) = struct
         Some struct_descr
     | Object.List _ ->
         invalid_msg "decoded list pointer where struct pointer was expected"
+
+
+  let void_list_decoders =
+    ListDecoders.Empty (fun (x : unit) -> x)
+
+  let bit_list_decoders =
+    ListDecoders.Bit (fun (x : bool) -> x)
+
+  let int8_list_decoders =
+    ListDecoders.Bytes1 (fun slice -> Slice.get_int8 slice 0)
+
+  let int16_list_decoders =
+    ListDecoders.Bytes2 (fun slice -> Slice.get_int16 slice 0)
+
+  let int32_list_decoders =
+    ListDecoders.Bytes4 (fun slice -> Slice.get_int32 slice 0)
+
+  let int64_list_decoders =
+    ListDecoders.Bytes8 (fun slice -> Slice.get_int64 slice 0)
+
+  let uint8_list_decoders =
+    ListDecoders.Bytes1 (fun slice -> Slice.get_uint8 slice 0)
+
+  let uint16_list_decoders =
+    ListDecoders.Bytes2 (fun slice -> Slice.get_uint16 slice 0)
+
+  let uint32_list_decoders =
+    ListDecoders.Bytes4 (fun slice -> Slice.get_uint32 slice 0)
+
+  let uint64_list_decoders =
+    ListDecoders.Bytes8 (fun slice -> Slice.get_uint64 slice 0)
+
+  let float32_list_decoders = ListDecoders.Bytes4
+      (fun slice -> Int32.float_of_bits (Slice.get_int32 slice 0))
+
+  let float64_list_decoders = ListDecoders.Bytes8
+      (fun slice -> Int64.float_of_bits (Slice.get_int64 slice 0))
+
+  let text_list_decoders = ListDecoders.Pointer (fun slice ->
+      match deref_list_pointer slice with
+      | Some list_storage ->
+          string_of_uint8_list ~null_terminated:true list_storage
+      | None ->
+          "")
+
+  let blob_list_decoders = ListDecoders.Pointer (fun slice ->
+      match deref_list_pointer slice with
+      | Some list_storage ->
+          string_of_uint8_list ~null_terminated:false list_storage
+      | None ->
+          "")
+
+  let struct_list_decoders =
+    let struct_decoders =
+      let bytes slice = Some {
+          StructStorage.data = slice;
+          StructStorage.pointers = {
+            slice with
+            Slice.start = Slice.get_end slice;
+            Slice.len   = 0;
+          };
+        }
+      in
+      let pointer slice = Some {
+          StructStorage.data = {
+            slice with
+            Slice.len = 0;
+          };
+          StructStorage.pointers = slice;
+        }
+      in
+      let composite x = Some x in {
+        ListDecoders.bytes;
+        ListDecoders.pointer;
+        ListDecoders.composite;
+      }
+    in
+    ListDecoders.Struct struct_decoders
 
 
   (* Locate the storage region corresponding to the root struct of a message. *)
@@ -346,146 +423,91 @@ module Make (MessageWrapper : Message.S) = struct
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
     : (ro, unit, 'cap ListStorage.t) InnerArray.t =
-    get_list ?default (ListDecoders.Empty (fun (x : unit) -> x)) pointer_opt
+    get_list ?default void_list_decoders pointer_opt
 
   let get_bit_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
     : (ro, bool, 'cap ListStorage.t) InnerArray.t =
-    get_list ?default (ListDecoders.Bit (fun (x : bool) -> x)) pointer_opt
+    get_list ?default bit_list_decoders pointer_opt
 
   let get_int8_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
     : (ro, int, 'cap ListStorage.t) InnerArray.t =
-    get_list ?default (ListDecoders.Bytes1 (fun slice -> Slice.get_int8 slice 0))
-      pointer_opt
+    get_list ?default int8_list_decoders pointer_opt
 
   let get_int16_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
     : (ro, int, 'cap ListStorage.t) InnerArray.t =
-    get_list ?default (ListDecoders.Bytes2 (fun slice -> Slice.get_int16 slice 0))
-      pointer_opt
+    get_list ?default int16_list_decoders pointer_opt
 
   let get_int32_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
     : (ro, int32, 'cap ListStorage.t) InnerArray.t =
-    get_list ?default (ListDecoders.Bytes4 (fun slice -> Slice.get_int32 slice 0))
-      pointer_opt
+    get_list ?default int32_list_decoders pointer_opt
 
   let get_int64_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
     : (ro, int64, 'cap ListStorage.t) InnerArray.t =
-    get_list ?default (ListDecoders.Bytes8 (fun slice -> Slice.get_int64 slice 0))
-      pointer_opt
+    get_list ?default int64_list_decoders pointer_opt
 
   let get_uint8_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
     : (ro, int, 'cap ListStorage.t) InnerArray.t =
-    get_list ?default (ListDecoders.Bytes1 (fun slice -> Slice.get_uint8 slice 0))
-      pointer_opt
+    get_list ?default uint8_list_decoders pointer_opt
 
   let get_uint16_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
     : (ro, int, 'cap ListStorage.t) InnerArray.t =
-    get_list ?default (ListDecoders.Bytes2 (fun slice -> Slice.get_uint16 slice 0))
-      pointer_opt
+    get_list ?default uint16_list_decoders pointer_opt
 
   let get_uint32_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
     : (ro, Uint32.t, 'cap ListStorage.t) InnerArray.t =
-    get_list ?default (ListDecoders.Bytes4 (fun slice -> Slice.get_uint32 slice 0))
-      pointer_opt
+    get_list ?default uint32_list_decoders pointer_opt
 
   let get_uint64_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
     : (ro, Uint64.t, 'cap ListStorage.t) InnerArray.t =
-    get_list ?default (ListDecoders.Bytes8 (fun slice -> Slice.get_uint64 slice 0))
-      pointer_opt
+    get_list ?default uint64_list_decoders pointer_opt
 
   let get_float32_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
     : (ro, float, 'cap ListStorage.t) InnerArray.t =
-    get_list ?default (ListDecoders.Bytes4
-        (fun slice -> Int32.float_of_bits (Slice.get_int32 slice 0)))
-      pointer_opt
+    get_list ?default float32_list_decoders pointer_opt
 
   let get_float64_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
     : (ro, float, 'cap ListStorage.t) InnerArray.t =
-    get_list ?default (ListDecoders.Bytes4
-        (fun slice -> Int64.float_of_bits (Slice.get_int64 slice 0)))
-      pointer_opt
+    get_list ?default float64_list_decoders pointer_opt
 
   let get_text_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
     : (ro, string, 'cap ListStorage.t) InnerArray.t =
-    let decoders =
-      ListDecoders.Pointer (fun slice ->
-        match deref_list_pointer slice with
-        | Some list_storage ->
-            string_of_uint8_list ~null_terminated:true list_storage
-        | None ->
-            "")
-    in
-    get_list ?default decoders pointer_opt
+    get_list ?default text_list_decoders pointer_opt
 
   let get_blob_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
     : (ro, string, 'cap ListStorage.t) InnerArray.t =
-    let decoders =
-      ListDecoders.Pointer (fun slice ->
-        match deref_list_pointer slice with
-        | Some list_storage ->
-            string_of_uint8_list ~null_terminated:false list_storage
-        | None ->
-            "")
-    in
-    get_list ?default decoders pointer_opt
+    get_list ?default blob_list_decoders pointer_opt
 
   let get_struct_list
       ?(default : ro ListStorage.t option)
       (pointer_opt : 'cap Slice.t option)
     : (ro, 'cap StructStorage.t option, 'cap ListStorage.t) InnerArray.t =
-    let decoders =
-      let struct_decoders =
-        let bytes slice = Some {
-            StructStorage.data = slice;
-            StructStorage.pointers = {
-              slice with
-              Slice.start = Slice.get_end slice;
-              Slice.len   = 0;
-            };
-          }
-        in
-        let pointer slice = Some {
-            StructStorage.data = {
-              slice with
-              Slice.len = 0;
-            };
-            StructStorage.pointers = slice;
-          }
-        in
-        let composite x = Some x in {
-          ListDecoders.bytes;
-          ListDecoders.pointer;
-          ListDecoders.composite;
-        }
-      in
-      (ListDecoders.Struct struct_decoders)
-    in
-    get_list ?default decoders pointer_opt
+    get_list ?default struct_list_decoders pointer_opt
 
   let get_struct
       ?(default : ro StructStorage.t option)
