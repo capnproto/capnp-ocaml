@@ -364,7 +364,13 @@ let rec generate_node
           (apply_indent ~indent:"  " body) @
           [ "end" ]
   | Interface iface_def ->
-      generate_nested_modules ()
+      let body = generate_nested_modules () in
+      if suppress_module_wrapper then
+        body
+      else
+        [ "module " ^ node_name ^ " : sig" ] @
+          (apply_indent ~indent:"  " body) @
+          [ "end" ]
   | Const const_def -> [
       sprintf "val %s : %s"
         (GenCommon.underscore_name node_name)
