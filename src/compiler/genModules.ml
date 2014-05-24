@@ -1007,16 +1007,33 @@ let generate_one_field_accessors ~nodes_table ~node_id ~scope
                 "_set x v = failwith \"not implemented (iface 2)\"";
             ] in
             (getters, setters)
-        | (PS.Type.AnyPointer, PS.Value.AnyPointer pointer) ->
+        | (PS.Type.AnyPointer, PS.Value.AnyPointer pointer_slice_opt) ->
+            let reader_default_str, builder_default_str =
+              match pointer_slice_opt with
+              | Some pointer_bytes ->
+                  let pointer_val = GenCommon.M.Slice.get_int64 pointer_bytes 0 in
+                  if Int64.compare pointer_val Int64.zero <> 0 then
+                    let ident = Defaults.make_ident node_id field_name in
+                    (" ~default:" ^ (Defaults.reader_string_of_ident ident),
+                     " ~default:" ^ (Defaults.builder_string_of_ident ident))
+                  else
+                    ("", "")
+              | None ->
+                  ("", "")
+            in
             let getters = [
               "let " ^ field_name ^ "_get x =";
-              sprintf "  %s.get_pointer_field x %u ~f:(fun x -> x)"
+              sprintf "  %s.get_pointer_field x %u ~f:(%s.get_pointer%s)"
                 api_module
-                field_ofs;
+                field_ofs
+                api_module
+                (if mode = Mode.Reader then reader_default_str else builder_default_str);
             ] in
             let setters = [
-              "let " ^ field_name ^
-                "_set x v = failwith \"not implemented\"";
+              "let " ^ field_name ^ "_set x v =";
+              sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.set_pointer v)"
+                discr_str
+                field_ofs
             ] in
             (getters, setters)
         | (PS.Type.Undefined x, _) ->
@@ -1468,6 +1485,19 @@ let update_defaults_context_struct ~nodes_table ~context ~node ~struct_def =
             | None ->
                 ()
             end
+        | (PS.Type.AnyPointer, PS.Value.AnyPointer pointer_slice_opt) ->
+            begin match pointer_slice_opt with
+            | Some pointer_slice ->
+                begin match ReaderApi.decode_pointer pointer_slice with
+                | C.Runtime.Pointer.Null ->
+                    ()
+                | _ ->
+                    let ident = Defaults.make_ident node_id field_name in
+                    Defaults.add_pointer context ident pointer_slice
+                end
+            | None ->
+                ()
+            end
         | _ ->
             ()
         end
@@ -1504,7 +1534,6 @@ let update_defaults_context_constant ~nodes_table ~context
       | Some pointer_slice ->
           begin match ReaderApi.deref_list_pointer pointer_slice with
           | Some default_storage ->
-              let name = GenCommon.underscore_name node_name in
               let ident = Defaults.make_ident node_id name in
               Defaults.add_list context ident default_storage
           | None ->
@@ -1512,6 +1541,14 @@ let update_defaults_context_constant ~nodes_table ~context
                   "List constant \"%s\" has unexpected type."
                   name)
           end
+      | None ->
+          assert false
+      end
+  | AnyPointer pointer_slice_opt ->
+      begin match pointer_slice_opt with
+      | Some pointer_slice ->
+          let ident = Defaults.make_ident node_id name in
+          Defaults.add_pointer context ident pointer_slice
       | None ->
           assert false
       end

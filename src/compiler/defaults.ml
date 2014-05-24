@@ -73,15 +73,20 @@ type t = {
   (* Array of lists which have been stored in the message, along with
      their unique identifiers. *)
   lists : (string * Capnp.Message.rw DC.ListStorage.t) Res.Array.t;
+
+  (* Array of pointers which have been stored in the message, along
+     with their unique identifiers. *)
+  pointers : (string * Capnp.Message.rw M.Slice.t) Res.Array.t;
 }
 
 type ident_t = string
 
 
 let create () = {
-  message = M.Message.create 64;
-  structs = Res.Array.empty ();
-  lists   = Res.Array.empty ();
+  message  = M.Message.create 64;
+  structs  = Res.Array.empty ();
+  lists    = Res.Array.empty ();
+  pointers = Res.Array.empty ();
 }
 
 let make_ident node_id field_name =
@@ -108,6 +113,12 @@ let add_list defaults ident list_storage =
       ~dest_message:defaults.message ()
   in
   Res.Array.add_one defaults.lists (ident, list_copy)
+
+
+let add_pointer defaults ident pointer_bytes =
+  let dest = M.Slice.alloc defaults.message sizeof_uint64 in
+  let () = Copier.deep_copy_pointer ~src:pointer_bytes ~dest in
+  Res.Array.add_one defaults.pointers (ident, dest)
 
 
 let hex_table = [|
@@ -228,16 +239,37 @@ let emit_instantiate_builder_lists list_array : string list =
       "  DefaultsCommon_.ListStorage.num_elements = " ^
         (Int.to_string list_storage.num_elements) ^ ";";
       "}";
-      ""
+      "";
     ] @ acc)
     list_array
     []
 
 
+(* Generate code which instantiates slices for pointer defaults
+   stored in the message. *)
+let emit_instantiate_builder_pointers pointer_array : string list =
+  Res.Array.fold_right (fun (ident, pointer_bytes) acc -> [
+      "let " ^ (builder_string_of_ident ident) ^ " = {";
+      "  DefaultsMessage_.Slice.msg = _builder_defaults_message;";
+      "  DefaultsMessage_.Slice.segment_id = " ^
+        (Int.to_string pointer_bytes.M.Slice.segment_id) ^ ";";
+      "  DefaultsMessage_.Slice.start = " ^
+        (Int.to_string pointer_bytes.M.Slice.start) ^ ";";
+      "  DefaultsMessage_.Slice.len = " ^
+        (Int.to_string pointer_bytes.M.Slice.len) ^ ";";
+      "}";
+      "";
+    ] @ acc)
+    pointer_array
+    []
+
+
+
 let gen_builder_defaults defaults =
   (emit_instantiate_builder_message defaults.message) @
     (emit_instantiate_builder_structs defaults.structs) @
-    (emit_instantiate_builder_lists defaults.lists)
+    (emit_instantiate_builder_lists defaults.lists) @
+    (emit_instantiate_builder_pointers defaults.pointers)
 
 
 (* Generate code for instantiating a defaults storage message
@@ -287,8 +319,24 @@ let emit_instantiate_reader_lists list_array =
     list_array
 
 
+let emit_instantiate_reader_pointers pointer_array =
+  Res.Array.fold_left (fun acc (ident, pointer_bytes) -> [
+      "let " ^ (reader_string_of_ident ident) ^ " =";
+      "  DefaultsMessage_.Slice.readonly";
+      "    (let dest = DefaultsMessage_.Slice.alloc 8 in";
+      "    let () = DefaultsCopier_.deep_copy_pointer ~src:" ^
+        (builder_string_of_ident ident);
+      "      ~dest";
+      "    in dest)";
+      "";
+    ] @ acc)
+    []
+    pointer_array
+
+
 let gen_reader_defaults defaults =
   (emit_instantiate_reader_message ()) @
     (emit_instantiate_reader_structs defaults.structs) @
-    (emit_instantiate_reader_lists defaults.lists)
+    (emit_instantiate_reader_lists defaults.lists) @
+    (emit_instantiate_builder_pointers defaults.pointers)
 

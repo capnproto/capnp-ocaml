@@ -524,5 +524,19 @@ module Make (MessageWrapper : Message.S) = struct
     | None ->
         default
 
+  let get_pointer
+      ?(default: ro Slice.t option)
+      (pointer_opt : 'cap Slice.t option)
+    : 'cap Slice.t option =
+    match pointer_opt with
+    | Some pointer_bytes ->
+        let pointer_val = Slice.get_int64 pointer_bytes 0 in
+        if Int64.compare pointer_val Int64.zero <> 0 then
+          pointer_opt
+        else
+          default
+    | None ->
+        default
+
 end
 

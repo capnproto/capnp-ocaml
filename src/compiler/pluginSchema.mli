@@ -485,11 +485,11 @@ module type S = sig
       val float64_set : t -> float -> unit
       val text_set : t -> string -> unit
       val data_set : t -> string -> unit
-      val list_set : t -> pointer_t -> unit
+      val list_set : t -> pointer_t -> pointer_t
       val enum_set_exn : t -> int -> unit
-      val struct_set : t -> pointer_t -> unit
+      val struct_set : t -> pointer_t -> pointer_t
       val interface_set : t -> unit
-      val any_pointer_set : t -> pointer_t -> unit
+      val any_pointer_set : t -> pointer_t -> pointer_t
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
       val init_root : ?message_size:int -> unit -> t

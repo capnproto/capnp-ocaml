@@ -114,8 +114,7 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode field
       | Float64
       | Text
       | Data
-      | Interface _
-      | AnyPointer -> [
+      | Interface _ -> [
           Getter [
             sprintf "val %s_get : t -> %s"
               field_name
@@ -123,6 +122,17 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode field
           Setter [
             sprintf "val %s_set : t -> %s -> unit"
               field_name
+              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+        ]
+      | AnyPointer -> [
+          Getter [
+            sprintf "val %s_get : t -> %s"
+              field_name
+              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+          Setter [
+            sprintf "val %s_set : t -> %s -> %s"
+              field_name
+              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp)
               (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
         ]
       | List _ -> [

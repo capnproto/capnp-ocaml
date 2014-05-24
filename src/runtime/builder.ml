@@ -640,6 +640,24 @@ module Make (NM : Message.S) = struct
     in
     BOps.deref_struct_pointer ~create_default ~data_words ~pointer_words pointer_bytes
 
+  let get_pointer
+    ?(default : ro DefaultsMessage.Slice.t option)
+    (pointer_bytes : rw NM.Slice.t)
+    : rw NM.Slice.t =
+    let () =
+      let pointer_val = NM.Slice.get_int64 pointer_bytes 0 in
+      if Int64.compare pointer_val Int64.zero <> 0 then
+        ()
+      else
+        match default with
+        | Some default_pointer ->
+            DefaultsCopier.deep_copy_pointer ~src:default_pointer
+              ~dest:pointer_bytes
+        | None ->
+            ()
+  in
+  pointer_bytes
+
 
   (*******************************************************************************
    * METHODS FOR SETTING OBJECTS STORED BY POINTER
@@ -825,6 +843,13 @@ module Make (NM : Message.S) = struct
     let () = BOps.deep_zero_pointer pointer_bytes in
     let () = BOps.init_struct_pointer pointer_bytes dest_storage in
     dest_storage
+
+  let set_pointer
+      (value : 'cap NM.Slice.t)
+      (pointer_bytes : rw NM.Slice.t)
+    : rw NM.Slice.t =
+    let () = BOps.deep_copy_pointer ~src:value ~dest:pointer_bytes in
+    pointer_bytes
 
 
   (*******************************************************************************

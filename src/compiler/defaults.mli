@@ -50,6 +50,10 @@ val add_struct : t -> ident_t ->
 val add_list : t -> ident_t ->
   Capnp.Message.ro CapnpRuntime.Common.Make(GenCommon.M).ListStorage.t -> unit
 
+(** [add_pointer defaults ident lst] adds a deep copy of the [pointer] to the
+    defaults message, making it accessible under the specified identifier. *)
+val add_pointer : t -> ident_t -> Capnp.Message.ro GenCommon.M.Slice.t -> unit
+
 (** [make_ident id field_name] constructs an identifier for the default value
     associated with the named field within the node with the given [id]. *)
 val make_ident : Uint64.t -> string -> ident_t

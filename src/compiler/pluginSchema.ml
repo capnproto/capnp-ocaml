@@ -485,11 +485,11 @@ module type S = sig
       val float64_set : t -> float -> unit
       val text_set : t -> string -> unit
       val data_set : t -> string -> unit
-      val list_set : t -> pointer_t -> unit
+      val list_set : t -> pointer_t -> pointer_t
       val enum_set_exn : t -> int -> unit
-      val struct_set : t -> pointer_t -> unit
+      val struct_set : t -> pointer_t -> pointer_t
       val interface_set : t -> unit
-      val any_pointer_set : t -> pointer_t -> unit
+      val any_pointer_set : t -> pointer_t -> pointer_t
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
       val init_root : ?message_size:int -> unit -> t
@@ -865,18 +865,18 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
 
   type 'cap message_t = 'cap MessageWrapper.Message.t
 
+  module DefaultsCopier_ =
+    Runtime.BuilderOps.Make(Runtime.Builder.DefaultsMessage)(MessageWrapper)
+
+  let _reader_defaults_message =
+    MessageWrapper.Message.create
+      (DefaultsMessage_.Message.total_size _builder_defaults_message)
+
 
   module Reader = struct
     type array_t = ro RA_.ListStorage.t
     type builder_array_t = rw RA_.ListStorage.t
     type pointer_t = ro MessageWrapper.Slice.t option
-
-    module DefaultsCopier_ =
-      Runtime.BuilderOps.Make(Runtime.Builder.DefaultsMessage)(MessageWrapper)
-
-    let _reader_defaults_message =
-      MessageWrapper.Message.create
-        (DefaultsMessage_.Message.total_size _builder_defaults_message)
 
     module ElementSize = struct
       type t =
@@ -1042,14 +1042,14 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       let data_get x =
         RA_.get_pointer_field x 0 ~f:(RA_.get_blob ~default:"")
       let list_get x =
-        RA_.get_pointer_field x 0 ~f:(fun x -> x)
+        RA_.get_pointer_field x 0 ~f:(RA_.get_pointer)
       let enum_get x =
         RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:2)
       let struct_get x =
-        RA_.get_pointer_field x 0 ~f:(fun x -> x)
+        RA_.get_pointer_field x 0 ~f:(RA_.get_pointer)
       let interface_get x = ()
       let any_pointer_get x =
-        RA_.get_pointer_field x 0 ~f:(fun x -> x)
+        RA_.get_pointer_field x 0 ~f:(RA_.get_pointer)
       type unnamed_union_t =
         | Void
         | Bool of bool
@@ -1126,7 +1126,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       let result_struct_type_get_int_exn x =
         Uint64.to_int (result_struct_type_get x)
       let annotations_get x =
-        RA_.get_pointer_field x 1 ~f:RA_.get_struct_list
+        RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list)
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
     end
     module Enumerant = struct
@@ -1139,7 +1139,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       let code_order_get x =
         RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:0)
       let annotations_get x =
-        RA_.get_pointer_field x 1 ~f:RA_.get_struct_list
+        RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list)
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
     end
     module Field = struct
@@ -1147,7 +1147,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       type builder_t = rw RA_.StructStorage.t
       type t_Field_11145653318641710175 = t
       type builder_t_Field_11145653318641710175 = builder_t
-      let no_discriminant = 65535
+      let no_discriminant =
+        65535
       module Ordinal = struct
         type t = ro RA_.StructStorage.t option
         type builder_t = rw RA_.StructStorage.t
@@ -1211,7 +1212,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       let code_order_get x =
         RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:0)
       let annotations_get x =
-        RA_.get_pointer_field x 1 ~f:RA_.get_struct_list
+        RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list)
       let discriminant_value_get x =
         RA_.get_data_field x ~f:(RA_.get_uint16 ~default:65535 ~byte_ofs:2)
       let ordinal_get x = x
@@ -1255,7 +1256,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         let discriminant_offset_get_int_exn x =
           Uint32.to_int (discriminant_offset_get x)
         let fields_get x =
-          RA_.get_pointer_field x 3 ~f:RA_.get_struct_list
+          RA_.get_pointer_field x 3 ~f:(RA_.get_struct_list)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       end
       module Enum = struct
@@ -1264,7 +1265,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         type t_Enum_13063450714778629528 = t
         type builder_t_Enum_13063450714778629528 = builder_t
         let enumerants_get x =
-          RA_.get_pointer_field x 3 ~f:RA_.get_struct_list
+          RA_.get_pointer_field x 3 ~f:(RA_.get_struct_list)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       end
       module Annotation = struct
@@ -1317,9 +1318,9 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         type t_Interface_16728431493453586831 = t
         type builder_t_Interface_16728431493453586831 = builder_t
         let methods_get x =
-          RA_.get_pointer_field x 3 ~f:RA_.get_struct_list
+          RA_.get_pointer_field x 3 ~f:(RA_.get_struct_list)
         let extends_get x =
-          RA_.get_pointer_field x 4 ~f:RA_.get_uint64_list
+          RA_.get_pointer_field x 4 ~f:(RA_.get_uint64_list)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       end
       module NestedNode = struct
@@ -1373,9 +1374,9 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       let scope_id_get_int_exn x =
         Uint64.to_int (scope_id_get x)
       let nested_nodes_get x =
-        RA_.get_pointer_field x 1 ~f:RA_.get_struct_list
+        RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list)
       let annotations_get x =
-        RA_.get_pointer_field x 2 ~f:RA_.get_struct_list
+        RA_.get_pointer_field x 2 ~f:(RA_.get_struct_list)
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
     end
     module CodeGeneratorRequest = struct
@@ -1408,13 +1409,13 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         let filename_get x =
           RA_.get_pointer_field x 0 ~f:(RA_.get_text ~default:"")
         let imports_get x =
-          RA_.get_pointer_field x 1 ~f:RA_.get_struct_list
+          RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       end
       let nodes_get x =
-        RA_.get_pointer_field x 0 ~f:RA_.get_struct_list
+        RA_.get_pointer_field x 0 ~f:(RA_.get_struct_list)
       let requested_files_get x =
-        RA_.get_pointer_field x 1 ~f:RA_.get_struct_list
+        RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list)
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
     end
   end
@@ -1680,21 +1681,24 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       let data_set x v =
         BA_.get_pointer_field ~discr:{BA_.Discr.value=13; BA_.Discr.byte_ofs=0} x 0 ~f:(BA_.set_blob v)
       let list_get x =
-        BA_.get_pointer_field x 0 ~f:(fun x -> x)
-      let list_set x v = failwith "not implemented"
+        BA_.get_pointer_field x 0 ~f:(BA_.get_pointer)
+      let list_set x v =
+        BA_.get_pointer_field ~discr:{BA_.Discr.value=14; BA_.Discr.byte_ofs=0} x 0 ~f:(BA_.set_pointer v)
       let enum_get x =
         BA_.get_data_field x ~f:(BA_.get_uint16 ~default:0 ~byte_ofs:2)
       let enum_set_exn x v =
         BA_.get_data_field ~discr:{BA_.Discr.value=15; BA_.Discr.byte_ofs=0} x ~f:(BA_.set_uint16 ~default:0 ~byte_ofs:2 v)
       let struct_get x =
-        BA_.get_pointer_field x 0 ~f:(fun x -> x)
-      let struct_set x v = failwith "not implemented"
+        BA_.get_pointer_field x 0 ~f:(BA_.get_pointer)
+      let struct_set x v =
+        BA_.get_pointer_field ~discr:{BA_.Discr.value=16; BA_.Discr.byte_ofs=0} x 0 ~f:(BA_.set_pointer v)
       let interface_get x = ()
       let interface_set x =
         BA_.get_data_field ~discr:{BA_.Discr.value=17; BA_.Discr.byte_ofs=0} x ~f:BA_.set_void
       let any_pointer_get x =
-        BA_.get_pointer_field x 0 ~f:(fun x -> x)
-      let any_pointer_set x v = failwith "not implemented"
+        BA_.get_pointer_field x 0 ~f:(BA_.get_pointer)
+      let any_pointer_set x v =
+        BA_.get_pointer_field ~discr:{BA_.Discr.value=18; BA_.Discr.byte_ofs=0} x 0 ~f:(BA_.set_pointer v)
       type unnamed_union_t =
         | Void
         | Bool of bool
@@ -1835,7 +1839,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       type reader_t = Reader.Field.t
       type t_Field_11145653318641710175 = t
       type reader_t_Field_11145653318641710175 = reader_t
-      let no_discriminant = 65535
+      let no_discriminant =
+        65535
       module Ordinal = struct
         type t = Reader.Field.Ordinal.builder_t
         type reader_t = Reader.Field.Ordinal.t
@@ -2159,7 +2164,7 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         let methods_init x n =
           BA_.get_pointer_field x 3 ~f:(BA_.init_struct_list ~data_words:3 ~pointer_words:2 n)
         let extends_get x =
-          BA_.get_pointer_field x 4 ~f:BA_.get_uint64_list
+          BA_.get_pointer_field x 4 ~f:(BA_.get_uint64_list)
         let extends_set x v =
           BA_.get_pointer_field x 4 ~f:(BA_.set_uint64_list v)
         let extends_init x n =
