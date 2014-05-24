@@ -28,19 +28,34 @@
  ******************************************************************************)
 
 
-module Bitfield = struct
-  let tag_mask       = Int64.of_int 0x3
-  let tag_val_list   = Int64.one
-  let tag_val_struct = Int64.zero
-  let tag_val_far    = Int64.of_int 0x2
-  let tag_val_other  = tag_mask
-end
+module Int64 = Core.Core_int64
 
 type t =
-  | Null
-  | List   of ListPointer.t
-  | Struct of StructPointer.t
-  | Far    of FarPointer.t
-  | Other  of OtherPointer.t
+  | Capability of Uint32.t
+
+let tag_val_other = Int64.of_int 0x3
+
+let b_shift = 2
+let b_mask  = Int64.shift_left (Int64.of_int 0x3fffffff) b_shift
+
+let index_shift = 32
+let index_mask  = Int64.shift_left (Int64.of_string "0xffffffff") index_shift
+
+let decode (pointer64 : Int64.t) : t =
+  if Int64.compare (Int64.bit_and pointer64 b_mask) Int64.zero = 0 then
+    let shifted_index = Int64.bit_and pointer64 index_mask in
+    let index64 = Int64.shift_right shifted_index index_shift in
+    let index32 = Int64.to_int32_exn index64 in
+    Capability (Uint32.of_int32 index32)
+  else
+    Message.invalid_msg "'other' pointer is of non-capability type"
+
+let encode (descr : t) : Int64.t =
+  match descr with
+  | Capability index ->
+      let index32 = Uint32.to_int32 index in
+      let index64 = Int64.of_int32 index32 in
+      let shifted_index = Int64.shift_left index64 index_shift in
+      Int64.bit_or shifted_index tag_val_other
 
 

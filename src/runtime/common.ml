@@ -160,6 +160,7 @@ module Make (MessageWrapper : Message.S) = struct
       | None
       | List of 'cap ListStorage.t
       | Struct of 'cap StructStorage.t
+      | Capability of Uint32.t
   end
 
 
@@ -178,6 +179,8 @@ module Make (MessageWrapper : Message.S) = struct
         Pointer.Struct (StructPointer.decode pointer64)
       else if Int64.compare tag B.tag_val_far = 0 then
         Pointer.Far (FarPointer.decode pointer64)
+      else if Int64.compare tag B.tag_val_other = 0 then
+        Pointer.Other (OtherPointer.decode pointer64)
       else
         invalid_msg "pointer has undefined type tag"
 
@@ -366,6 +369,8 @@ module Make (MessageWrapper : Message.S) = struct
         Object.Struct { StructStorage.data; StructStorage.pointers; }
     | Pointer.Far far_pointer ->
         deref_far_pointer far_pointer pointer_bytes.Slice.msg
+    | Pointer.Other (OtherPointer.Capability index) ->
+        Object.Capability index
 
 
   let list_fold_left_generic

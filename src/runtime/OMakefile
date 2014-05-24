@@ -10,6 +10,7 @@ RUNTIME_MODULES =   \
   listPointer       \
   message           \
   messageStorage    \
+  otherPointer      \
   pointer           \
   reader            \
   stringStorage     \

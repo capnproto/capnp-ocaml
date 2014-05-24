@@ -51,6 +51,8 @@ module Make (MessageWrapper : Message.S) = struct
         Some list_descr
     | Object.Struct _ ->
         invalid_msg "decoded struct pointer where list pointer was expected"
+    | Object.Capability _ ->
+        invalid_msg "decoded capability pointer where list pointer was expected"
 
 
   (* Given a pointer which is expected to be a struct pointer, compute the
@@ -65,6 +67,8 @@ module Make (MessageWrapper : Message.S) = struct
         Some struct_descr
     | Object.List _ ->
         invalid_msg "decoded list pointer where struct pointer was expected"
+    | Object.Capability _ ->
+        invalid_msg "decoded capability pointer where struct pointer was expected"
 
 
   let void_list_decoders =
@@ -537,6 +541,23 @@ module Make (MessageWrapper : Message.S) = struct
           default
     | None ->
         default
+
+  let get_interface
+      (pointer_opt : 'cap Slice.t option)
+    : Uint32.t option =
+    match pointer_opt with
+    | Some pointer_bytes ->
+        begin match decode_pointer pointer_bytes with
+        | Pointer.Null ->
+            None
+        | Pointer.Other (OtherPointer.Capability index) ->
+            Some index
+        | _ ->
+            invalid_msg "decoded non-capability pointer where capability was expected"
+        end
+    | None ->
+        None
+
 
 end
 

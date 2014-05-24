@@ -343,6 +343,9 @@ module Make (ROM : Message.S) (RWM : Message.S) = struct
         init_list_pointer dest list_storage
     | RWC.Object.Struct struct_storage ->
         init_struct_pointer dest struct_storage
+    | RWC.Object.Capability _ ->
+        let word = RWM.Slice.get_int64 src 0 in
+        RWM.Slice.set_int64 dest 0 word
 
 
   (* Copy a struct from the source slice to the destination slice.  This
@@ -547,6 +550,9 @@ module Make (ROM : Message.S) (RWM : Message.S) = struct
             ~data_words ~pointer_words
         in
         init_struct_pointer dest dest_struct_storage
+    | ROC.Object.Capability _ ->
+        let word = ROM.Slice.get_int64 src 0 in
+        RWM.Slice.set_int64 dest 0 word
 
   (* Given a [src] struct storage descriptor, first allocate storage in
      [dest_message] for a copy of the struct and then fill the allocated
@@ -769,6 +775,8 @@ module Make (ROM : Message.S) (RWM : Message.S) = struct
         deep_zero_list list_storage
     | RWC.Object.Struct struct_storage ->
         deep_zero_struct struct_storage
+    | RWC.Object.Capability _ ->
+        ()
 
   and deep_zero_list
       (list_storage : rw RWC.ListStorage.t)

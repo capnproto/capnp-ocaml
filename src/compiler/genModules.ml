@@ -307,7 +307,7 @@ let rec generate_list_element_decoder ~nodes_table ~scope list_def =
         "    get_enum_list (Some slice))";
         "in";
       ]
-  | Interface _ ->
+  | Interface iface_def ->
       failwith "not implemented"
   | AnyPointer ->
       failwith "not implemented"
@@ -999,12 +999,17 @@ let generate_one_field_accessors ~nodes_table ~node_id ~scope
             (getters, setters)
         | (PS.Type.Interface iface_def, PS.Value.Interface) ->
             let getters = [
-              "let " ^ field_name ^
-                "_get x = failwith \"not implemented (iface 2)\"";
+              "let " ^ field_name ^ "_get x =";
+              sprintf "  %s.get_pointer_field x %u ~f:%s.get_interface"
+                api_module
+                field_ofs
+                api_module;
             ] in
             let setters = [
-              "let " ^ field_name ^
-                "_set x v = failwith \"not implemented (iface 2)\"";
+              "let " ^ field_name ^ "_set x v =";
+              sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.set_interface v)"
+                discr_str
+                field_ofs;
             ] in
             (getters, setters)
         | (PS.Type.AnyPointer, PS.Value.AnyPointer pointer_slice_opt) ->

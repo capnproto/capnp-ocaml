@@ -655,8 +655,19 @@ module Make (NM : Message.S) = struct
               ~dest:pointer_bytes
         | None ->
             ()
-  in
-  pointer_bytes
+    in
+    pointer_bytes
+
+  let get_interface
+      (pointer_bytes : rw NM.Slice.t)
+    : Uint32.t option =
+    match NC.decode_pointer pointer_bytes with
+    | Pointer.Null ->
+        None
+    | Pointer.Other (OtherPointer.Capability index) ->
+        Some index
+    | _ ->
+        invalid_msg "decoded non-capability pointer where capability was expected"
 
 
   (*******************************************************************************
@@ -850,6 +861,17 @@ module Make (NM : Message.S) = struct
     : rw NM.Slice.t =
     let () = BOps.deep_copy_pointer ~src:value ~dest:pointer_bytes in
     pointer_bytes
+
+  let set_interface
+      (value : Uint32.t option)
+      (pointer_bytes : rw NM.Slice.t)
+    : unit =
+    match value with
+    | Some index ->
+        NM.Slice.set_int64 pointer_bytes 0
+          (OtherPointer.encode (OtherPointer.Capability index))
+    | None ->
+        NM.Slice.set_int64 pointer_bytes 0 Int64.zero
 
 
   (*******************************************************************************
