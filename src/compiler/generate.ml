@@ -128,7 +128,6 @@ let string_of_lines lines =
 
 let compile
     (request : PS.CodeGeneratorRequest.t)
-    (dest_dir : string)
   : unit =
   let nodes_table = Hashtbl.Poly.create () in
   let nodes = PS.CodeGeneratorRequest.nodes_get request in

@@ -52,7 +52,7 @@ let main () : int =
       let message = Message.readonly (Message.of_storage segments) in
       let request = PS.CodeGeneratorRequest.of_message message in
       begin try
-        let () = Generate.compile request "dir_name" in
+        let () = Generate.compile request in
         ExitCode.success
       with (Failure msg) as e ->
         let bs = Exn.backtrace () in
