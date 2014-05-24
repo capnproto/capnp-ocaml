@@ -353,7 +353,7 @@ let rec generate_node
   | Const const_def -> [
       sprintf "val %s : %s"
         (GenCommon.underscore_name node_name)
-        (GenCommon.type_name ~mode:Mode.Reader ~scope_mode:Mode.Reader
+        (GenCommon.type_name ~mode:Mode.Reader ~scope_mode:mode
            nodes_table scope (Const.type_get const_def));
     ]
   | Annotation annot_def ->

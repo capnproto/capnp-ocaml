@@ -158,7 +158,8 @@ let compile
     in
     let mod_file_content =
       let defaults_context =
-        GenModules.build_defaults_context ~nodes_table requested_file_node
+        GenModules.build_defaults_context ~nodes_table ~node_name:requested_filename
+        requested_file_node
       in
       let reader_body =
         GenCommon.apply_indent ~indent:"    "

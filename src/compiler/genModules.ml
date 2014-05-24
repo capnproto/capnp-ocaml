@@ -1117,6 +1117,115 @@ let generate_accessors ~nodes_table ~node ~scope ~mode struct_def fields =
     x @ acc)
 
 
+(* Generate a definition for a constant. *)
+let generate_constant ~nodes_table ~scope ~node ~node_name const_def =
+  let const_type = PS.Node.Const.type_get const_def in
+  let const_val  = PS.Node.Const.value_get const_def in
+  let open PS in
+  match (Type.get const_type, Value.get const_val) with
+  | (Type.Void, Value.Void) ->
+      "()"
+  | (Type.Bool, Value.Bool a) ->
+      if a then "true" else "false"
+  | (Type.Int8, Value.Int8 a)
+  | (Type.Int16, Value.Int16 a)
+  | (Type.Uint8, Value.Uint8 a)
+  | (Type.Uint16, Value.Uint16 a) ->
+      Int.to_string a
+  | (Type.Int32, Value.Int32 a) ->
+      (Int32.to_string a) ^ "l"
+  | (Type.Int64, Value.Int64 a) ->
+      (Int64.to_string a) ^ "L"
+  | (Type.Uint32, Value.Uint32 a) ->
+      sprintf "(Uint32.of_string %s)" (Uint32.to_string a)
+  | (Type.Uint64, Value.Uint64 a) ->
+      sprintf "(Uint64.of_string %s)" (Uint64.to_string a)
+  | (Type.Float32, Value.Float32 a) ->
+      sprintf "(Int32.float_of_bits %sl)"
+        (Int32.to_string (Int32.bits_of_float a))
+  | (Type.Float64, Value.Float64 a) ->
+      sprintf "(Int64.float_of_bits %sL)"
+        (Int64.to_string (Int64.bits_of_float a))
+  | (Type.Text, Value.Text a)
+  | (Type.Data, Value.Data a) ->
+      "\"" ^ (String.escaped a) ^ "\""
+  | (Type.List list_def, Value.List pointer_slice_opt) ->
+      failwith "List constants are not yet implemented."
+  | (Type.Enum _, Value.Enum enum_val) ->
+      let const_type = PS.Node.Const.type_get const_def in
+      let enum_node =
+        match PS.Type.get const_type with
+        | PS.Type.Enum enum_def ->
+            let enum_id = PS.Type.Enum.type_id_get enum_def in
+            Hashtbl.find_exn nodes_table enum_id
+        | _ ->
+            failwith "Decoded non-enum node where enum node was expected."
+      in
+      let enumerants =
+        match PS.Node.get enum_node with
+        | PS.Node.Enum enum_group -> PS.Node.Enum.enumerants_get enum_group
+        | _ -> failwith "Decoded non-enum node where enum node was expected."
+      in
+      let undefined_name = GenCommon.mangle_enum_undefined enumerants in
+      let scope_relative_name =
+        GenCommon.get_scope_relative_name nodes_table scope enum_node in
+      if enum_val >= C.Array.length enumerants then
+        sprintf "%s.%s %u" scope_relative_name
+          (String.capitalize undefined_name) enum_val
+      else
+        let enumerant = C.Array.get enumerants enum_val in
+        sprintf "%s.%s"
+          scope_relative_name
+          (String.capitalize (PS.Enumerant.name_get enumerant))
+  | (Type.Struct _, Value.Struct pointer_slice_opt) ->
+      begin match pointer_slice_opt with
+      | Some pointer_slice ->
+          begin match ReaderApi.deref_struct_pointer pointer_slice with
+          | Some _ ->
+              let node_id = PS.Node.id_get node in
+              let name = GenCommon.underscore_name node_name in
+              Defaults.reader_string_of_ident (Defaults.make_ident node_id name)
+          | None ->
+              failwith (sprintf "Struct constant \"%s\" is null."
+                  node_name)
+          end
+      | None ->
+          assert false
+      end
+  | (Type.Interface _, Value.Interface) ->
+      failwith "Interface constants are not yet implemented."
+  | (Type.AnyPointer, Value.AnyPointer pointer) ->
+      failwith "AnyPointer constants are not yet implemented."
+  | (Type.Undefined x, _) ->
+      failwith (sprintf "Unknown Value union discriminant %u." x)
+  (* All other cases represent an ill-formed default value in the plugin request *)
+  | (Type.Void, _)
+  | (Type.Bool, _)
+  | (Type.Int8, _)
+  | (Type.Int16, _)
+  | (Type.Int32, _)
+  | (Type.Int64, _)
+  | (Type.Uint8, _)
+  | (Type.Uint16, _)
+  | (Type.Uint32, _)
+  | (Type.Uint64, _)
+  | (Type.Float32, _)
+  | (Type.Float64, _)
+  | (Type.Text, _)
+  | (Type.Data, _)
+  | (Type.List _, _)
+  | (Type.Enum _, _)
+  | (Type.Struct _, _)
+  | (Type.Interface _, _)
+  | (Type.AnyPointer, _) ->
+      let err_msg = sprintf
+          "The value provided for the constant with name \"%s\" has \
+           an unexpected type."
+          node_name
+      in
+      failwith err_msg
+
+
 (* Generate the OCaml module corresponding to a struct definition.  [scope] is a
  * stack of scope IDs corresponding to this lexical context, and is used to figure
  * out what module prefixes are required to properly qualify a type.
@@ -1256,7 +1365,7 @@ and generate_node
       generate_nested_modules ()
   | PS.Node.Const const_def -> [
         "let " ^ (GenCommon.underscore_name node_name) ^ " = " ^
-          (GenCommon.generate_constant ~nodes_table ~scope const_def);
+          (generate_constant ~nodes_table ~scope ~node ~node_name const_def);
       ]
   | PS.Node.Annotation annot_def ->
       generate_nested_modules ()
@@ -1266,7 +1375,7 @@ and generate_node
 
 (* Update the default-value context with default values associated with
    the specified struct. *)
-let update_defaults_context ~nodes_table ~context ~node ~struct_def =
+let update_defaults_context_struct ~nodes_table ~context ~node ~struct_def =
   let fields = PS.Node.Struct.fields_get struct_def in
   C.Array.iter fields ~f:(fun field ->
     let field_name = GenCommon.underscore_name (PS.Field.name_get field) in
@@ -1312,12 +1421,53 @@ let update_defaults_context ~nodes_table ~context ~node ~struct_def =
         failwith (sprintf "Unknown Field union discriminant %u." x))
 
 
+(* Update the default-value context with default values associated with
+   the specified constant. *)
+let update_defaults_context_constant ~nodes_table ~context
+    ~node ~node_name ~const_def =
+  let node_id = PS.Node.id_get node in
+  let open PS.Value in
+  let const_val = PS.Node.Const.value_get const_def in
+  match get const_val with
+  | Struct pointer_slice_opt ->
+      begin match pointer_slice_opt with
+      | Some pointer_slice ->
+          begin match ReaderApi.deref_struct_pointer pointer_slice with
+          | Some default_storage ->
+              let name = GenCommon.underscore_name node_name in
+              let ident = Defaults.make_ident node_id name in
+              Defaults.add_struct context ident default_storage
+          | None ->
+              ()
+          end
+      | None ->
+          ()
+      end
+  | List pointer_slice_opt ->
+      begin match pointer_slice_opt with
+      | Some pointer_slice ->
+          begin match ReaderApi.deref_list_pointer pointer_slice with
+          | Some default_storage ->
+              let name = GenCommon.underscore_name node_name in
+              let ident = Defaults.make_ident node_id name in
+              Defaults.add_list context ident default_storage
+          | None ->
+              ()
+          end
+      | None ->
+          ()
+      end
+  | _ ->
+      ()
+
+
 (* Construct new context for managing struct and list default values,
    and fill the context with all the default values associated with the
    node (recursively). *)
 let rec build_defaults_context
     ?(context : Defaults.t option)
     ~(nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
+    ~(node_name : string)
     (node : PS.Node.t)
   : Defaults.t =
   let ctx =
@@ -1327,20 +1477,29 @@ let rec build_defaults_context
   in
   let child_nodes = GenCommon.children_of nodes_table node in
   let () = List.iter child_nodes ~f:(fun child_node ->
-    let _ = build_defaults_context ~context:ctx ~nodes_table child_node in ())
+      let child_name = GenCommon.get_unqualified_name
+          ~parent:node ~child:child_node
+      in
+      let _ = build_defaults_context ~context:ctx ~nodes_table
+          ~node_name:child_name child_node in ())
   in
   match PS.Node.get node with
   | PS.Node.Struct struct_def ->
-      let () = update_defaults_context ~nodes_table ~context:ctx ~node ~struct_def in
+      let () = update_defaults_context_struct ~nodes_table
+          ~context:ctx ~node ~struct_def
+      in
+      ctx
+  | PS.Node.Const const_def ->
+      let () = update_defaults_context_constant ~nodes_table
+          ~context:ctx ~node ~node_name ~const_def
+      in
       ctx
   | PS.Node.File
   | PS.Node.Enum _
   | PS.Node.Interface _
-  | PS.Node.Const _
   | PS.Node.Annotation _ ->
       ctx
   | PS.Node.Undefined x ->
       failwith (sprintf "Unknown Node union discriminant %u" x)
-
 
 
