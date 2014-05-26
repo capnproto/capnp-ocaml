@@ -300,7 +300,7 @@ module type S = sig
       val scope_id_get : t -> Uint64.t
       val scope_id_get_int_exn : t -> int
       val nested_nodes_get : t -> (ro, NestedNode.t, array_t) Capnp.Array.t
-      val annotations_get : t -> (ro, Annotation.t, array_t) Capnp.Array.t
+      val annotations_get : t -> (ro, reader_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
       val of_message : 'cap message_t -> t
     end
     module CodeGeneratorRequest : sig
@@ -746,9 +746,9 @@ module type S = sig
       val nested_nodes_get : t -> (rw, NestedNode.t, array_t) Capnp.Array.t
       val nested_nodes_set : t -> (rw, NestedNode.t, array_t) Capnp.Array.t -> (rw, NestedNode.t, array_t) Capnp.Array.t
       val nested_nodes_init : t -> int -> (rw, NestedNode.t, array_t) Capnp.Array.t
-      val annotations_get : t -> (rw, Annotation.t, array_t) Capnp.Array.t
-      val annotations_set : t -> (rw, Annotation.t, array_t) Capnp.Array.t -> (rw, Annotation.t, array_t) Capnp.Array.t
-      val annotations_init : t -> int -> (rw, Annotation.t, array_t) Capnp.Array.t
+      val annotations_get : t -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
+      val annotations_set : t -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
+      val annotations_init : t -> int -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
       val init_root : ?message_size:int -> unit -> t

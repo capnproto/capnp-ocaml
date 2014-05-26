@@ -223,6 +223,34 @@ let make_unique_typename ~(mode : Mode.t) ~nodes_table node =
   sprintf "%s_%s_%s" t_str uq_name (Uint64.to_string (PS.Node.id_get node))
 
 
+(* Determines whether a simple name for [node], as given by
+ * [get_scope_relative_name], may be ambiguous for referring to the [node]
+ * from the given [scope]. *)
+let is_node_naming_collision ~nodes_table ~scope node =
+  let target_name = get_scope_relative_name nodes_table scope node in
+  let target_scope_id = PS.Node.scope_id_get node in
+  List.fold_left scope ~init:false
+    ~f:(fun is_collision scope_id ->
+      if is_collision then
+        true
+      else if uint64_equal target_scope_id scope_id then
+        (* Skipping over the target node *)
+        false
+      else
+        Hashtbl.fold nodes_table ~init:false
+          ~f:(fun ~key:id ~data:other_node found ->
+            if found then
+              true
+            else
+              if uint64_equal scope_id (PS.Node.scope_id_get other_node) then
+                let candidate_name =
+                  get_scope_relative_name nodes_table scope other_node
+                in
+                String.equal target_name candidate_name
+              else
+                false))
+
+
 (* When modules refer to types defined in other modules, readability dictates
  * that we use OtherModule.t/OtherModule.reader_t/OtherModule.builder_t as
  * the preferred type name.  However, consider the case of nested modules:
@@ -247,13 +275,39 @@ let make_unique_typename ~(mode : Mode.t) ~nodes_table node =
  * In this case, module Foo does not have a complete declaration at the time
  * foo_get is declared, so we can't refer to the type as "Foo.t".  So for
  * this case instead of using Foo.t we emit an unambiguous type identifier
- * based on the 64-bit unique ID for Foo. *)
+ * based on the 64-bit unique ID for Foo.
+ *
+ * A second case occurs when two different nodes with the same name are
+ * visible at the same scope:
+ *
+ * struct Foo {
+ *   struct Nested {
+ *     ...
+ *   }
+ *
+ *   struct Bar {
+ *     struct Nested {
+ *       ...
+ *     }
+ *
+ *     nested @0 :Foo.Nested;
+ *   }
+ * }
+ *
+ * In this case we must ensure that the type of field 'nested' is
+ * emitted in an unambiguous form which cannot be confused with Foo.Bar.Nested.
+ * The test here is "at this scope, are there multiple nodes present with the
+ * same name as the target node"? *)
 let make_disambiguated_type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
     ~nodes_table ~scope ~tp node =
   let node_id = PS.Node.id_get node in
   if List.mem scope node_id then
     (* The node of interest is a parent node of the node being generated.
-       this is the case where an unambiguous type is emitted. *)
+       this is a case where an unambiguous type is emitted. *)
+    make_unique_typename ~mode ~nodes_table node
+  else if is_node_naming_collision ~nodes_table ~scope node then
+    (* A scope-relative name would be ambiguous due to the presence of
+       another node with the same name.  Emit an unambiguous type. *)
     make_unique_typename ~mode ~nodes_table node
   else
     let module_name = get_scope_relative_name nodes_table scope node in
