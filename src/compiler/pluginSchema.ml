@@ -890,6 +890,36 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       | Pointer
       | InlineComposite
       | Undefined of int
+    let decode u16 = match u16 with
+      | 0 -> Empty
+      | 1 -> Bit
+      | 2 -> Byte
+      | 3 -> TwoBytes
+      | 4 -> FourBytes
+      | 5 -> EightBytes
+      | 6 -> Pointer
+      | 7 -> InlineComposite
+      | v -> Undefined v
+    let encode_safe enum = match enum with
+      | Empty -> 0
+      | Bit -> 1
+      | Byte -> 2
+      | TwoBytes -> 3
+      | FourBytes -> 4
+      | EightBytes -> 5
+      | Pointer -> 6
+      | InlineComposite -> 7
+      | Undefined x -> invalid_msg "Cannot encode undefined enum value."
+    let encode_unsafe enum = match enum with
+      | Empty -> 0
+      | Bit -> 1
+      | Byte -> 2
+      | TwoBytes -> 3
+      | FourBytes -> 4
+      | EightBytes -> 5
+      | Pointer -> 6
+      | InlineComposite -> 7
+      | Undefined x -> x
   end
   module DefaultsCopier_ =
     Runtime.BuilderOps.Make(Runtime.Builder.DefaultsMessage)(MessageWrapper)
@@ -1229,20 +1259,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         let pointer_count_get x =
           RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:24)
         let preferred_list_encoding_get x =
-          let decode =
-            (fun u16 -> match u16 with
-              | 0 -> ElementSize.Empty
-              | 1 -> ElementSize.Bit
-              | 2 -> ElementSize.Byte
-              | 3 -> ElementSize.TwoBytes
-              | 4 -> ElementSize.FourBytes
-              | 5 -> ElementSize.EightBytes
-              | 6 -> ElementSize.Pointer
-              | 7 -> ElementSize.InlineComposite
-              | v -> ElementSize.Undefined v)
-          in
           let discr = RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:26) in
-          decode discr
+          ElementSize_15102134695616452902.decode discr
         let is_group_get x =
           RA_.get_data_field x ~f:(RA_.get_bit ~default:false ~byte_ofs:28 ~bit_ofs:0)
         let discriminant_count_get x =
@@ -1925,49 +1943,12 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         let pointer_count_set_exn x v =
           BA_.get_data_field x ~f:(BA_.set_uint16 ~default:0 ~byte_ofs:24 v)
         let preferred_list_encoding_get x =
-          let decode =
-            (fun u16 -> match u16 with
-              | 0 -> ElementSize.Empty
-              | 1 -> ElementSize.Bit
-              | 2 -> ElementSize.Byte
-              | 3 -> ElementSize.TwoBytes
-              | 4 -> ElementSize.FourBytes
-              | 5 -> ElementSize.EightBytes
-              | 6 -> ElementSize.Pointer
-              | 7 -> ElementSize.InlineComposite
-              | v -> ElementSize.Undefined v)
-          in
           let discr = BA_.get_data_field x ~f:(BA_.get_uint16 ~default:0 ~byte_ofs:26) in
-          decode discr
+          ElementSize_15102134695616452902.decode discr
         let preferred_list_encoding_set x e =
-          let encode =
-            (fun enum -> match enum with
-              | ElementSize.Empty -> 0
-              | ElementSize.Bit -> 1
-              | ElementSize.Byte -> 2
-              | ElementSize.TwoBytes -> 3
-              | ElementSize.FourBytes -> 4
-              | ElementSize.EightBytes -> 5
-              | ElementSize.Pointer -> 6
-              | ElementSize.InlineComposite -> 7
-              | ElementSize.Undefined _ ->
-                  invalid_msg "Cannot encode undefined enum value.")
-          in
-          BA_.get_data_field x ~f:(BA_.set_uint16 ~default:0 ~byte_ofs:26 (encode e))
+          BA_.get_data_field x ~f:(BA_.set_uint16 ~default:0 ~byte_ofs:26 (ElementSize_15102134695616452902.encode_safe e))
         let preferred_list_encoding_set_unsafe x e =
-          let encode =
-            (fun enum -> match enum with
-              | ElementSize.Empty -> 0
-              | ElementSize.Bit -> 1
-              | ElementSize.Byte -> 2
-              | ElementSize.TwoBytes -> 3
-              | ElementSize.FourBytes -> 4
-              | ElementSize.EightBytes -> 5
-              | ElementSize.Pointer -> 6
-              | ElementSize.InlineComposite -> 7
-              | ElementSize.Undefined x -> x)
-          in
-          BA_.get_data_field x ~f:(BA_.set_uint16 ~default:0 ~byte_ofs:26 (encode e))
+          BA_.get_data_field x ~f:(BA_.set_uint16 ~default:0 ~byte_ofs:26 (ElementSize_15102134695616452902.encode_unsafe e))
         let is_group_get x =
           BA_.get_data_field x ~f:(BA_.get_bit ~default:false ~byte_ofs:28 ~bit_ofs:0)
         let is_group_set x v =

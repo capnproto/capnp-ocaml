@@ -234,7 +234,7 @@ let emit_instantiate_builder_lists list_array : string list =
         (Int.to_string list_storage.storage.M.Slice.start) ^ ";";
       "    DefaultsMessage_.Slice.len = " ^
         (Int.to_string list_storage.storage.M.Slice.len) ^ "; };";
-      "  DefaultsCommon_.ListStorage.storage_type = Capnp.Runtime.Common. " ^
+      "  DefaultsCommon_.ListStorage.storage_type = Capnp.Runtime.Common." ^
         (Common.ListStorageType.to_string list_storage.storage_type) ^ ";";
       "  DefaultsCommon_.ListStorage.num_elements = " ^
         (Int.to_string list_storage.num_elements) ^ ";";

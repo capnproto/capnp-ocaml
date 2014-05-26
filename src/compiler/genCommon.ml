@@ -211,18 +211,21 @@ let get_scope_relative_name nodes_table (scope_stack : Uint64.t list) node
   String.concat ~sep:"." (List.map rel_name ~f:fst)
 
 
-let make_unique_typename ~(mode : Mode.t) ~nodes_table node =
+let make_unique_enum_module_name ~nodes_table enum_node =
   let uq_name = get_unqualified_name
-    ~parent:(Hashtbl.find_exn nodes_table (PS.Node.scope_id_get node)) ~child:node
+      ~parent:(Hashtbl.find_exn nodes_table (PS.Node.scope_id_get enum_node))
+      ~child:enum_node
   in
-  let node_id = PS.Node.id_get node in
+  let node_id = PS.Node.id_get enum_node in
+  (String.capitalize uq_name) ^ "_" ^ (Uint64.to_string node_id)
+
+
+let make_unique_typename ~(mode : Mode.t) ~nodes_table node =
   match PS.Node.get node with
   | PS.Node.Enum enum_def ->
       (* Enums don't have unique type names, they have unique module names.  This
          allows us to use the same enum constructor names without name collisions. *)
-      let unique_module_name =
-        (String.capitalize uq_name) ^ "_" ^ (Uint64.to_string node_id)
-      in
+      let unique_module_name = make_unique_enum_module_name ~nodes_table node in
       unique_module_name ^ ".t"
   | _ ->
       let t_str =
@@ -230,6 +233,10 @@ let make_unique_typename ~(mode : Mode.t) ~nodes_table node =
         | Mode.Reader  -> "reader_t"
         | Mode.Builder -> "builder_t"
       in
+      let uq_name = get_unqualified_name
+        ~parent:(Hashtbl.find_exn nodes_table (PS.Node.scope_id_get node)) ~child:node
+      in
+      let node_id = PS.Node.id_get node in
       sprintf "%s_%s_%s" t_str uq_name (Uint64.to_string node_id)
 
 
@@ -440,6 +447,57 @@ let generate_union_type ~(mode : Mode.t) nodes_table scope fields =
   (header @ cases @ footer)
 
 
+(* Generate a decoder function for converting from a uint16 to the
+   associated enum value. *)
+let generate_enum_decoder enum_def =
+  let header = [ "let decode u16 = match u16 with" ] in
+  let enumerants = PS.Node.Enum.enumerants_get enum_def in
+  let match_cases =
+    C.Array.foldi_right enumerants ~init:[] ~f:(fun i enumerant acc ->
+      let case_str =
+        sprintf "  | %u -> %s" i
+          (String.capitalize (PS.Enumerant.name_get enumerant))
+      in
+      case_str :: acc)
+  in
+  let undefined_name = mangle_enum_undefined enumerants in
+  let footer = [
+    sprintf "  | v -> %s v" undefined_name
+  ] in
+  header @ match_cases @ footer
+
+
+(* Generate an encoder function for converting from an enum value to the
+   associated uint16. *)
+let generate_enum_encoder ~unsafe enum_def =
+  let header =
+    if unsafe then
+      [ "let encode_unsafe enum = match enum with" ]
+    else
+      [ "let encode_safe enum = match enum with" ]
+  in
+  let enumerants = PS.Node.Enum.enumerants_get enum_def in
+  let match_cases =
+    C.Array.foldi_right enumerants ~init:[] ~f:(fun i enumerant acc ->
+      let case_str =
+        sprintf "  | %s -> %u"
+          (String.capitalize (PS.Enumerant.name_get enumerant))
+          i
+      in
+      case_str :: acc)
+  in
+  let footer =
+    let undefined_name = mangle_enum_undefined enumerants in
+    if unsafe then
+      [ sprintf "  | %s x -> x" undefined_name ]
+    else
+      [ sprintf "  | %s x -> \
+                 invalid_msg \"Cannot encode undefined enum value.\""
+          undefined_name ]
+  in
+  header @ match_cases @ footer
+
+
 (* Generate the signature for an enum type. *)
 let generate_enum_sig ?unique_module_name enum_def =
   let header =
@@ -513,17 +571,25 @@ let rec collect_unique_enums ?(toplevel = true) ~is_sig ~nodes_table ~node_name 
     | PS.Node.Interface _ ->
         []
     | PS.Node.Enum enum_def ->
-        let unique_module_name =
-          (String.capitalize node_name) ^ "_" ^ (Uint64.to_string (PS.Node.id_get node))
-        in
+        let unique_module_name = make_unique_enum_module_name ~nodes_table node in
         let body = generate_enum_sig enum_def in
+        let codecs =
+          if is_sig then
+            []
+          else
+            (* Emit encoder and decoder functions for private use within the
+               module implementation *)
+            (generate_enum_decoder enum_def) @
+              (generate_enum_encoder ~unsafe:false enum_def) @
+              (generate_enum_encoder ~unsafe:true enum_def)
+        in
         let header =
           if is_sig then
             [ "module " ^ unique_module_name ^ " : sig" ]
           else
             [ "module " ^ unique_module_name ^ " = struct" ]
         in
-        header @ (apply_indent ~indent:"  " body) @ [ "end" ]
+        header @ (apply_indent ~indent:"  " (body @ codecs)) @ [ "end" ]
     | PS.Node.Undefined x ->
         failwith (sprintf "Unknown Node union discriminant %u" x)
   in

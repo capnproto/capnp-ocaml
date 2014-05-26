@@ -46,180 +46,90 @@ let api_of_mode mode =
   | Mode.Builder -> "BA_"
 
 
-(* Generate a decoder lambda for converting from a uint16 to the
-   associated enum value. *)
-let generate_enum_decoder ~nodes_table ~scope ~enum_node =
-  let header = [ "(fun u16 -> match u16 with" ] in
-  let scope_relative_name =
-    GenCommon.get_scope_relative_name nodes_table scope enum_node
-  in
-  let enumerants =
-    match PS.Node.get enum_node with
-    | PS.Node.Enum enum_group ->
-        PS.Node.Enum.enumerants_get enum_group
-    | _ ->
-        failwith "Decoded non-enum node where enum node was expected."
-  in
-  let match_cases =
-    C.Array.foldi_right enumerants ~init:[] ~f:(fun i enumerant acc ->
-      let case_str =
-        sprintf "  | %u -> %s.%s" i scope_relative_name
-          (String.capitalize (PS.Enumerant.name_get enumerant))
-      in
-      case_str :: acc)
-  in
-  let undefined_name = GenCommon.mangle_enum_undefined enumerants in
-  let footer = [
-    sprintf "  | v -> %s.%s v)" scope_relative_name undefined_name
-  ] in
-  header @ match_cases @ footer
-
-
-(* Generate an encoder lambda for converting from an enum value to the associated
-   uint16.  [allow_undefined] indicates whether or not to permit enum values which
-   use the [Undefined] constructor. *)
-let generate_enum_encoder ~(allow_undefined : bool) ~nodes_table ~scope
-    ~enum_node =
-  let header = [ "(fun enum -> match enum with" ] in
-  let scope_relative_name =
-    GenCommon.get_scope_relative_name nodes_table scope enum_node
-  in
-  let enumerants =
-    match PS.Node.get enum_node with
-    | PS.Node.Enum enum_group ->
-        PS.Node.Enum.enumerants_get enum_group
-    | _ ->
-        failwith "Decoded non-enum node where enum node was expected."
-  in
-  let match_cases =
-    C.Array.foldi_right enumerants ~init:[] ~f:(fun i enumerant acc ->
-      let case_str =
-        sprintf "  | %s.%s -> %u"
-          scope_relative_name
-          (String.capitalize (PS.Enumerant.name_get enumerant))
-          i
-      in
-      case_str :: acc)
-  in
-  let footer = 
-    let undefined_name = GenCommon.mangle_enum_undefined enumerants in
-    if allow_undefined then [
-      sprintf "  | %s.%s x -> x)" scope_relative_name undefined_name
-    ] else [
-      sprintf "  | %s.%s _ ->" scope_relative_name undefined_name;
-              "      invalid_msg \"Cannot encode undefined enum value.\")";
-    ]
-  in
-  header @ match_cases @ footer
-
-
 (* Generate an accessor for decoding an enum type. *)
-let generate_enum_getter ~nodes_table ~scope ~enum_node ~mode
+let generate_enum_getter ~nodes_table ~enum_node ~mode
     ~field_name ~field_ofs ~default =
   let api_module = api_of_mode mode in
-  let decoder_lambda =
-    apply_indent ~indent:"    "
-      (generate_enum_decoder ~nodes_table ~scope ~enum_node)
+  let unique_module_name =
+    GenCommon.make_unique_enum_module_name ~nodes_table enum_node
   in [
     "let " ^ field_name ^ "_get x =";
-    "  let decode ="; ] @ decoder_lambda @ [
-    "  in";
     sprintf "  let discr = %s.get_data_field x \
              ~f:(%s.get_uint16 ~default:%u ~byte_ofs:%u) in"
       api_module
       api_module
       default
       (field_ofs * 2);
-    "  decode discr";
+    "  " ^ unique_module_name ^ ".decode discr";
   ]
 
 
 (* Generate an accessor for setting the value of an enum. *)
-let generate_enum_safe_setter ~nodes_table ~scope ~enum_node ~field_name
+let generate_enum_safe_setter ~nodes_table ~enum_node ~field_name
     ~field_ofs ~default ~discr_str =
-  let encoder_lambda =
-    apply_indent ~indent:"    "
-      (generate_enum_encoder ~allow_undefined:false
-         ~nodes_table ~scope ~enum_node)
+  let unique_module_name =
+    GenCommon.make_unique_enum_module_name ~nodes_table enum_node
   in [
     "let " ^ field_name ^ "_set x e =";
-    "  let encode =" ] @ encoder_lambda @ [
-    "  in";
     sprintf
       "  BA_.get_data_field %sx ~f:(BA_.set_uint16 \
-       ~default:%u ~byte_ofs:%u (encode e))"
+       ~default:%u ~byte_ofs:%u (%s.encode_safe e))"
       discr_str
       default
-      (field_ofs * 2);
+      (field_ofs * 2)
+      unique_module_name;
   ]
 
 
 (* Generate an accessor for setting the value of an enum, permitting values
    which are not defined in the schema. *)
-let generate_enum_unsafe_setter ~nodes_table ~scope ~enum_node
-    ~field_name ~field_ofs ~default ~discr_str =
-  let encoder_lambda =
-    apply_indent ~indent:"    "
-      (generate_enum_encoder ~allow_undefined:true
-        ~nodes_table ~scope ~enum_node)
+let generate_enum_unsafe_setter ~nodes_table ~enum_node ~field_name
+    ~field_ofs ~default ~discr_str =
+  let unique_module_name =
+    GenCommon.make_unique_enum_module_name ~nodes_table enum_node
   in [
-    "let " ^ field_name ^ "_set_unsafe x e =";
-    "  let encode =" ] @ encoder_lambda @ [
-    "  in";
-    sprintf
+    "let " ^ field_name ^ "_set_unsafe x e ="; sprintf
       "  BA_.get_data_field %sx ~f:(BA_.set_uint16 \
-       ~default:%u ~byte_ofs:%u (encode e))"
+       ~default:%u ~byte_ofs:%u (%s.encode_unsafe e))"
       discr_str
       default
-      (field_ofs * 2);
+      (field_ofs * 2)
+      unique_module_name;
   ]
 
 
 (* There is no get_enum() or get_enum_list() in the runtime API,
    because the enum values are schema-dependent.  This function
    will generate something appropriate for localized use. *)
-let generate_enum_runtime_getters ~nodes_table ~scope ~mode enum_def =
+let generate_enum_runtime_getters ~nodes_table ~mode enum_node =
   let api_module = api_of_mode mode in
-  let enum_id = PS.Type.Enum.type_id_get enum_def in
-  let enum_node = Hashtbl.find_exn nodes_table enum_id in
-  let decoder_lambda =
-    apply_indent ~indent:"    "
-      (generate_enum_decoder ~nodes_table ~scope ~enum_node)
-  in
-  let encoder_lambda =
-    apply_indent ~indent:"    "
-      (generate_enum_encoder ~nodes_table ~scope ~enum_node
-         ~allow_undefined:false)
+  let unique_module_name =
+    GenCommon.make_unique_enum_module_name ~nodes_table enum_node
   in
   let get_enum_list =
     match mode with
     | Mode.Reader -> [
         "let get_enum_list ?default pointer_opt =";
-        "  let decode ="; ] @ decoder_lambda @ [
-        "  in";
         "  RA_.get_list ?default (RA_.ListDecoders.Bytes2 (fun slice ->";
-        "    decode (Slice.get_uint16 slice 0)))";
+        "    " ^ unique_module_name ^ ".decode (Slice.get_uint16 slice 0)))";
         "    pointer_opt";
         "in";
       ]
     | Mode.Builder -> [
         "let get_enum_list ?default pointer =";
-        "  let decode ="; ] @ decoder_lambda @ [
-        "  in";
-        "  let encode ="; ] @ encoder_lambda @ [
-        "  in";
         "  let codecs = BA_.ListCodecs.Bytes2 (";
-        "    (fun slice -> decode (Slice.get_uint16 slice 0)),";
-        "    (fun v slice -> Slice.set_uint16 slice 0 (encode v)))";
+        "    (fun slice -> " ^ unique_module_name ^
+          ".decode (Slice.get_uint16 slice 0)),";
+        "    (fun v slice -> Slice.set_uint16 slice 0 (" ^ unique_module_name ^
+          ".encode_safe v)))";
         "  in";
         "  BA_.get_list ~storage_type:BA_.ListStorage.Bytes2 ~codecs pointer_bytes";
         "in";
       ]
   in [
     "let get_enum ~byte_ofs data_opt =";
-    "  let decode ="; ] @ decoder_lambda @ [
-    "  in";
-    "  decode (" ^ api_module ^ ".get_uint16 ~default:0 ~byte_ofs data_opt)";
+    "  " ^ unique_module_name ^ ".decode (" ^ api_module ^
+      ".get_uint16 ~default:0 ~byte_ofs data_opt)";
     "in";
   ] @ get_enum_list
 
@@ -227,31 +137,20 @@ let generate_enum_runtime_getters ~nodes_table ~scope ~mode enum_def =
 (* There is no set_enum() or set_enum_list() in the runtime API,
    because the enum values are schema-dependent.  This function
    will generate something appropriate for localized use. *)
-let generate_enum_runtime_setters ~nodes_table ~scope enum_def =
-  let enum_id = PS.Type.Enum.type_id_get enum_def in
-  let enum_node = Hashtbl.find_exn nodes_table enum_id in
-  let decoder_lambda =
-    apply_indent ~indent:"    "
-      (generate_enum_decoder ~nodes_table ~scope ~enum_node)
-  in
-  let encoder_lambda =
-    apply_indent ~indent:"    "
-      (generate_enum_encoder ~nodes_table ~scope ~enum_node
-         ~allow_undefined:false)
+let generate_enum_runtime_setters ~nodes_table enum_node =
+  let unique_module_name =
+    GenCommon.make_unique_enum_module_name ~nodes_table enum_node
   in [
     "let set_enum ~byte_ofs value data =";
-    "  let encode ="; ] @ encoder_lambda @ [
-    "  in";
-    "  BA_.set_uint16 ~default:0 ~byte_ofs (encode value) data";
+    "  BA_.set_uint16 ~default:0 ~byte_ofs (" ^ unique_module_name ^
+      ".encode_safe value) data";
     "in";
     "let set_enum_list ~default value pointer_bytes =";
-    "  let decode ="; ] @ decoder_lambda @ [
-    "  in";
-    "  let encode ="; ] @ encoder_lambda @ [
-    "  in";
     "  let codecs = BA_.ListCodecs.Bytes2 (";
-    "    (fun slice -> decode (Slice.get_uint16 slice 0)),";
-    "    (fun v slice -> Slice.set_uint16 slice 0 (encode v)))";
+    "    (fun slice -> " ^ unique_module_name ^
+      ".decode (Slice.get_uint16 slice 0)),";
+    "    (fun v slice -> Slice.set_uint16 slice 0 (" ^ unique_module_name ^
+      ".encode_safe v)))";
     "  in";
     "  BA_.set_list ~storage_type:BA_.ListStorage.Bytes2 ~codecs value pointer_bytes";
     "in";
@@ -296,10 +195,11 @@ let rec generate_list_element_decoder ~nodes_table ~scope list_def =
         "  RA_.get_list decoders (Some slice))";
       ]
   | Enum enum_def ->
+      let enum_id = PS.Type.Enum.type_id_get enum_def in
+      let enum_node = Hashtbl.find_exn nodes_table enum_id in
       let enum_getters =
         apply_indent ~indent:"  "
-          (generate_enum_runtime_getters ~nodes_table ~scope
-             ~mode:Mode.Reader enum_def)
+          (generate_enum_runtime_getters ~nodes_table ~mode:Mode.Reader enum_node)
       in [
         "let decoders =";
       ] @ enum_getters @ [
@@ -358,14 +258,15 @@ let rec generate_list_element_codecs ~nodes_table ~scope list_def =
         "in";
       ]
   | Enum enum_def ->
+      let enum_id = PS.Type.Enum.type_id_get enum_def in
+      let enum_node = Hashtbl.find_exn nodes_table enum_id in
       let enum_getters =
         apply_indent ~indent:"  "
-          (generate_enum_runtime_getters ~nodes_table ~scope
-             ~mode:Mode.Builder enum_def)
+          (generate_enum_runtime_getters ~nodes_table ~mode:Mode.Builder enum_node)
       in
       let enum_setters =
         apply_indent ~indent:"  "
-          (generate_enum_runtime_setters ~nodes_table ~scope enum_def)
+          (generate_enum_runtime_setters ~nodes_table enum_node)
       in [
         "let codecs ="; ] @ enum_getters @ enum_setters @ [
         "  RA_.ListDecoders.Pointer (get_enum_list, set_enum_list)";
@@ -454,20 +355,36 @@ let generate_list_getter ~nodes_table ~scope ~list_type ~mode
   | Enum enum_def ->
       let enum_id = Enum.type_id_get enum_def in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
-      let decoder_lambda =
-        apply_indent ~indent:"    "
-          (generate_enum_decoder ~nodes_table ~scope ~enum_node)
-      in [
-        "let " ^ field_name ^ "_get x =";
-        "  let enum_decoder ="; ] @ decoder_lambda @ [
-        "  in";
-        "  let slice_decoder slice =";
-        "    enum_decoder (MessageWrapper.Slice.get_uint16 slice 0)";
-        "  in";
-        sprintf "  %s.get_pointer_field x %u ~f:(%s.get_list%s "
-          api_module field_ofs api_module default_str;
-        "    (RA_.ListDecoders.Bytes2 slice_decoder))";
-        ]
+      let unique_module_name =
+        GenCommon.make_unique_enum_module_name ~nodes_table enum_node
+      in
+      begin match mode with
+      | Mode.Reader -> [
+          "let " ^ field_name ^ "_get x =";
+          "  let slice_decoder slice =";
+          "    " ^ unique_module_name ^
+            ".decode (MessageWrapper.Slice.get_uint16 slice 0)";
+          "  in";
+          sprintf "  RA_.get_pointer_field x %u ~f:(RA_.get_list%s"
+            field_ofs default_str;
+          "    (RA_.ListDecoders.Bytes2 slice_decoder))";
+          ]
+      | Mode.Builder -> [
+          "let " ^ field_name ^ "_get x =";
+          "  let slice_decoder slice =";
+          "    " ^ unique_module_name ^
+            ".decode (MessageWrapper.Slice.get_uint16 slice 0)";
+          "  in";
+          "  let slice_encoder v slice =";
+          "    MessageWrapper.Slice.set_uint16 slice 0 (" ^ unique_module_name ^
+            ".encode_safe v)";
+          "  in";
+          sprintf "  BA_.get_pointer_field x %u ~f:(BA_.get_list%s"
+            field_ofs default_str;
+          "    ~storage_type:Runtime.Common.ListStorageType.Bytes2";
+          "    ~codecs:(BA_.NC.ListCodecs.Bytes2 (slice_decoder, slice_encoder)))";
+          ]
+      end
   | Interface _ -> [
         "let " ^ field_name ^ "_get x = failwith \"not implemented (type iface)\"";
       ]
@@ -555,32 +472,31 @@ let generate_list_setters ~nodes_table ~scope ~list_type
   | Enum enum_def ->
       let enum_id = Enum.type_id_get enum_def in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
-      let decoder_lambda =
-        apply_indent ~indent:"    "
-          (generate_enum_decoder ~nodes_table ~scope ~enum_node)
+      let unique_module_name =
+        GenCommon.make_unique_enum_module_name ~nodes_table enum_node
       in
-      let encoder_lambda =
-        apply_indent ~indent:"    "
-          (generate_enum_encoder ~nodes_table ~scope ~enum_node
-             ~allow_undefined:false)
-      in [
+      let codecs = [
+        "  let slice_decoder slice =";
+        "    " ^ unique_module_name ^
+          ".decode (MessageWrapper.Slice.get_uint16 slice 0)";
+        "  in";
+        "  let slice_encoder v slice =";
+        "    MessageWrapper.Slice.set_uint16 slice 0 (" ^ unique_module_name ^
+          ".encode_safe v)";
+        "  in";
+      ] in [
         "let " ^ field_name ^ "_set x v =";
-        "  let enum_decoder ="; ] @ decoder_lambda @ [
-        "  in";
-        "  let enum_encoder ="; ] @ encoder_lambda @ [
-        "  in";
-        sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.set_list "
+      ] @ codecs @ [
+        sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.set_list v"
           discr_str field_ofs;
-        "    ~codecs:(BA_.ListCodecs.Bytes2 (enum_decoder, enum_encoder)))";
+        "    ~storage_type:Runtime.Common.ListStorageType.Bytes2";
+        "    ~codecs:(BA_.NC.ListCodecs.Bytes2 (slice_decoder, slice_encoder)))";
         "let " ^ field_name ^ "_init x n =";
-        "  let enum_decoder ="; ] @ decoder_lambda @ [
-        "  in";
-        "  let enum_encoder ="; ] @ encoder_lambda @ [
-        "  in";
-        sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.init_list "
+      ] @ codecs @ [
+        sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.init_list n"
           discr_str field_ofs;
-        "    ~storage_type:BA_.ListStorage.Bytes2 \
-         ~codecs:(BA_.ListCodecs.Bytes2 (enum_decoder, enum_encoder)))";
+        "    ~storage_type:Runtime.Common.ListStorageType.Bytes2";
+        "    ~codecs:(BA_.NC.ListCodecs.Bytes2 (slice_decoder, slice_encoder)))";
       ]
   | Interface _ -> [
         "let " ^ field_name ^ "_get x = failwith \"not implemented (type iface)\"";
@@ -926,13 +842,13 @@ let generate_one_field_accessors ~nodes_table ~node_id ~scope
         | (PS.Type.Enum enum_def, PS.Value.Enum val_uint16) ->
             let enum_id = PS.Type.Enum.type_id_get enum_def in
             let enum_node = Hashtbl.find_exn nodes_table enum_id in
-            let getters = generate_enum_getter ~nodes_table ~scope ~enum_node
+            let getters = generate_enum_getter ~nodes_table ~enum_node
                 ~mode ~field_name ~field_ofs ~default:val_uint16
             in
             let setters =
-              (generate_enum_safe_setter ~nodes_table ~scope ~enum_node
+              (generate_enum_safe_setter ~nodes_table ~enum_node
                 ~field_name ~field_ofs ~default:val_uint16 ~discr_str) @
-              (generate_enum_unsafe_setter ~nodes_table ~scope ~enum_node
+              (generate_enum_unsafe_setter ~nodes_table ~enum_node
                  ~field_name ~field_ofs ~default:val_uint16 ~discr_str)
             in
             (getters, setters)
@@ -1180,18 +1096,15 @@ let generate_list_constant ~nodes_table ~scope ~node_id ~list_name list_def =
           "  decoders)";
         ]
     | Enum enum_def ->
-        let decoder_lambda =
-          let enum_id = PS.Type.Enum.type_id_get enum_def in
-          let enum_node = Hashtbl.find_exn nodes_table enum_id in
-          apply_indent ~indent:"    "
-            (generate_enum_decoder ~nodes_table ~scope ~enum_node)
+      let enum_id = PS.Type.Enum.type_id_get enum_def in
+      let enum_node = Hashtbl.find_exn nodes_table enum_id in
+        let unique_module_name =
+          GenCommon.make_unique_enum_module_name ~nodes_table enum_node
         in [
           "let decoders =";
-          "  let decode =";
-        ] @ decoder_lambda @ [
-          "  in";
           "  RA_.ListDecoders.Bytes2 (fun slice ->";
-          "    decode (MessageWrapper.Slice.get_uint16 slice 0))";
+          "    " ^ unique_module_name ^
+            ".decode (MessageWrapper.Slice.get_uint16 slice 0))";
           "in";
         ]
     | Interface _ ->
@@ -1426,7 +1339,7 @@ and generate_node
           [ "end" ]
   | PS.Node.Enum enum_def ->
       let unique_module_name =
-        (String.capitalize node_name) ^ "_" ^ (Uint64.to_string node_id)
+        GenCommon.make_unique_enum_module_name ~nodes_table node
       in
       let body =
         (generate_nested_modules ()) @
