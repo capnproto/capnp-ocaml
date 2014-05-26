@@ -1336,29 +1336,21 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~mode
   let non_union_accessors =
     generate_accessors ~nodes_table ~node ~scope ~mode struct_def non_union_fields
   in
-  let unique_reader =
-    GenCommon.make_unique_typename ~mode:Mode.Reader ~scope_mode:mode
+  let unique_reader = GenCommon.make_unique_typename ~mode:Mode.Reader
       ~nodes_table node
   in
-  let unique_builder =
-    GenCommon.make_unique_typename ~mode:Mode.Builder ~scope_mode:mode
+  let unique_builder = GenCommon.make_unique_typename ~mode:Mode.Builder
       ~nodes_table node
   in
   let header =
     match mode with
     | Mode.Reader -> [
-        "type t = ro RA_.StructStorage.t option";
-        "type builder_t = rw RA_.StructStorage.t";
-        "type " ^ unique_reader ^ " = t";
-        "type " ^ unique_builder ^ " = builder_t";
+        "type t = " ^ unique_reader;
+        "type builder_t = " ^ unique_builder;
       ]
     | Mode.Builder -> [
-        "type t = Reader." ^
-          (GenCommon.get_fully_qualified_name nodes_table node) ^ ".builder_t";
-        "type reader_t = Reader." ^
-          (GenCommon.get_fully_qualified_name nodes_table node) ^ ".t";
-        "type " ^ unique_builder ^ " = t";
-        "type " ^ unique_reader ^ " = reader_t";
+        "type t = " ^ unique_builder;
+        "type reader_t = " ^ unique_reader;
       ]
   in
   let footer =

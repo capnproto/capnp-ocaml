@@ -211,19 +211,14 @@ let get_scope_relative_name nodes_table (scope_stack : Uint64.t list) node
   String.concat ~sep:"." (List.map rel_name ~f:fst)
 
 
-let make_unique_typename ~(mode : Mode.t) ~(scope_mode : Mode.t) ~nodes_table node =
+let make_unique_typename ~(mode : Mode.t) ~nodes_table node =
   let uq_name = get_unqualified_name
     ~parent:(Hashtbl.find_exn nodes_table (PS.Node.scope_id_get node)) ~child:node
   in
   let t_str =
-    match (mode, scope_mode) with
-    | (Mode.Reader, Mode.Reader)
-    | (Mode.Builder, Mode.Builder) ->
-        "t"
-    | (Mode.Reader, Mode.Builder) ->
-        "reader_t"
-    | (Mode.Builder, Mode.Reader) ->
-        "builder_t"
+    match mode with
+    | Mode.Reader  -> "reader_t"
+    | Mode.Builder -> "builder_t"
   in
   sprintf "%s_%s_%s" t_str uq_name (Uint64.to_string (PS.Node.id_get node))
 
@@ -259,7 +254,7 @@ let make_disambiguated_type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
   if List.mem scope node_id then
     (* The node of interest is a parent node of the node being generated.
        this is the case where an unambiguous type is emitted. *)
-    make_unique_typename ~mode ~scope_mode ~nodes_table node
+    make_unique_typename ~mode ~nodes_table node
   else
     let module_name = get_scope_relative_name nodes_table scope node in
     let t_str =
@@ -406,5 +401,37 @@ let generate_enum_sig ~nodes_table ~scope ~nested_modules
       match_case :: acc)
   in
   nested_modules @ header @ variants
+
+
+(* Recurse through the schema, collecting unique type names and type
+   definitions for all the nodes. *)
+let rec collect_unique_types ?acc ~nodes_table node =
+  let child_type_names = List.concat_map (children_of nodes_table node)
+      ~f:(fun child -> collect_unique_types ~nodes_table child)
+  in
+  let names =
+    match acc with
+    | None   -> child_type_names
+    | Some x -> child_type_names @ x
+  in
+  match PS.Node.get node with
+  | PS.Node.File
+  | PS.Node.Const _
+  | PS.Node.Annotation _ ->
+      names
+  | PS.Node.Struct _
+  | PS.Node.Enum _
+  | PS.Node.Interface _ ->
+      let reader_name = make_unique_typename ~nodes_table
+          ~mode:Mode.Reader node
+      in
+      let reader_type = "ro RA_.StructStorage.t option" in
+      let builder_name = make_unique_typename ~nodes_table
+          ~mode:Mode.Builder node
+      in
+      let builder_type = "rw BA_.NC.StructStorage.t" in
+      (builder_name, builder_type) :: (reader_name, reader_type) :: names
+  | PS.Node.Undefined x ->
+      failwith (sprintf "Unknown Node union discriminant %u" x)
 
 

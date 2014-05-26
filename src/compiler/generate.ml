@@ -42,6 +42,10 @@ let sig_s_header = [
   "module type S = sig";
   "  type 'cap message_t";
   "";
+]
+
+let sig_s_reader_header = [
+  "";
   "  module Reader : sig";
   "    type array_t";
   "    type builder_array_t";
@@ -140,8 +144,18 @@ let compile
     let requested_file_id = RequestedFile.id_get requested_file in
     let requested_file_node = Hashtbl.find_exn nodes_table requested_file_id in
     let requested_filename = RequestedFile.filename_get requested_file in
+    let sig_unique_types = List.rev_map
+        (GenCommon.collect_unique_types ~nodes_table requested_file_node)
+        ~f:(fun (name, tp) -> "  type " ^ name)
+    in
+    let mod_unique_types = (List.rev_map
+        (GenCommon.collect_unique_types ~nodes_table requested_file_node)
+        ~f:(fun (name, tp) -> "  type " ^ name ^ " = " ^ tp)) @ [""]
+    in
     let sig_s =
       sig_s_header @
+      sig_unique_types @
+      sig_s_reader_header @
       (GenCommon.apply_indent ~indent:"    "
         (GenSignatures.generate_node ~suppress_module_wrapper:true ~nodes_table
            ~scope:[] ~mode:Mode.Reader ~node_name:requested_filename
@@ -181,6 +195,7 @@ let compile
         sig_s @
         builder_defaults @
         mod_header @
+        mod_unique_types @
         reader_defaults @
         mod_reader_header @
         reader_body @
