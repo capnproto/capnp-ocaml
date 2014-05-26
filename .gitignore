@@ -16,3 +16,6 @@
 *.omc
 src/compiler/capnpc-ocaml
 src/tests/test
+src/tests/test.mli
+src/tests/test.ml
+src/tests/.capnp-repo

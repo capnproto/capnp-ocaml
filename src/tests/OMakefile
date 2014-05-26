@@ -2,9 +2,26 @@ OCAMLINCLUDES += ../runtime
 OCAML_LIBS += ../runtime/libcapnp
 
 TEST_MODULES = \
-  testStringStorage
+  testStringStorage \
+  test
 
-PROGRAM = test
+PROGRAM = run-tests
+
+# We will check out a local copy of the capnproto repo in order to generate
+# code based on the "test.capnp" schema.
+COMPILER = ../compiler/capnpc-ocaml
+CAPNPROTO_REPO = https://github.com/kentonv/capnproto.git 
+CAPNPROTO_REVISION = 25509cf4f1fe6b3f5a6faa2f42b865f7571db8c4
+
+.capnp-repo:
+	bash -c 'REPO_DIR=`mktemp -d`/capnproto && git clone $(CAPNPROTO_REPO) $$REPO_DIR && \
+	pushd $$REPO_DIR && git checkout $(CAPNPROTO_REVISION) && popd && \
+	echo "$$REPO_DIR" > .capnp-repo'
+
+test.mli test.ml: $(COMPILER) .capnp-repo
+	bash -c 'REPO_DIR=`cat .capnp-repo` && \
+	capnp compile -o $(COMPILER) -I $$REPO_DIR/c++/src \
+		$$REPO_DIR/c++/src/capnp/test.capnp'
 
 OCamlProgram($(PROGRAM), $(TEST_MODULES))
 
@@ -12,7 +29,12 @@ OCamlProgram($(PROGRAM), $(TEST_MODULES))
 
 test-clean:
 	rm -f $(PROGRAM)$(EXE) $(PROGRAM).opt $(PROGRAM).byte \
-		*.cmi *.cmo *.cmx *.cma *.cmxa *.cmxs *.a *.o
+		*.cmi *.cmo *.cmx *.cma *.cmxa *.cmxs *.a *.o \
+		test.mli test.ml
+	bash -c 'if [ -f .capnp-repo ]; then \
+		cat .capnp-repo | xargs rm -rf --preserve-root; \
+		rm .capnp-repo; \
+		fi'
 
 test-distclean: test-clean
 	rm -f *.omc
