@@ -193,6 +193,7 @@ let rec generate_list_element_decoder ~nodes_table ~scope list_def =
         "let decoders = RA_.ListDecoders.Pointer (fun slice ->";
       ] @ inner_decoder_decl @ [
         "  RA_.get_list decoders (Some slice))";
+        "in";
       ]
   | Enum enum_def ->
       let enum_id = PS.Type.Enum.type_id_get enum_def in
@@ -223,8 +224,9 @@ let rec generate_list_element_codecs ~nodes_table ~scope list_def =
   let make_terminal_codecs element_name = [
       "let codecs =";
       "  let decode slice = BA_.get_" ^ element_name ^ "_list slice in";
-      "  let encode v slice = BA_.set_" ^ element_name ^ "_list v slice in";
-      "  BA_.ListCodecs.Pointer (decode, encode)";
+      "  let encode v slice = let _ = BA_.set_" ^ element_name ^
+        "_list v slice in () in";
+      "  BA_.NC.ListCodecs.Pointer (decode, encode)";
       "in";
     ]
   in
@@ -245,7 +247,28 @@ let rec generate_list_element_codecs ~nodes_table ~scope list_def =
   | Float64  -> make_terminal_codecs "float64"
   | Text     -> make_terminal_codecs "text"
   | Data     -> make_terminal_codecs "blob"
-  | Struct _ -> make_terminal_codecs "struct"
+  | Struct struct_def ->
+      let data_words, pointer_words =
+        let id = PS.Type.Struct.type_id_get struct_def in
+        let node = Hashtbl.find_exn nodes_table id in
+        match PS.Node.get node with
+        | PS.Node.Struct struct_def ->
+            (PS.Node.Struct.data_word_count_get struct_def,
+             PS.Node.Struct.pointer_count_get struct_def)
+        | _ ->
+            failwith
+              "Decoded non-struct node where struct node was expected."
+      in [
+        "let codecs =";
+        sprintf "  let decode slice = BA_.get_struct_list \
+                 ~data_words:%u ~pointer_words:%u slice in"
+          data_words pointer_words;
+        sprintf "  let encode v slice = let _ = BA_.set_struct_list \
+                 ~data_words:%u ~pointer_words:%u v slice in () in"
+          data_words pointer_words;
+        "  BA_.NC.ListCodecs.Pointer (decode, encode)";
+        "in";
+      ]
   | List inner_list_def ->
       let inner_codecs_decl =
         apply_indent ~indent:"  "
@@ -254,7 +277,7 @@ let rec generate_list_element_codecs ~nodes_table ~scope list_def =
         "let codecs ="; ] @ inner_codecs_decl @ [
         "  let decode slice = BA_.get_list ~codecs slice in";
         "  let encode v slice = BA_.set_list ~codecs v slice in";
-        "  BA_.ListCodecs.Pointer (decode, encode)";
+        "  BA_.NC.ListCodecs.Pointer (decode, encode)";
         "in";
       ]
   | Enum enum_def ->
@@ -340,18 +363,31 @@ let generate_list_getter ~nodes_table ~scope ~list_type ~mode
           ]
       end
   | List list_def ->
-      let decoder_declaration =
-        apply_indent ~indent:"  "
-          (generate_list_element_decoder ~nodes_table ~scope list_def)
-      in [
-        "let " ^ field_name ^ "_get x =";
-      ] @ decoder_declaration @ [
-        sprintf "  %s.get_pointer_field x %u ~f:(%s.get_list%s decoders)"
-          api_module
-          field_ofs
-          api_module
-          default_str;
-      ]
+      begin match mode with
+      | Mode.Reader ->
+          let decoder_declaration =
+            apply_indent ~indent:"  "
+              (generate_list_element_decoder ~nodes_table ~scope list_def)
+          in [
+            "let " ^ field_name ^ "_get x =";
+          ] @ decoder_declaration @ [
+            sprintf "  RA_.get_pointer_field x %u ~f:(RA_.get_list%s decoders)"
+              field_ofs
+              default_str;
+          ]
+      | Mode.Builder ->
+          let codecs_declaration =
+            apply_indent ~indent:"  "
+              (generate_list_element_codecs ~nodes_table ~scope list_def)
+          in [
+            "let " ^ field_name ^ "_get x =";
+          ] @ codecs_declaration @ [
+            sprintf "  BA_.get_pointer_field x %u ~f:(BA_.get_list%s"
+              field_ofs
+              default_str;
+            "    ~storage_type:Runtime.Common.ListStorageType.Pointer ~codecs)";
+          ]
+      end
   | Enum enum_def ->
       let enum_id = Enum.type_id_get enum_def in
       let enum_node = Hashtbl.find_exn nodes_table enum_id in
@@ -460,14 +496,14 @@ let generate_list_setters ~nodes_table ~scope ~list_type
       in [
         "let " ^ field_name ^ "_set x v =";
       ] @ codecs_declaration @ [
-        sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.set_list ~codecs v)"
+        sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.set_list v"
           discr_str field_ofs;
+        "    ~storage_type:Runtime.Common.ListStorageType.Pointer ~codecs)";
         "let " ^ field_name ^ "_init x n =";
       ] @ codecs_declaration @ [
-        sprintf "  BA_.get_pointer_field %sx %u \
-                  ~f:(BA_.init_list ~storage_type:BA_.ListStorage.Pointer \
-                  ~codecs n)"
+        sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.init_list n"
           discr_str field_ofs;
+        "    ~storage_type:Runtime.Common.ListStorageType.Pointer ~codecs)";
       ]
   | Enum enum_def ->
       let enum_id = Enum.type_id_get enum_def in
