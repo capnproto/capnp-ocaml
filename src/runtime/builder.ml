@@ -466,6 +466,12 @@ module Make (NM : Message.S) = struct
     let () = set_opt_discriminant struct_storage.NC.StructStorage.data discr in
     result
 
+  let has_field
+      (pointer_bytes : 'cap NM.Slice.t)
+    : bool =
+    let ptr_val = NM.Slice.get_int64 pointer_bytes 0 in
+    Int64.compare ptr_val Int64.zero <> 0
+
   let get_text
       ~(default : string)
       (pointer_bytes : 'cap NM.Slice.t)

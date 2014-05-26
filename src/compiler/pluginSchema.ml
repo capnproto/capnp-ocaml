@@ -99,6 +99,7 @@ module type S = sig
       module List : sig
         type t = reader_t_List_9792858745991129751
         type builder_t = builder_t_List_9792858745991129751
+        val has_element_type : t -> bool
         val element_type_get : t -> reader_t_Type_15020482145304562784
         val of_message : 'cap message_t -> t
       end
@@ -165,26 +166,31 @@ module type S = sig
       type builder_t = builder_t_Annotation_17422339044421236034
       val id_get : t -> Uint64.t
       val id_get_int_exn : t -> int
+      val has_value : t -> bool
       val value_get : t -> Value.t
       val of_message : 'cap message_t -> t
     end
     module Method : sig
       type t = reader_t_Method_10736806783679155584
       type builder_t = builder_t_Method_10736806783679155584
+      val has_name : t -> bool
       val name_get : t -> string
       val code_order_get : t -> int
       val param_struct_type_get : t -> Uint64.t
       val param_struct_type_get_int_exn : t -> int
       val result_struct_type_get : t -> Uint64.t
       val result_struct_type_get_int_exn : t -> int
+      val has_annotations : t -> bool
       val annotations_get : t -> (ro, Annotation.t, array_t) Capnp.Array.t
       val of_message : 'cap message_t -> t
     end
     module Enumerant : sig
       type t = reader_t_Enumerant_10919677598968879693
       type builder_t = builder_t_Enumerant_10919677598968879693
+      val has_name : t -> bool
       val name_get : t -> string
       val code_order_get : t -> int
+      val has_annotations : t -> bool
       val annotations_get : t -> (ro, Annotation.t, array_t) Capnp.Array.t
       val of_message : 'cap message_t -> t
     end
@@ -214,7 +220,9 @@ module type S = sig
         type builder_t = builder_t_Slot_14133145859926553711
         val offset_get : t -> Uint32.t
         val offset_get_int_exn : t -> int
+        val has_type : t -> bool
         val type_get : t -> Type.t
+        val has_default_value : t -> bool
         val default_value_get : t -> Value.t
         val had_explicit_default_get : t -> bool
         val of_message : 'cap message_t -> t
@@ -224,8 +232,10 @@ module type S = sig
         | Group of Group.t
         | Undefined of int
       val get : t -> unnamed_union_t
+      val has_name : t -> bool
       val name_get : t -> string
       val code_order_get : t -> int
+      val has_annotations : t -> bool
       val annotations_get : t -> (ro, Annotation.t, array_t) Capnp.Array.t
       val discriminant_value_get : t -> int
       val ordinal_get : t -> Ordinal.t
@@ -244,18 +254,21 @@ module type S = sig
         val discriminant_count_get : t -> int
         val discriminant_offset_get : t -> Uint32.t
         val discriminant_offset_get_int_exn : t -> int
+        val has_fields : t -> bool
         val fields_get : t -> (ro, Field.t, array_t) Capnp.Array.t
         val of_message : 'cap message_t -> t
       end
       module Enum : sig
         type t = reader_t_Enum_13063450714778629528
         type builder_t = builder_t_Enum_13063450714778629528
+        val has_enumerants : t -> bool
         val enumerants_get : t -> (ro, Enumerant.t, array_t) Capnp.Array.t
         val of_message : 'cap message_t -> t
       end
       module Annotation : sig
         type t = reader_t_Annotation_17011813041836786320
         type builder_t = builder_t_Annotation_17011813041836786320
+        val has_type : t -> bool
         val type_get : t -> Type.t
         val targets_file_get : t -> bool
         val targets_const_get : t -> bool
@@ -274,20 +287,25 @@ module type S = sig
       module Const : sig
         type t = reader_t_Const_12793219851699983392
         type builder_t = builder_t_Const_12793219851699983392
+        val has_type : t -> bool
         val type_get : t -> Type.t
+        val has_value : t -> bool
         val value_get : t -> Value.t
         val of_message : 'cap message_t -> t
       end
       module Interface : sig
         type t = reader_t_Interface_16728431493453586831
         type builder_t = builder_t_Interface_16728431493453586831
+        val has_methods : t -> bool
         val methods_get : t -> (ro, Method.t, array_t) Capnp.Array.t
+        val has_extends : t -> bool
         val extends_get : t -> (ro, Uint64.t, array_t) Capnp.Array.t
         val of_message : 'cap message_t -> t
       end
       module NestedNode : sig
         type t = reader_t_NestedNode_16050641862814319170
         type builder_t = builder_t_NestedNode_16050641862814319170
+        val has_name : t -> bool
         val name_get : t -> string
         val id_get : t -> Uint64.t
         val id_get_int_exn : t -> int
@@ -304,12 +322,15 @@ module type S = sig
       val get : t -> unnamed_union_t
       val id_get : t -> Uint64.t
       val id_get_int_exn : t -> int
+      val has_display_name : t -> bool
       val display_name_get : t -> string
       val display_name_prefix_length_get : t -> Uint32.t
       val display_name_prefix_length_get_int_exn : t -> int
       val scope_id_get : t -> Uint64.t
       val scope_id_get_int_exn : t -> int
+      val has_nested_nodes : t -> bool
       val nested_nodes_get : t -> (ro, NestedNode.t, array_t) Capnp.Array.t
+      val has_annotations : t -> bool
       val annotations_get : t -> (ro, reader_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
       val of_message : 'cap message_t -> t
     end
@@ -324,16 +345,21 @@ module type S = sig
           type builder_t = builder_t_Import_12560611460656617445
           val id_get : t -> Uint64.t
           val id_get_int_exn : t -> int
+          val has_name : t -> bool
           val name_get : t -> string
           val of_message : 'cap message_t -> t
         end
         val id_get : t -> Uint64.t
         val id_get_int_exn : t -> int
+        val has_filename : t -> bool
         val filename_get : t -> string
+        val has_imports : t -> bool
         val imports_get : t -> (ro, Import.t, array_t) Capnp.Array.t
         val of_message : 'cap message_t -> t
       end
+      val has_nodes : t -> bool
       val nodes_get : t -> (ro, Node.t, array_t) Capnp.Array.t
+      val has_requested_files : t -> bool
       val requested_files_get : t -> (ro, RequestedFile.t, array_t) Capnp.Array.t
       val of_message : 'cap message_t -> t
     end
@@ -383,6 +409,7 @@ module type S = sig
       module List : sig
         type t = builder_t_List_9792858745991129751
         type reader_t = reader_t_List_9792858745991129751
+        val has_element_type : t -> bool
         val element_type_get : t -> builder_t_Type_15020482145304562784
         val element_type_set_reader : t -> reader_t_Type_15020482145304562784 -> builder_t_Type_15020482145304562784
         val element_type_set_builder : t -> builder_t_Type_15020482145304562784 -> builder_t_Type_15020482145304562784
@@ -502,6 +529,7 @@ module type S = sig
       val id_get_int_exn : t -> int
       val id_set : t -> Uint64.t -> unit
       val id_set_int_exn : t -> int -> unit
+      val has_value : t -> bool
       val value_get : t -> Value.t
       val value_set_reader : t -> Value.reader_t -> Value.t
       val value_set_builder : t -> Value.t -> Value.t
@@ -513,6 +541,7 @@ module type S = sig
     module Method : sig
       type t = builder_t_Method_10736806783679155584
       type reader_t = reader_t_Method_10736806783679155584
+      val has_name : t -> bool
       val name_get : t -> string
       val name_set : t -> string -> unit
       val code_order_get : t -> int
@@ -525,6 +554,7 @@ module type S = sig
       val result_struct_type_get_int_exn : t -> int
       val result_struct_type_set : t -> Uint64.t -> unit
       val result_struct_type_set_int_exn : t -> int -> unit
+      val has_annotations : t -> bool
       val annotations_get : t -> (rw, Annotation.t, array_t) Capnp.Array.t
       val annotations_set : t -> (rw, Annotation.t, array_t) Capnp.Array.t -> (rw, Annotation.t, array_t) Capnp.Array.t
       val annotations_init : t -> int -> (rw, Annotation.t, array_t) Capnp.Array.t
@@ -535,10 +565,12 @@ module type S = sig
     module Enumerant : sig
       type t = builder_t_Enumerant_10919677598968879693
       type reader_t = reader_t_Enumerant_10919677598968879693
+      val has_name : t -> bool
       val name_get : t -> string
       val name_set : t -> string -> unit
       val code_order_get : t -> int
       val code_order_set_exn : t -> int -> unit
+      val has_annotations : t -> bool
       val annotations_get : t -> (rw, Annotation.t, array_t) Capnp.Array.t
       val annotations_set : t -> (rw, Annotation.t, array_t) Capnp.Array.t -> (rw, Annotation.t, array_t) Capnp.Array.t
       val annotations_init : t -> int -> (rw, Annotation.t, array_t) Capnp.Array.t
@@ -582,10 +614,12 @@ module type S = sig
         val offset_get_int_exn : t -> int
         val offset_set : t -> Uint32.t -> unit
         val offset_set_int_exn : t -> int -> unit
+        val has_type : t -> bool
         val type_get : t -> Type.t
         val type_set_reader : t -> Type.reader_t -> Type.t
         val type_set_builder : t -> Type.t -> Type.t
         val type_init : t -> Type.t
+        val has_default_value : t -> bool
         val default_value_get : t -> Value.t
         val default_value_set_reader : t -> Value.reader_t -> Value.t
         val default_value_set_builder : t -> Value.t -> Value.t
@@ -601,10 +635,12 @@ module type S = sig
         | Group of Group.t
         | Undefined of int
       val get : t -> unnamed_union_t
+      val has_name : t -> bool
       val name_get : t -> string
       val name_set : t -> string -> unit
       val code_order_get : t -> int
       val code_order_set_exn : t -> int -> unit
+      val has_annotations : t -> bool
       val annotations_get : t -> (rw, Annotation.t, array_t) Capnp.Array.t
       val annotations_set : t -> (rw, Annotation.t, array_t) Capnp.Array.t -> (rw, Annotation.t, array_t) Capnp.Array.t
       val annotations_init : t -> int -> (rw, Annotation.t, array_t) Capnp.Array.t
@@ -636,6 +672,7 @@ module type S = sig
         val discriminant_offset_get_int_exn : t -> int
         val discriminant_offset_set : t -> Uint32.t -> unit
         val discriminant_offset_set_int_exn : t -> int -> unit
+        val has_fields : t -> bool
         val fields_get : t -> (rw, Field.t, array_t) Capnp.Array.t
         val fields_set : t -> (rw, Field.t, array_t) Capnp.Array.t -> (rw, Field.t, array_t) Capnp.Array.t
         val fields_init : t -> int -> (rw, Field.t, array_t) Capnp.Array.t
@@ -646,6 +683,7 @@ module type S = sig
       module Enum : sig
         type t = builder_t_Enum_13063450714778629528
         type reader_t = reader_t_Enum_13063450714778629528
+        val has_enumerants : t -> bool
         val enumerants_get : t -> (rw, Enumerant.t, array_t) Capnp.Array.t
         val enumerants_set : t -> (rw, Enumerant.t, array_t) Capnp.Array.t -> (rw, Enumerant.t, array_t) Capnp.Array.t
         val enumerants_init : t -> int -> (rw, Enumerant.t, array_t) Capnp.Array.t
@@ -656,6 +694,7 @@ module type S = sig
       module Annotation : sig
         type t = builder_t_Annotation_17011813041836786320
         type reader_t = reader_t_Annotation_17011813041836786320
+        val has_type : t -> bool
         val type_get : t -> Type.t
         val type_set_reader : t -> Type.reader_t -> Type.t
         val type_set_builder : t -> Type.t -> Type.t
@@ -691,10 +730,12 @@ module type S = sig
       module Const : sig
         type t = builder_t_Const_12793219851699983392
         type reader_t = reader_t_Const_12793219851699983392
+        val has_type : t -> bool
         val type_get : t -> Type.t
         val type_set_reader : t -> Type.reader_t -> Type.t
         val type_set_builder : t -> Type.t -> Type.t
         val type_init : t -> Type.t
+        val has_value : t -> bool
         val value_get : t -> Value.t
         val value_set_reader : t -> Value.reader_t -> Value.t
         val value_set_builder : t -> Value.t -> Value.t
@@ -706,9 +747,11 @@ module type S = sig
       module Interface : sig
         type t = builder_t_Interface_16728431493453586831
         type reader_t = reader_t_Interface_16728431493453586831
+        val has_methods : t -> bool
         val methods_get : t -> (rw, Method.t, array_t) Capnp.Array.t
         val methods_set : t -> (rw, Method.t, array_t) Capnp.Array.t -> (rw, Method.t, array_t) Capnp.Array.t
         val methods_init : t -> int -> (rw, Method.t, array_t) Capnp.Array.t
+        val has_extends : t -> bool
         val extends_get : t -> (rw, Uint64.t, array_t) Capnp.Array.t
         val extends_set : t -> (rw, Uint64.t, array_t) Capnp.Array.t -> (rw, Uint64.t, array_t) Capnp.Array.t
         val extends_init : t -> int -> (rw, Uint64.t, array_t) Capnp.Array.t
@@ -719,6 +762,7 @@ module type S = sig
       module NestedNode : sig
         type t = builder_t_NestedNode_16050641862814319170
         type reader_t = reader_t_NestedNode_16050641862814319170
+        val has_name : t -> bool
         val name_get : t -> string
         val name_set : t -> string -> unit
         val id_get : t -> Uint64.t
@@ -743,6 +787,7 @@ module type S = sig
       val id_get_int_exn : t -> int
       val id_set : t -> Uint64.t -> unit
       val id_set_int_exn : t -> int -> unit
+      val has_display_name : t -> bool
       val display_name_get : t -> string
       val display_name_set : t -> string -> unit
       val display_name_prefix_length_get : t -> Uint32.t
@@ -753,9 +798,11 @@ module type S = sig
       val scope_id_get_int_exn : t -> int
       val scope_id_set : t -> Uint64.t -> unit
       val scope_id_set_int_exn : t -> int -> unit
+      val has_nested_nodes : t -> bool
       val nested_nodes_get : t -> (rw, NestedNode.t, array_t) Capnp.Array.t
       val nested_nodes_set : t -> (rw, NestedNode.t, array_t) Capnp.Array.t -> (rw, NestedNode.t, array_t) Capnp.Array.t
       val nested_nodes_init : t -> int -> (rw, NestedNode.t, array_t) Capnp.Array.t
+      val has_annotations : t -> bool
       val annotations_get : t -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
       val annotations_set : t -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
       val annotations_init : t -> int -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
@@ -776,6 +823,7 @@ module type S = sig
           val id_get_int_exn : t -> int
           val id_set : t -> Uint64.t -> unit
           val id_set_int_exn : t -> int -> unit
+          val has_name : t -> bool
           val name_get : t -> string
           val name_set : t -> string -> unit
           val of_message : rw message_t -> t
@@ -786,8 +834,10 @@ module type S = sig
         val id_get_int_exn : t -> int
         val id_set : t -> Uint64.t -> unit
         val id_set_int_exn : t -> int -> unit
+        val has_filename : t -> bool
         val filename_get : t -> string
         val filename_set : t -> string -> unit
+        val has_imports : t -> bool
         val imports_get : t -> (rw, Import.t, array_t) Capnp.Array.t
         val imports_set : t -> (rw, Import.t, array_t) Capnp.Array.t -> (rw, Import.t, array_t) Capnp.Array.t
         val imports_init : t -> int -> (rw, Import.t, array_t) Capnp.Array.t
@@ -795,9 +845,11 @@ module type S = sig
         val to_message : t -> rw message_t
         val init_root : ?message_size:int -> unit -> t
       end
+      val has_nodes : t -> bool
       val nodes_get : t -> (rw, Node.t, array_t) Capnp.Array.t
       val nodes_set : t -> (rw, Node.t, array_t) Capnp.Array.t -> (rw, Node.t, array_t) Capnp.Array.t
       val nodes_init : t -> int -> (rw, Node.t, array_t) Capnp.Array.t
+      val has_requested_files : t -> bool
       val requested_files_get : t -> (rw, RequestedFile.t, array_t) Capnp.Array.t
       val requested_files_set : t -> (rw, RequestedFile.t, array_t) Capnp.Array.t -> (rw, RequestedFile.t, array_t) Capnp.Array.t
       val requested_files_init : t -> int -> (rw, RequestedFile.t, array_t) Capnp.Array.t
@@ -970,6 +1022,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       module List = struct
         type t = reader_t_List_9792858745991129751
         type builder_t = builder_t_List_9792858745991129751
+        let has_element_type x =
+          RA_.get_pointer_field x 0 ~f:RA_.has_field
         let element_type_get x =
           RA_.get_pointer_field x 0 ~f:(RA_.get_struct)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -1081,8 +1135,12 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         RA_.get_data_field x ~f:(RA_.get_float32 ~default_bits:(0l) ~byte_ofs:4)
       let float64_get x =
         RA_.get_data_field x ~f:(RA_.get_float64 ~default_bits:(0L) ~byte_ofs:8)
+      let has_text x =
+        RA_.get_pointer_field x 0 ~f:RA_.has_field
       let text_get x =
         RA_.get_pointer_field x 0 ~f:(RA_.get_text ~default:"")
+      let has_data x =
+        RA_.get_pointer_field x 0 ~f:RA_.has_field
       let data_get x =
         RA_.get_pointer_field x 0 ~f:(RA_.get_blob ~default:"")
       let list_get x =
@@ -1146,6 +1204,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         RA_.get_data_field x ~f:(RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:0)
       let id_get_int_exn x =
         Uint64.to_int (id_get x)
+      let has_value x =
+        RA_.get_pointer_field x 0 ~f:RA_.has_field
       let value_get x =
         RA_.get_pointer_field x 0 ~f:(RA_.get_struct)
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -1153,6 +1213,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
     module Method = struct
       type t = reader_t_Method_10736806783679155584
       type builder_t = builder_t_Method_10736806783679155584
+      let has_name x =
+        RA_.get_pointer_field x 0 ~f:RA_.has_field
       let name_get x =
         RA_.get_pointer_field x 0 ~f:(RA_.get_text ~default:"")
       let code_order_get x =
@@ -1165,6 +1227,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         RA_.get_data_field x ~f:(RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:16)
       let result_struct_type_get_int_exn x =
         Uint64.to_int (result_struct_type_get x)
+      let has_annotations x =
+        RA_.get_pointer_field x 1 ~f:RA_.has_field
       let annotations_get x =
         RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list)
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -1172,10 +1236,14 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
     module Enumerant = struct
       type t = reader_t_Enumerant_10919677598968879693
       type builder_t = builder_t_Enumerant_10919677598968879693
+      let has_name x =
+        RA_.get_pointer_field x 0 ~f:RA_.has_field
       let name_get x =
         RA_.get_pointer_field x 0 ~f:(RA_.get_text ~default:"")
       let code_order_get x =
         RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:0)
+      let has_annotations x =
+        RA_.get_pointer_field x 1 ~f:RA_.has_field
       let annotations_get x =
         RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list)
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -1218,8 +1286,12 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
           RA_.get_data_field x ~f:(RA_.get_uint32 ~default:Uint32.zero ~byte_ofs:4)
         let offset_get_int_exn x =
           Uint32.to_int (offset_get x)
+        let has_type x =
+          RA_.get_pointer_field x 2 ~f:RA_.has_field
         let type_get x =
           RA_.get_pointer_field x 2 ~f:(RA_.get_struct)
+        let has_default_value x =
+          RA_.get_pointer_field x 3 ~f:RA_.has_field
         let default_value_get x =
           RA_.get_pointer_field x 3 ~f:(RA_.get_struct)
         let had_explicit_default_get x =
@@ -1237,10 +1309,14 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         | 0 -> Slot (slot_get x)
         | 1 -> Group (group_get x)
         | v -> Undefined v
+      let has_name x =
+        RA_.get_pointer_field x 0 ~f:RA_.has_field
       let name_get x =
         RA_.get_pointer_field x 0 ~f:(RA_.get_text ~default:"")
       let code_order_get x =
         RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:0)
+      let has_annotations x =
+        RA_.get_pointer_field x 1 ~f:RA_.has_field
       let annotations_get x =
         RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list)
       let discriminant_value_get x =
@@ -1269,6 +1345,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
           RA_.get_data_field x ~f:(RA_.get_uint32 ~default:Uint32.zero ~byte_ofs:32)
         let discriminant_offset_get_int_exn x =
           Uint32.to_int (discriminant_offset_get x)
+        let has_fields x =
+          RA_.get_pointer_field x 3 ~f:RA_.has_field
         let fields_get x =
           RA_.get_pointer_field x 3 ~f:(RA_.get_struct_list)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -1276,6 +1354,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       module Enum = struct
         type t = reader_t_Enum_13063450714778629528
         type builder_t = builder_t_Enum_13063450714778629528
+        let has_enumerants x =
+          RA_.get_pointer_field x 3 ~f:RA_.has_field
         let enumerants_get x =
           RA_.get_pointer_field x 3 ~f:(RA_.get_struct_list)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -1283,6 +1363,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       module Annotation = struct
         type t = reader_t_Annotation_17011813041836786320
         type builder_t = builder_t_Annotation_17011813041836786320
+        let has_type x =
+          RA_.get_pointer_field x 3 ~f:RA_.has_field
         let type_get x =
           RA_.get_pointer_field x 3 ~f:(RA_.get_struct)
         let targets_file_get x =
@@ -1314,8 +1396,12 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       module Const = struct
         type t = reader_t_Const_12793219851699983392
         type builder_t = builder_t_Const_12793219851699983392
+        let has_type x =
+          RA_.get_pointer_field x 3 ~f:RA_.has_field
         let type_get x =
           RA_.get_pointer_field x 3 ~f:(RA_.get_struct)
+        let has_value x =
+          RA_.get_pointer_field x 4 ~f:RA_.has_field
         let value_get x =
           RA_.get_pointer_field x 4 ~f:(RA_.get_struct)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -1323,8 +1409,12 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       module Interface = struct
         type t = reader_t_Interface_16728431493453586831
         type builder_t = builder_t_Interface_16728431493453586831
+        let has_methods x =
+          RA_.get_pointer_field x 3 ~f:RA_.has_field
         let methods_get x =
           RA_.get_pointer_field x 3 ~f:(RA_.get_struct_list)
+        let has_extends x =
+          RA_.get_pointer_field x 4 ~f:RA_.has_field
         let extends_get x =
           RA_.get_pointer_field x 4 ~f:(RA_.get_uint64_list)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -1332,6 +1422,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       module NestedNode = struct
         type t = reader_t_NestedNode_16050641862814319170
         type builder_t = builder_t_NestedNode_16050641862814319170
+        let has_name x =
+          RA_.get_pointer_field x 0 ~f:RA_.has_field
         let name_get x =
           RA_.get_pointer_field x 0 ~f:(RA_.get_text ~default:"")
         let id_get x =
@@ -1367,6 +1459,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         RA_.get_data_field x ~f:(RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:0)
       let id_get_int_exn x =
         Uint64.to_int (id_get x)
+      let has_display_name x =
+        RA_.get_pointer_field x 0 ~f:RA_.has_field
       let display_name_get x =
         RA_.get_pointer_field x 0 ~f:(RA_.get_text ~default:"")
       let display_name_prefix_length_get x =
@@ -1377,8 +1471,12 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         RA_.get_data_field x ~f:(RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:16)
       let scope_id_get_int_exn x =
         Uint64.to_int (scope_id_get x)
+      let has_nested_nodes x =
+        RA_.get_pointer_field x 1 ~f:RA_.has_field
       let nested_nodes_get x =
         RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list)
+      let has_annotations x =
+        RA_.get_pointer_field x 2 ~f:RA_.has_field
       let annotations_get x =
         RA_.get_pointer_field x 2 ~f:(RA_.get_struct_list)
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -1396,6 +1494,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
             RA_.get_data_field x ~f:(RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:0)
           let id_get_int_exn x =
             Uint64.to_int (id_get x)
+          let has_name x =
+            RA_.get_pointer_field x 0 ~f:RA_.has_field
           let name_get x =
             RA_.get_pointer_field x 0 ~f:(RA_.get_text ~default:"")
           let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -1404,14 +1504,22 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
           RA_.get_data_field x ~f:(RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:0)
         let id_get_int_exn x =
           Uint64.to_int (id_get x)
+        let has_filename x =
+          RA_.get_pointer_field x 0 ~f:RA_.has_field
         let filename_get x =
           RA_.get_pointer_field x 0 ~f:(RA_.get_text ~default:"")
+        let has_imports x =
+          RA_.get_pointer_field x 1 ~f:RA_.has_field
         let imports_get x =
           RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       end
+      let has_nodes x =
+        RA_.get_pointer_field x 0 ~f:RA_.has_field
       let nodes_get x =
         RA_.get_pointer_field x 0 ~f:(RA_.get_struct_list)
+      let has_requested_files x =
+        RA_.get_pointer_field x 1 ~f:RA_.has_field
       let requested_files_get x =
         RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list)
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -1471,6 +1579,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       module List = struct
         type t = builder_t_List_9792858745991129751
         type reader_t = reader_t_List_9792858745991129751
+        let has_element_type x =
+          BA_.get_pointer_field x 0 ~f:BA_.has_field
         let element_type_get x =
           BA_.get_pointer_field x 0 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1)
         let element_type_set_reader x v =
@@ -1658,10 +1768,14 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         BA_.get_data_field x ~f:(BA_.get_float64 ~default_bits:(0L) ~byte_ofs:8)
       let float64_set x v =
       BA_.get_data_field ~discr:{BA_.Discr.value=11; BA_.Discr.byte_ofs=0} x ~f:(BA_.set_float64 ~default_bits:(0L) ~byte_ofs:8 v)
+      let has_text x =
+        BA_.get_pointer_field x 0 ~f:BA_.has_field
       let text_get x =
         BA_.get_pointer_field x 0 ~f:(BA_.get_text ~default:"")
       let text_set x v =
         BA_.get_pointer_field ~discr:{BA_.Discr.value=12; BA_.Discr.byte_ofs=0} x 0 ~f:(BA_.set_text v)
+      let has_data x =
+        BA_.get_pointer_field x 0 ~f:BA_.has_field
       let data_get x =
         BA_.get_pointer_field x 0 ~f:(BA_.get_blob ~default:"")
       let data_set x v =
@@ -1743,6 +1857,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       let id_set x v =
         BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:0 v)
       let id_set_int_exn x v = id_set x (Uint64.of_int v)
+      let has_value x =
+        BA_.get_pointer_field x 0 ~f:BA_.has_field
       let value_get x =
         BA_.get_pointer_field x 0 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1)
       let value_set_reader x v =
@@ -1759,6 +1875,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
     module Method = struct
       type t = builder_t_Method_10736806783679155584
       type reader_t = reader_t_Method_10736806783679155584
+      let has_name x =
+        BA_.get_pointer_field x 0 ~f:BA_.has_field
       let name_get x =
         BA_.get_pointer_field x 0 ~f:(BA_.get_text ~default:"")
       let name_set x v =
@@ -1781,6 +1899,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       let result_struct_type_set x v =
         BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:16 v)
       let result_struct_type_set_int_exn x v = result_struct_type_set x (Uint64.of_int v)
+      let has_annotations x =
+        BA_.get_pointer_field x 1 ~f:BA_.has_field
       let annotations_get x =
         BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1)
       let annotations_set x v =
@@ -1795,6 +1915,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
     module Enumerant = struct
       type t = builder_t_Enumerant_10919677598968879693
       type reader_t = reader_t_Enumerant_10919677598968879693
+      let has_name x =
+        BA_.get_pointer_field x 0 ~f:BA_.has_field
       let name_get x =
         BA_.get_pointer_field x 0 ~f:(BA_.get_text ~default:"")
       let name_set x v =
@@ -1803,6 +1925,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         BA_.get_data_field x ~f:(BA_.get_uint16 ~default:0 ~byte_ofs:0)
       let code_order_set_exn x v =
         BA_.get_data_field x ~f:(BA_.set_uint16 ~default:0 ~byte_ofs:0 v)
+      let has_annotations x =
+        BA_.get_pointer_field x 1 ~f:BA_.has_field
       let annotations_get x =
         BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1)
       let annotations_set x v =
@@ -1868,6 +1992,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         let offset_set x v =
           BA_.get_data_field x ~f:(BA_.set_uint32 ~default:Uint32.zero ~byte_ofs:4 v)
         let offset_set_int_exn x v = offset_set x (Uint32.of_int v)
+        let has_type x =
+          BA_.get_pointer_field x 2 ~f:BA_.has_field
         let type_get x =
           BA_.get_pointer_field x 2 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1)
         let type_set_reader x v =
@@ -1876,6 +2002,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
           BA_.get_pointer_field x 2 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (Some v))
         let type_init x =
           BA_.get_pointer_field x 2 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1)
+        let has_default_value x =
+          BA_.get_pointer_field x 3 ~f:BA_.has_field
         let default_value_get x =
           BA_.get_pointer_field x 3 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1)
         let default_value_set_reader x v =
@@ -1904,6 +2032,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         | 0 -> Slot (slot_get x)
         | 1 -> Group (group_get x)
         | v -> Undefined v
+      let has_name x =
+        BA_.get_pointer_field x 0 ~f:BA_.has_field
       let name_get x =
         BA_.get_pointer_field x 0 ~f:(BA_.get_text ~default:"")
       let name_set x v =
@@ -1912,6 +2042,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         BA_.get_data_field x ~f:(BA_.get_uint16 ~default:0 ~byte_ofs:0)
       let code_order_set_exn x v =
         BA_.get_data_field x ~f:(BA_.set_uint16 ~default:0 ~byte_ofs:0 v)
+      let has_annotations x =
+        BA_.get_pointer_field x 1 ~f:BA_.has_field
       let annotations_get x =
         BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1)
       let annotations_set x v =
@@ -1964,6 +2096,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         let discriminant_offset_set x v =
           BA_.get_data_field x ~f:(BA_.set_uint32 ~default:Uint32.zero ~byte_ofs:32 v)
         let discriminant_offset_set_int_exn x v = discriminant_offset_set x (Uint32.of_int v)
+        let has_fields x =
+          BA_.get_pointer_field x 3 ~f:BA_.has_field
         let fields_get x =
           BA_.get_pointer_field x 3 ~f:(BA_.get_struct_list ~data_words:3 ~pointer_words:4)
         let fields_set x v =
@@ -1978,6 +2112,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       module Enum = struct
         type t = builder_t_Enum_13063450714778629528
         type reader_t = reader_t_Enum_13063450714778629528
+        let has_enumerants x =
+          BA_.get_pointer_field x 3 ~f:BA_.has_field
         let enumerants_get x =
           BA_.get_pointer_field x 3 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:2)
         let enumerants_set x v =
@@ -1992,6 +2128,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       module Annotation = struct
         type t = builder_t_Annotation_17011813041836786320
         type reader_t = reader_t_Annotation_17011813041836786320
+        let has_type x =
+          BA_.get_pointer_field x 3 ~f:BA_.has_field
         let type_get x =
           BA_.get_pointer_field x 3 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1)
         let type_set_reader x v =
@@ -2056,6 +2194,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       module Const = struct
         type t = builder_t_Const_12793219851699983392
         type reader_t = reader_t_Const_12793219851699983392
+        let has_type x =
+          BA_.get_pointer_field x 3 ~f:BA_.has_field
         let type_get x =
           BA_.get_pointer_field x 3 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1)
         let type_set_reader x v =
@@ -2064,6 +2204,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
           BA_.get_pointer_field x 3 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (Some v))
         let type_init x =
           BA_.get_pointer_field x 3 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1)
+        let has_value x =
+          BA_.get_pointer_field x 4 ~f:BA_.has_field
         let value_get x =
           BA_.get_pointer_field x 4 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1)
         let value_set_reader x v =
@@ -2080,12 +2222,16 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       module Interface = struct
         type t = builder_t_Interface_16728431493453586831
         type reader_t = reader_t_Interface_16728431493453586831
+        let has_methods x =
+          BA_.get_pointer_field x 3 ~f:BA_.has_field
         let methods_get x =
           BA_.get_pointer_field x 3 ~f:(BA_.get_struct_list ~data_words:3 ~pointer_words:2)
         let methods_set x v =
           BA_.get_pointer_field x 3 ~f:(BA_.set_struct_list ~data_words:3 ~pointer_words:2 v)
         let methods_init x n =
           BA_.get_pointer_field x 3 ~f:(BA_.init_struct_list ~data_words:3 ~pointer_words:2 n)
+        let has_extends x =
+          BA_.get_pointer_field x 4 ~f:BA_.has_field
         let extends_get x =
           BA_.get_pointer_field x 4 ~f:(BA_.get_uint64_list)
         let extends_set x v =
@@ -2100,6 +2246,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       module NestedNode = struct
         type t = builder_t_NestedNode_16050641862814319170
         type reader_t = reader_t_NestedNode_16050641862814319170
+        let has_name x =
+          BA_.get_pointer_field x 0 ~f:BA_.has_field
         let name_get x =
           BA_.get_pointer_field x 0 ~f:(BA_.get_text ~default:"")
         let name_set x v =
@@ -2148,6 +2296,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       let id_set x v =
         BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:0 v)
       let id_set_int_exn x v = id_set x (Uint64.of_int v)
+      let has_display_name x =
+        BA_.get_pointer_field x 0 ~f:BA_.has_field
       let display_name_get x =
         BA_.get_pointer_field x 0 ~f:(BA_.get_text ~default:"")
       let display_name_set x v =
@@ -2166,12 +2316,16 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
       let scope_id_set x v =
         BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:16 v)
       let scope_id_set_int_exn x v = scope_id_set x (Uint64.of_int v)
+      let has_nested_nodes x =
+        BA_.get_pointer_field x 1 ~f:BA_.has_field
       let nested_nodes_get x =
         BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1)
       let nested_nodes_set x v =
         BA_.get_pointer_field x 1 ~f:(BA_.set_struct_list ~data_words:1 ~pointer_words:1 v)
       let nested_nodes_init x n =
         BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n)
+      let has_annotations x =
+        BA_.get_pointer_field x 2 ~f:BA_.has_field
       let annotations_get x =
         BA_.get_pointer_field x 2 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1)
       let annotations_set x v =
@@ -2199,6 +2353,8 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
           let id_set x v =
             BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:0 v)
           let id_set_int_exn x v = id_set x (Uint64.of_int v)
+          let has_name x =
+            BA_.get_pointer_field x 0 ~f:BA_.has_field
           let name_get x =
             BA_.get_pointer_field x 0 ~f:(BA_.get_text ~default:"")
           let name_set x v =
@@ -2215,10 +2371,14 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         let id_set x v =
           BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:0 v)
         let id_set_int_exn x v = id_set x (Uint64.of_int v)
+        let has_filename x =
+          BA_.get_pointer_field x 0 ~f:BA_.has_field
         let filename_get x =
           BA_.get_pointer_field x 0 ~f:(BA_.get_text ~default:"")
         let filename_set x v =
           BA_.get_pointer_field x 0 ~f:(BA_.set_text v)
+        let has_imports x =
+          BA_.get_pointer_field x 1 ~f:BA_.has_field
         let imports_get x =
           BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1)
         let imports_set x v =
@@ -2230,12 +2390,16 @@ module Make (MessageWrapper : Capnp.Message.S) = struct
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:1 ~pointer_words:2 ()
       end
+      let has_nodes x =
+        BA_.get_pointer_field x 0 ~f:BA_.has_field
       let nodes_get x =
         BA_.get_pointer_field x 0 ~f:(BA_.get_struct_list ~data_words:5 ~pointer_words:5)
       let nodes_set x v =
         BA_.get_pointer_field x 0 ~f:(BA_.set_struct_list ~data_words:5 ~pointer_words:5 v)
       let nodes_init x n =
         BA_.get_pointer_field x 0 ~f:(BA_.init_struct_list ~data_words:5 ~pointer_words:5 n)
+      let has_requested_files x =
+        BA_.get_pointer_field x 1 ~f:BA_.has_field
       let requested_files_get x =
         BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:2)
       let requested_files_set x v =

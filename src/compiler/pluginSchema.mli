@@ -99,6 +99,7 @@ module type S = sig
       module List : sig
         type t = reader_t_List_9792858745991129751
         type builder_t = builder_t_List_9792858745991129751
+        val has_element_type : t -> bool
         val element_type_get : t -> reader_t_Type_15020482145304562784
         val of_message : 'cap message_t -> t
       end
@@ -165,26 +166,31 @@ module type S = sig
       type builder_t = builder_t_Annotation_17422339044421236034
       val id_get : t -> Uint64.t
       val id_get_int_exn : t -> int
+      val has_value : t -> bool
       val value_get : t -> Value.t
       val of_message : 'cap message_t -> t
     end
     module Method : sig
       type t = reader_t_Method_10736806783679155584
       type builder_t = builder_t_Method_10736806783679155584
+      val has_name : t -> bool
       val name_get : t -> string
       val code_order_get : t -> int
       val param_struct_type_get : t -> Uint64.t
       val param_struct_type_get_int_exn : t -> int
       val result_struct_type_get : t -> Uint64.t
       val result_struct_type_get_int_exn : t -> int
+      val has_annotations : t -> bool
       val annotations_get : t -> (ro, Annotation.t, array_t) Capnp.Array.t
       val of_message : 'cap message_t -> t
     end
     module Enumerant : sig
       type t = reader_t_Enumerant_10919677598968879693
       type builder_t = builder_t_Enumerant_10919677598968879693
+      val has_name : t -> bool
       val name_get : t -> string
       val code_order_get : t -> int
+      val has_annotations : t -> bool
       val annotations_get : t -> (ro, Annotation.t, array_t) Capnp.Array.t
       val of_message : 'cap message_t -> t
     end
@@ -214,7 +220,9 @@ module type S = sig
         type builder_t = builder_t_Slot_14133145859926553711
         val offset_get : t -> Uint32.t
         val offset_get_int_exn : t -> int
+        val has_type : t -> bool
         val type_get : t -> Type.t
+        val has_default_value : t -> bool
         val default_value_get : t -> Value.t
         val had_explicit_default_get : t -> bool
         val of_message : 'cap message_t -> t
@@ -224,8 +232,10 @@ module type S = sig
         | Group of Group.t
         | Undefined of int
       val get : t -> unnamed_union_t
+      val has_name : t -> bool
       val name_get : t -> string
       val code_order_get : t -> int
+      val has_annotations : t -> bool
       val annotations_get : t -> (ro, Annotation.t, array_t) Capnp.Array.t
       val discriminant_value_get : t -> int
       val ordinal_get : t -> Ordinal.t
@@ -244,18 +254,21 @@ module type S = sig
         val discriminant_count_get : t -> int
         val discriminant_offset_get : t -> Uint32.t
         val discriminant_offset_get_int_exn : t -> int
+        val has_fields : t -> bool
         val fields_get : t -> (ro, Field.t, array_t) Capnp.Array.t
         val of_message : 'cap message_t -> t
       end
       module Enum : sig
         type t = reader_t_Enum_13063450714778629528
         type builder_t = builder_t_Enum_13063450714778629528
+        val has_enumerants : t -> bool
         val enumerants_get : t -> (ro, Enumerant.t, array_t) Capnp.Array.t
         val of_message : 'cap message_t -> t
       end
       module Annotation : sig
         type t = reader_t_Annotation_17011813041836786320
         type builder_t = builder_t_Annotation_17011813041836786320
+        val has_type : t -> bool
         val type_get : t -> Type.t
         val targets_file_get : t -> bool
         val targets_const_get : t -> bool
@@ -274,20 +287,25 @@ module type S = sig
       module Const : sig
         type t = reader_t_Const_12793219851699983392
         type builder_t = builder_t_Const_12793219851699983392
+        val has_type : t -> bool
         val type_get : t -> Type.t
+        val has_value : t -> bool
         val value_get : t -> Value.t
         val of_message : 'cap message_t -> t
       end
       module Interface : sig
         type t = reader_t_Interface_16728431493453586831
         type builder_t = builder_t_Interface_16728431493453586831
+        val has_methods : t -> bool
         val methods_get : t -> (ro, Method.t, array_t) Capnp.Array.t
+        val has_extends : t -> bool
         val extends_get : t -> (ro, Uint64.t, array_t) Capnp.Array.t
         val of_message : 'cap message_t -> t
       end
       module NestedNode : sig
         type t = reader_t_NestedNode_16050641862814319170
         type builder_t = builder_t_NestedNode_16050641862814319170
+        val has_name : t -> bool
         val name_get : t -> string
         val id_get : t -> Uint64.t
         val id_get_int_exn : t -> int
@@ -304,12 +322,15 @@ module type S = sig
       val get : t -> unnamed_union_t
       val id_get : t -> Uint64.t
       val id_get_int_exn : t -> int
+      val has_display_name : t -> bool
       val display_name_get : t -> string
       val display_name_prefix_length_get : t -> Uint32.t
       val display_name_prefix_length_get_int_exn : t -> int
       val scope_id_get : t -> Uint64.t
       val scope_id_get_int_exn : t -> int
+      val has_nested_nodes : t -> bool
       val nested_nodes_get : t -> (ro, NestedNode.t, array_t) Capnp.Array.t
+      val has_annotations : t -> bool
       val annotations_get : t -> (ro, reader_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
       val of_message : 'cap message_t -> t
     end
@@ -324,16 +345,21 @@ module type S = sig
           type builder_t = builder_t_Import_12560611460656617445
           val id_get : t -> Uint64.t
           val id_get_int_exn : t -> int
+          val has_name : t -> bool
           val name_get : t -> string
           val of_message : 'cap message_t -> t
         end
         val id_get : t -> Uint64.t
         val id_get_int_exn : t -> int
+        val has_filename : t -> bool
         val filename_get : t -> string
+        val has_imports : t -> bool
         val imports_get : t -> (ro, Import.t, array_t) Capnp.Array.t
         val of_message : 'cap message_t -> t
       end
+      val has_nodes : t -> bool
       val nodes_get : t -> (ro, Node.t, array_t) Capnp.Array.t
+      val has_requested_files : t -> bool
       val requested_files_get : t -> (ro, RequestedFile.t, array_t) Capnp.Array.t
       val of_message : 'cap message_t -> t
     end
@@ -383,6 +409,7 @@ module type S = sig
       module List : sig
         type t = builder_t_List_9792858745991129751
         type reader_t = reader_t_List_9792858745991129751
+        val has_element_type : t -> bool
         val element_type_get : t -> builder_t_Type_15020482145304562784
         val element_type_set_reader : t -> reader_t_Type_15020482145304562784 -> builder_t_Type_15020482145304562784
         val element_type_set_builder : t -> builder_t_Type_15020482145304562784 -> builder_t_Type_15020482145304562784
@@ -502,6 +529,7 @@ module type S = sig
       val id_get_int_exn : t -> int
       val id_set : t -> Uint64.t -> unit
       val id_set_int_exn : t -> int -> unit
+      val has_value : t -> bool
       val value_get : t -> Value.t
       val value_set_reader : t -> Value.reader_t -> Value.t
       val value_set_builder : t -> Value.t -> Value.t
@@ -513,6 +541,7 @@ module type S = sig
     module Method : sig
       type t = builder_t_Method_10736806783679155584
       type reader_t = reader_t_Method_10736806783679155584
+      val has_name : t -> bool
       val name_get : t -> string
       val name_set : t -> string -> unit
       val code_order_get : t -> int
@@ -525,6 +554,7 @@ module type S = sig
       val result_struct_type_get_int_exn : t -> int
       val result_struct_type_set : t -> Uint64.t -> unit
       val result_struct_type_set_int_exn : t -> int -> unit
+      val has_annotations : t -> bool
       val annotations_get : t -> (rw, Annotation.t, array_t) Capnp.Array.t
       val annotations_set : t -> (rw, Annotation.t, array_t) Capnp.Array.t -> (rw, Annotation.t, array_t) Capnp.Array.t
       val annotations_init : t -> int -> (rw, Annotation.t, array_t) Capnp.Array.t
@@ -535,10 +565,12 @@ module type S = sig
     module Enumerant : sig
       type t = builder_t_Enumerant_10919677598968879693
       type reader_t = reader_t_Enumerant_10919677598968879693
+      val has_name : t -> bool
       val name_get : t -> string
       val name_set : t -> string -> unit
       val code_order_get : t -> int
       val code_order_set_exn : t -> int -> unit
+      val has_annotations : t -> bool
       val annotations_get : t -> (rw, Annotation.t, array_t) Capnp.Array.t
       val annotations_set : t -> (rw, Annotation.t, array_t) Capnp.Array.t -> (rw, Annotation.t, array_t) Capnp.Array.t
       val annotations_init : t -> int -> (rw, Annotation.t, array_t) Capnp.Array.t
@@ -582,10 +614,12 @@ module type S = sig
         val offset_get_int_exn : t -> int
         val offset_set : t -> Uint32.t -> unit
         val offset_set_int_exn : t -> int -> unit
+        val has_type : t -> bool
         val type_get : t -> Type.t
         val type_set_reader : t -> Type.reader_t -> Type.t
         val type_set_builder : t -> Type.t -> Type.t
         val type_init : t -> Type.t
+        val has_default_value : t -> bool
         val default_value_get : t -> Value.t
         val default_value_set_reader : t -> Value.reader_t -> Value.t
         val default_value_set_builder : t -> Value.t -> Value.t
@@ -601,10 +635,12 @@ module type S = sig
         | Group of Group.t
         | Undefined of int
       val get : t -> unnamed_union_t
+      val has_name : t -> bool
       val name_get : t -> string
       val name_set : t -> string -> unit
       val code_order_get : t -> int
       val code_order_set_exn : t -> int -> unit
+      val has_annotations : t -> bool
       val annotations_get : t -> (rw, Annotation.t, array_t) Capnp.Array.t
       val annotations_set : t -> (rw, Annotation.t, array_t) Capnp.Array.t -> (rw, Annotation.t, array_t) Capnp.Array.t
       val annotations_init : t -> int -> (rw, Annotation.t, array_t) Capnp.Array.t
@@ -636,6 +672,7 @@ module type S = sig
         val discriminant_offset_get_int_exn : t -> int
         val discriminant_offset_set : t -> Uint32.t -> unit
         val discriminant_offset_set_int_exn : t -> int -> unit
+        val has_fields : t -> bool
         val fields_get : t -> (rw, Field.t, array_t) Capnp.Array.t
         val fields_set : t -> (rw, Field.t, array_t) Capnp.Array.t -> (rw, Field.t, array_t) Capnp.Array.t
         val fields_init : t -> int -> (rw, Field.t, array_t) Capnp.Array.t
@@ -646,6 +683,7 @@ module type S = sig
       module Enum : sig
         type t = builder_t_Enum_13063450714778629528
         type reader_t = reader_t_Enum_13063450714778629528
+        val has_enumerants : t -> bool
         val enumerants_get : t -> (rw, Enumerant.t, array_t) Capnp.Array.t
         val enumerants_set : t -> (rw, Enumerant.t, array_t) Capnp.Array.t -> (rw, Enumerant.t, array_t) Capnp.Array.t
         val enumerants_init : t -> int -> (rw, Enumerant.t, array_t) Capnp.Array.t
@@ -656,6 +694,7 @@ module type S = sig
       module Annotation : sig
         type t = builder_t_Annotation_17011813041836786320
         type reader_t = reader_t_Annotation_17011813041836786320
+        val has_type : t -> bool
         val type_get : t -> Type.t
         val type_set_reader : t -> Type.reader_t -> Type.t
         val type_set_builder : t -> Type.t -> Type.t
@@ -691,10 +730,12 @@ module type S = sig
       module Const : sig
         type t = builder_t_Const_12793219851699983392
         type reader_t = reader_t_Const_12793219851699983392
+        val has_type : t -> bool
         val type_get : t -> Type.t
         val type_set_reader : t -> Type.reader_t -> Type.t
         val type_set_builder : t -> Type.t -> Type.t
         val type_init : t -> Type.t
+        val has_value : t -> bool
         val value_get : t -> Value.t
         val value_set_reader : t -> Value.reader_t -> Value.t
         val value_set_builder : t -> Value.t -> Value.t
@@ -706,9 +747,11 @@ module type S = sig
       module Interface : sig
         type t = builder_t_Interface_16728431493453586831
         type reader_t = reader_t_Interface_16728431493453586831
+        val has_methods : t -> bool
         val methods_get : t -> (rw, Method.t, array_t) Capnp.Array.t
         val methods_set : t -> (rw, Method.t, array_t) Capnp.Array.t -> (rw, Method.t, array_t) Capnp.Array.t
         val methods_init : t -> int -> (rw, Method.t, array_t) Capnp.Array.t
+        val has_extends : t -> bool
         val extends_get : t -> (rw, Uint64.t, array_t) Capnp.Array.t
         val extends_set : t -> (rw, Uint64.t, array_t) Capnp.Array.t -> (rw, Uint64.t, array_t) Capnp.Array.t
         val extends_init : t -> int -> (rw, Uint64.t, array_t) Capnp.Array.t
@@ -719,6 +762,7 @@ module type S = sig
       module NestedNode : sig
         type t = builder_t_NestedNode_16050641862814319170
         type reader_t = reader_t_NestedNode_16050641862814319170
+        val has_name : t -> bool
         val name_get : t -> string
         val name_set : t -> string -> unit
         val id_get : t -> Uint64.t
@@ -743,6 +787,7 @@ module type S = sig
       val id_get_int_exn : t -> int
       val id_set : t -> Uint64.t -> unit
       val id_set_int_exn : t -> int -> unit
+      val has_display_name : t -> bool
       val display_name_get : t -> string
       val display_name_set : t -> string -> unit
       val display_name_prefix_length_get : t -> Uint32.t
@@ -753,9 +798,11 @@ module type S = sig
       val scope_id_get_int_exn : t -> int
       val scope_id_set : t -> Uint64.t -> unit
       val scope_id_set_int_exn : t -> int -> unit
+      val has_nested_nodes : t -> bool
       val nested_nodes_get : t -> (rw, NestedNode.t, array_t) Capnp.Array.t
       val nested_nodes_set : t -> (rw, NestedNode.t, array_t) Capnp.Array.t -> (rw, NestedNode.t, array_t) Capnp.Array.t
       val nested_nodes_init : t -> int -> (rw, NestedNode.t, array_t) Capnp.Array.t
+      val has_annotations : t -> bool
       val annotations_get : t -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
       val annotations_set : t -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
       val annotations_init : t -> int -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
@@ -776,6 +823,7 @@ module type S = sig
           val id_get_int_exn : t -> int
           val id_set : t -> Uint64.t -> unit
           val id_set_int_exn : t -> int -> unit
+          val has_name : t -> bool
           val name_get : t -> string
           val name_set : t -> string -> unit
           val of_message : rw message_t -> t
@@ -786,8 +834,10 @@ module type S = sig
         val id_get_int_exn : t -> int
         val id_set : t -> Uint64.t -> unit
         val id_set_int_exn : t -> int -> unit
+        val has_filename : t -> bool
         val filename_get : t -> string
         val filename_set : t -> string -> unit
+        val has_imports : t -> bool
         val imports_get : t -> (rw, Import.t, array_t) Capnp.Array.t
         val imports_set : t -> (rw, Import.t, array_t) Capnp.Array.t -> (rw, Import.t, array_t) Capnp.Array.t
         val imports_init : t -> int -> (rw, Import.t, array_t) Capnp.Array.t
@@ -795,9 +845,11 @@ module type S = sig
         val to_message : t -> rw message_t
         val init_root : ?message_size:int -> unit -> t
       end
+      val has_nodes : t -> bool
       val nodes_get : t -> (rw, Node.t, array_t) Capnp.Array.t
       val nodes_set : t -> (rw, Node.t, array_t) Capnp.Array.t -> (rw, Node.t, array_t) Capnp.Array.t
       val nodes_init : t -> int -> (rw, Node.t, array_t) Capnp.Array.t
+      val has_requested_files : t -> bool
       val requested_files_get : t -> (rw, RequestedFile.t, array_t) Capnp.Array.t
       val requested_files_set : t -> (rw, RequestedFile.t, array_t) Capnp.Array.t -> (rw, RequestedFile.t, array_t) Capnp.Array.t
       val requested_files_init : t -> int -> (rw, RequestedFile.t, array_t) Capnp.Array.t

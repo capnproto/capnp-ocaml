@@ -111,9 +111,20 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode field
         ]
       | Bool
       | Float32
-      | Float64
+      | Float64 -> [
+          Getter [
+            sprintf "val %s_get : t -> %s"
+              field_name
+              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+          Setter [
+            sprintf "val %s_set : t -> %s -> unit"
+              field_name
+              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+        ]
       | Text
       | Data -> [
+          Getter [
+            "val has_" ^ field_name ^ " : t -> bool"; ];
           Getter [
             sprintf "val %s_get : t -> %s"
               field_name
@@ -141,6 +152,8 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode field
               (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
         ]
       | List _ -> [
+          Getter [
+            "val has_" ^ field_name ^ " : t -> bool"; ];
           Getter [
             sprintf "val %s_get : t -> %s"
               field_name
@@ -176,6 +189,8 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode field
                  nodes_table scope tp); ];
         ]
       | Struct _ -> [
+          Getter [
+            "val has_" ^ field_name ^ " : t -> bool"; ];
           Getter [
             sprintf "val %s_get : t -> %s"
               field_name

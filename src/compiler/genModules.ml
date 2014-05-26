@@ -818,6 +818,9 @@ let generate_one_field_accessors ~nodes_table ~node_id ~scope
             (getters, setters)
         | (PS.Type.Text, PS.Value.Text a) ->
             let getters = [
+              "let has_" ^ field_name ^ " x =";
+              sprintf "  %s.get_pointer_field x %u ~f:%s.has_field"
+                api_module field_ofs api_module;
               "let " ^ field_name ^ "_get x =";
               sprintf "  %s.get_pointer_field x %u ~f:(%s.get_text ~default:\"%s\")"
                 api_module
@@ -834,6 +837,9 @@ let generate_one_field_accessors ~nodes_table ~node_id ~scope
             (getters, setters)
         | (PS.Type.Data, PS.Value.Data a) ->
             let getters = [
+              "let has_" ^ field_name ^ " x =";
+              sprintf "  %s.get_pointer_field x %u ~f:%s.has_field"
+                api_module field_ofs api_module;
               "let " ^ field_name ^ "_get x =";
               sprintf "  %s.get_pointer_field x %u ~f:(%s.get_blob ~default:\"%s\")"
                 api_module
@@ -868,8 +874,12 @@ let generate_one_field_accessors ~nodes_table ~node_id ~scope
                   ""
             in
             let list_type = PS.Type.List.element_type_get list_def in
-            let getters = generate_list_getter ~nodes_table ~scope ~list_type
-              ~mode ~field_name ~field_ofs ~default_str
+            let getters = [
+              "let has_" ^ field_name ^ " x =";
+              sprintf "  %s.get_pointer_field x %u ~f:%s.has_field"
+                api_module field_ofs api_module;
+              ] @ (generate_list_getter ~nodes_table ~scope ~list_type
+                ~mode ~field_name ~field_ofs ~default_str)
             in
             let setters = generate_list_setters ~nodes_table ~scope ~list_type
               ~discr_str ~field_name ~field_ofs
@@ -917,11 +927,15 @@ let generate_one_field_accessors ~nodes_table ~node_id ~scope
             let getters =
               match mode with
               | Mode.Reader -> [
+                  "let has_" ^ field_name ^ " x =";
+                  sprintf "  RA_.get_pointer_field x %u ~f:RA_.has_field" field_ofs;
                   "let " ^ field_name ^ "_get x =";
                   sprintf "  RA_.get_pointer_field x %u ~f:(RA_.get_struct%s)"
                     field_ofs reader_default_str;
                 ]
               | Mode.Builder -> [
+                  "let has_" ^ field_name ^ " x =";
+                  sprintf "  BA_.get_pointer_field x %u ~f:BA_.has_field" field_ofs;
                   "let " ^ field_name ^ "_get x =";
                   sprintf "  BA_.get_pointer_field x %u \
                            ~f:(BA_.get_struct%s ~data_words:%u ~pointer_words:%u)"

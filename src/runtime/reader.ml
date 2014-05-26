@@ -369,6 +369,16 @@ module Make (MessageWrapper : Message.S) = struct
     in
     f pointer_opt
 
+  let has_field
+      (pointer_opt : 'cap Slice.t option)
+    : bool =
+    match pointer_opt with
+    | Some pointer_bytes ->
+        let ptr_val = Slice.get_int64 pointer_bytes 0 in
+        Int64.compare ptr_val Int64.zero <> 0
+    | None ->
+        false
+
   let get_text
       ~(default : string)
       (pointer_opt : 'cap Slice.t option)
