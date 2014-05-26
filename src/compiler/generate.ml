@@ -148,13 +148,24 @@ let compile
         (GenCommon.collect_unique_types ~nodes_table requested_file_node)
         ~f:(fun (name, tp) -> "  type " ^ name)
     in
+    let sig_unique_enums =
+      GenCommon.apply_indent ~indent:"  "
+        (GenCommon.collect_unique_enums ~is_sig:true ~nodes_table
+           ~node_name:requested_filename requested_file_node)
+    in
     let mod_unique_types = (List.rev_map
         (GenCommon.collect_unique_types ~nodes_table requested_file_node)
         ~f:(fun (name, tp) -> "  type " ^ name ^ " = " ^ tp)) @ [""]
     in
+    let mod_unique_enums =
+      GenCommon.apply_indent ~indent:"  "
+        (GenCommon.collect_unique_enums ~is_sig:false ~nodes_table
+           ~node_name:requested_filename requested_file_node)
+    in
     let sig_s =
       sig_s_header @
       sig_unique_types @
+      sig_unique_enums @
       sig_s_reader_header @
       (GenCommon.apply_indent ~indent:"    "
         (GenSignatures.generate_node ~suppress_module_wrapper:true ~nodes_table
@@ -196,6 +207,7 @@ let compile
         builder_defaults @
         mod_header @
         mod_unique_types @
+        mod_unique_enums @
         reader_defaults @
         mod_reader_header @
         reader_body @

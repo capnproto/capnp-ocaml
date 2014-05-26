@@ -50,15 +50,25 @@ module type S = sig
   type builder_t_Enum_11389172934837766057
   type reader_t_Type_15020482145304562784
   type builder_t_Type_15020482145304562784
-  type reader_t_ElementSize_15102134695616452902
-  type builder_t_ElementSize_15102134695616452902
+  module ElementSize_15102134695616452902 : sig
+    type t =
+      | Empty
+      | Bit
+      | Byte
+      | TwoBytes
+      | FourBytes
+      | EightBytes
+      | Pointer
+      | InlineComposite
+      | Undefined of int
+  end
 
   module Reader : sig
     type array_t
     type builder_array_t
     type pointer_t
     module ElementSize : sig
-      type t =
+      type t = ElementSize_15102134695616452902.t =
         | Empty
         | Bit
         | Byte
@@ -334,7 +344,7 @@ module type S = sig
     type reader_array_t = Reader.array_t
     type pointer_t
     module ElementSize : sig
-      type t = Reader.ElementSize.t =
+      type t = ElementSize_15102134695616452902.t =
         | Empty
         | Bit
         | Byte

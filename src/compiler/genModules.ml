@@ -1425,10 +1425,12 @@ and generate_node
           (apply_indent ~indent:"  " body) @
           [ "end" ]
   | PS.Node.Enum enum_def ->
-      let nested_modules = generate_nested_modules () in
+      let unique_module_name =
+        (String.capitalize node_name) ^ "_" ^ (Uint64.to_string node_id)
+      in
       let body =
-        GenCommon.generate_enum_sig ~nodes_table ~scope ~nested_modules
-          ~mode ~node enum_def
+        (generate_nested_modules ()) @
+        (GenCommon.generate_enum_sig ~unique_module_name enum_def)
       in
       if suppress_module_wrapper then
         body

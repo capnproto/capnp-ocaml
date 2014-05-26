@@ -215,12 +215,22 @@ let make_unique_typename ~(mode : Mode.t) ~nodes_table node =
   let uq_name = get_unqualified_name
     ~parent:(Hashtbl.find_exn nodes_table (PS.Node.scope_id_get node)) ~child:node
   in
-  let t_str =
-    match mode with
-    | Mode.Reader  -> "reader_t"
-    | Mode.Builder -> "builder_t"
-  in
-  sprintf "%s_%s_%s" t_str uq_name (Uint64.to_string (PS.Node.id_get node))
+  let node_id = PS.Node.id_get node in
+  match PS.Node.get node with
+  | PS.Node.Enum enum_def ->
+      (* Enums don't have unique type names, they have unique module names.  This
+         allows us to use the same enum constructor names without name collisions. *)
+      let unique_module_name =
+        (String.capitalize uq_name) ^ "_" ^ (Uint64.to_string node_id)
+      in
+      unique_module_name ^ ".t"
+  | _ ->
+      let t_str =
+        match mode with
+        | Mode.Reader  -> "reader_t"
+        | Mode.Builder -> "builder_t"
+      in
+      sprintf "%s_%s_%s" t_str uq_name (Uint64.to_string node_id)
 
 
 (* Determines whether a simple name for [node], as given by
@@ -431,17 +441,13 @@ let generate_union_type ~(mode : Mode.t) nodes_table scope fields =
 
 
 (* Generate the signature for an enum type. *)
-let generate_enum_sig ~nodes_table ~scope ~nested_modules
-    ~mode ~node enum_def =
-  let is_builder = mode = Mode.Builder in
+let generate_enum_sig ?unique_module_name enum_def =
   let header =
-    if is_builder then
-      let reader_type_string =
-        "Reader." ^ (get_fully_qualified_name nodes_table node) ^ ".t"
-      in
-      [ "type t = " ^ reader_type_string ^ " =" ]
-    else
-      [ "type t =" ]
+    match unique_module_name with
+    | Some name ->
+        [ "type t = " ^ name ^ ".t =" ]
+    | None ->
+        [ "type t =" ]
   in
   let variants =
     let enumerants = PS.Node.Enum.enumerants_get enum_def in
@@ -454,7 +460,7 @@ let generate_enum_sig ~nodes_table ~scope ~nested_modules
       let match_case = "  | " ^ name in
       match_case :: acc)
   in
-  nested_modules @ header @ variants
+  header @ variants
 
 
 (* Recurse through the schema, collecting unique type names and type
@@ -471,10 +477,10 @@ let rec collect_unique_types ?acc ~nodes_table node =
   match PS.Node.get node with
   | PS.Node.File
   | PS.Node.Const _
-  | PS.Node.Annotation _ ->
+  | PS.Node.Annotation _
+  | PS.Node.Enum _ ->
       names
   | PS.Node.Struct _
-  | PS.Node.Enum _
   | PS.Node.Interface _ ->
       let reader_name = make_unique_typename ~nodes_table
           ~mode:Mode.Reader node
@@ -487,5 +493,46 @@ let rec collect_unique_types ?acc ~nodes_table node =
       (builder_name, builder_type) :: (reader_name, reader_type) :: names
   | PS.Node.Undefined x ->
       failwith (sprintf "Unknown Node union discriminant %u" x)
+
+
+(* Recurse through the schema, emitting uniquely-named modules for
+   all enum types. *)
+let rec collect_unique_enums ?(toplevel = true) ~is_sig ~nodes_table ~node_name node =
+  let child_decls = List.concat_map (children_of nodes_table node)
+      ~f:(fun child_node ->
+        let child_name = get_unqualified_name ~parent:node ~child:child_node in
+        collect_unique_enums ~toplevel:false ~is_sig ~nodes_table
+          ~node_name:child_name child_node)
+  in
+  let parent_decl =
+    match PS.Node.get node with
+    | PS.Node.File
+    | PS.Node.Const _
+    | PS.Node.Annotation _
+    | PS.Node.Struct _
+    | PS.Node.Interface _ ->
+        []
+    | PS.Node.Enum enum_def ->
+        let unique_module_name =
+          (String.capitalize node_name) ^ "_" ^ (Uint64.to_string (PS.Node.id_get node))
+        in
+        let body = generate_enum_sig enum_def in
+        let header =
+          if is_sig then
+            [ "module " ^ unique_module_name ^ " : sig" ]
+          else
+            [ "module " ^ unique_module_name ^ " = struct" ]
+        in
+        header @ (apply_indent ~indent:"  " body) @ [ "end" ]
+    | PS.Node.Undefined x ->
+        failwith (sprintf "Unknown Node union discriminant %u" x)
+  in
+  let all_decls = (List.rev_append parent_decl child_decls) in
+  if toplevel then
+    (* Toplevel call *)
+    List.rev all_decls
+  else
+    (* Recursive call *)
+    all_decls
 
 
