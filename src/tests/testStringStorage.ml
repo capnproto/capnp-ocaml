@@ -29,7 +29,6 @@
 
 
 module SM = Capnp.Message.Make(Capnp.StringStorage)
-
 open OUnit2
 
 

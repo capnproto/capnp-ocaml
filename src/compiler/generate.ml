@@ -78,12 +78,10 @@ let functor_sig = [
 
 let mod_header = [
   "module Make (MessageWrapper : Capnp.Message.S) = struct";
-  "  open Capnp";
+  "  let invalid_msg = Capnp.Message.invalid_msg";
   "";
-  "  let invalid_msg = Message.invalid_msg";
-  "";
-  "  module RA_ = Runtime.Reader.Make(MessageWrapper)";
-  "  module BA_ = Runtime.Builder.Make(MessageWrapper)";
+  "  module RA_ = Capnp.Runtime.Reader.Make(MessageWrapper)";
+  "  module BA_ = Capnp.Runtime.Builder.Make(MessageWrapper)";
   "";
   "  type 'cap message_t = 'cap MessageWrapper.Message.t";
   "";

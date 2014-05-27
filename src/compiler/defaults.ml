@@ -276,7 +276,7 @@ let gen_builder_defaults defaults =
    using the same native storage type as the functor parameter. *)
 let emit_instantiate_reader_message () = [
   "module DefaultsCopier_ =";
-  "  Runtime.BuilderOps.Make(Runtime.Builder.DefaultsMessage)(MessageWrapper)";
+  "  Capnp.Runtime.BuilderOps.Make(Capnp.Runtime.Builder.DefaultsMessage)(MessageWrapper)";
   "";
   "let _reader_defaults_message =";
   "  MessageWrapper.Message.create";

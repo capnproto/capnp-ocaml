@@ -151,21 +151,38 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode field
               (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp)
               (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
         ]
-      | List _ -> [
+      | List list_descr ->
+          let list_type = List.element_type_get list_descr in [
           Getter [
             "val has_" ^ field_name ^ " : t -> bool"; ];
           Getter [
             sprintf "val %s_get : t -> %s"
               field_name
               (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+          Getter [
+            sprintf "val %s_get_list : t -> %s list"
+              field_name
+              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope list_type); ];
+          Getter [
+            sprintf "val %s_get_array : t -> %s array"
+              field_name
+              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope list_type); ];
           Setter [
             (* FIXME: should allow setting from a Reader *)
             sprintf "val %s_set : t -> %s -> %s"
               field_name
-              (GenCommon.type_name ~mode ~scope_mode:mode
-                 nodes_table scope tp)
-              (GenCommon.type_name ~mode ~scope_mode:mode
-                 nodes_table scope tp); ];
+              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp)
+              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+          Setter [
+            sprintf "val %s_set_list : t -> %s list -> %s"
+              field_name
+              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope list_type)
+              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+          Setter [
+            sprintf "val %s_set_array : t -> %s array -> %s"
+              field_name
+              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope list_type)
+              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
           Setter [
             sprintf "val %s_init : t -> int -> %s"
               field_name
@@ -289,7 +306,7 @@ let generate_struct_node ~nodes_table ~scope ~nested_modules
     | Mode.Reader -> [
         "type t = " ^ unique_reader;
         "type builder_t = " ^ unique_builder;
-      ] 
+      ]
     | Mode.Builder -> [
         "type t = " ^ unique_builder;
         "type reader_t = " ^ unique_reader;

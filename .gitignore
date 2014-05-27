@@ -15,7 +15,9 @@
 .omakedb.lock
 *.omc
 src/compiler/capnpc-ocaml
-src/tests/test
+src/tests/run-tests
+src/tests/run-tests.opt
+src/tests/run-tests.run
 src/tests/test.mli
 src/tests/test.ml
 src/tests/.capnp-repo

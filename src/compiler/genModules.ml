@@ -304,7 +304,7 @@ let rec generate_list_element_codecs ~nodes_table ~scope list_def =
 
 
 (* Generate an accessor for retrieving a list of the given type. *)
-let generate_list_getter ~nodes_table ~scope ~list_type ~mode
+let generate_list_getters ~nodes_table ~scope ~list_type ~mode
     ~field_name ~field_ofs ~default_str =
   let api_module = api_of_mode mode in
   let make_primitive_accessor element_name = [
@@ -318,117 +318,125 @@ let generate_list_getter ~nodes_table ~scope ~list_type ~mode
       ;
     ]
   in
-  let open PS.Type in
-  match get list_type with
-  | Void     -> make_primitive_accessor "void"
-  | Bool     -> make_primitive_accessor "bit"
-  | Int8     -> make_primitive_accessor "int8"
-  | Int16    -> make_primitive_accessor "int16"
-  | Int32    -> make_primitive_accessor "int32"
-  | Int64    -> make_primitive_accessor "int64"
-  | Uint8    -> make_primitive_accessor "uint8"
-  | Uint16   -> make_primitive_accessor "uint16"
-  | Uint32   -> make_primitive_accessor "uint32"
-  | Uint64   -> make_primitive_accessor "uint64"
-  | Float32  -> make_primitive_accessor "float32"
-  | Float64  -> make_primitive_accessor "float64"
-  | Text     -> make_primitive_accessor "text"
-  | Data     -> make_primitive_accessor "blob"
-  | Struct struct_def ->
-      begin match mode with
-      | Mode.Reader -> [
-          "let " ^ field_name ^ "_get x =";
-          sprintf "  RA_.get_pointer_field x %u ~f:(RA_.get_struct_list%s)"
-            field_ofs default_str;
-        ]
-      | Mode.Builder ->
-          let data_words, pointer_words =
-            let id = PS.Type.Struct.type_id_get struct_def in
-            let node = Hashtbl.find_exn nodes_table id in
-            match PS.Node.get node with
-            | PS.Node.Struct struct_def ->
-                (PS.Node.Struct.data_word_count_get struct_def,
-                 PS.Node.Struct.pointer_count_get struct_def)
-            | _ ->
-                failwith
-                  "Decoded non-struct node where struct node was expected."
-          in [
+  let basic_getter =
+    let open PS.Type in
+    match get list_type with
+    | Void     -> make_primitive_accessor "void"
+    | Bool     -> make_primitive_accessor "bit"
+    | Int8     -> make_primitive_accessor "int8"
+    | Int16    -> make_primitive_accessor "int16"
+    | Int32    -> make_primitive_accessor "int32"
+    | Int64    -> make_primitive_accessor "int64"
+    | Uint8    -> make_primitive_accessor "uint8"
+    | Uint16   -> make_primitive_accessor "uint16"
+    | Uint32   -> make_primitive_accessor "uint32"
+    | Uint64   -> make_primitive_accessor "uint64"
+    | Float32  -> make_primitive_accessor "float32"
+    | Float64  -> make_primitive_accessor "float64"
+    | Text     -> make_primitive_accessor "text"
+    | Data     -> make_primitive_accessor "blob"
+    | Struct struct_def ->
+        begin match mode with
+        | Mode.Reader -> [
             "let " ^ field_name ^ "_get x =";
-            sprintf "  BA_.get_pointer_field x %u \
-                     ~f:(BA_.get_struct_list%s ~data_words:%u ~pointer_words:%u)"
-              field_ofs
-              default_str
-              data_words
-              pointer_words;
+            sprintf "  RA_.get_pointer_field x %u ~f:(RA_.get_struct_list%s)"
+              field_ofs default_str;
           ]
-      end
-  | List list_def ->
-      begin match mode with
-      | Mode.Reader ->
-          let decoder_declaration =
-            apply_indent ~indent:"  "
-              (generate_list_element_decoder ~nodes_table ~scope list_def)
-          in [
+        | Mode.Builder ->
+            let data_words, pointer_words =
+              let id = PS.Type.Struct.type_id_get struct_def in
+              let node = Hashtbl.find_exn nodes_table id in
+              match PS.Node.get node with
+              | PS.Node.Struct struct_def ->
+                  (PS.Node.Struct.data_word_count_get struct_def,
+                   PS.Node.Struct.pointer_count_get struct_def)
+              | _ ->
+                  failwith
+                    "Decoded non-struct node where struct node was expected."
+            in [
+              "let " ^ field_name ^ "_get x =";
+              sprintf "  BA_.get_pointer_field x %u \
+                       ~f:(BA_.get_struct_list%s ~data_words:%u ~pointer_words:%u)"
+                field_ofs
+                default_str
+                data_words
+                pointer_words;
+            ]
+        end
+    | List list_def ->
+        begin match mode with
+        | Mode.Reader ->
+            let decoder_declaration =
+              apply_indent ~indent:"  "
+                (generate_list_element_decoder ~nodes_table ~scope list_def)
+            in [
+              "let " ^ field_name ^ "_get x =";
+            ] @ decoder_declaration @ [
+              sprintf "  RA_.get_pointer_field x %u ~f:(RA_.get_list%s decoders)"
+                field_ofs
+                default_str;
+            ]
+        | Mode.Builder ->
+            let codecs_declaration =
+              apply_indent ~indent:"  "
+                (generate_list_element_codecs ~nodes_table ~scope list_def)
+            in [
+              "let " ^ field_name ^ "_get x =";
+            ] @ codecs_declaration @ [
+              sprintf "  BA_.get_pointer_field x %u ~f:(BA_.get_list%s"
+                field_ofs
+                default_str;
+              "    ~storage_type:Capnp.Runtime.Common.ListStorageType.Pointer ~codecs)";
+            ]
+        end
+    | Enum enum_def ->
+        let enum_id = Enum.type_id_get enum_def in
+        let enum_node = Hashtbl.find_exn nodes_table enum_id in
+        let unique_module_name =
+          GenCommon.make_unique_enum_module_name ~nodes_table enum_node
+        in
+        begin match mode with
+        | Mode.Reader -> [
             "let " ^ field_name ^ "_get x =";
-          ] @ decoder_declaration @ [
-            sprintf "  RA_.get_pointer_field x %u ~f:(RA_.get_list%s decoders)"
-              field_ofs
-              default_str;
-          ]
-      | Mode.Builder ->
-          let codecs_declaration =
-            apply_indent ~indent:"  "
-              (generate_list_element_codecs ~nodes_table ~scope list_def)
-          in [
+            "  let slice_decoder slice =";
+            "    " ^ unique_module_name ^
+              ".decode (MessageWrapper.Slice.get_uint16 slice 0)";
+            "  in";
+            sprintf "  RA_.get_pointer_field x %u ~f:(RA_.get_list%s"
+              field_ofs default_str;
+            "    (RA_.ListDecoders.Bytes2 slice_decoder))";
+            ]
+        | Mode.Builder -> [
             "let " ^ field_name ^ "_get x =";
-          ] @ codecs_declaration @ [
+            "  let slice_decoder slice =";
+            "    " ^ unique_module_name ^
+              ".decode (MessageWrapper.Slice.get_uint16 slice 0)";
+            "  in";
+            "  let slice_encoder v slice =";
+            "    MessageWrapper.Slice.set_uint16 slice 0 (" ^ unique_module_name ^
+              ".encode_safe v)";
+            "  in";
             sprintf "  BA_.get_pointer_field x %u ~f:(BA_.get_list%s"
-              field_ofs
-              default_str;
-            "    ~storage_type:Runtime.Common.ListStorageType.Pointer ~codecs)";
-          ]
-      end
-  | Enum enum_def ->
-      let enum_id = Enum.type_id_get enum_def in
-      let enum_node = Hashtbl.find_exn nodes_table enum_id in
-      let unique_module_name =
-        GenCommon.make_unique_enum_module_name ~nodes_table enum_node
-      in
-      begin match mode with
-      | Mode.Reader -> [
-          "let " ^ field_name ^ "_get x =";
-          "  let slice_decoder slice =";
-          "    " ^ unique_module_name ^
-            ".decode (MessageWrapper.Slice.get_uint16 slice 0)";
-          "  in";
-          sprintf "  RA_.get_pointer_field x %u ~f:(RA_.get_list%s"
-            field_ofs default_str;
-          "    (RA_.ListDecoders.Bytes2 slice_decoder))";
-          ]
-      | Mode.Builder -> [
-          "let " ^ field_name ^ "_get x =";
-          "  let slice_decoder slice =";
-          "    " ^ unique_module_name ^
-            ".decode (MessageWrapper.Slice.get_uint16 slice 0)";
-          "  in";
-          "  let slice_encoder v slice =";
-          "    MessageWrapper.Slice.set_uint16 slice 0 (" ^ unique_module_name ^
-            ".encode_safe v)";
-          "  in";
-          sprintf "  BA_.get_pointer_field x %u ~f:(BA_.get_list%s"
-            field_ofs default_str;
-          "    ~storage_type:Runtime.Common.ListStorageType.Bytes2";
-          "    ~codecs:(BA_.NC.ListCodecs.Bytes2 (slice_decoder, slice_encoder)))";
-          ]
-      end
-  | Interface _ -> [
-        "let " ^ field_name ^ "_get x = failwith \"not implemented (type iface)\"";
-      ]
-  | AnyPointer -> [
-        "let " ^ field_name ^ "_get x = failwith \"not implemented (type anyptr)\"";
-      ]
-  | Undefined x ->
-       failwith (sprintf "Unknown Type union discriminant %d" x)
+              field_ofs default_str;
+            "    ~storage_type:Capnp.Runtime.Common.ListStorageType.Bytes2";
+            "    ~codecs:(BA_.NC.ListCodecs.Bytes2 (slice_decoder, slice_encoder)))";
+            ]
+        end
+    | Interface _ -> [
+          "let " ^ field_name ^ "_get x = failwith \"not implemented (type iface)\"";
+        ]
+    | AnyPointer -> [
+          "let " ^ field_name ^ "_get x = failwith \"not implemented (type anyptr)\"";
+        ]
+    | Undefined x ->
+         failwith (sprintf "Unknown Type union discriminant %d" x)
+  in
+  basic_getter @ [
+    "let " ^ field_name ^ "_get_list x =";
+    "  Capnp.Array.to_list (" ^ field_name ^ "_get x)";
+    "let " ^ field_name ^ "_get_array x =";
+    "  Capnp.Array.to_array (" ^ field_name ^ "_get x)";
+  ]
 
 
 (* Generate accessors for setting or initializing a list of the given type. *)
@@ -446,102 +454,114 @@ let generate_list_setters ~nodes_table ~scope ~list_type
       field_ofs
       element_name;
   ] in
-  let open PS.Type in
-  match get list_type with
-  | Void     -> make_primitive_setters "void"
-  | Bool     -> make_primitive_setters "bit"
-  | Int8     -> make_primitive_setters "int8"
-  | Int16    -> make_primitive_setters "int16"
-  | Int32    -> make_primitive_setters "int32"
-  | Int64    -> make_primitive_setters "int64"
-  | Uint8    -> make_primitive_setters "uint8"
-  | Uint16   -> make_primitive_setters "uint16"
-  | Uint32   -> make_primitive_setters "uint32"
-  | Uint64   -> make_primitive_setters "uint64"
-  | Float32  -> make_primitive_setters "float32"
-  | Float64  -> make_primitive_setters "float64"
-  | Text     -> make_primitive_setters "text"
-  | Data     -> make_primitive_setters "blob"
-  | Struct struct_def ->
-      let data_words, pointer_words =
-        let id = PS.Type.Struct.type_id_get struct_def in
-        let node = Hashtbl.find_exn nodes_table id in
-        match PS.Node.get node with
-        | PS.Node.Struct struct_def ->
-            (PS.Node.Struct.data_word_count_get struct_def,
-             PS.Node.Struct.pointer_count_get struct_def)
-        | _ ->
-            failwith
-              "Decoded non-struct node where struct node was expected."
-      in [
-        "let " ^ field_name ^ "_set x v =";
-        sprintf "  BA_.get_pointer_field %sx %u \
-                 ~f:(BA_.set_struct_list ~data_words:%u ~pointer_words:%u v)"
-          discr_str
-          field_ofs
-          data_words
-          pointer_words;
-        "let " ^ field_name ^ "_init x n =";
-        sprintf "  BA_.get_pointer_field %sx %u \
-                 ~f:(BA_.init_struct_list ~data_words:%u ~pointer_words:%u n)"
-          discr_str
-          field_ofs
-          data_words
-          pointer_words;
-      ]
-  | List list_def ->
-      let codecs_declaration =
-        apply_indent ~indent:"  "
-          (generate_list_element_codecs ~nodes_table ~scope list_def)
-      in [
-        "let " ^ field_name ^ "_set x v =";
-      ] @ codecs_declaration @ [
-        sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.set_list v"
-          discr_str field_ofs;
-        "    ~storage_type:Runtime.Common.ListStorageType.Pointer ~codecs)";
-        "let " ^ field_name ^ "_init x n =";
-      ] @ codecs_declaration @ [
-        sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.init_list n"
-          discr_str field_ofs;
-        "    ~storage_type:Runtime.Common.ListStorageType.Pointer ~codecs)";
-      ]
-  | Enum enum_def ->
-      let enum_id = Enum.type_id_get enum_def in
-      let enum_node = Hashtbl.find_exn nodes_table enum_id in
-      let unique_module_name =
-        GenCommon.make_unique_enum_module_name ~nodes_table enum_node
-      in
-      let codecs = [
-        "  let slice_decoder slice =";
-        "    " ^ unique_module_name ^
-          ".decode (MessageWrapper.Slice.get_uint16 slice 0)";
-        "  in";
-        "  let slice_encoder v slice =";
-        "    MessageWrapper.Slice.set_uint16 slice 0 (" ^ unique_module_name ^
-          ".encode_safe v)";
-        "  in";
-      ] in [
-        "let " ^ field_name ^ "_set x v =";
-      ] @ codecs @ [
-        sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.set_list v"
-          discr_str field_ofs;
-        "    ~storage_type:Runtime.Common.ListStorageType.Bytes2";
-        "    ~codecs:(BA_.NC.ListCodecs.Bytes2 (slice_decoder, slice_encoder)))";
-        "let " ^ field_name ^ "_init x n =";
-      ] @ codecs @ [
-        sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.init_list n"
-          discr_str field_ofs;
-        "    ~storage_type:Runtime.Common.ListStorageType.Bytes2";
-        "    ~codecs:(BA_.NC.ListCodecs.Bytes2 (slice_decoder, slice_encoder)))";
-      ]
-  | Interface _ -> [
-        "let " ^ field_name ^ "_get x = failwith \"not implemented (type iface)\"";
-      ]
-  | AnyPointer -> [
-        "let " ^ field_name ^ "_get x = failwith \"not implemented (type anyptr)\"";
-      ]
-  | Undefined x ->
-       failwith (sprintf "Unknown Type union discriminant %d" x)
+  let basic_setters =
+    let open PS.Type in
+    match get list_type with
+    | Void     -> make_primitive_setters "void"
+    | Bool     -> make_primitive_setters "bit"
+    | Int8     -> make_primitive_setters "int8"
+    | Int16    -> make_primitive_setters "int16"
+    | Int32    -> make_primitive_setters "int32"
+    | Int64    -> make_primitive_setters "int64"
+    | Uint8    -> make_primitive_setters "uint8"
+    | Uint16   -> make_primitive_setters "uint16"
+    | Uint32   -> make_primitive_setters "uint32"
+    | Uint64   -> make_primitive_setters "uint64"
+    | Float32  -> make_primitive_setters "float32"
+    | Float64  -> make_primitive_setters "float64"
+    | Text     -> make_primitive_setters "text"
+    | Data     -> make_primitive_setters "blob"
+    | Struct struct_def ->
+        let data_words, pointer_words =
+          let id = PS.Type.Struct.type_id_get struct_def in
+          let node = Hashtbl.find_exn nodes_table id in
+          match PS.Node.get node with
+          | PS.Node.Struct struct_def ->
+              (PS.Node.Struct.data_word_count_get struct_def,
+               PS.Node.Struct.pointer_count_get struct_def)
+          | _ ->
+              failwith
+                "Decoded non-struct node where struct node was expected."
+        in [
+          "let " ^ field_name ^ "_set x v =";
+          sprintf "  BA_.get_pointer_field %sx %u \
+                   ~f:(BA_.set_struct_list ~data_words:%u ~pointer_words:%u v)"
+            discr_str
+            field_ofs
+            data_words
+            pointer_words;
+          "let " ^ field_name ^ "_init x n =";
+          sprintf "  BA_.get_pointer_field %sx %u \
+                   ~f:(BA_.init_struct_list ~data_words:%u ~pointer_words:%u n)"
+            discr_str
+            field_ofs
+            data_words
+            pointer_words;
+        ]
+    | List list_def ->
+        let codecs_declaration =
+          apply_indent ~indent:"  "
+            (generate_list_element_codecs ~nodes_table ~scope list_def)
+        in [
+          "let " ^ field_name ^ "_set x v =";
+        ] @ codecs_declaration @ [
+          sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.set_list v"
+            discr_str field_ofs;
+          "    ~storage_type:Capnp.Runtime.Common.ListStorageType.Pointer ~codecs)";
+          "let " ^ field_name ^ "_init x n =";
+        ] @ codecs_declaration @ [
+          sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.init_list n"
+            discr_str field_ofs;
+          "    ~storage_type:Capnp.Runtime.Common.ListStorageType.Pointer ~codecs)";
+        ]
+    | Enum enum_def ->
+        let enum_id = Enum.type_id_get enum_def in
+        let enum_node = Hashtbl.find_exn nodes_table enum_id in
+        let unique_module_name =
+          GenCommon.make_unique_enum_module_name ~nodes_table enum_node
+        in
+        let codecs = [
+          "  let slice_decoder slice =";
+          "    " ^ unique_module_name ^
+            ".decode (MessageWrapper.Slice.get_uint16 slice 0)";
+          "  in";
+          "  let slice_encoder v slice =";
+          "    MessageWrapper.Slice.set_uint16 slice 0 (" ^ unique_module_name ^
+            ".encode_safe v)";
+          "  in";
+        ] in [
+          "let " ^ field_name ^ "_set x v =";
+        ] @ codecs @ [
+          sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.set_list v"
+            discr_str field_ofs;
+          "    ~storage_type:Capnp.Runtime.Common.ListStorageType.Bytes2";
+          "    ~codecs:(BA_.NC.ListCodecs.Bytes2 (slice_decoder, slice_encoder)))";
+          "let " ^ field_name ^ "_init x n =";
+        ] @ codecs @ [
+          sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.init_list n"
+            discr_str field_ofs;
+          "    ~storage_type:Capnp.Runtime.Common.ListStorageType.Bytes2";
+          "    ~codecs:(BA_.NC.ListCodecs.Bytes2 (slice_decoder, slice_encoder)))";
+        ]
+    | Interface _ -> [
+          "let " ^ field_name ^ "_set x v = failwith \"not implemented (type iface)\"";
+        ]
+    | AnyPointer -> [
+          "let " ^ field_name ^ "_set x v = failwith \"not implemented (type anyptr)\"";
+        ]
+    | Undefined x ->
+         failwith (sprintf "Unknown Type union discriminant %d" x)
+  in
+  basic_setters @ [
+    "let " ^ field_name ^ "_set_list x v =";
+    "  let builder = " ^ field_name ^ "_init x (List.length v) in";
+    "  let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in";
+    "  builder";
+    "let " ^ field_name ^ "_set_array x v =";
+    "  let builder = " ^ field_name ^ "_init x (Array.length v) in";
+    "  let () = Array.iteri (fun i a -> Capnp.Array.set builder i a) v in";
+    "  builder";
+  ]
 
 
 let generate_one_field_accessors ~nodes_table ~node_id ~scope
@@ -878,7 +898,7 @@ let generate_one_field_accessors ~nodes_table ~node_id ~scope
               "let has_" ^ field_name ^ " x =";
               sprintf "  %s.get_pointer_field x %u ~f:%s.has_field"
                 api_module field_ofs api_module;
-              ] @ (generate_list_getter ~nodes_table ~scope ~list_type
+              ] @ (generate_list_getters ~nodes_table ~scope ~list_type
                 ~mode ~field_name ~field_ofs ~default_str)
             in
             let setters = generate_list_setters ~nodes_table ~scope ~list_type

@@ -1,9 +1,14 @@
 OCAMLINCLUDES += ../runtime
 OCAML_LIBS += ../runtime/libcapnp
 
+# It's OK if tests run slowly; if something goes wrong, we want the
+# best possible backtrace support.
+NATIVE_ENABLED = false
+
 TEST_MODULES = \
+  test \
   testStringStorage \
-  test
+  testEncoding
 
 PROGRAM = run-tests
 
