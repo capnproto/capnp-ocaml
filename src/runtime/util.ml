@@ -33,6 +33,7 @@ open Core.Std
 (* Decode [num] as a signed integer of width [n] bits, using two's complement
    representation of negative numbers. *)
 let decode_signed n num =
+  let () = assert (n < Int.num_bits) in
   let power_of_two = 1 lsl (n - 1) in
   let is_signed = (num land power_of_two) <> 0 in
   if is_signed then
@@ -44,10 +45,11 @@ let decode_signed n num =
 (* Encode signed integer [num] into [n] bits, using two's complement
    representation of negative numbers. *)
 let encode_signed n num =
+  let () = assert (n < Int.num_bits) in
   if num >= 0 then
     num
   else
-    (1 lsl (n - 1)) + num
+    (1 lsl n) + num
 
 
 (* [ceil_ratio n m] computes ceiling(n/m) *)

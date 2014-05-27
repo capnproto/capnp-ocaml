@@ -8,6 +8,7 @@ NATIVE_ENABLED = false
 TEST_MODULES = \
   test \
   testStringStorage \
+	testMisc \
   testEncoding
 
 PROGRAM = run-tests
