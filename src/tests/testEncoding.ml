@@ -150,196 +150,324 @@ let init_test_message (s : T.Builder.TestAllTypes.t) : unit =
   ()
 
 
-let check_test_message (s : T.Reader.TestAllTypes.t) : unit =
-  let open T.Reader.TestAllTypes in
-  let () = assert_equal () (void_field_get s) in
-  let () = assert_equal true (bool_field_get s) in
-  let () = assert_equal (-123) (int8_field_get s) in
-  let () = assert_equal (-12345) (int16_field_get s) in
-  let () = assert_equal (-12345678l) (int32_field_get s) in
-  let () = assert_equal (-123456789012345L) (int64_field_get s) in
-  let () = assert_equal 234 (u_int8_field_get s) in
-  let () = assert_equal 45678 (u_int16_field_get s) in
-  let () = assert_equal (Uint32.of_string "3456789012") (u_int32_field_get s) in
-  let () = assert_equal (Uint64.of_string "12345678901234567890") (u_int64_field_get s) in
-  let () = assert_float32_equal 1234.5 (float32_field_get s) in
-  let () = assert_float64_equal (-123e45) (float64_field_get s) in
-  let () = assert_equal "foo" (text_field_get s) in
-  let () = assert_equal "bar" (data_field_get s) in
-  let () = 
-    let sub = struct_field_get s in
-    let () = assert_equal () (void_field_get sub) in
-    let () = assert_equal true (bool_field_get sub) in
-    let () = assert_equal (-12) (int8_field_get sub) in
-    let () = assert_equal 3456 (int16_field_get sub) in
-    let () = assert_equal (-78901234l) (int32_field_get sub) in
-    let () = assert_equal 56789012345678L (int64_field_get sub) in
-    let () = assert_equal 90 (u_int8_field_get sub) in
-    let () = assert_equal 1234 (u_int16_field_get sub) in
-    let () = assert_equal (Uint32.of_int 56789012) (u_int32_field_get sub) in
-    let () = assert_equal (Uint64.of_string "345678901234567890") (u_int64_field_get sub) in
-    let () = assert_float32_equal (-1.25e-10) (float32_field_get sub) in
-    let () = assert_float64_equal 345.0 (float64_field_get sub) in
-    let () = assert_equal "baz" (text_field_get sub) in
-    let () = assert_equal "qux" (data_field_get sub) in
-    let () =
-      let sub_sub = struct_field_get sub in
-      let () = assert_equal "nested" (text_field_get sub_sub) in
-      let () = assert_equal "really nested" (text_field_get (struct_field_get sub_sub)) in
+(* Provide a signature for the TestAllTypes module which we can implement
+   using either a Reader or a Builder. *)
+module type TEST_ALL_TYPES = sig
+  type t
+  type array_t
+  type 'a message_t
+  type access
+  type message_access
+
+  val void_field_get : t -> unit
+  val bool_field_get : t -> bool
+  val int8_field_get : t -> int
+  val int16_field_get : t -> int
+  val int32_field_get : t -> int32
+  val int32_field_get_int_exn : t -> int
+  val int64_field_get : t -> int64
+  val int64_field_get_int_exn : t -> int
+  val u_int8_field_get : t -> int
+  val u_int16_field_get : t -> int
+  val u_int32_field_get : t -> Uint32.t
+  val u_int32_field_get_int_exn : t -> int
+  val u_int64_field_get : t -> Uint64.t
+  val u_int64_field_get_int_exn : t -> int
+  val float32_field_get : t -> float
+  val float64_field_get : t -> float
+  val has_text_field : t -> bool
+  val text_field_get : t -> string
+  val has_data_field : t -> bool
+  val data_field_get : t -> string
+  val has_struct_field : t -> bool
+  val struct_field_get : t -> t
+  val enum_field_get : t -> T.Reader.TestEnum.t
+  val interface_field_get : t -> unit
+  val has_void_list : t -> bool
+  val void_list_get : t -> (access, unit, array_t) Capnp.Array.t
+  val void_list_get_list : t -> unit list
+  val void_list_get_array : t -> unit array
+  val has_bool_list : t -> bool
+  val bool_list_get : t -> (access, bool, array_t) Capnp.Array.t
+  val bool_list_get_list : t -> bool list
+  val bool_list_get_array : t -> bool array
+  val has_int8_list : t -> bool
+  val int8_list_get : t -> (access, int, array_t) Capnp.Array.t
+  val int8_list_get_list : t -> int list
+  val int8_list_get_array : t -> int array
+  val has_int16_list : t -> bool
+  val int16_list_get : t -> (access, int, array_t) Capnp.Array.t
+  val int16_list_get_list : t -> int list
+  val int16_list_get_array : t -> int array
+  val has_int32_list : t -> bool
+  val int32_list_get : t -> (access, int32, array_t) Capnp.Array.t
+  val int32_list_get_list : t -> int32 list
+  val int32_list_get_array : t -> int32 array
+  val has_int64_list : t -> bool
+  val int64_list_get : t -> (access, int64, array_t) Capnp.Array.t
+  val int64_list_get_list : t -> int64 list
+  val int64_list_get_array : t -> int64 array
+  val has_u_int8_list : t -> bool
+  val u_int8_list_get : t -> (access, int, array_t) Capnp.Array.t
+  val u_int8_list_get_list : t -> int list
+  val u_int8_list_get_array : t -> int array
+  val has_u_int16_list : t -> bool
+  val u_int16_list_get : t -> (access, int, array_t) Capnp.Array.t
+  val u_int16_list_get_list : t -> int list
+  val u_int16_list_get_array : t -> int array
+  val has_u_int32_list : t -> bool
+  val u_int32_list_get : t -> (access, Uint32.t, array_t) Capnp.Array.t
+  val u_int32_list_get_list : t -> Uint32.t list
+  val u_int32_list_get_array : t -> Uint32.t array
+  val has_u_int64_list : t -> bool
+  val u_int64_list_get : t -> (access, Uint64.t, array_t) Capnp.Array.t
+  val u_int64_list_get_list : t -> Uint64.t list
+  val u_int64_list_get_array : t -> Uint64.t array
+  val has_float32_list : t -> bool
+  val float32_list_get : t -> (access, float, array_t) Capnp.Array.t
+  val float32_list_get_list : t -> float list
+  val float32_list_get_array : t -> float array
+  val has_float64_list : t -> bool
+  val float64_list_get : t -> (access, float, array_t) Capnp.Array.t
+  val float64_list_get_list : t -> float list
+  val float64_list_get_array : t -> float array
+  val has_text_list : t -> bool
+  val text_list_get : t -> (access, string, array_t) Capnp.Array.t
+  val text_list_get_list : t -> string list
+  val text_list_get_array : t -> string array
+  val has_data_list : t -> bool
+  val data_list_get : t -> (access, string, array_t) Capnp.Array.t
+  val data_list_get_list : t -> string list
+  val data_list_get_array : t -> string array
+  val has_struct_list : t -> bool
+  val struct_list_get : t -> (access, t, array_t) Capnp.Array.t
+  val struct_list_get_list : t -> t list
+  val struct_list_get_array : t -> t array
+  val has_enum_list : t -> bool
+  val enum_list_get : t -> (access, T.Reader.TestEnum.t, array_t) Capnp.Array.t
+  val enum_list_get_list : t -> T.Reader.TestEnum.t list
+  val enum_list_get_array : t -> T.Reader.TestEnum.t array
+  val has_interface_list : t -> bool
+  val interface_list_get : t -> (access, unit, array_t) Capnp.Array.t
+  val interface_list_get_list : t -> unit list
+  val interface_list_get_array : t -> unit array
+  val of_message : message_access message_t -> t
+end
+
+
+module Check_test_message(M : TEST_ALL_TYPES) = struct
+  let f (s : M.t) : unit =
+    let open M in
+    let () = assert_equal () (void_field_get s) in
+    let () = assert_equal true (bool_field_get s) in
+    let () = assert_equal (-123) (int8_field_get s) in
+    let () = assert_equal (-12345) (int16_field_get s) in
+    let () = assert_equal (-12345678l) (int32_field_get s) in
+    let () = assert_equal (-123456789012345L) (int64_field_get s) in
+    let () = assert_equal 234 (u_int8_field_get s) in
+    let () = assert_equal 45678 (u_int16_field_get s) in
+    let () = assert_equal (Uint32.of_string "3456789012") (u_int32_field_get s) in
+    let () = assert_equal (Uint64.of_string "12345678901234567890") (u_int64_field_get s) in
+    let () = assert_float32_equal 1234.5 (float32_field_get s) in
+    let () = assert_float64_equal (-123e45) (float64_field_get s) in
+    let () = assert_equal "foo" (text_field_get s) in
+    let () = assert_equal "bar" (data_field_get s) in
+    let () = 
+      let sub = struct_field_get s in
+      let () = assert_equal () (void_field_get sub) in
+      let () = assert_equal true (bool_field_get sub) in
+      let () = assert_equal (-12) (int8_field_get sub) in
+      let () = assert_equal 3456 (int16_field_get sub) in
+      let () = assert_equal (-78901234l) (int32_field_get sub) in
+      let () = assert_equal 56789012345678L (int64_field_get sub) in
+      let () = assert_equal 90 (u_int8_field_get sub) in
+      let () = assert_equal 1234 (u_int16_field_get sub) in
+      let () = assert_equal (Uint32.of_int 56789012) (u_int32_field_get sub) in
+      let () = assert_equal (Uint64.of_string "345678901234567890") (u_int64_field_get sub) in
+      let () = assert_float32_equal (-1.25e-10) (float32_field_get sub) in
+      let () = assert_float64_equal 345.0 (float64_field_get sub) in
+      let () = assert_equal "baz" (text_field_get sub) in
+      let () = assert_equal "qux" (data_field_get sub) in
+      let () =
+        let sub_sub = struct_field_get sub in
+        let () = assert_equal "nested" (text_field_get sub_sub) in
+        let () = assert_equal "really nested" (text_field_get (struct_field_get sub_sub)) in
+        ()
+      in
+      let () = assert_equal T.Reader.TestEnum.Baz (enum_field_get sub) in
+      let () = assert_equal
+          [ (); (); () ]
+          (void_list_get_list sub)
+      in
+      let () = assert_equal
+          [ false; true; false; true; true ]
+          (bool_list_get_list sub)
+      in
+      let () = assert_equal
+          [ 12; -34; -0x80; 0x7f ]
+          (int8_list_get_list sub)
+      in
+      let () = assert_equal
+          [ 1234; -5678; -0x8000; 0x7fff ]
+          (int16_list_get_list sub)
+      in
+      let () = assert_equal
+          [12345678l; -90123456l; -0x80000000l; 0x7fffffffl]
+          (int32_list_get_list sub)
+      in
+      let () = assert_equal
+          [ 123456789012345L; -678901234567890L; -0x8000000000000000L; 0x7fffffffffffffffL ]
+          (int64_list_get_list sub)
+      in
+      let () = assert_equal
+          [12; 34; 0; 0xff]
+          (u_int8_list_get_list sub)
+      in
+      let () = assert_equal
+          [ 1234; 5678; 0; 0xffff ]
+          (u_int16_list_get_list sub)
+      in
+      let () = assert_equal
+          [ Uint32.of_string "12345678"; Uint32.of_string "90123456";
+            Uint32.zero; Uint32.of_string "0xffffffff" ]
+          (u_int32_list_get_list sub)
+      in
+      let () = assert_equal
+          [ Uint64.of_string "123456789012345"; Uint64.of_string "678901234567890";
+            Uint64.zero; Uint64.of_string "0xffffffffffffffff" ]
+          (u_int64_list_get_list sub)
+      in
+      let () = assert_equal
+          [ "quux"; "corge"; "grault" ]
+          (text_list_get_list sub)
+      in
+      let () = assert_equal
+          [ "garply"; "waldo"; "fred" ]
+          (data_list_get_list sub)
+      in
+      let () =
+        let list_reader = struct_list_get sub in
+        let () = assert_equal 3 (Capnp.Array.length list_reader) in
+        let () = assert_equal "x structlist 1"
+            (text_field_get (Capnp.Array.get list_reader 0))
+        in
+        let () = assert_equal "x structlist 2"
+            (text_field_get (Capnp.Array.get list_reader 1))
+        in
+        let () = assert_equal "x structlist 3"
+            (text_field_get (Capnp.Array.get list_reader 2))
+        in
+        ()
+      in
+      let () = assert_equal
+          [ T.Reader.TestEnum.Qux; T.Reader.TestEnum.Bar;
+            T.Reader.TestEnum.Grault ]
+          (enum_list_get_list sub)
+      in
       ()
     in
-    let () = assert_equal T.Reader.TestEnum.Baz (enum_field_get sub) in
+    let () = assert_equal 6 (Capnp.Array.length (void_list_get s)) in
     let () = assert_equal
-        [ (); (); () ]
-        (void_list_get_list sub)
+        [ true; false; false; true ]
+        (bool_list_get_list s)
     in
     let () = assert_equal
-        [ false; true; false; true; true ]
-        (bool_list_get_list sub)
+        [ 111; -111 ]
+        (int8_list_get_list s)
     in
     let () = assert_equal
-        [ 12; -34; -0x80; 0x7f ]
-        (int8_list_get_list sub)
+        [ 11111; -11111 ]
+        (int16_list_get_list s)
     in
     let () = assert_equal
-        [ 1234; -5678; -0x8000; 0x7fff ]
-        (int16_list_get_list sub)
+        [ 111111111l; -111111111l ]
+        (int32_list_get_list s)
+    in
+    let () = assert_equal 
+        [ 1111111111111111111L; -1111111111111111111L ]
+        (int64_list_get_list s)
     in
     let () = assert_equal
-        [12345678l; -90123456l; -0x80000000l; 0x7fffffffl]
-        (int32_list_get_list sub)
+        [ 111; 222 ]
+        (u_int8_list_get_list s)
     in
     let () = assert_equal
-        [ 123456789012345L; -678901234567890L; -0x8000000000000000L; 0x7fffffffffffffffL ]
-        (int64_list_get_list sub)
+        [ 33333; 44444 ]
+        (u_int16_list_get_list s)
     in
     let () = assert_equal
-        [12; 34; 0; 0xff]
-        (u_int8_list_get_list sub)
+        [ Uint32.of_string "3333333333" ]
+        (u_int32_list_get_list s)
     in
     let () = assert_equal
-        [ 1234; 5678; 0; 0xffff ]
-        (u_int16_list_get_list sub)
-    in
-    let () = assert_equal
-        [ Uint32.of_string "12345678"; Uint32.of_string "90123456";
-          Uint32.zero; Uint32.of_string "0xffffffff" ]
-        (u_int32_list_get_list sub)
-    in
-    let () = assert_equal
-        [ Uint64.of_string "123456789012345"; Uint64.of_string "678901234567890";
-          Uint64.zero; Uint64.of_string "0xffffffffffffffff" ]
-        (u_int64_list_get_list sub)
-    in
-    let () = assert_equal
-        [ "quux"; "corge"; "grault" ]
-        (text_list_get_list sub)
-    in
-    let () = assert_equal
-        [ "garply"; "waldo"; "fred" ]
-        (data_list_get_list sub)
+        [ Uint64.of_string "11111111111111111111" ]
+        (u_int64_list_get_list s)
     in
     let () =
-      let list_reader = struct_list_get sub in
+      let list_reader = float32_list_get s in
+      let () = assert_equal 4 (Capnp.Array.length list_reader) in
+      let () = assert_float32_equal 5555.5 (Capnp.Array.get list_reader 0) in
+      let () = assert_equal infinity (Capnp.Array.get list_reader 1) in
+      let () = assert_equal neg_infinity (Capnp.Array.get list_reader 2) in
+      let () = assert_equal (Pervasives.compare nan (Capnp.Array.get list_reader 3)) 0 in
+      ()
+    in
+    let () =
+      let list_reader = float64_list_get s in
+      let () = assert_equal 4 (Capnp.Array.length list_reader) in
+      let () = assert_float64_equal 7777.75 (Capnp.Array.get list_reader 0) in
+      let () = assert_equal infinity (Capnp.Array.get list_reader 1) in
+      let () = assert_equal neg_infinity (Capnp.Array.get list_reader 2) in
+      let () = assert_equal (Pervasives.compare nan (Capnp.Array.get list_reader 3)) 0 in
+      ()
+    in
+    let () = assert_equal [ "plugh"; "xyzzy"; "thud" ] (text_list_get_list s) in
+    let () = assert_equal [ "oops"; "exhausted"; "rfc3092" ] (data_list_get_list s) in
+    let () =
+      let list_reader = struct_list_get s in
       let () = assert_equal 3 (Capnp.Array.length list_reader) in
-      let () = assert_equal "x structlist 1"
-          (text_field_get (Capnp.Array.get list_reader 0))
-      in
-      let () = assert_equal "x structlist 2"
-          (text_field_get (Capnp.Array.get list_reader 1))
-      in
-      let () = assert_equal "x structlist 3"
-          (text_field_get (Capnp.Array.get list_reader 2))
-      in
+      let () = assert_equal "structlist 1" (text_field_get (Capnp.Array.get list_reader 0)) in
+      let () = assert_equal "structlist 2" (text_field_get (Capnp.Array.get list_reader 1)) in
+      let () = assert_equal "structlist 3" (text_field_get (Capnp.Array.get list_reader 2)) in
       ()
     in
     let () = assert_equal
-        [ T.Reader.TestEnum.Qux; T.Reader.TestEnum.Bar;
-          T.Reader.TestEnum.Grault ]
-        (enum_list_get_list sub)
+        [ T.Reader.TestEnum.Foo; T.Reader.TestEnum.Garply ]
+        (enum_list_get_list s)
     in
     ()
-  in
-  let () = assert_equal 6 (Capnp.Array.length (void_list_get s)) in
-  let () = assert_equal
-      [ true; false; false; true ]
-      (bool_list_get_list s)
-  in
-  let () = assert_equal
-      [ 111; -111 ]
-      (int8_list_get_list s)
-  in
-  let () = assert_equal
-      [ 11111; -11111 ]
-      (int16_list_get_list s)
-  in
-  let () = assert_equal
-      [ 111111111l; -111111111l ]
-      (int32_list_get_list s)
-  in
-  let () = assert_equal 
-      [ 1111111111111111111L; -1111111111111111111L ]
-      (int64_list_get_list s)
-  in
-  let () = assert_equal
-      [ 111; 222 ]
-      (u_int8_list_get_list s)
-  in
-  let () = assert_equal
-      [ 33333; 44444 ]
-      (u_int16_list_get_list s)
-  in
-  let () = assert_equal
-      [ Uint32.of_string "3333333333" ]
-      (u_int32_list_get_list s)
-  in
-  let () = assert_equal
-      [ Uint64.of_string "11111111111111111111" ]
-      (u_int64_list_get_list s)
-  in
-  let () =
-    let list_reader = float32_list_get s in
-    let () = assert_equal 4 (Capnp.Array.length list_reader) in
-    let () = assert_float32_equal 5555.5 (Capnp.Array.get list_reader 0) in
-    let () = assert_equal infinity (Capnp.Array.get list_reader 1) in
-    let () = assert_equal neg_infinity (Capnp.Array.get list_reader 2) in
-    let () = assert_equal (Pervasives.compare nan (Capnp.Array.get list_reader 3)) 0 in
-    ()
-  in
-  let () =
-    let list_reader = float64_list_get s in
-    let () = assert_equal 4 (Capnp.Array.length list_reader) in
-    let () = assert_float64_equal 7777.75 (Capnp.Array.get list_reader 0) in
-    let () = assert_equal infinity (Capnp.Array.get list_reader 1) in
-    let () = assert_equal neg_infinity (Capnp.Array.get list_reader 2) in
-    let () = assert_equal (Pervasives.compare nan (Capnp.Array.get list_reader 3)) 0 in
-    ()
-  in
-  let () = assert_equal [ "plugh"; "xyzzy"; "thud" ] (text_list_get_list s) in
-  let () = assert_equal [ "oops"; "exhausted"; "rfc3092" ] (data_list_get_list s) in
-  let () =
-    let list_reader = struct_list_get s in
-    let () = assert_equal 3 (Capnp.Array.length list_reader) in
-    let () = assert_equal "structlist 1" (text_field_get (Capnp.Array.get list_reader 0)) in
-    let () = assert_equal "structlist 2" (text_field_get (Capnp.Array.get list_reader 1)) in
-    let () = assert_equal "structlist 3" (text_field_get (Capnp.Array.get list_reader 2)) in
-    ()
-  in
-  let () = assert_equal
-      [ T.Reader.TestEnum.Foo; T.Reader.TestEnum.Garply ]
-      (enum_list_get_list s)
-  in
-  ()
+end
+
+module ReaderTestAllTypes = struct
+  include T.Reader.TestAllTypes
+  type 'a message_t = 'a T.message_t
+  type array_t = T.Reader.array_t
+  type access = Test.ro
+  type message_access = Test.ro
+end
+
+module Reader_check_test_message = Check_test_message(ReaderTestAllTypes)
+
+module BuilderTestAllTypes = struct
+  include T.Builder.TestAllTypes
+  type 'a message_t = 'a T.message_t
+  type array_t = T.Builder.array_t
+  type access = Test.rw
+  type message_access = Test.rw
+end
+
+module Builder_check_test_message = Check_test_message(BuilderTestAllTypes)
 
 
 let test_encode_decode ctx =
   let message =
     let builder = T.Builder.TestAllTypes.init_root () in
     let () = init_test_message builder in
+    let () = Builder_check_test_message.f builder in
     T.Builder.TestAllTypes.to_message builder
   in
   let reader = T.Reader.TestAllTypes.of_message message in
-  check_test_message reader
+  Reader_check_test_message.f reader
 
 
 let encoding_suite =
