@@ -33,18 +33,18 @@ module Int64 = Core.Core_int64
 type t =
   | Capability of Uint32.t
 
-let tag_val_other = Int64.of_int 0x3
+let tag_val_other = 0x3L
 
 let b_shift = 2
-let b_mask  = Int64.shift_left (Int64.of_int 0x3fffffff) b_shift
+let b_mask  = Int64.shift_left 0x3fffffffL b_shift
 
 let index_shift = 32
-let index_mask  = Int64.shift_left (Int64.of_string "0xffffffff") index_shift
+let index_mask  = Int64.shift_left 0xffffffffL index_shift
 
 let decode (pointer64 : Int64.t) : t =
   if Int64.compare (Int64.bit_and pointer64 b_mask) Int64.zero = 0 then
     let shifted_index = Int64.bit_and pointer64 index_mask in
-    let index64 = Int64.shift_right shifted_index index_shift in
+    let index64 = Int64.shift_right_logical shifted_index index_shift in
     let index32 = Int64.to_int32_exn index64 in
     Capability (Uint32.of_int32 index32)
   else

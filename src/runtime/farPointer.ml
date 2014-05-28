@@ -47,17 +47,16 @@ type t = {
 }
 
 
-let tag_val_far = Int64.of_int 0x2
+let tag_val_far = 0x2L
 
 let landing_pad_type_shift = 2
-let landing_pad_type_mask  = Int64.shift_left Int64.one landing_pad_type_shift
+let landing_pad_type_mask  = Int64.shift_left 0L landing_pad_type_shift
 
 let offset_shift = 3
-let offset_mask  = Int64.shift_left (Int64.of_int 0x1fffffff) offset_shift
+let offset_mask  = Int64.shift_left 0x1fffffffL offset_shift
 
 let segment_shift = 32
-let segment_mask  =
-  Int64.shift_left (Int64.(-) (Int64.shift_left Int64.one 32) Int64.one) segment_shift
+let segment_mask  = Int64.shift_left 0xffffffffL segment_shift
 
 let decode (pointer64 : Int64.t) : t =
   let landing_pad =

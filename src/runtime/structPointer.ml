@@ -43,16 +43,16 @@ type t = {
 }
 
 
-let tag_val_struct = Int64.zero
+let tag_val_struct = 0L
 
 let offset_shift = 2
-let offset_mask  = Int64.shift_left (Int64.of_int 0x3fffffff) offset_shift
+let offset_mask  = Int64.shift_left 0x3fffffffL offset_shift
 
 let data_size_shift = 32
-let data_size_mask  = Int64.shift_left (Int64.of_int 0xffff) data_size_shift
+let data_size_mask  = Int64.shift_left 0xffffL data_size_shift
 
 let pointers_size_shift = 48
-let pointers_size_mask  = Int64.shift_left (Int64.of_int 0xffff) pointers_size_shift
+let pointers_size_mask  = Int64.shift_left 0xffffL pointers_size_shift
 
 let decode (pointer64 : Int64.t) : t =
   let offset =

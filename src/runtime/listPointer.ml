@@ -26,16 +26,16 @@ type t = {
 }
 
 
-let tag_val_list = Int64.one
+let tag_val_list = 1L
 
 let offset_shift = 2
-let offset_mask  = Int64.shift_left (Int64.of_int 0x3fffffff) offset_shift
+let offset_mask  = Int64.shift_left 0x3fffffffL offset_shift
 
 let type_shift = 32
-let type_mask  = Int64.shift_left (Int64.of_int 0x7) type_shift
+let type_mask  = Int64.shift_left 0x7L type_shift
 
 let count_shift = 35
-let count_mask  = Int64.shift_left (Int64.of_int 0x1fffffff) count_shift
+let count_mask  = Int64.shift_left 0x1fffffffL count_shift
 
 let decode (pointer64 : Int64.t) : t =
   let offset =
