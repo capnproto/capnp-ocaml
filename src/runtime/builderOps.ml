@@ -126,7 +126,10 @@ module Make (ROM : Message.S) (RWM : Message.S) = struct
           } in
           let tag_val = StructPointer.encode tag_descr in
           let () = RWM.Slice.set_int64 slice 0 tag_val in
-          slice
+          (* Omit the tag word from the list descriptor *)
+          { slice with
+            RWM.Slice.start = slice.RWM.Slice.start + sizeof_uint64;
+            RWM.Slice.len   = slice.RWM.Slice.len   - sizeof_uint64; }
     in
     let open RWC.ListStorage in {
       storage;
@@ -220,16 +223,22 @@ module Make (ROM : Message.S) (RWM : Message.S) = struct
     in
     let offset_bytes = storage_slice.RWM.Slice.start - RWM.Slice.get_end pointer_bytes in
     let () = assert (offset_bytes land 7 = 0) in
-    let offset_words = offset_bytes / 8 in
     let element_type =
       list_pointer_type_of_storage_type list_storage.RWC.ListStorage.storage_type
     in
-    let pointer_element_count =
+    let offset_words, pointer_element_count =
       match list_storage.RWC.ListStorage.storage_type with
       | Common.ListStorageType.Composite (data_words, pointer_words) ->
-          list_storage.RWC.ListStorage.num_elements * (data_words + pointer_words)
+          (* For Composite lists, we use the convention that the storage slice
+             begins *after* the tag word.  But the offset encoded in the list
+             pointer is an offset to the start of the tag word. *)
+          let offset_words = (offset_bytes / 8) - 1 in
+          let element_count =
+            list_storage.RWC.ListStorage.num_elements * (data_words + pointer_words)
+          in
+          (offset_words, element_count)
       | _ ->
-          list_storage.RWC.ListStorage.num_elements
+          (offset_bytes / 8, list_storage.RWC.ListStorage.num_elements)
     in
     let pointer_descr = {
       ListPointer.offset = offset_words;
@@ -264,11 +273,23 @@ module Make (ROM : Message.S) (RWM : Message.S) = struct
               list_storage.RWC.ListStorage.storage_type;
           ListPointer.num_elements = pointer_element_count;
         } in
-        RWM.Slice.set_int64 pointer_bytes 0 (ListPointer.encode tag_word_desc)
+        RWM.Slice.set_int64 tag_slice 0 (ListPointer.encode tag_word_desc)
+      in
+      (* Account for the tag word in a composite list *)
+      let content_slice =
+        match list_storage.RWC.ListStorage.storage_type with
+        | Common.ListStorageType.Composite _ ->
+            let slice = list_storage.RWC.ListStorage.storage in {
+              slice with
+              RWM.Slice.start = slice.RWM.Slice.start - sizeof_uint64;
+              RWM.Slice.len   = slice.RWM.Slice.len   + sizeof_uint64;
+            }
+        | _ ->
+            list_storage.RWC.ListStorage.storage
       in
       init_far_pointer pointer_bytes
         ~content:list_storage
-        ~content_slice:list_storage.RWC.ListStorage.storage
+        ~content_slice
         ~init_normal_pointer:init_normal_list_pointer
         ~init_far_pointer_tag
 
@@ -314,7 +335,7 @@ module Make (ROM : Message.S) (RWM : Message.S) = struct
           StructPointer.pointer_words =
             struct_storage.RWC.StructStorage.pointers.RWM.Slice.len / 8;
         } in
-        RWM.Slice.set_int64 pointer_bytes 0 (StructPointer.encode tag_word_desc)
+        RWM.Slice.set_int64 tag_slice 0 (StructPointer.encode tag_word_desc)
       in
       let content_slice = {
         struct_storage.RWC.StructStorage.data with
@@ -653,9 +674,9 @@ module Make (ROM : Message.S) (RWM : Message.S) = struct
           | ListStorageType.Empty ->
               ()
           | ListStorageType.Bit ->
-              copy_by_value
-                (Util.ceil_ratio (Util.ceil_ratio src.ROC.ListStorage.num_elements 8)
-                   sizeof_uint64)
+              let total_bytes = Util.ceil_ratio src.ROC.ListStorage.num_elements 8 in
+              let total_words = Util.ceil_ratio total_bytes sizeof_uint64 in
+              copy_by_value total_words
           | ListStorageType.Bytes1
           | ListStorageType.Bytes2
           | ListStorageType.Bytes4
@@ -663,9 +684,9 @@ module Make (ROM : Message.S) (RWM : Message.S) = struct
               let byte_count =
                 ListStorageType.get_byte_count src.ROC.ListStorage.storage_type
               in
-              copy_by_value
-                (Util.ceil_ratio (src.ROC.ListStorage.num_elements * byte_count)
-                   sizeof_uint64)
+              let total_bytes = src.ROC.ListStorage.num_elements * byte_count in
+              let total_words = Util.ceil_ratio total_bytes sizeof_uint64 in
+              copy_by_value total_words
           | ListStorageType.Pointer ->
               let open RWC.ListStorage in
               for i = 0 to src.ROC.ListStorage.num_elements - 1 do
@@ -746,8 +767,8 @@ module Make (ROM : Message.S) (RWM : Message.S) = struct
             (max data_words src_data_words, max pointer_words src_pointer_words)
         | ListStorageType.Empty
         | ListStorageType.Bit ->
-          invalid_msg
-            "decoded unexpected list type where List<struct> was expected"
+            invalid_msg
+              "decoded unexpected list type where List<struct> was expected"
       in
       alloc_list_storage dest_message
         (Common.ListStorageType.Composite (dest_data_words, dest_pointer_words))

@@ -260,12 +260,11 @@ module Make (MessageWrapper : Message.S) = struct
               struct_pointer.SP.data_words + struct_pointer.SP.pointer_words
             in
             if num_elements * words_per_element > num_words then
-              invalid_msg "composite list pointer describes invalid word count";
-            make_list_storage_aux ~offset:sizeof_uint64
-              ~num_words:list_pointer.num_elements
-              ~num_elements:struct_pointer.SP.offset
-              ~storage_type:(ListStorageType.Composite
-                 (struct_pointer.SP.data_words, struct_pointer.SP.pointer_words))
+              invalid_msg "composite list pointer describes invalid word count"
+            else
+              make_list_storage_aux ~offset:sizeof_uint64 ~num_words ~num_elements
+                ~storage_type:(ListStorageType.Composite
+                   (struct_pointer.SP.data_words, struct_pointer.SP.pointer_words))
         | _ ->
             invalid_msg "composite list pointer has malformed element type tag"
         end
