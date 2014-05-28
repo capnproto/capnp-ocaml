@@ -35,6 +35,17 @@ module T  = Test.Make(SM)
 open OUnit2
 
 
+let assert_float_equal f1 f2 eps =
+  let f1_abs = abs_float f1 in
+  let f2_abs = abs_float f2 in
+  let largest = max f1_abs f2_abs in
+  let delta = abs_float (f1 -. f2) in
+  assert_bool "floating point equality" (delta <= largest *. 3.0 *. eps)
+
+let assert_float32_equal f1 f2 = assert_float_equal f1 f2 1.192092896e-07
+let assert_float64_equal f1 f2 = assert_float_equal f1 f2 epsilon_float
+
+
 let init_test_message (s : T.Builder.TestAllTypes.t) : unit =
   let open T.Builder.TestAllTypes in
   let () = void_field_set s in
@@ -76,7 +87,7 @@ let init_test_message (s : T.Builder.TestAllTypes.t) : unit =
 
     let _ = void_list_set_list sub [ (); (); () ] in
     let _ = bool_list_set_array sub [| false; true; false; true; true |] in
-    let _ = int8_list_set_list sub [ 12; -34; -0x80; -0x7f ] in
+    let _ = int8_list_set_list sub [ 12; -34; -0x80; 0x7f ] in
     let _ = int16_list_set_list sub [ 1234; -5678; -0x8000; 0x7fff ] in
     let _ = int32_list_set_list sub [ 12345678l; -90123456l; -0x80000000l; 0x7fffffffl ] in
     let _ = int64_list_set_list sub
@@ -151,8 +162,8 @@ let check_test_message (s : T.Reader.TestAllTypes.t) : unit =
   let () = assert_equal 45678 (u_int16_field_get s) in
   let () = assert_equal (Uint32.of_string "3456789012") (u_int32_field_get s) in
   let () = assert_equal (Uint64.of_string "12345678901234567890") (u_int64_field_get s) in
-  let () = assert_equal 1234.5 (float32_field_get s) in
-  let () = assert_equal (-123e45) (float64_field_get s) in
+  let () = assert_float32_equal 1234.5 (float32_field_get s) in
+  let () = assert_float64_equal (-123e45) (float64_field_get s) in
   let () = assert_equal "foo" (text_field_get s) in
   let () = assert_equal "bar" (data_field_get s) in
   let () = 
@@ -167,8 +178,8 @@ let check_test_message (s : T.Reader.TestAllTypes.t) : unit =
     let () = assert_equal 1234 (u_int16_field_get sub) in
     let () = assert_equal (Uint32.of_int 56789012) (u_int32_field_get sub) in
     let () = assert_equal (Uint64.of_string "345678901234567890") (u_int64_field_get sub) in
-    let () = assert_equal (-1.25e-10) (float32_field_get sub) in
-    let () = assert_equal 345.0 (float64_field_get sub) in
+    let () = assert_float32_equal (-1.25e-10) (float32_field_get sub) in
+    let () = assert_float64_equal 345.0 (float64_field_get sub) in
     let () = assert_equal "baz" (text_field_get sub) in
     let () = assert_equal "qux" (data_field_get sub) in
     let () =
@@ -289,7 +300,7 @@ let check_test_message (s : T.Reader.TestAllTypes.t) : unit =
   let () =
     let list_reader = float32_list_get s in
     let () = assert_equal 4 (Capnp.Array.length list_reader) in
-    let () = assert_equal 5555.5 (Capnp.Array.get list_reader 0) in
+    let () = assert_float32_equal 5555.5 (Capnp.Array.get list_reader 0) in
     let () = assert_equal infinity (Capnp.Array.get list_reader 1) in
     let () = assert_equal neg_infinity (Capnp.Array.get list_reader 2) in
     let () = assert_equal (Pervasives.compare nan (Capnp.Array.get list_reader 3)) 0 in
@@ -298,7 +309,7 @@ let check_test_message (s : T.Reader.TestAllTypes.t) : unit =
   let () =
     let list_reader = float64_list_get s in
     let () = assert_equal 4 (Capnp.Array.length list_reader) in
-    let () = assert_equal 7777.75 (Capnp.Array.get list_reader 0) in
+    let () = assert_float64_equal 7777.75 (Capnp.Array.get list_reader 0) in
     let () = assert_equal infinity (Capnp.Array.get list_reader 1) in
     let () = assert_equal neg_infinity (Capnp.Array.get list_reader 2) in
     let () = assert_equal (Pervasives.compare nan (Capnp.Array.get list_reader 3)) 0 in
@@ -336,4 +347,5 @@ let encoding_suite =
     "encode/decode" >:: test_encode_decode;
   ]
 
+let () = run_test_tt_main encoding_suite
 
