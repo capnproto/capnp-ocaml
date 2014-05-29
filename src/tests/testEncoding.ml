@@ -158,6 +158,7 @@ module type TEST_ALL_TYPES = sig
   type 'a message_t
   type access
   type message_access
+  type inner_struct_t
 
   val void_field_get : t -> unit
   val bool_field_get : t -> bool
@@ -180,7 +181,7 @@ module type TEST_ALL_TYPES = sig
   val has_data_field : t -> bool
   val data_field_get : t -> string
   val has_struct_field : t -> bool
-  val struct_field_get : t -> t
+  val struct_field_get : t -> inner_struct_t
   val enum_field_get : t -> T.Reader.TestEnum.t
   val interface_field_get : t -> unit
   val has_void_list : t -> bool
@@ -240,9 +241,9 @@ module type TEST_ALL_TYPES = sig
   val data_list_get_list : t -> string list
   val data_list_get_array : t -> string array
   val has_struct_list : t -> bool
-  val struct_list_get : t -> (access, t, array_t) Capnp.Array.t
-  val struct_list_get_list : t -> t list
-  val struct_list_get_array : t -> t array
+  val struct_list_get : t -> (access, inner_struct_t, array_t) Capnp.Array.t
+  val struct_list_get_list : t -> inner_struct_t list
+  val struct_list_get_array : t -> inner_struct_t array
   val has_enum_list : t -> bool
   val enum_list_get : t -> (access, T.Reader.TestEnum.t, array_t) Capnp.Array.t
   val enum_list_get_list : t -> T.Reader.TestEnum.t list
@@ -255,9 +256,20 @@ module type TEST_ALL_TYPES = sig
 end
 
 
-module Check_test_message(M : TEST_ALL_TYPES) = struct
-  let f (s : M.t) : unit =
-    let open M in
+(* Using a two-argument functor here because the Outer module may be either
+   TestAllTypes or TestDefaults (i.e. completely different structs defined in the
+   schema which happen to share the same structure), but the Inner module (obtained
+   via [struct_field_get] or [struct_list_get] is always a variant of TestAllTypes
+   due to the way the schema was defined. *)
+
+module Check_test_message
+    (Outer : TEST_ALL_TYPES)
+    (Inner : TEST_ALL_TYPES
+     with type t = Outer.inner_struct_t
+      and type inner_struct_t = Outer.inner_struct_t) = struct
+
+  let f (s : Outer.t) : unit =
+    let open Outer in
     let () = assert_equal () (void_field_get s) in
     let () = assert_equal true (bool_field_get s) in
     let () = assert_equal (-123) (int8_field_get s) in
@@ -274,6 +286,7 @@ module Check_test_message(M : TEST_ALL_TYPES) = struct
     let () = assert_equal "bar" (data_field_get s) in
     let () = 
       let sub = struct_field_get s in
+      let open Inner in
       let () = assert_equal () (void_field_get sub) in
       let () = assert_equal true (bool_field_get sub) in
       let () = assert_equal (-12) (int8_field_get sub) in
@@ -425,6 +438,7 @@ module Check_test_message(M : TEST_ALL_TYPES) = struct
     let () = assert_equal [ "oops"; "exhausted"; "rfc3092" ] (data_list_get_list s) in
     let () =
       let list_reader = struct_list_get s in
+      let open Inner in
       let () = assert_equal 3 (Capnp.Array.length list_reader) in
       let () = assert_equal "structlist 1" (text_field_get (Capnp.Array.get list_reader 0)) in
       let () = assert_equal "structlist 2" (text_field_get (Capnp.Array.get list_reader 1)) in
@@ -444,9 +458,11 @@ module ReaderTestAllTypes = struct
   type array_t = T.Reader.array_t
   type access = Test.ro
   type message_access = Test.ro
+  type inner_struct_t = t
 end
 
-module Reader_check_test_message = Check_test_message(ReaderTestAllTypes)
+module Reader_check_test_message =
+  Check_test_message(ReaderTestAllTypes)(ReaderTestAllTypes)
 
 module BuilderTestAllTypes = struct
   include T.Builder.TestAllTypes
@@ -454,9 +470,35 @@ module BuilderTestAllTypes = struct
   type array_t = T.Builder.array_t
   type access = Test.rw
   type message_access = Test.rw
+  type inner_struct_t = t
 end
 
-module Builder_check_test_message = Check_test_message(BuilderTestAllTypes)
+module Builder_check_test_message =
+  Check_test_message(BuilderTestAllTypes)(BuilderTestAllTypes)
+
+module ReaderTestDefaults = struct
+  include T.Reader.TestDefaults
+  type 'a message_t = 'a T.message_t
+  type array_t = T.Reader.array_t
+  type access = Test.ro
+  type message_access = Test.ro
+  type inner_struct_t = T.Reader.TestAllTypes.t
+end
+
+module Reader_check_test_defaults =
+  Check_test_message(ReaderTestDefaults)(ReaderTestAllTypes)
+
+module BuilderTestDefaults = struct
+  include T.Builder.TestDefaults
+  type 'a message_t = 'a T.message_t
+  type array_t = T.Builder.array_t
+  type access = Test.rw
+  type message_access = Test.rw
+  type inner_struct_t = T.Builder.TestAllTypes.t
+end
+
+module Builder_check_test_defaults =
+  Check_test_message(BuilderTestDefaults)(BuilderTestAllTypes)
 
 
 let test_encode_decode ctx =
@@ -470,9 +512,33 @@ let test_encode_decode ctx =
   Reader_check_test_message.f reader
 
 
+let test_decode_defaults ctx =
+  let null_root = "\x00\x00\x00\x00\x00\x00\x00\x00" in
+  let message = SM.Message.readonly (SM.Message.of_storage [ null_root ]) in
+  let reader = T.Reader.TestDefaults.of_message message in
+  Reader_check_test_defaults.f reader
+
+
+let test_init_defaults ctx =
+  let null_root = "\x00\x00\x00\x00\x00\x00\x00\x00" in
+  let message = SM.Message.of_storage [ null_root ] in
+  let () =
+    let builder = T.Builder.TestDefaults.of_message message in
+    (* First pass initializes [message] with defaults *)
+    let () = Builder_check_test_defaults.f builder in
+    (* Second pass just reads the initialized structure *)
+    let () = Builder_check_test_defaults.f builder in
+    ()
+  in
+  let reader = T.Reader.TestDefaults.of_message message in
+  Reader_check_test_defaults.f reader
+
+
 let encoding_suite =
   "all_types" >::: [
     "encode/decode" >:: test_encode_decode;
+    "decode defaults" >:: test_decode_defaults;
+    "init defaults" >:: test_init_defaults;
   ]
 
 let () = run_test_tt_main encoding_suite
