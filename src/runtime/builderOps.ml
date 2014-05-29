@@ -173,7 +173,7 @@ module Make (ROM : Message.S) (RWM : Message.S) = struct
           in
           let far_pointer_desc = {
             FarPointer.landing_pad = FarPointer.NormalPointer;
-            FarPointer.offset = content_slice.RWM.Slice.start / 8;
+            FarPointer.offset = content_slice.RWM.Slice.start / sizeof_uint64;
             FarPointer.segment_id = content_slice.RWM.Slice.segment_id;
           } in
           let () = RWM.Slice.set_int64 landing_pad 0

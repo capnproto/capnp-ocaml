@@ -50,7 +50,7 @@ type t = {
 let tag_val_far = 0x2L
 
 let landing_pad_type_shift = 2
-let landing_pad_type_mask  = Int64.shift_left 0L landing_pad_type_shift
+let landing_pad_type_mask  = Int64.shift_left 1L landing_pad_type_shift
 
 let offset_shift = 3
 let offset_mask  = Int64.shift_left 0x1fffffffL offset_shift

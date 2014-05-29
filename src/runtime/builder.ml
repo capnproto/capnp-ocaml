@@ -460,9 +460,7 @@ module Make (NM : Message.S) = struct
       (pointer_word : int)
       ~(f : 'cap NM.Slice.t -> 'a)
     : 'a =
-    let result =
-      f (BOps.get_struct_pointer struct_storage pointer_word)
-    in
+    let result = f (BOps.get_struct_pointer struct_storage pointer_word) in
     let () = set_opt_discriminant struct_storage.NC.StructStorage.data discr in
     result
 
