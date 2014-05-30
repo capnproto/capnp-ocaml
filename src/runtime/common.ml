@@ -372,37 +372,6 @@ module Make (MessageWrapper : Message.S) = struct
         Object.Capability index
 
 
-  let list_fold_left_generic
-      (list_storage : 'cap ListStorage.t)
-      ~(get : 'cap ListStorage.t -> int -> 'a)
-      ~(f : 'b -> 'a -> 'b)
-      ~(init : 'b)
-    : 'b =
-    let rec loop acc i =
-      if i = list_storage.ListStorage.num_elements then
-        acc
-      else
-        let v = get list_storage i in
-        loop (f acc v) (i + 1)
-    in
-    loop init 0
-
-
-  let list_fold_right_generic
-      (list_storage : 'cap ListStorage.t)
-      ~(get : 'cap ListStorage.t -> int -> 'a)
-      ~(f : 'b -> 'a -> 'b)
-      ~(init : 'b)
-    : 'b =
-    let rec loop acc i =
-      if i < 0 then
-        acc
-      else
-        let v = get list_storage i in
-        loop (f acc v) (i - 1)
-    in
-    loop init (list_storage.ListStorage.num_elements - 1)
-
   let make_empty_array () =
     let get_unsafe i = assert false in {
       InnerArray.length = 0;
@@ -412,7 +381,6 @@ module Make (MessageWrapper : Message.S) = struct
     }
 
 
-  (* FIXME: Bytes type should encode the expected byte count *)
   module ListDecoders = struct
     type ('cap, 'a) struct_decoders_t = {
       bytes     : 'cap Slice.t -> 'a;
