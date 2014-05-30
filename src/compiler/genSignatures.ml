@@ -316,10 +316,12 @@ let generate_struct_node ~nodes_table ~scope ~nested_modules
     match mode with
     | Mode.Reader -> [
         "val of_message : 'cap message_t -> t";
+        "val of_builder : builder_t -> t";
       ]
     | Mode.Builder -> [
         "val of_message : rw message_t -> t";
         "val to_message : t -> rw message_t";
+        "val to_reader : t -> reader_t";
         "val init_root : ?message_size:int -> unit -> t";
       ]
   in

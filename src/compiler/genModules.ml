@@ -1340,6 +1340,7 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~mode
     match mode with
     | Mode.Reader -> [
         "let of_message x = RA_.get_root_struct (RA_.Message.readonly x)";
+        "let of_builder x = Some (RA_.StructStorage.readonly x)";
       ]
     | Mode.Builder ->
         let data_words    = PS.Node.Struct.data_word_count_get struct_def in
@@ -1348,6 +1349,7 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~mode
                    ~data_words:%u ~pointer_words:%u x"
             data_words pointer_words;
           "let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg";
+          "let to_reader x = Some (RA_.StructStorage.readonly x)";
           "let init_root ?message_size () =";
           sprintf "  BA_.alloc_root_struct ?message_size \
                    ~data_words:%u ~pointer_words:%u ()"
