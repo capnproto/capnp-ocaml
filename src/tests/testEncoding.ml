@@ -546,12 +546,188 @@ let test_union_encoding ctx =
   ()
 
 
+let init_union (setter : T.Builder.TestUnion.t -> 'a) =
+  (* Use the given setter to initialize the given union field and then
+     return both the location of the data that was written as well as
+     the values of the four union discriminants. *)
+  let builder = T.Builder.TestUnion.init_root ~message_size:1024 () in
+  let _ = setter builder in
+  let message = SM.Message.readonly (T.Builder.TestUnion.to_message builder) in
+  let segment = SM.Message.get_segment message 0 in
+
+  (* Find the offset of the first set bit after the union discriminants. *)
+  let bit_offset =
+    let starting_byte = 16 in
+    let rec loop byte_ofs bit_ofs =
+      if byte_ofs = SM.Segment.length segment then
+        None
+      else if bit_ofs = 8 then
+        loop (byte_ofs + 1) 0
+      else
+        let byte_val = SM.Segment.get_uint8 segment byte_ofs in
+        if ((1 lsl bit_ofs) land byte_val) <> 0 then
+          Some ((8 * (byte_ofs - starting_byte)) + bit_ofs)
+        else
+          loop byte_ofs (bit_ofs + 1)
+    in
+    loop starting_byte 0
+  in
+  ([ SM.Segment.get_uint16 segment 8;
+     SM.Segment.get_uint16 segment 10;
+     SM.Segment.get_uint16 segment 12;
+     SM.Segment.get_uint16 segment 14; ],
+   bit_offset)
+
+
+let test_union_layout ctx =
+  let open T.Builder.TestUnion in
+  let () = assert_equal ([ 0; 0; 0; 0 ], None)
+      (init_union (fun b -> Union0.u0f0s0_set (union0_get b)))
+  in
+  let () = assert_equal ([ 1; 0; 0; 0 ], Some 0)
+      (init_union (fun b -> Union0.u0f0s1_set (union0_get b) true))
+  in
+  let () = assert_equal ([ 2; 0; 0; 0 ], Some 0)
+      (init_union (fun b -> Union0.u0f0s8_set_exn (union0_get b) 1))
+  in
+  let () = assert_equal ([ 3; 0; 0; 0 ], Some 0)
+      (init_union (fun b -> Union0.u0f0s16_set_exn (union0_get b) 1))
+  in
+  let () = assert_equal ([ 4; 0; 0; 0 ], Some 0)
+      (init_union (fun b -> Union0.u0f0s32_set_int_exn (union0_get b) 1))
+  in
+  let () = assert_equal ([ 5; 0; 0; 0 ], Some 0)
+      (init_union (fun b -> Union0.u0f0s64_set_int_exn (union0_get b) 1))
+  in
+  let () = assert_equal ([ 6; 0; 0; 0 ], Some 448)
+      (init_union (fun b -> Union0.u0f0sp_set (union0_get b) "1"))
+  in
+
+  let () = assert_equal ([ 7; 0; 0; 0], None)
+      (init_union (fun b -> Union0.u0f1s0_set (union0_get b)))
+  in
+  let () = assert_equal ([ 8; 0; 0; 0], Some 0)
+      (init_union (fun b -> Union0.u0f1s1_set (union0_get b) true))
+  in
+  let () = assert_equal ([ 9; 0; 0; 0], Some 0)
+      (init_union (fun b -> Union0.u0f1s8_set_exn (union0_get b) 1))
+  in
+  let () = assert_equal ([ 10; 0; 0; 0 ], Some 0)
+      (init_union (fun b -> Union0.u0f1s16_set_exn (union0_get b) 1))
+  in
+  let () = assert_equal ([ 11; 0; 0; 0 ], Some 0)
+      (init_union (fun b -> Union0.u0f1s32_set_int_exn (union0_get b) 1))
+  in
+  let () = assert_equal ([ 12; 0; 0; 0 ], Some 0)
+      (init_union (fun b -> Union0.u0f1s64_set_int_exn (union0_get b) 1))
+  in
+  let () = assert_equal ([ 13; 0; 0; 0 ], Some 448)
+      (init_union (fun b -> Union0.u0f1sp_set (union0_get b) "1"))
+  in
+
+  let () = assert_equal ([ 0; 0; 0; 0 ], None)
+      (init_union (fun b -> Union1.u1f0s0_set (union1_get b)))
+  in
+  let () = assert_equal ([ 0; 1; 0; 0 ], Some 65)
+      (init_union (fun b -> Union1.u1f0s1_set (union1_get b) true))
+  in
+  let () = assert_equal ([ 0; 2; 0; 0 ], Some 65)
+      (init_union (fun b -> Union1.u1f1s1_set (union1_get b) true))
+  in
+  let () = assert_equal ([ 0; 3; 0; 0 ], Some 72)
+      (init_union (fun b -> Union1.u1f0s8_set_exn (union1_get b) 1))
+  in
+  let () = assert_equal ([ 0; 4; 0; 0 ], Some 72)
+      (init_union (fun b -> Union1.u1f1s8_set_exn (union1_get b) 1))
+  in
+  let () = assert_equal ([ 0; 5; 0; 0 ], Some 80)
+      (init_union (fun b -> Union1.u1f0s16_set_exn (union1_get b) 1))
+  in
+  let () = assert_equal ([ 0; 6; 0; 0 ], Some 80)
+      (init_union (fun b -> Union1.u1f1s16_set_exn (union1_get b) 1))
+  in
+  let () = assert_equal ([ 0; 7; 0; 0 ], Some 96)
+      (init_union (fun b -> Union1.u1f0s32_set_int_exn (union1_get b) 1))
+  in
+  let () = assert_equal ([ 0; 8; 0; 0 ], Some 96)
+      (init_union (fun b -> Union1.u1f1s32_set_int_exn (union1_get b) 1))
+  in
+  let () = assert_equal ([ 0; 9; 0; 0 ], Some 128)
+      (init_union (fun b -> Union1.u1f0s64_set_int_exn (union1_get b) 1))
+  in
+  let () = assert_equal ([ 0; 10; 0; 0 ], Some 128)
+      (init_union (fun b -> Union1.u1f1s64_set_int_exn (union1_get b) 1))
+  in
+  let () = assert_equal ([ 0; 11; 0; 0 ], Some 512)
+      (init_union (fun b -> Union1.u1f0sp_set (union1_get b) "1"))
+  in
+  let () = assert_equal ([ 0; 12; 0; 0 ], Some 512)
+      (init_union (fun b -> Union1.u1f1sp_set (union1_get b) "1"))
+  in
+
+  let () = assert_equal ([ 0; 13; 0; 0 ], None)
+      (init_union (fun b -> Union1.u1f2s0_set (union1_get b)))
+  in
+  let () = assert_equal ([ 0; 14; 0; 0 ], Some 65)
+      (init_union (fun b -> Union1.u1f2s1_set (union1_get b) true))
+  in
+  let () = assert_equal ([ 0; 15; 0; 0 ], Some 72)
+      (init_union (fun b -> Union1.u1f2s8_set_exn (union1_get b) 1))
+  in
+  let () = assert_equal ([ 0; 16; 0; 0 ], Some 80)
+      (init_union (fun b -> Union1.u1f2s16_set_exn (union1_get b) 1))
+  in
+  let () = assert_equal ([ 0; 17; 0; 0 ], Some 96)
+      (init_union (fun b -> Union1.u1f2s32_set_int_exn (union1_get b) 1))
+  in
+  let () = assert_equal ([ 0; 18; 0; 0 ], Some 128)
+      (init_union (fun b -> Union1.u1f2s64_set_int_exn (union1_get b) 1))
+  in
+  let () = assert_equal ([ 0; 19; 0; 0 ], Some 512)
+      (init_union (fun b -> Union1.u1f2sp_set (union1_get b) "1"))
+  in
+
+  let () = assert_equal ([ 0; 0; 0; 0 ], Some 192)
+      (init_union (fun b -> Union2.u2f0s1_set (union2_get b) true))
+  in
+  let () = assert_equal ([ 0; 0; 0; 0 ], Some 193)
+      (init_union (fun b -> Union3.u3f0s1_set (union3_get b) true))
+  in
+  let () = assert_equal ([ 0; 0; 1; 0 ], Some 200)
+      (init_union (fun b -> Union2.u2f0s8_set_exn (union2_get b) 1))
+  in
+  let () = assert_equal ([ 0; 0; 0; 1 ], Some 208)
+      (init_union (fun b -> Union3.u3f0s8_set_exn (union3_get b) 1))
+  in
+  let () = assert_equal ([ 0; 0; 2; 0 ], Some 224)
+      (init_union (fun b -> Union2.u2f0s16_set_exn (union2_get b) 1))
+  in
+  let () = assert_equal ([ 0; 0; 0; 2 ], Some 240)
+      (init_union (fun b -> Union3.u3f0s16_set_exn (union3_get b) 1))
+  in
+  let () = assert_equal ([ 0; 0; 3; 0 ], Some 256)
+      (init_union (fun b -> Union2.u2f0s32_set_int_exn (union2_get b) 1))
+  in
+  let () = assert_equal ([ 0; 0; 0; 3 ], Some 288)
+      (init_union (fun b -> Union3.u3f0s32_set_int_exn (union3_get b) 1))
+  in
+  let () = assert_equal ([ 0; 0; 4; 0 ], Some 320)
+      (init_union (fun b -> Union2.u2f0s64_set_int_exn (union2_get b) 1))
+  in
+  let () = assert_equal ([ 0; 0; 0; 4 ], Some 384)
+      (init_union (fun b -> Union3.u3f0s64_set_int_exn (union3_get b) 1))
+  in
+  ()
+
+
+
 let encoding_suite =
   "all_types" >::: [
     "encode/decode" >:: test_encode_decode;
     "decode defaults" >:: test_decode_defaults;
     "init defaults" >:: test_init_defaults;
-    "union" >:: test_union_encoding;
+    "union encode/decode" >:: test_union_encoding;
+    "union layout" >:: test_union_layout;
   ]
 
 let () = run_test_tt_main encoding_suite
