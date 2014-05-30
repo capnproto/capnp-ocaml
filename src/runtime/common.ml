@@ -193,11 +193,11 @@ module Make (MessageWrapper : Message.S) = struct
       ~(segment_offset : int)         (* Segment offset where list storage is found *)
       ~(list_pointer : ListPointer.t)
     : 'cap ListStorage.t =
-    let make_list_storage_aux ~offset ~num_words ~num_elements ~storage_type =
+    let make_list_storage_aux ~num_words ~num_elements ~storage_type =
       let storage = {
         Slice.msg        = message;
         Slice.segment_id = segment_id;
-        Slice.start      = segment_offset + offset;
+        Slice.start      = segment_offset;
         Slice.len        = num_words * sizeof_uint64;
       } in
       let () = bounds_check_slice_exn
@@ -211,33 +211,33 @@ module Make (MessageWrapper : Message.S) = struct
     let open ListPointer in
     match list_pointer.element_type with
     | Void ->
-        make_list_storage_aux ~offset:0 ~num_words:0
+        make_list_storage_aux ~num_words:0
           ~num_elements:list_pointer.num_elements ~storage_type:ListStorageType.Empty
     | OneBitValue ->
-        make_list_storage_aux ~offset:0
+        make_list_storage_aux
           ~num_words:(Util.ceil_ratio list_pointer.num_elements 64)
           ~num_elements:list_pointer.num_elements ~storage_type:ListStorageType.Bit
     | OneByteValue ->
-        make_list_storage_aux ~offset:0
+        make_list_storage_aux
           ~num_words:(Util.ceil_ratio list_pointer.num_elements 8)
           ~num_elements:list_pointer.num_elements
           ~storage_type:ListStorageType.Bytes1
     | TwoByteValue ->
-        make_list_storage_aux ~offset:0
+        make_list_storage_aux
           ~num_words:(Util.ceil_ratio list_pointer.num_elements 4)
           ~num_elements:list_pointer.num_elements
           ~storage_type:ListStorageType.Bytes2
     | FourByteValue ->
-        make_list_storage_aux ~offset:0
+        make_list_storage_aux
           ~num_words:(Util.ceil_ratio list_pointer.num_elements 2)
           ~num_elements:list_pointer.num_elements
           ~storage_type:ListStorageType.Bytes4
     | EightByteValue ->
-        make_list_storage_aux ~offset:0 ~num_words:list_pointer.num_elements
+        make_list_storage_aux ~num_words:list_pointer.num_elements
           ~num_elements:list_pointer.num_elements
           ~storage_type:ListStorageType.Bytes8
     | EightBytePointer ->
-        make_list_storage_aux ~offset:0 ~num_words:list_pointer.num_elements
+        make_list_storage_aux ~num_words:list_pointer.num_elements
           ~num_elements:list_pointer.num_elements
           ~storage_type:ListStorageType.Pointer
     | Composite ->
@@ -262,7 +262,7 @@ module Make (MessageWrapper : Message.S) = struct
             if num_elements * words_per_element > num_words then
               invalid_msg "composite list pointer describes invalid word count"
             else
-              make_list_storage_aux ~offset:sizeof_uint64 ~num_words ~num_elements
+              make_list_storage_aux ~num_words ~num_elements
                 ~storage_type:(ListStorageType.Composite
                    (struct_pointer.SP.data_words, struct_pointer.SP.pointer_words))
         | _ ->
@@ -492,7 +492,7 @@ module Make (MessageWrapper : Message.S) = struct
           | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
               fun i -> decode (make_element_slice i 1)
           | _ ->
-              invalid_msg 
+              invalid_msg
                 "decoded List<1 byte> where a different list type was expected"
           end
       | ListStorageType.Bytes2 ->
@@ -501,7 +501,7 @@ module Make (MessageWrapper : Message.S) = struct
           | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
               fun i -> decode (make_element_slice i 2)
           | _ ->
-              invalid_msg 
+              invalid_msg
                 "decoded List<2 byte> where a different list type was expected"
           end
       | ListStorageType.Bytes4 ->
@@ -510,7 +510,7 @@ module Make (MessageWrapper : Message.S) = struct
           | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
               fun i -> decode (make_element_slice i 4)
           | _ ->
-              invalid_msg 
+              invalid_msg
                 "decoded List<4 byte> where a different list type was expected"
           end
       | ListStorageType.Bytes8 ->
@@ -519,7 +519,7 @@ module Make (MessageWrapper : Message.S) = struct
           | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
               fun i -> decode (make_element_slice i 8)
           | _ ->
-              invalid_msg 
+              invalid_msg
                 "decoded List<8 byte> where a different list type was expected"
           end
       | ListStorageType.Pointer ->
@@ -537,13 +537,15 @@ module Make (MessageWrapper : Message.S) = struct
               let element_data_size     = data_words * sizeof_uint64 in
               let element_pointers_size = pointer_words * sizeof_uint64 in
               let element_size          = element_data_size + element_pointers_size in
+              (* Skip over the composite tag word *)
+              let content_offset =
+                list_storage.ListStorage.storage.Slice.start + sizeof_uint64
+              in
               fun i ->
                 let struct_storage =
                   let data = {
                     list_storage.ListStorage.storage with
-                    Slice.start =
-                      list_storage.ListStorage.storage.Slice.start +
-                        (i * element_size);
+                    Slice.start = content_offset + (i * element_size);
                     Slice.len = element_data_size;
                   } in
                   let pointers = {
@@ -676,14 +678,17 @@ module Make (MessageWrapper : Message.S) = struct
                 "decoded List<pointer> where a different list type was expected"
           end
       | ListStorageType.Composite (data_words, pointer_words) ->
+          let data_size     = data_words * sizeof_uint64 in
+          let pointers_size = pointer_words * sizeof_uint64 in
+          let total_size    = data_size + pointers_size in
+          (* Skip over the composite tag word *)
+          let content_offset =
+            list_storage.ListStorage.storage.Slice.start + sizeof_uint64
+          in
           let make_storage i =
-            let data_size     = data_words * sizeof_uint64 in
-            let pointers_size = pointer_words * sizeof_uint64 in
-            let total_size    = data_size + pointers_size in
             let data = {
               list_storage.ListStorage.storage with
-              Slice.start =
-                list_storage.ListStorage.storage.Slice.start + (i * total_size);
+              Slice.start = content_offset + (i * total_size);
               Slice.len = data_size;
             } in
             let pointers = {
@@ -801,10 +806,12 @@ module Make (MessageWrapper : Message.S) = struct
         let data_size     = data_words * sizeof_uint64 in
         let pointers_size = pointer_words * sizeof_uint64 in
         let element_size  = data_size + pointers_size in
+        (* Skip over the composite tag word *)
+        let content_offset = storage.Slice.start + sizeof_uint64 in
         fun i ->
           let data = {
             storage with
-            Slice.start = storage.Slice.start + (i * element_size);
+            Slice.start = content_offset + (i * element_size);
             Slice.len   = data_size;
           } in
           let pointers = {
