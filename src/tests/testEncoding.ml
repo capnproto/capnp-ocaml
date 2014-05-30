@@ -714,6 +714,21 @@ let test_union_layout ctx =
   ()
 
 
+let test_unnamed_union_encoding ctx =
+  let module R = T.Reader.TestUnnamedUnion in
+  let module B = T.Builder.TestUnnamedUnion in
+  let builder = B.init_root () in
+  let () = assert_equal (B.Foo 0) (B.get builder) in
+
+  let () = B.bar_set_int_exn builder 321 in
+  let () = assert_equal (B.Bar (Uint32.of_int 321)) (B.get builder) in
+  let () = assert_equal (R.Bar (Uint32.of_int 321)) (R.get (R.of_builder builder)) in
+
+  let () = B.foo_set_exn builder 123 in
+  let () = assert_equal (B.Foo 123) (B.get builder) in
+  let () = assert_equal (R.Foo 123) (R.get (B.to_reader builder)) in
+  ()
+
 
 let encoding_suite =
   "all_types" >::: [
@@ -722,6 +737,7 @@ let encoding_suite =
     "init defaults" >:: test_init_defaults;
     "union encode/decode" >:: test_union_encoding;
     "union layout" >:: test_union_layout;
+    "unnamed union encode/decode" >:: test_unnamed_union_encoding;
   ]
 
 let () = run_test_tt_main encoding_suite
