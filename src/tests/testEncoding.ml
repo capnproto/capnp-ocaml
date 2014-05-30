@@ -534,11 +534,24 @@ let test_init_defaults ctx =
   Reader_check_test_defaults.f reader
 
 
+let test_union_encoding ctx =
+  let open T.Builder.TestUnion in
+  let builder = init_root () in
+  let union0 = union0_get builder in
+  let () = assert_equal Union0.U0f0s0 (Union0.get union0) in
+  let () = Union0.u0f0s1_set union0 true in
+  let () = assert_equal (Union0.U0f0s1 true) (Union0.get union0) in
+  let () = Union0.u0f0s8_set_exn union0 123 in
+  let () = assert_equal (Union0.U0f0s8 123) (Union0.get union0) in
+  ()
+
+
 let encoding_suite =
   "all_types" >::: [
     "encode/decode" >:: test_encode_decode;
     "decode defaults" >:: test_decode_defaults;
     "init defaults" >:: test_init_defaults;
+    "union" >:: test_union_encoding;
   ]
 
 let () = run_test_tt_main encoding_suite
