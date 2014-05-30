@@ -502,13 +502,10 @@ module Builder_check_test_defaults =
 
 
 let test_encode_decode ctx =
-  let message =
-    let builder = T.Builder.TestAllTypes.init_root () in
-    let () = init_test_message builder in
-    let () = Builder_check_test_message.f builder in
-    T.Builder.TestAllTypes.to_message builder
-  in
-  let reader = T.Reader.TestAllTypes.of_message message in
+  let builder = T.Builder.TestAllTypes.init_root () in
+  let () = init_test_message builder in
+  let () = Builder_check_test_message.f builder in
+  let reader = T.Reader.TestAllTypes.of_builder builder in
   Reader_check_test_message.f reader
 
 
@@ -522,15 +519,12 @@ let test_decode_defaults ctx =
 let test_init_defaults ctx =
   let null_root = "\x00\x00\x00\x00\x00\x00\x00\x00" in
   let message = SM.Message.of_storage [ null_root ] in
-  let () =
-    let builder = T.Builder.TestDefaults.of_message message in
-    (* First pass initializes [message] with defaults *)
-    let () = Builder_check_test_defaults.f builder in
-    (* Second pass just reads the initialized structure *)
-    let () = Builder_check_test_defaults.f builder in
-    ()
-  in
-  let reader = T.Reader.TestDefaults.of_message message in
+  let builder = T.Builder.TestDefaults.of_message message in
+  (* First pass initializes [message] with defaults *)
+  let () = Builder_check_test_defaults.f builder in
+  (* Second pass just reads the initialized structure *)
+  let () = Builder_check_test_defaults.f builder in
+  let reader = T.Reader.TestDefaults.of_builder builder in
   Reader_check_test_defaults.f reader
 
 
