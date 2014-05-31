@@ -456,8 +456,8 @@ let test_init_defaults ctx =
 
 let test_union_encoding ctx =
   let open T.Builder.TestUnion in
-  let builder = init_root () in
-  let union0 = union0_get builder in
+  let root = init_root () in
+  let union0 = union0_get root in
   assert_equal Union0.U0f0s0 (Union0.get union0);
   Union0.u0f0s1_set union0 true;
   assert_equal (Union0.U0f0s1 true) (Union0.get union0);
@@ -597,16 +597,134 @@ let test_union_layout ctx =
 let test_unnamed_union_encoding ctx =
   let module R = T.Reader.TestUnnamedUnion in
   let module B = T.Builder.TestUnnamedUnion in
-  let builder = B.init_root () in
-  assert_equal (B.Foo 0) (B.get builder);
+  let root = B.init_root () in
+  assert_equal (B.Foo 0) (B.get root);
 
-  B.bar_set_int_exn builder 321;
-  assert_equal (B.Bar (Uint32.of_int 321)) (B.get builder);
-  assert_equal (R.Bar (Uint32.of_int 321)) (R.get (R.of_builder builder));
+  B.bar_set_int_exn root 321;
+  assert_equal (B.Bar (Uint32.of_int 321)) (B.get root);
+  assert_equal (R.Bar (Uint32.of_int 321)) (R.get (R.of_builder root));
 
-  B.foo_set_exn builder 123;
-  assert_equal (B.Foo 123) (B.get builder);
-  assert_equal (R.Foo 123) (R.get (B.to_reader builder))
+  B.foo_set_exn root 123;
+  assert_equal (B.Foo 123) (B.get root);
+  assert_equal (R.Foo 123) (R.get (B.to_reader root))
+
+
+let test_groups ctx =
+  let open T.Builder.TestGroups in
+  let root = init_root () in
+  let () =
+    let groups = groups_get root in
+    let foo = Groups.foo_init groups in
+    Groups.Foo.corge_set foo 12345678l;
+    Groups.Foo.grault_set foo 123456789012345L;
+    Groups.Foo.garply_set foo "foobar";
+
+    assert_equal 12345678l (Groups.Foo.corge_get foo);
+    assert_equal 123456789012345L (Groups.Foo.grault_get foo);
+    assert_equal "foobar" (Groups.Foo.garply_get foo)
+  in
+  let () =
+    let groups = groups_get root in
+    let bar = Groups.bar_init groups in
+    Groups.Bar.corge_set bar 23456789l;
+    Groups.Bar.grault_set bar "bazbaz";
+    Groups.Bar.garply_set bar 234567890123456L;
+
+    assert_equal 23456789l (Groups.Bar.corge_get bar);
+    assert_equal "bazbaz" (Groups.Bar.grault_get bar);
+    assert_equal 234567890123456L (Groups.Bar.garply_get bar)
+  in
+  let () =
+    let groups = groups_get root in
+    let baz = Groups.baz_init groups in
+    Groups.Baz.corge_set baz 34567890l;
+    Groups.Baz.grault_set baz "bazqux";
+    Groups.Baz.garply_set baz "quxquux";
+
+    assert_equal 34567890l (Groups.Baz.corge_get baz);
+    assert_equal "bazqux" (Groups.Baz.grault_get baz);
+    assert_equal "quxquux" (Groups.Baz.garply_get baz)
+  in
+  ()
+
+
+let test_interleaved_groups ctx =
+  let module B = T.Builder.TestInterleavedGroups in
+  let module R = T.Reader.TestInterleavedGroups in
+  let root = B.init_root () in
+
+  (* Init both groups to different values. *)
+  let () =
+    let group = B.group1_get root in
+    B.Group1.foo_set_int_exn group 12345678;
+    B.Group1.bar_set group (Uint64.of_string "123456789012345");
+    let corge = B.Group1.corge_init group in
+    B.Group1.Corge.grault_set corge (Uint64.of_string "987654321098765");
+    B.Group1.Corge.garply_set_exn corge 12345;
+    B.Group1.Corge.plugh_set corge "plugh";
+    B.Group1.Corge.xyzzy_set corge "xyzzy";
+    B.Group1.waldo_set group "waldo"
+  in
+  let () =
+    let group = B.group2_get root in
+    B.Group2.foo_set_int_exn group 23456789;
+    B.Group2.bar_set group (Uint64.of_string "234567890123456");
+    let corge = B.Group2.corge_init group in
+    B.Group2.Corge.grault_set corge (Uint64.of_string "876543210987654");
+    B.Group2.Corge.garply_set_exn corge 23456;
+    B.Group2.Corge.plugh_set corge "hgulp";
+    B.Group2.Corge.xyzzy_set corge "yzzyx";
+    B.Group2.waldo_set group "odlaw"
+  in
+
+  (* Verify that group 1 is still set correctly. *)
+  let () =
+    let group = R.group1_get (R.of_builder root) in
+    assert_equal 12345678 (R.Group1.foo_get_int_exn group);
+    assert_equal (Uint64.of_string "123456789012345") (R.Group1.bar_get group);
+    match R.Group1.get group with
+    | R.Group1.Corge corge ->
+        assert_equal (Uint64.of_string "987654321098765") (R.Group1.Corge.grault_get corge);
+        assert_equal 12345 (R.Group1.Corge.garply_get corge);
+        assert_equal "plugh" (R.Group1.Corge.plugh_get corge);
+        assert_equal "xyzzy" (R.Group1.Corge.xyzzy_get corge);
+        let _ = R.Group1.has_waldo group in
+        assert_equal "waldo" (R.Group1.waldo_get group)
+    | _ ->
+        assert_failure "Corge unexpectedly unset"
+  in
+
+  (* Zero out group 1 and verify that it is zero'd *)
+  let () =
+    let group = R.Group1.of_builder (B.group1_init root) in
+    assert_equal Uint32.zero (R.Group1.foo_get group);
+    assert_equal Uint64.zero (R.Group1.bar_get group);
+    let () =
+      match R.Group1.get group with
+      | R.Group1.Qux x ->
+          assert_equal 0 x
+      | _ ->
+          assert_failure "Qux unexpectedly unset"
+    in
+    assert_equal false (R.Group1.has_waldo group)
+  in
+
+  (* Group 2 should not have been touched *)
+  let () =
+    let group = R.group2_get (R.of_builder root) in
+    assert_equal 23456789 (R.Group2.foo_get_int_exn group);
+    assert_equal (Uint64.of_string "234567890123456") (R.Group2.bar_get group);
+    match R.Group2.get group with
+    | R.Group2.Corge corge ->
+        assert_equal (Uint64.of_string "876543210987654") (R.Group2.Corge.grault_get corge);
+        assert_equal 23456 (R.Group2.Corge.garply_get corge);
+        assert_equal "hgulp" (R.Group2.Corge.plugh_get corge);
+        assert_equal "yzzyx" (R.Group2.Corge.xyzzy_get corge);
+        assert_equal "odlaw" (R.Group2.waldo_get group)
+    | _ ->
+        assert_failure "Corge unexpectedly unset"
+  in
+  ()
 
 
 let encoding_suite =
@@ -617,6 +735,8 @@ let encoding_suite =
     "union encode/decode" >:: test_union_encoding;
     "union layout" >:: test_union_layout;
     "unnamed union encode/decode" >:: test_unnamed_union_encoding;
+    "group encode/decode" >:: test_groups;
+    "interleaved groups" >:: test_interleaved_groups;
   ]
 
 let () = run_test_tt_main encoding_suite
