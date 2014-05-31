@@ -509,9 +509,9 @@ let test_union_layout ctx =
   assert_equal ([ 3; 0; 0; 0 ], Some 0)
     (init_union (fun b -> Union0.u0f0s16_set_exn (union0_get b) 1));
   assert_equal ([ 4; 0; 0; 0 ], Some 0)
-    (init_union (fun b -> Union0.u0f0s32_set_int_exn (union0_get b) 1));
+    (init_union (fun b -> Union0.u0f0s32_set (union0_get b) 1l));
   assert_equal ([ 5; 0; 0; 0 ], Some 0)
-    (init_union (fun b -> Union0.u0f0s64_set_int_exn (union0_get b) 1));
+    (init_union (fun b -> Union0.u0f0s64_set (union0_get b) 1L));
   assert_equal ([ 6; 0; 0; 0 ], Some 448)
     (init_union (fun b -> Union0.u0f0sp_set (union0_get b) "1"));
 
@@ -524,9 +524,9 @@ let test_union_layout ctx =
   assert_equal ([ 10; 0; 0; 0 ], Some 0)
     (init_union (fun b -> Union0.u0f1s16_set_exn (union0_get b) 1));
   assert_equal ([ 11; 0; 0; 0 ], Some 0)
-    (init_union (fun b -> Union0.u0f1s32_set_int_exn (union0_get b) 1));
+    (init_union (fun b -> Union0.u0f1s32_set (union0_get b) 1l));
   assert_equal ([ 12; 0; 0; 0 ], Some 0)
-    (init_union (fun b -> Union0.u0f1s64_set_int_exn (union0_get b) 1));
+    (init_union (fun b -> Union0.u0f1s64_set (union0_get b) 1L));
   assert_equal ([ 13; 0; 0; 0 ], Some 448)
     (init_union (fun b -> Union0.u0f1sp_set (union0_get b) "1"));
 
@@ -545,13 +545,13 @@ let test_union_layout ctx =
   assert_equal ([ 0; 6; 0; 0 ], Some 80)
     (init_union (fun b -> Union1.u1f1s16_set_exn (union1_get b) 1));
   assert_equal ([ 0; 7; 0; 0 ], Some 96)
-    (init_union (fun b -> Union1.u1f0s32_set_int_exn (union1_get b) 1));
+    (init_union (fun b -> Union1.u1f0s32_set (union1_get b) 1l));
   assert_equal ([ 0; 8; 0; 0 ], Some 96)
-    (init_union (fun b -> Union1.u1f1s32_set_int_exn (union1_get b) 1));
+    (init_union (fun b -> Union1.u1f1s32_set (union1_get b) 1l));
   assert_equal ([ 0; 9; 0; 0 ], Some 128)
-    (init_union (fun b -> Union1.u1f0s64_set_int_exn (union1_get b) 1));
+    (init_union (fun b -> Union1.u1f0s64_set (union1_get b) 1L));
   assert_equal ([ 0; 10; 0; 0 ], Some 128)
-    (init_union (fun b -> Union1.u1f1s64_set_int_exn (union1_get b) 1));
+    (init_union (fun b -> Union1.u1f1s64_set (union1_get b) 1L));
   assert_equal ([ 0; 11; 0; 0 ], Some 512)
     (init_union (fun b -> Union1.u1f0sp_set (union1_get b) "1"));
   assert_equal ([ 0; 12; 0; 0 ], Some 512)
@@ -566,9 +566,9 @@ let test_union_layout ctx =
   assert_equal ([ 0; 16; 0; 0 ], Some 80)
     (init_union (fun b -> Union1.u1f2s16_set_exn (union1_get b) 1));
   assert_equal ([ 0; 17; 0; 0 ], Some 96)
-    (init_union (fun b -> Union1.u1f2s32_set_int_exn (union1_get b) 1));
+    (init_union (fun b -> Union1.u1f2s32_set (union1_get b) 1l));
   assert_equal ([ 0; 18; 0; 0 ], Some 128)
-    (init_union (fun b -> Union1.u1f2s64_set_int_exn (union1_get b) 1));
+    (init_union (fun b -> Union1.u1f2s64_set (union1_get b) 1L));
   assert_equal ([ 0; 19; 0; 0 ], Some 512)
     (init_union (fun b -> Union1.u1f2sp_set (union1_get b) "1"));
 
@@ -585,13 +585,13 @@ let test_union_layout ctx =
   assert_equal ([ 0; 0; 0; 2 ], Some 240)
     (init_union (fun b -> Union3.u3f0s16_set_exn (union3_get b) 1));
   assert_equal ([ 0; 0; 3; 0 ], Some 256)
-    (init_union (fun b -> Union2.u2f0s32_set_int_exn (union2_get b) 1));
+    (init_union (fun b -> Union2.u2f0s32_set (union2_get b) 1l));
   assert_equal ([ 0; 0; 0; 3 ], Some 288)
-    (init_union (fun b -> Union3.u3f0s32_set_int_exn (union3_get b) 1));
+    (init_union (fun b -> Union3.u3f0s32_set (union3_get b) 1l));
   assert_equal ([ 0; 0; 4; 0 ], Some 320)
-    (init_union (fun b -> Union2.u2f0s64_set_int_exn (union2_get b) 1));
+    (init_union (fun b -> Union2.u2f0s64_set (union2_get b) 1L));
   assert_equal ([ 0; 0; 0; 4 ], Some 384)
-    (init_union (fun b -> Union3.u3f0s64_set_int_exn (union3_get b) 1))
+    (init_union (fun b -> Union3.u3f0s64_set (union3_get b) 1L))
 
 
 let test_unnamed_union_encoding ctx =
