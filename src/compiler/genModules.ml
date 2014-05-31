@@ -564,12 +564,112 @@ let generate_list_setters ~nodes_table ~scope ~list_type
   ]
 
 
+(* When generating the _init function for a group, it we need to
+   (recursively) locate all fields belonging to the group and zero 
+   them out one-by-one.  There's no better solution in general, as
+   it's possible for the fields of multiple groups to be interleaved
+   in memory.
+
+   Note that this implementation does not attempt to detect overlapping
+   fields... we just blindly set all the fields to binary zero.
+
+   The resulting lines are returned in reverse order. *)
+let rec generate_clear_group_fields_rev ~acc ~nodes_table ~group_id =
+  let node = Hashtbl.find_exn nodes_table group_id in
+  match PS.Node.get node with
+  | PS.Node.Struct struct_def ->
+      let () = assert (PS.Node.Struct.is_group_get struct_def) in
+      let acc =
+        if PS.Node.Struct.discriminant_count_get struct_def <> 0 then
+          (* Clear out the discriminant field *)
+          [ sprintf "let () = BA_.set_int16 ~default:0 ~byte_ofs:%u 0 data in"
+              ((PS.Node.Struct.discriminant_offset_get_int_exn struct_def) * 2) ] @
+            acc
+        else
+          acc
+      in
+      let fields = PS.Node.Struct.fields_get struct_def in
+      C.Array.fold fields ~init:acc ~f:(fun lines field ->
+        match PS.Field.get field with
+        | PS.Field.Group group ->
+            let group_id = PS.Field.Group.type_id_get group in
+            generate_clear_group_fields_rev ~acc:lines ~nodes_table ~group_id
+        | PS.Field.Slot slot ->
+            let field_ofs = PS.Field.Slot.offset_get_int_exn slot in
+            let tp = PS.Field.Slot.type_get slot in
+            let clear_field =
+              match PS.Type.get tp with
+              | PS.Type.Void ->
+                  []
+              | PS.Type.Bool -> [
+                  sprintf "let () = BA_.set_bit ~default:false ~byte_ofs:%u ~bit_ofs:%u \
+                           false data in"
+                    (field_ofs / 8) (field_ofs mod 8)
+                ]
+              | PS.Type.Int8
+              | PS.Type.Uint8 -> [
+                  sprintf "let () = BA_.set_int8 ~default:0 ~byte_ofs:%u 0 data in"
+                    field_ofs
+                ]
+              | PS.Type.Int16
+              | PS.Type.Uint16
+              | PS.Type.Enum _ -> [
+                  sprintf "let () = BA_.set_int16 ~default:0 ~byte_ofs:%u 0 data in"
+                    (field_ofs * 2)
+                ]
+              | PS.Type.Int32
+              | PS.Type.Uint32
+              | PS.Type.Float32 -> [
+                  sprintf "let () = BA_.set_int32 ~default:0l ~byte_ofs:%u 0l data in"
+                    (field_ofs * 4)
+                ]
+              | PS.Type.Int64
+              | PS.Type.Uint64
+              | PS.Type.Float64 -> [
+                  sprintf "let () = BA_.set_int64 ~default:0L ~byte_ofs:%u 0L data in"
+                    (field_ofs * 8)
+                ]
+              | PS.Type.Text
+              | PS.Type.Data
+              | PS.Type.List _
+              | PS.Type.Struct _
+              | PS.Type.Interface _
+              | PS.Type.AnyPointer -> [
+                  "let () =";
+                  "  let ptr = {";
+                  "    pointers with";
+                  "    MessageWrapper.Slice.start = \
+                   pointers.MessageWrapper.Slice.start + " ^
+                    (Int.to_string (field_ofs * 8)) ^ ";";
+                  "    MessageWrapper.Slice.len = 8;";
+                  "  } in";
+                  "  let () = BA_.BOps.deep_zero_pointer ptr in";
+                  "  MessageWrapper.Slice.set_int64 ptr 0 0L";
+                  "in";
+                ]
+              | PS.Type.Undefined x ->
+                  failwith (sprintf "Unknown Type union discriminant %u" x)
+            in
+            List.rev_append clear_field lines
+        | PS.Field.Undefined x ->
+            failwith (sprintf "Unknown Field union discriminant %u" x))
+  | PS.Node.File
+  | PS.Node.Enum _
+  | PS.Node.Interface _
+  | PS.Node.Const _
+  | PS.Node.Annotation _ ->
+      failwith "Found non-struct node when searching for a group."
+  | PS.Node.Undefined x ->
+      failwith (sprintf "Unknown Node union discriminant %u" x)
+
+
+(* Generate the accessors for a single field. *)
 let generate_one_field_accessors ~nodes_table ~node_id ~scope
     ~mode ~discr_ofs field =
   let api_module = api_of_mode mode in
   let field_name = GenCommon.underscore_name (PS.Field.name_get field) in
+  let discriminant_value = PS.Field.discriminant_value_get field in
   let discr_str =
-    let discriminant_value = PS.Field.discriminant_value_get field in
     if discriminant_value = PS.Field.no_discriminant then
       ""
     else
@@ -581,9 +681,37 @@ let generate_one_field_accessors ~nodes_table ~node_id ~scope
     begin match PS.Field.get field with
     | PS.Field.Group group ->
         let getters = [ "let " ^ field_name ^ "_get x = x" ] in
-        (getters, [])
+        let setters =
+          let clear_fields =
+            apply_indent ~indent:"  "
+              (List.rev
+                (generate_clear_group_fields_rev ~acc:[] ~nodes_table
+                  ~group_id:(PS.Field.Group.type_id_get group)))
+          in
+          let set_discriminant =
+            if discriminant_value = PS.Field.no_discriminant then
+              []
+            else
+              apply_indent ~indent:"  " [
+                "let () = BA_.set_opt_discriminant data";
+                sprintf "  (Some {BA_.Discr.value=%u; BA_.Discr.byte_ofs=%u})"
+                  discriminant_value (discr_ofs * 2);
+                "in"
+              ]
+          in [
+            "let " ^ field_name ^ "_init x =";
+            "  let data = x.BA_.NC.StructStorage.data in";
+            "  let pointers = x.BA_.NC.StructStorage.pointers in";
+            (* Suppress unused variable warnings *)
+            "  let () = ignore data in";
+            "  let () = ignore pointers in"; ] @
+            set_discriminant @
+            clear_fields @
+            [ "  x" ]
+        in
+        (getters, setters)
     | PS.Field.Slot slot ->
-        let field_ofs = Uint32.to_int (PS.Field.Slot.offset_get slot) in
+        let field_ofs = PS.Field.Slot.offset_get_int_exn slot in
         let tp = PS.Field.Slot.type_get slot in
         let default = PS.Field.Slot.default_value_get slot in
         begin match (PS.Type.get tp, PS.Value.get default) with
@@ -1345,7 +1473,7 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~mode
     | Mode.Builder ->
         let data_words    = PS.Node.Struct.data_word_count_get struct_def in
         let pointer_words = PS.Node.Struct.pointer_count_get struct_def in [
-          sprintf "  let of_message x = BA_.get_root_struct \
+          sprintf "let of_message x = BA_.get_root_struct \
                    ~data_words:%u ~pointer_words:%u x"
             data_words pointer_words;
           "let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg";

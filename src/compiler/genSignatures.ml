@@ -68,6 +68,10 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode field
           sprintf "val %s_get : t -> %s.t"
             field_name group_name;
         ];
+        Setter [
+          sprintf "val %s_init : t -> %s.t"
+            field_name group_name
+        ];
       ]
   | PS.Field.Slot slot ->
       let tp = PS.Field.Slot.type_get slot in
