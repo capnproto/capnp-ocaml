@@ -727,6 +727,91 @@ let test_interleaved_groups ctx =
   ()
 
 
+let test_union_defaults ctx =
+  let module B = T.Builder.TestUnionDefaults in
+  let module R = T.Reader.TestUnionDefaults in
+  let reader = R.of_builder (B.init_root ()) in
+  (* Note: the following code is pretty clumsy.  Seems like a getter for a named union
+     field could just bypass the intermediate type? *)
+  let () =
+    let field = R.s16s8s64s8_set_get reader in
+    let module TU = T.Reader.TestUnion in
+    begin match TU.Union0.get (TU.union0_get field) with
+    | TU.Union0.U0f0s16 321 ->
+        ()
+    | _ ->
+        assert_failure "bad union0 default"
+    end;
+    begin match TU.Union1.get (TU.union1_get field) with
+    | TU.Union1.U1f0s8 123 ->
+        ()
+    | _ ->
+        assert_failure "bad union1 default"
+    end;
+    begin match TU.Union2.get (TU.union2_get field) with
+    | TU.Union2.U2f0s64 12345678901234567L ->
+        ()
+    | _ ->
+        assert_failure "bad union2 default"
+    end;
+    begin match TU.Union3.get (TU.union3_get field) with
+    | TU.Union3.U3f0s8 55 ->
+        ()
+    | _ ->
+        assert_failure "bad union3 default"
+    end
+  in
+  let () =
+    let field = R.s0sps1s32_set_get reader in
+    let module TU = T.Reader.TestUnion in
+    begin match TU.Union0.get (TU.union0_get field) with
+    | TU.Union0.U0f1s0 ->
+        ()
+    | _ ->
+        assert_failure "bad union0 default"
+    end;
+    begin match TU.Union1.get (TU.union1_get field) with
+    | TU.Union1.U1f0sp s when s = "foo" ->
+        ()
+    | _ ->
+        assert_failure "bad union1 default"
+    end;
+    begin match TU.Union2.get (TU.union2_get field) with
+    | TU.Union2.U2f0s1 true ->
+        ()
+    | _ ->
+        assert_failure "bad union2 default"
+    end;
+    begin match TU.Union3.get (TU.union3_get field) with
+    | TU.Union3.U3f0s32 12345678l ->
+        ()
+    | _ -> assert_failure "bad union3 default"
+    end
+  in
+  let () =
+    let field = R.unnamed1_get reader in
+    begin match T.Reader.TestUnnamedUnion.get field with
+    | T.Reader.TestUnnamedUnion.Foo 123 ->
+        ()
+    | _ -> assert_failure "bad unnamed1 default"
+    end;
+    assert_equal false (T.Reader.TestUnnamedUnion.has_before field);
+    assert_equal false (T.Reader.TestUnnamedUnion.has_after field);
+  in
+  let () =
+    let field = R.unnamed2_get reader in
+    begin match T.Reader.TestUnnamedUnion.get field with
+    | T.Reader.TestUnnamedUnion.Bar x when x = (Uint32.of_int 321) ->
+        ()
+    | _ -> assert_failure "bad unnamed1 default"
+    end;
+    assert_equal "foo" (T.Reader.TestUnnamedUnion.before_get field);
+    assert_equal "bar" (T.Reader.TestUnnamedUnion.after_get field)
+  in
+  ()
+
+
+
 let encoding_suite =
   "all_types" >::: [
     "encode/decode" >:: test_encode_decode;
@@ -737,6 +822,7 @@ let encoding_suite =
     "unnamed union encode/decode" >:: test_unnamed_union_encoding;
     "group encode/decode" >:: test_groups;
     "interleaved groups" >:: test_interleaved_groups;
+    "union defaults" >:: test_union_defaults;
   ]
 
 let () = run_test_tt_main encoding_suite
