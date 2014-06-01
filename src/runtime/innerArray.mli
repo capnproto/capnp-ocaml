@@ -34,10 +34,11 @@ type ro = Message.ro
 type rw = Message.rw
 
 type ('cap, 'a, 'arr) t = {
-  length : int;
-  get_unsafe : int -> 'a;
-  set_unsafe : int -> 'a -> unit;
-  storage : 'arr option;
+  mutable length : int;
+  mutable storage : 'arr option;
+  get_unsafe : 'arr -> int -> 'a;
+  set_unsafe : 'arr -> int -> 'a -> unit;
+  init : int -> 'arr;
 }
 
 val length : ('cap, 'a, 'arr) t -> int
@@ -46,7 +47,13 @@ val get : ('cap, 'a, 'arr) t -> int -> 'a
 
 val set : (rw, 'a, 'arr) t -> int -> 'a -> unit
 
+val init : (rw, 'a, 'arr) t -> int -> unit
+
 val to_storage : ('cap, 'a, 'arr) t -> 'arr option
 
-val invalid_set_unsafe : int -> 'a -> unit
+val invalid_get_unsafe : 'arr -> int -> 'a
+
+val invalid_set_unsafe : 'arr -> int -> 'a -> unit
+
+val invalid_init : int -> 'arr
 

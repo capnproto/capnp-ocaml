@@ -372,15 +372,6 @@ module Make (MessageWrapper : Message.S) = struct
         Object.Capability index
 
 
-  let make_empty_array () =
-    let get_unsafe i = assert false in {
-      InnerArray.length = 0;
-      InnerArray.get_unsafe;
-      InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
-      InnerArray.storage = None
-    }
-
-
   module ListDecoders = struct
     type ('cap, 'a) struct_decoders_t = {
       bytes     : 'cap Slice.t -> 'a;
@@ -423,10 +414,9 @@ module Make (MessageWrapper : Message.S) = struct
       (list_storage : 'cap ListStorage.t)
       (decoders : ('cap, 'a) ListDecoders.t)
     : (ro, 'a, 'cap ListStorage.t) InnerArray.t =
-    let make_element_slice i byte_count = {
-      list_storage.ListStorage.storage with
-      Slice.start =
-        list_storage.ListStorage.storage.Slice.start + (i * byte_count);
+    let make_element_slice ls i byte_count = {
+      ls.ListStorage.storage with
+      Slice.start = ls.ListStorage.storage.Slice.start + (i * byte_count);
       Slice.len = byte_count;
     } in
     let length = list_storage.ListStorage.num_elements in
@@ -435,7 +425,7 @@ module Make (MessageWrapper : Message.S) = struct
       | ListStorageType.Empty ->
           begin match decoders with
           | ListDecoders.Empty decode ->
-              fun i -> decode ()
+              fun ls i -> decode ()
           | _ ->
               invalid_msg
                 "decoded List<Void> where a different list type was expected"
@@ -443,11 +433,11 @@ module Make (MessageWrapper : Message.S) = struct
       | ListStorageType.Bit ->
           begin match decoders with
           | ListDecoders.Bit decode ->
-              fun i ->
+              fun ls i ->
                 let byte_ofs = i / 8 in
                 let bit_ofs  = i mod 8 in
                 let byte_val =
-                  Slice.get_uint8 list_storage.ListStorage.storage byte_ofs
+                  Slice.get_uint8 ls.ListStorage.storage byte_ofs
                 in
                 decode ((byte_val land (1 lsl bit_ofs)) <> 0)
           | _ ->
@@ -458,7 +448,7 @@ module Make (MessageWrapper : Message.S) = struct
           begin match decoders with
           | ListDecoders.Bytes1 decode
           | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
-              fun i -> decode (make_element_slice i 1)
+              fun ls i -> decode (make_element_slice ls i 1)
           | _ ->
               invalid_msg
                 "decoded List<1 byte> where a different list type was expected"
@@ -467,7 +457,7 @@ module Make (MessageWrapper : Message.S) = struct
           begin match decoders with
           | ListDecoders.Bytes2 decode
           | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
-              fun i -> decode (make_element_slice i 2)
+              fun ls i -> decode (make_element_slice ls i 2)
           | _ ->
               invalid_msg
                 "decoded List<2 byte> where a different list type was expected"
@@ -476,7 +466,7 @@ module Make (MessageWrapper : Message.S) = struct
           begin match decoders with
           | ListDecoders.Bytes4 decode
           | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
-              fun i -> decode (make_element_slice i 4)
+              fun ls i -> decode (make_element_slice ls i 4)
           | _ ->
               invalid_msg
                 "decoded List<4 byte> where a different list type was expected"
@@ -485,7 +475,7 @@ module Make (MessageWrapper : Message.S) = struct
           begin match decoders with
           | ListDecoders.Bytes8 decode
           | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
-              fun i -> decode (make_element_slice i 8)
+              fun ls i -> decode (make_element_slice ls i 8)
           | _ ->
               invalid_msg
                 "decoded List<8 byte> where a different list type was expected"
@@ -494,7 +484,8 @@ module Make (MessageWrapper : Message.S) = struct
           begin match decoders with
           | ListDecoders.Pointer decode
           | ListDecoders.Struct { ListDecoders.pointer = decode; _ } ->
-              fun i -> decode (make_element_slice i sizeof_uint64)
+              fun ls i ->
+                decode (make_element_slice ls i sizeof_uint64)
           | _ ->
               invalid_msg
                 "decoded List<pointer> a different list type was expected"
@@ -505,14 +496,14 @@ module Make (MessageWrapper : Message.S) = struct
               let element_data_size     = data_words * sizeof_uint64 in
               let element_pointers_size = pointer_words * sizeof_uint64 in
               let element_size          = element_data_size + element_pointers_size in
-              (* Skip over the composite tag word *)
-              let content_offset =
-                list_storage.ListStorage.storage.Slice.start + sizeof_uint64
-              in
-              fun i ->
+              fun ls i ->
+                (* Skip over the composite tag word *)
+                let content_offset =
+                  ls.ListStorage.storage.Slice.start + sizeof_uint64
+                in
                 let struct_storage =
                   let data = {
-                    list_storage.ListStorage.storage with
+                    ls.ListStorage.storage with
                     Slice.start = content_offset + (i * element_size);
                     Slice.len = element_data_size;
                   } in
@@ -530,6 +521,7 @@ module Make (MessageWrapper : Message.S) = struct
           end
     in {
       InnerArray.length;
+      InnerArray.init = InnerArray.invalid_init;
       InnerArray.get_unsafe;
       InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
       InnerArray.storage = Some list_storage;
@@ -537,13 +529,13 @@ module Make (MessageWrapper : Message.S) = struct
 
 
   let make_array_readwrite
-      (list_storage : rw ListStorage.t)
-      (codecs : 'a ListCodecs.t)
+      ~(list_storage : rw ListStorage.t)
+      ~(init : int -> rw ListStorage.t)
+      ~(codecs : 'a ListCodecs.t)
     : (rw, 'a, rw ListStorage.t) InnerArray.t =
-    let make_element_slice i byte_count = {
-      list_storage.ListStorage.storage with
-      Slice.start =
-        list_storage.ListStorage.storage.Slice.start + (i * byte_count);
+    let make_element_slice ls i byte_count = {
+      ls.ListStorage.storage with
+      Slice.start = ls.ListStorage.storage.Slice.start + (i * byte_count);
       Slice.len = byte_count;
     } in
     let length = list_storage.ListStorage.num_elements in
@@ -552,8 +544,8 @@ module Make (MessageWrapper : Message.S) = struct
       | ListStorageType.Empty ->
           begin match codecs with
           | ListCodecs.Empty (decode, encode) ->
-              let get i = decode () in
-              let set i v = encode v in
+              let get ls i = decode () in
+              let set ls i v = encode v in
               (get, set)
           | _ ->
               invalid_msg
@@ -562,20 +554,20 @@ module Make (MessageWrapper : Message.S) = struct
       | ListStorageType.Bit ->
           begin match codecs with
           | ListCodecs.Bit (decode, encode) ->
-              let get i =
+              let get ls i =
                 let byte_ofs = i / 8 in
                 let bit_ofs  = i mod 8 in
                 let byte_val =
-                  Slice.get_uint8 list_storage.ListStorage.storage byte_ofs
+                  Slice.get_uint8 ls.ListStorage.storage byte_ofs
                 in
                 decode ((byte_val land (1 lsl bit_ofs)) <> 0)
               in
-              let set i v =
+              let set ls i v =
                 let byte_ofs = i / 8 in
                 let bit_ofs  = i mod 8 in
                 let bitmask  = 1 lsl bit_ofs in
                 let old_byte_val =
-                  Slice.get_uint8 list_storage.ListStorage.storage byte_ofs
+                  Slice.get_uint8 ls.ListStorage.storage byte_ofs
                 in
                 let new_byte_val =
                   if encode v then
@@ -583,7 +575,7 @@ module Make (MessageWrapper : Message.S) = struct
                   else
                     old_byte_val land (lnot bitmask)
                 in
-                Slice.set_uint8 list_storage.ListStorage.storage byte_ofs new_byte_val
+                Slice.set_uint8 ls.ListStorage.storage byte_ofs new_byte_val
               in
               (get, set)
           | _ ->
@@ -594,8 +586,8 @@ module Make (MessageWrapper : Message.S) = struct
           begin match codecs with
           | ListCodecs.Bytes1 (decode, encode)
           | ListCodecs.Struct { ListCodecs.bytes = (decode, encode); _ } ->
-              let get i = decode (make_element_slice i 1) in
-              let set i v = encode v (make_element_slice i 1) in
+              let get ls i = decode (make_element_slice ls i 1) in
+              let set ls i v = encode v (make_element_slice ls i 1) in
               (get, set)
           | _ ->
               invalid_msg
@@ -605,8 +597,8 @@ module Make (MessageWrapper : Message.S) = struct
           begin match codecs with
           | ListCodecs.Bytes2 (decode, encode)
           | ListCodecs.Struct { ListCodecs.bytes = (decode, encode); _ } ->
-              let get i = decode (make_element_slice i 2) in
-              let set i v = encode v (make_element_slice i 2) in
+              let get ls i = decode (make_element_slice ls i 2) in
+              let set ls i v = encode v (make_element_slice ls i 2) in
               (get, set)
           | _ ->
               invalid_msg
@@ -616,8 +608,8 @@ module Make (MessageWrapper : Message.S) = struct
           begin match codecs with
           | ListCodecs.Bytes4 (decode, encode)
           | ListCodecs.Struct { ListCodecs.bytes = (decode, encode); _ } ->
-              let get i = decode (make_element_slice i 4) in
-              let set i v = encode v (make_element_slice i 4) in
+              let get ls i = decode (make_element_slice ls i 4) in
+              let set ls i v = encode v (make_element_slice ls i 4) in
               (get, set)
           | _ ->
               invalid_msg
@@ -627,8 +619,8 @@ module Make (MessageWrapper : Message.S) = struct
           begin match codecs with
           | ListCodecs.Bytes8 (decode, encode)
           | ListCodecs.Struct { ListCodecs.bytes = (decode, encode); _ } ->
-              let get i = decode (make_element_slice i 8) in
-              let set i v = encode v (make_element_slice i 8) in
+              let get ls i = decode (make_element_slice ls i 8) in
+              let set ls i v = encode v (make_element_slice ls i 8) in
               (get, set)
           | _ ->
               invalid_msg
@@ -638,8 +630,8 @@ module Make (MessageWrapper : Message.S) = struct
           begin match codecs with
           | ListCodecs.Pointer (decode, encode)
           | ListCodecs.Struct { ListCodecs.pointer = (decode, encode); _ } ->
-              let get i = decode (make_element_slice i sizeof_uint64) in
-              let set i v = encode v (make_element_slice i sizeof_uint64) in
+              let get ls i = decode (make_element_slice ls i sizeof_uint64) in
+              let set ls i v = encode v (make_element_slice ls i sizeof_uint64) in
               (get, set)
           | _ ->
               invalid_msg
@@ -649,13 +641,13 @@ module Make (MessageWrapper : Message.S) = struct
           let data_size     = data_words * sizeof_uint64 in
           let pointers_size = pointer_words * sizeof_uint64 in
           let total_size    = data_size + pointers_size in
-          (* Skip over the composite tag word *)
-          let content_offset =
-            list_storage.ListStorage.storage.Slice.start + sizeof_uint64
-          in
-          let make_storage i =
+          let make_storage ls i =
+            (* Skip over the composite tag word *)
+            let content_offset =
+              ls.ListStorage.storage.Slice.start + sizeof_uint64
+            in
             let data = {
-              list_storage.ListStorage.storage with
+              ls.ListStorage.storage with
               Slice.start = content_offset + (i * total_size);
               Slice.len = data_size;
             } in
@@ -668,8 +660,8 @@ module Make (MessageWrapper : Message.S) = struct
           in
           begin match codecs with
           | ListCodecs.Struct { ListCodecs.composite = (decode, encode); _ } ->
-              let get i = decode (make_storage i) in
-              let set i v = encode v (make_storage i) in
+              let get ls i = decode (make_storage ls i) in
+              let set ls i v = encode v (make_storage ls i) in
               (get, set)
           | _ ->
               invalid_msg
@@ -677,6 +669,7 @@ module Make (MessageWrapper : Message.S) = struct
           end
     in {
       InnerArray.length;
+      InnerArray.init;
       InnerArray.get_unsafe;
       InnerArray.set_unsafe;
       InnerArray.storage = Some list_storage;

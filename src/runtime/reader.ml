@@ -419,7 +419,12 @@ module Make (MessageWrapper : Message.S) = struct
       | Some default_storage ->
           make_array_readonly default_storage decoders
       | None ->
-          make_empty_array ()
+          (* Empty array *)
+          { InnerArray.length     = 0;
+            InnerArray.storage    = None;
+            InnerArray.init       = InnerArray.invalid_init;
+            InnerArray.get_unsafe = InnerArray.invalid_get_unsafe;
+            InnerArray.set_unsafe = InnerArray.invalid_set_unsafe; }
       end
     in
     match pointer_opt with
@@ -431,7 +436,7 @@ module Make (MessageWrapper : Message.S) = struct
             make_default ()
         end
     | None ->
-        make_default()
+        make_default ()
 
   let get_void_list
       ?(default : ro ListStorage.t option)

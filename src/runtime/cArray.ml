@@ -37,6 +37,8 @@ type ('cap, 'a, 'arr) t = ('cap, 'a, 'arr) InnerArray.t
 let length = InnerArray.length
 let get    = InnerArray.get
 let set    = InnerArray.set 
+let init   = InnerArray.init
+
 let foldi a ~init ~f =
   let len = length a in
   let () = assert (len >= 0) in
@@ -161,6 +163,14 @@ let to_list a =
 
 let to_array a =
   Core.Std.Array.init (length a) (fun i -> get a i)
+
+let set_list a lst =
+  let () = init a (List.length lst) in
+  List.iteri lst ~f:(fun i x -> set a i x)
+
+let set_array a arr =
+  let () = init a (Array.length arr) in
+  Array.iteri arr ~f:(fun i x -> set a i x)
 
 let map_array a ~f =
   Core.Std.Array.init (length a) (fun i -> f (get a i))

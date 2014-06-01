@@ -497,6 +497,20 @@ module Make (NM : Message.S) = struct
         default
 
 
+  (* Zero-initialize list storage of the given length and storage type, 
+     associating it with the specified list pointer. *)
+  let init_list_storage
+      ~(storage_type : Common.ListStorageType.t)
+      ~(num_elements : int)
+      (pointer_bytes : rw NM.Slice.t)
+    : rw NC.ListStorage.t =
+    let () = BOps.deep_zero_pointer pointer_bytes in
+    let message = pointer_bytes.NM.Slice.msg in
+    let list_storage = BOps.alloc_list_storage message storage_type num_elements in
+    let () = BOps.init_list_pointer pointer_bytes list_storage in
+    list_storage
+
+
   let get_list
       ?(struct_sizes : BuilderOps.StructSizes.t option)
       ?(default : ro DC.ListStorage.t option)
@@ -515,7 +529,8 @@ module Make (NM : Message.S) = struct
     let list_storage = BOps.deref_list_pointer ?struct_sizes ~create_default
         pointer_bytes
     in
-    NC.make_array_readwrite list_storage codecs
+    NC.make_array_readwrite ~list_storage ~codecs
+      ~init:(fun n -> init_list_storage ~storage_type ~num_elements:n pointer_bytes)
 
   let get_void_list
       ?(default : ro DC.ListStorage.t option)
@@ -707,7 +722,7 @@ module Make (NM : Message.S) = struct
       (value : 'cap NC.ListStorage.t option)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, 'a, rw NC.ListStorage.t) InnerArray.t =
-    let dest_storage =
+    let list_storage =
       match value with
       | Some src_storage ->
           BOps.deep_copy_list ?struct_sizes
@@ -716,8 +731,9 @@ module Make (NM : Message.S) = struct
           BOps.alloc_list_storage pointer_bytes.NM.Slice.msg storage_type 0
     in
     let () = BOps.deep_zero_pointer pointer_bytes in
-    let () = BOps.init_list_pointer pointer_bytes dest_storage in
-    NC.make_array_readwrite dest_storage codecs
+    let () = BOps.init_list_pointer pointer_bytes list_storage in
+    NC.make_array_readwrite ~list_storage ~codecs
+      ~init:(fun n -> init_list_storage ~storage_type ~num_elements:n pointer_bytes)
 
   let set_list
       ?(struct_sizes : BuilderOps.StructSizes.t option)
@@ -895,11 +911,9 @@ module Make (NM : Message.S) = struct
       (num_elements : int)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, 'a, rw NC.ListStorage.t) InnerArray.t =
-    let () = BOps.deep_zero_pointer pointer_bytes in
-    let message = pointer_bytes.NM.Slice.msg in
-    let list_storage = BOps.alloc_list_storage message storage_type num_elements in
-    let () = BOps.init_list_pointer pointer_bytes list_storage in
-    NC.make_array_readwrite list_storage codecs
+    let list_storage = init_list_storage ~storage_type ~num_elements pointer_bytes in
+    NC.make_array_readwrite ~list_storage ~codecs
+      ~init:(fun n -> init_list_storage ~storage_type ~num_elements:n pointer_bytes)
 
   let init_void_list
       (num_elements : int)

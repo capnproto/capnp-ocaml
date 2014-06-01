@@ -53,6 +53,11 @@ val get : ('cap, 'a, 'arr) t -> int -> 'a
     0 to [length a] - 1. *)
 val set : (rw, 'a, 'arr) t -> int -> 'a -> unit
 
+(** [init a n] destroys the content of array [a], replacing it with newly-allocated
+    array storage of length [n].  The new array elements are initialized to the
+    empty state (zero for primitives and default values for structs). *)
+val init : (rw, 'a, 'arr) t -> int -> unit
+
 (** [mem ~equal a x] tests whether element [x] is present in array [a], using the
     provided equality function.  If the equality function is not provided,
     polymorphic compare is used. *)
@@ -109,6 +114,12 @@ val to_list : ('cap, 'a, 'arr) t -> 'a list
 
 (** [to_array a] returns an OCaml array containing all the elements of [a], in order. *)
 val to_array : ('cap, 'a, 'arr) t -> 'a array
+
+(** [set_list a lst] resizes array [a] and sets its content of list [lst]. *)
+val set_list : (rw, 'a, 'arr) t -> 'a list -> unit
+
+(** [set_array a arr] resizes array [a] and sets its content of OCaml array [arr] *)
+val set_array : (rw, 'a, 'arr) t -> 'a array -> unit
 
 (** [map_array a ~f] returns [| f e1; f e2; ... f en |], where [e1..en] are the
     elements of [a]. *)

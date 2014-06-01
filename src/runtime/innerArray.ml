@@ -31,10 +31,11 @@ type ro = Message.ro
 type rw = Message.rw
 
 type ('cap, 'a, 'arr) t = {
-  length : int;
-  get_unsafe : int -> 'a;
-  set_unsafe : int -> 'a -> unit;
-  storage : 'arr option;
+  mutable length : int;
+  mutable storage : 'arr option;
+  get_unsafe : 'arr -> int -> 'a;
+  set_unsafe : 'arr -> int -> 'a -> unit;
+  init : int -> 'arr;
 }
 
 let length x = x.length
@@ -43,15 +44,34 @@ let get x i =
   if i < 0 || i >= x.length then
     invalid_arg "index out of bounds"
   else
-    x.get_unsafe i
+    match x.storage with
+    | Some storage ->
+        x.get_unsafe storage i
+    | None ->
+        assert false
 
 let set x i v =
   if i < 0 || i >= x.length then
     invalid_arg "index out of bounds"
   else
-    x.set_unsafe i v
+    match x.storage with
+    | Some storage ->
+        x.set_unsafe storage i v
+    | None ->
+        assert false
+
+let init x n =
+  if n < 0 then
+    invalid_arg "InnerArray.init"
+  else
+    let () = x.storage <- Some (x.init n) in
+    x.length <- n
 
 let to_storage x = x.storage
 
-let invalid_set_unsafe i v = assert false
+let invalid_get_unsafe a i = assert false
+
+let invalid_set_unsafe a i v = assert false
+
+let invalid_init n = assert false
 
