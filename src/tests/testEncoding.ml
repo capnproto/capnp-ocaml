@@ -955,8 +955,7 @@ end
 
 
 
-let init_list_defaults (builder : T.Builder.TestListDefaults.t) =
-  let lists = T.Builder.TestListDefaults.lists_init builder in
+let init_list_defaults (lists : T.Builder.TestLists.t) =
   let open T.Builder.TestLists in
 
   (* FIXME: skipping list0 and list1... at present we don't support encoding
@@ -1125,6 +1124,13 @@ let test_list_defaults ctx =
   Reader_check_test_list.f (T.Reader.TestLists.of_builder lists)
 
 
+let test_build_list_defaults ctx =
+  let root = T.Builder.TestLists.init_root () in
+  let () = init_list_defaults root in
+  Reader_check_test_list.f (T.Reader.TestLists.of_builder root);
+  Builder_check_test_list.f root;
+  Reader_check_test_list.f (T.Reader.TestLists.of_builder root)
+
 
 let encoding_suite =
   "all_types" >::: [
@@ -1138,6 +1144,7 @@ let encoding_suite =
     "interleaved groups" >:: test_interleaved_groups;
     "union defaults" >:: test_union_defaults;
     "list defaults" >:: test_list_defaults;
+    "build list defaults" >:: test_build_list_defaults;
   ]
 
 let () = run_test_tt_main encoding_suite
