@@ -750,7 +750,7 @@ module Make (MessageWrapper : Message.S) = struct
         fun i ->
           let slice = {
             storage with
-            Slice.start = i * byte_count;
+            Slice.start = storage.Slice.start + (i * byte_count);
             Slice.len   = byte_count;
           } in
           struct_of_bytes_slice slice
@@ -759,7 +759,7 @@ module Make (MessageWrapper : Message.S) = struct
         fun i ->
           let slice = {
             storage with
-            Slice.start = i * sizeof_uint64;
+            Slice.start = (storage.Slice.start) + (i * sizeof_uint64);
             Slice.len   = sizeof_uint64;
           } in
           struct_of_pointer_slice slice
