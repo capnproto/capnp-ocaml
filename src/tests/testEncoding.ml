@@ -264,7 +264,8 @@ module Check_test_message
     (Outer : TEST_ALL_TYPES)
     (Inner : TEST_ALL_TYPES
      with type t = Outer.inner_struct_t
-      and type inner_struct_t = Outer.inner_struct_t) = struct
+      and type inner_struct_t = Outer.inner_struct_t)
+= struct
 
   let f (s : Outer.t) : unit =
     let open Outer in
@@ -803,12 +804,325 @@ let test_union_defaults ctx =
     begin match T.Reader.TestUnnamedUnion.get field with
     | T.Reader.TestUnnamedUnion.Bar x when x = (Uint32.of_int 321) ->
         ()
-    | _ -> assert_failure "bad unnamed1 default"
+    | _ -> assert_failure "bad unnamed2 default"
     end;
     assert_equal "foo" (T.Reader.TestUnnamedUnion.before_get field);
     assert_equal "bar" (T.Reader.TestUnnamedUnion.after_get field)
   in
   ()
+
+
+module type TEST_LISTS = sig
+  type t
+  type array_t
+  type 'a message_t
+  type access
+  type message_access
+  type test_all_types_t
+
+  module Struct8 : sig
+    type t
+    val f_get : t -> int
+    val of_message : message_access message_t -> t
+  end
+  module Struct16c : sig
+    type t
+    val f_get : t -> int
+    val has_pad : t -> bool
+    val pad_get : t -> string
+    val of_message : message_access message_t -> t
+  end
+  module Struct64 : sig
+    type t
+    val f_get : t -> Uint64.t
+    val f_get_int_exn : t -> int
+    val of_message : message_access message_t -> t
+  end
+  module Struct8c : sig
+    type t
+    val f_get : t -> int
+    val has_pad : t -> bool
+    val pad_get : t -> string
+    val of_message : message_access message_t -> t
+  end
+  module StructP : sig
+    type t
+    val has_f : t -> bool
+    val f_get : t -> string
+    val of_message : message_access message_t -> t
+  end
+  module Struct32c : sig
+    type t
+    val f_get : t -> Uint32.t
+    val f_get_int_exn : t -> int
+    val has_pad : t -> bool
+    val pad_get : t -> string
+    val of_message : message_access message_t -> t
+  end
+  module Struct0c : sig
+    type t
+    val f_get : t -> unit
+    val has_pad : t -> bool
+    val pad_get : t -> string
+    val of_message : message_access message_t -> t
+  end
+  module Struct32 : sig
+    type t
+    val f_get : t -> Uint32.t
+    val f_get_int_exn : t -> int
+    val of_message : message_access message_t -> t
+  end
+  module StructPc : sig
+    type t
+    val has_f : t -> bool
+    val f_get : t -> string
+    val pad_get : t -> Uint64.t
+    val pad_get_int_exn : t -> int
+    val of_message : message_access message_t -> t
+  end
+  module Struct0 : sig
+    type t
+    val f_get : t -> unit
+    val of_message : message_access message_t -> t
+  end
+  module Struct64c : sig
+    type t
+    val f_get : t -> Uint64.t
+    val f_get_int_exn : t -> int
+    val has_pad : t -> bool
+    val pad_get : t -> string
+    val of_message : message_access message_t -> t
+  end
+  module Struct16 : sig
+    type t
+    val f_get : t -> int
+    val of_message : message_access message_t -> t
+  end
+  module Struct1c : sig
+    type t
+    val f_get : t -> bool
+    val has_pad : t -> bool
+    val pad_get : t -> string
+    val of_message : message_access message_t -> t
+  end
+  module Struct1 : sig
+    type t
+    val f_get : t -> bool
+    val of_message : message_access message_t -> t
+  end
+  val has_list0 : t -> bool
+  val list0_get : t -> (access, Struct0.t, array_t) Capnp.Array.t
+  val list0_get_list : t -> Struct0.t list
+  val list0_get_array : t -> Struct0.t array
+  val has_list1 : t -> bool
+  val list1_get : t -> (access, Struct1.t, array_t) Capnp.Array.t
+  val list1_get_list : t -> Struct1.t list
+  val list1_get_array : t -> Struct1.t array
+  val has_list8 : t -> bool
+  val list8_get : t -> (access, Struct8.t, array_t) Capnp.Array.t
+  val list8_get_list : t -> Struct8.t list
+  val list8_get_array : t -> Struct8.t array
+  val has_list16 : t -> bool
+  val list16_get : t -> (access, Struct16.t, array_t) Capnp.Array.t
+  val list16_get_list : t -> Struct16.t list
+  val list16_get_array : t -> Struct16.t array
+  val has_list32 : t -> bool
+  val list32_get : t -> (access, Struct32.t, array_t) Capnp.Array.t
+  val list32_get_list : t -> Struct32.t list
+  val list32_get_array : t -> Struct32.t array
+  val has_list64 : t -> bool
+  val list64_get : t -> (access, Struct64.t, array_t) Capnp.Array.t
+  val list64_get_list : t -> Struct64.t list
+  val list64_get_array : t -> Struct64.t array
+  val has_list_p : t -> bool
+  val list_p_get : t -> (access, StructP.t, array_t) Capnp.Array.t
+  val list_p_get_list : t -> StructP.t list
+  val list_p_get_array : t -> StructP.t array
+  val has_int32_list_list : t -> bool
+  val int32_list_list_get : t -> (access, (access, int32, array_t) Capnp.Array.t, array_t) Capnp.Array.t
+  val int32_list_list_get_list : t -> (access, int32, array_t) Capnp.Array.t list
+  val int32_list_list_get_array : t -> (access, int32, array_t) Capnp.Array.t array
+  val has_text_list_list : t -> bool
+  val text_list_list_get : t -> (access, (access, string, array_t) Capnp.Array.t, array_t) Capnp.Array.t
+  val text_list_list_get_list : t -> (access, string, array_t) Capnp.Array.t list
+  val text_list_list_get_array : t -> (access, string, array_t) Capnp.Array.t array
+  val has_struct_list_list : t -> bool
+  val struct_list_list_get : t -> (access, (access, test_all_types_t, array_t) Capnp.Array.t, array_t) Capnp.Array.t
+  val struct_list_list_get_list : t -> (access, test_all_types_t, array_t) Capnp.Array.t list
+  val struct_list_list_get_array : t -> (access, test_all_types_t, array_t) Capnp.Array.t array
+  val of_message : message_access message_t -> t
+end
+
+
+
+let init_list_defaults (builder : T.Builder.TestListDefaults.t) =
+  let lists = T.Builder.TestListDefaults.lists_init builder in
+  let open T.Builder.TestLists in
+
+  (* FIXME: skipping list0 and list1... at present we don't support encoding
+     lists of single field structs of Void or Bool as List<Void>/List<Bool>. *)
+
+  (*
+  let list0  = list0_init lists 2 in
+  let list1  = list1_init lists 4 in
+  *)
+  let list8  = list8_init lists 2 in
+  let list16 = list16_init lists 2 in
+  let list32 = list32_init lists 2 in
+  let list64 = list64_init lists 2 in
+  let listp  = list_p_init lists 2 in
+
+  (*
+  Struct0.f_set (Capnp.Array.get list0 0);
+  Struct0.f_set (Capnp.Array.get list0 1);
+  Struct1.f_set (Capnp.Array.get list1 0) true;
+  Struct1.f_set (Capnp.Array.get list1 1) false;
+  Struct1.f_set (Capnp.Array.get list1 2) true;
+  Struct1.f_set (Capnp.Array.get list1 3) true;
+  *)
+  Struct8.f_set_exn (Capnp.Array.get list8 0) 123;
+  Struct8.f_set_exn (Capnp.Array.get list8 1) 45;
+  Struct16.f_set_exn (Capnp.Array.get list16 0) 12345;
+  Struct16.f_set_exn (Capnp.Array.get list16 1) 6789;
+  Struct32.f_set (Capnp.Array.get list32 0) (Uint32.of_int 123456789);
+  Struct32.f_set (Capnp.Array.get list32 1) (Uint32.of_int 234567890);
+  Struct64.f_set (Capnp.Array.get list64 0) (Uint64.of_string "1234567890123456");
+  Struct64.f_set (Capnp.Array.get list64 1) (Uint64.of_string "2345678901234567");
+  StructP.f_set (Capnp.Array.get listp 0) "foo";
+  StructP.f_set (Capnp.Array.get listp 1) "bar";
+
+  let () =
+    let a = int32_list_list_init lists 3 in
+    Capnp.Array.set_list (Capnp.Array.get a 0) [ 1l; 2l; 3l ];
+    Capnp.Array.set_list (Capnp.Array.get a 1) [ 4l; 5l ];
+    Capnp.Array.set_list (Capnp.Array.get a 2) [ 12341234l ]
+  in
+  let () =
+    let a = text_list_list_init lists 3 in
+    Capnp.Array.set_array (Capnp.Array.get a 0) [| "foo"; "bar" |];
+    Capnp.Array.set_array (Capnp.Array.get a 1) [| "baz" |];
+    Capnp.Array.set_array (Capnp.Array.get a 2) [| "qux"; "corge" |]
+  in
+  let () =
+    let a = struct_list_list_init lists 2 in
+    let () =
+      let a0 = Capnp.Array.get a 0 in
+      Capnp.Array.init a0 2;
+      T.Builder.TestAllTypes.int32_field_set (Capnp.Array.get a0 0) 123l;
+      T.Builder.TestAllTypes.int32_field_set (Capnp.Array.get a0 1) 456l
+    in
+    let () =
+      let a1 = Capnp.Array.get a 1 in
+      Capnp.Array.init a1 1;
+      T.Builder.TestAllTypes.int32_field_set (Capnp.Array.get a1 0) 789l
+    in
+    ()
+  in
+  ()
+
+
+module Check_test_list
+    (TL : TEST_LISTS)
+    (TAT : TEST_ALL_TYPES with type t = TL.test_all_types_t)
+= struct
+  let f (lists : TL.t) =
+
+    (* FIXME: skipping list0 and list1... at present we don't support encoding
+       lists of single field structs of Void or Bool as List<Void>/List<Bool>. *)
+
+    (*
+    assert_equal 2 (Capnp.Array.length (TL.list0_get lists));
+    assert_equal 4 (Capnp.Array.length (TL.list1_get lists));
+    *)
+    assert_equal 2 (Capnp.Array.length (TL.list8_get lists));
+    assert_equal 2 (Capnp.Array.length (TL.list16_get lists));
+    assert_equal 2 (Capnp.Array.length (TL.list32_get lists));
+    assert_equal 2 (Capnp.Array.length (TL.list64_get lists));
+    assert_equal 2 (Capnp.Array.length (TL.list_p_get lists));
+
+    (*
+    assert_equal () (TL.Struct0.f_get (Capnp.Array.get (TL.list0_get lists) 0));
+    assert_equal () (TL.Struct0.f_get (Capnp.Array.get (TL.list0_get lists) 1));
+    assert_equal true  (TL.Struct1.f_get (Capnp.Array.get (TL.list1_get lists) 0));
+    assert_equal false (TL.Struct1.f_get (Capnp.Array.get (TL.list1_get lists) 1));
+    assert_equal true  (TL.Struct1.f_get (Capnp.Array.get (TL.list1_get lists) 2));
+    assert_equal true  (TL.Struct1.f_get (Capnp.Array.get (TL.list1_get lists) 3));
+    *)
+    assert_equal 123 (TL.Struct8.f_get (Capnp.Array.get (TL.list8_get lists) 0));
+    assert_equal 45  (TL.Struct8.f_get (Capnp.Array.get (TL.list8_get lists) 1));
+    assert_equal 12345 (TL.Struct16.f_get (Capnp.Array.get (TL.list16_get lists) 0));
+    assert_equal 6789  (TL.Struct16.f_get (Capnp.Array.get (TL.list16_get lists) 1));
+    assert_equal (Uint32.of_int 123456789)
+      (TL.Struct32.f_get (Capnp.Array.get (TL.list32_get lists) 0));
+    assert_equal (Uint32.of_int 234567890)
+      (TL.Struct32.f_get (Capnp.Array.get (TL.list32_get lists) 1));
+    assert_equal (Uint64.of_string "1234567890123456")
+      (TL.Struct64.f_get (Capnp.Array.get (TL.list64_get lists) 0));
+    assert_equal (Uint64.of_string "2345678901234567")
+      (TL.Struct64.f_get (Capnp.Array.get (TL.list64_get lists) 1));
+    assert_equal "foo" (TL.StructP.f_get (Capnp.Array.get (TL.list_p_get lists) 0));
+    assert_equal "bar" (TL.StructP.f_get (Capnp.Array.get (TL.list_p_get lists) 1));
+
+    let () =
+      let a = TL.int32_list_list_get lists in
+      assert_equal 3 (Capnp.Array.length a);
+      assert_equal (Capnp.Array.to_list (Capnp.Array.get a 0)) [ 1l; 2l; 3l ];
+      assert_equal (Capnp.Array.to_list (Capnp.Array.get a 1)) [ 4l; 5l ];
+      assert_equal (Capnp.Array.to_list (Capnp.Array.get a 2)) [ 12341234l ]
+    in
+    let () =
+      let a = TL.text_list_list_get lists in
+      assert_equal 3 (Capnp.Array.length a);
+      assert_equal (Capnp.Array.to_list (Capnp.Array.get a 0)) [ "foo"; "bar" ];
+      assert_equal (Capnp.Array.to_list (Capnp.Array.get a 1)) [ "baz" ];
+      assert_equal (Capnp.Array.to_list (Capnp.Array.get a 2)) [ "qux"; "corge" ]
+    in
+    let () =
+      let a = TL.struct_list_list_get lists in
+      assert_equal 2 (Capnp.Array.length a);
+      let e0 = Capnp.Array.get a 0 in
+      assert_equal 2 (Capnp.Array.length e0);
+      assert_equal 123l (TAT.int32_field_get (Capnp.Array.get e0 0));
+      assert_equal 456l (TAT.int32_field_get (Capnp.Array.get e0 1));
+      let e1 = Capnp.Array.get a 1 in
+      assert_equal 1 (Capnp.Array.length e1);
+      assert_equal 789l (TAT.int32_field_get (Capnp.Array.get e1 0))
+    in
+    ()
+end
+
+
+module ReaderTestLists = struct
+  include T.Reader.TestLists
+  type array_t = T.Reader.array_t
+  type 'a message_t = 'a T.message_t
+  type access = Test.ro
+  type message_access = Test.ro
+  type test_all_types_t = T.Reader.TestAllTypes.t
+end
+
+module BuilderTestLists = struct
+  include T.Builder.TestLists
+  type array_t = T.Builder.array_t
+  type 'a message_t = 'a T.message_t
+  type access = Test.rw
+  type message_access = Test.rw
+  type test_all_types_t = T.Builder.TestAllTypes.t
+end
+
+module Reader_check_test_list =
+  Check_test_list(ReaderTestLists)(ReaderTestAllTypes)
+
+module Builder_check_test_list =
+  Check_test_list(BuilderTestLists)(BuilderTestAllTypes)
+
+
+let test_list_defaults ctx =
+  let root = T.Builder.TestListDefaults.init_root () in
+  let lists = T.Builder.TestListDefaults.lists_get root in
+  Reader_check_test_list.f (T.Reader.TestLists.of_builder lists);
+  Builder_check_test_list.f lists;
+  Reader_check_test_list.f (T.Reader.TestLists.of_builder lists)
 
 
 
@@ -823,6 +1137,7 @@ let encoding_suite =
     "group encode/decode" >:: test_groups;
     "interleaved groups" >:: test_interleaved_groups;
     "union defaults" >:: test_union_defaults;
+    "list defaults" >:: test_list_defaults;
   ]
 
 let () = run_test_tt_main encoding_suite
