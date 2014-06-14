@@ -1132,6 +1132,90 @@ let test_build_list_defaults ctx =
   Reader_check_test_list.f (T.Reader.TestLists.of_builder root)
 
 
+let test_upgrade_struct_in_builder ctx =
+  let old_reader, message =
+    let open T.Builder.TestOldVersion in
+    let root = init_root () in
+    old1_set root 123L;
+    old2_set root "foo";
+    let sub = old3_init root in
+    old1_set sub 456L;
+    old2_set sub "bar";
+    (to_reader root, to_message root)
+  in
+
+  let () =
+    let module B = T.Builder.TestNewVersion in
+    let module R = T.Reader.TestOldVersion in
+    let new_version = B.of_message message in
+
+    (* The old instance should have been zero'd. *)
+    assert_equal 0L (R.old1_get old_reader);
+    assert_equal "" (R.old2_get old_reader);
+    assert_equal 0L (R.old1_get (R.old3_get old_reader));
+    assert_equal "" (R.old2_get (R.old3_get old_reader));
+
+    assert_equal 123L (B.old1_get new_version);
+    assert_equal "foo" (B.old2_get new_version);
+    assert_equal 987L (B.new1_get new_version);
+    assert_equal "baz" (B.new2_get new_version);
+
+    let sub = B.old3_get new_version in
+    assert_equal 456L (B.old1_get sub);
+    assert_equal "bar" (B.old2_get sub);
+    assert_equal 987L (B.new1_get sub);
+    assert_equal "baz" (B.new2_get sub);
+
+    B.old1_set new_version 234L;
+    B.old2_set new_version "qux";
+    B.new1_set new_version 321L;
+    B.new2_set new_version "quux";
+
+    B.old1_set sub 567L;
+    B.old2_set sub "corge";
+    B.new1_set sub 654L;
+    B.new2_set sub "grault"
+  in
+
+  let () =
+    (* Go back to the old version.  It should retain the values set on
+       the new version. *)
+    let open T.Builder.TestOldVersion in
+    let old_version = of_message message in
+    assert_equal 234L (old1_get old_version);
+    assert_equal "qux" (old2_get old_version);
+
+    let sub = old3_get old_version in
+    assert_equal 567L (old1_get sub);
+    assert_equal "corge" (old2_get sub);
+
+    (* Overwrite the old fields.  The new fields should remain intact. *)
+    old1_set old_version 345L;
+    old2_set old_version "garply";
+    old1_set sub 678L;
+    old2_set sub "waldo"
+  in
+
+  let () =
+    (* Back to the new version again. *)
+    let open T.Reader.TestNewVersion in
+    let new_version = of_message message in
+
+    assert_equal 345L (old1_get new_version);
+    assert_equal "garply" (old2_get new_version);
+    assert_equal 321L (new1_get new_version);
+    assert_equal "quux" (new2_get new_version);
+
+    let sub = old3_get new_version in
+    assert_equal 678L (old1_get sub);
+    assert_equal "waldo" (old2_get sub);
+    assert_equal 654L (new1_get sub);
+    assert_equal "grault" (new2_get sub)
+  in
+  ()
+
+
+
 let encoding_suite =
   "all_types" >::: [
     "encode/decode" >:: test_encode_decode;
@@ -1145,6 +1229,7 @@ let encoding_suite =
     "union defaults" >:: test_union_defaults;
     "list defaults" >:: test_list_defaults;
     "build list defaults" >:: test_build_list_defaults;
+    "upgrade struct in builder" >:: test_upgrade_struct_in_builder;
   ]
 
 let () = run_test_tt_main encoding_suite
