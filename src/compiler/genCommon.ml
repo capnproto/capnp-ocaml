@@ -41,11 +41,14 @@ let uint64_equal = C.Runtime.Util.uint64_equal
 
 module Context = struct
   type import_t = {
-    (* id associated with an imported file *)
+    (* ID associated with an imported file *)
     id : Uint64.t;
 
-    (* name which the current module uses to refer to the import *)
-    name : string;
+    (* Name which the current module uses to refer to the import *)
+    schema_name : string;
+
+    (* Actual module name associated with the import *)
+    module_name : string;
   }
 
   type codegen_context_t = {
@@ -91,6 +94,26 @@ let mangle_enum_undefined (enumerants : ('a, 'b, 'c) C.Array.t) =
 let mangle_field_undefined (fields : 'a list) =
   let field_names = List.rev_map fields ~f:PS.Field.name_get in
   mangle_undefined field_names
+
+
+(* Module filenames are alphanumeric and start with uppercase alpha.  Cap'n Proto
+   schema filenames have very weakly restricted naming, so we have to perform a
+   transformation on illegal characters. *)
+let make_legal_module_name schema_filename =
+  let base = Filename.chop_extension (Filename.basename schema_filename) in
+  let candidate =
+    String.concat_map base ~f:(fun c ->
+      if Char.is_alphanum c || c = '_' then
+        String.make 1 c
+      else if c = '-' then
+        String.make 1 '_'
+      else
+        sprintf "%02x" (Char.to_int c))
+  in
+  if Char.is_alpha candidate.[0] then
+    String.capitalize candidate
+  else
+    "M" ^ candidate
 
 
 let underscore_name (camelcase_name : string) : string =

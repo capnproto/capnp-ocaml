@@ -37,14 +37,20 @@ module Context = GenCommon.Context
 module Mode    = GenCommon.Mode
 
 
-let sig_s_header = [
+let sig_s_header ~context = [
   "type ro = Capnp.Message.ro";
   "type rw = Capnp.Message.rw";
   "";
   "module type S = sig";
   "  type 'cap message_t";
   "";
-]
+] @ (List.concat_map context.Context.imports ~f:(fun import -> [
+      "  module " ^ import.Context.schema_name ^ " : sig";
+      "    include " ^ import.Context.module_name ^ ".S with";
+      "      type 'cap message_t = 'cap message_t";
+      "  end";
+      "";
+    ]))
 
 let sig_s_reader_header = [
   "";
@@ -78,7 +84,7 @@ let functor_sig = [
   "";
 ]
 
-let mod_header = [
+let mod_header ~context = [
   "module Make (MessageWrapper : Capnp.Message.S) = struct";
   "  let invalid_msg = Capnp.Message.invalid_msg";
   "";
@@ -86,8 +92,11 @@ let mod_header = [
   "  module BA_ = Capnp.Runtime.Builder.Make(MessageWrapper)";
   "";
   "  type 'cap message_t = 'cap MessageWrapper.Message.t";
-  "";
-]
+  ""; ] @ (List.concat_map context.Context.imports ~f:(fun import -> [
+      "  module " ^ import.Context.schema_name ^ " = " ^
+          import.Context.module_name ^ ".Make(MessageWrapper)";
+      "";
+    ]))
 
 let mod_reader_header = [
   "";
@@ -114,16 +123,13 @@ let mod_footer = [
 ]
 
 
-let module_filename filename =
-  filename |>
-  Filename.basename |>
-  Filename.chop_extension |>
-  String.tr ~target:'-' ~replacement:'_' |>
-  String.uncapitalize
+let ml_filename filename =
+  let module_name = GenCommon.make_legal_module_name filename in
+  String.uncapitalize (module_name ^ ".ml")
 
-
-let ml_filename filename  = (module_filename filename) ^ ".ml"
-let mli_filename filename = (module_filename filename) ^ ".mli"
+let mli_filename filename =
+  let module_name = GenCommon.make_legal_module_name filename in
+  String.uncapitalize (module_name ^ ".mli")
 
 
 let string_of_lines lines =
@@ -145,9 +151,15 @@ let compile
     let requested_file_node = Hashtbl.find_exn nodes_table requested_file_id in
     let requested_filename = RequestedFile.filename_get requested_file in
     let imports = C.Array.map_list (RequestedFile.imports_get requested_file)
-        ~f:(fun import -> {
-            Context.id   = RequestedFile.Import.id_get import;
-            Context.name = RequestedFile.Import.name_get import;
+        ~f:(fun import ->
+          let import_id = RequestedFile.Import.id_get import in
+          let import_node = Hashtbl.find_exn nodes_table import_id in
+          let schema_filename = PS.Node.display_name_get import_node in
+          let module_name = GenCommon.make_legal_module_name schema_filename in {
+            Context.id = import_id;
+            Context.schema_name = module_name ^ "_" ^
+                (Uint64.to_string import_id);
+            Context.module_name = module_name
           })
     in
     let context = {
@@ -173,7 +185,7 @@ let compile
            ~node_name:requested_filename requested_file_node)
     in
     let sig_s =
-      sig_s_header @
+      (sig_s_header ~context) @
       sig_unique_types @
       sig_unique_enums @
       sig_s_reader_header @
@@ -215,7 +227,7 @@ let compile
       string_of_lines (
         sig_s @
         builder_defaults @
-        mod_header @
+        (mod_header ~context) @
         mod_unique_types @
         mod_unique_enums @
         reader_defaults @
