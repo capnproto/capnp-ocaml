@@ -32,7 +32,9 @@ open Core.Std
 
 module PS   = GenCommon.PS
 module C    = Capnp
-module Mode = GenCommon.Mode
+
+module Context = GenCommon.Context
+module Mode    = GenCommon.Mode
 
 
 let sig_s_header = [
@@ -142,22 +144,32 @@ let compile
     let requested_file_id = RequestedFile.id_get requested_file in
     let requested_file_node = Hashtbl.find_exn nodes_table requested_file_id in
     let requested_filename = RequestedFile.filename_get requested_file in
+    let imports = C.Array.map_list (RequestedFile.imports_get requested_file)
+        ~f:(fun import -> {
+            Context.id   = RequestedFile.Import.id_get import;
+            Context.name = RequestedFile.Import.name_get import;
+          })
+    in
+    let context = {
+      Context.nodes   = nodes_table;
+      Context.imports = imports;
+    } in
     let sig_unique_types = List.rev_map
-        (GenCommon.collect_unique_types ~nodes_table requested_file_node)
+        (GenCommon.collect_unique_types ~context requested_file_node)
         ~f:(fun (name, tp) -> "  type " ^ name)
     in
     let sig_unique_enums =
       GenCommon.apply_indent ~indent:"  "
-        (GenCommon.collect_unique_enums ~is_sig:true ~nodes_table
+        (GenCommon.collect_unique_enums ~is_sig:true ~context
            ~node_name:requested_filename requested_file_node)
     in
     let mod_unique_types = (List.rev_map
-        (GenCommon.collect_unique_types ~nodes_table requested_file_node)
+        (GenCommon.collect_unique_types ~context requested_file_node)
         ~f:(fun (name, tp) -> "  type " ^ name ^ " = " ^ tp)) @ [""]
     in
     let mod_unique_enums =
       GenCommon.apply_indent ~indent:"  "
-        (GenCommon.collect_unique_enums ~is_sig:false ~nodes_table
+        (GenCommon.collect_unique_enums ~is_sig:false ~context
            ~node_name:requested_filename requested_file_node)
     in
     let sig_s =
@@ -166,12 +178,12 @@ let compile
       sig_unique_enums @
       sig_s_reader_header @
       (GenCommon.apply_indent ~indent:"    "
-        (GenSignatures.generate_node ~suppress_module_wrapper:true ~nodes_table
+        (GenSignatures.generate_node ~suppress_module_wrapper:true ~context
            ~scope:[] ~mode:Mode.Reader ~node_name:requested_filename
            requested_file_node)) @
       sig_s_divide_reader_builder @
       (GenCommon.apply_indent ~indent:"    "
-        (GenSignatures.generate_node ~suppress_module_wrapper:true ~nodes_table
+        (GenSignatures.generate_node ~suppress_module_wrapper:true ~context
            ~scope:[] ~mode:Mode.Builder ~node_name:requested_filename
            requested_file_node)) @
       sig_s_footer
@@ -181,18 +193,18 @@ let compile
     in
     let mod_file_content =
       let defaults_context =
-        GenModules.build_defaults_context ~nodes_table ~node_name:requested_filename
+        GenModules.build_defaults_context ~context ~node_name:requested_filename
         requested_file_node
       in
       let reader_body =
         GenCommon.apply_indent ~indent:"    "
-          (GenModules.generate_node ~suppress_module_wrapper:true ~nodes_table
+          (GenModules.generate_node ~suppress_module_wrapper:true ~context
              ~scope:[] ~mode:Mode.Reader ~node_name:requested_filename
              requested_file_node)
       in
       let builder_body =
         GenCommon.apply_indent ~indent:"    "
-          (GenModules.generate_node ~suppress_module_wrapper:true ~nodes_table
+          (GenModules.generate_node ~suppress_module_wrapper:true ~context
              ~scope:[] ~mode:Mode.Builder ~node_name:requested_filename
              requested_file_node)
       in

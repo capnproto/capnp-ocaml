@@ -39,6 +39,25 @@ let sprintf = Printf.sprintf
 let uint64_equal = C.Runtime.Util.uint64_equal
 
 
+module Context = struct
+  type import_t = {
+    (* id associated with an imported file *)
+    id : Uint64.t;
+
+    (* name which the current module uses to refer to the import *)
+    name : string;
+  }
+
+  type codegen_context_t = {
+    (* Table of all nodes found in the code generation request *)
+    nodes : (Uint64.t, PS.Node.t) Hashtbl.t;
+
+    (* List of imports associated with the module to be generated *)
+    imports : import_t list;
+  }
+end
+
+
 (* Modes in which code generation can be run *)
 module Mode = struct
   type t =
@@ -89,12 +108,12 @@ let underscore_name (camelcase_name : string) : string =
 
 
 let children_of
-    (nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
+    ~(context : Context.codegen_context_t)
     (parent : PS.Node.t)
 : PS.Node.t list =
   let open PS.Node in
   let parent_id = id_get parent in
-  Hashtbl.fold nodes_table ~init:[] ~f:(fun ~key:id ~data:node acc ->
+  Hashtbl.fold context.Context.nodes ~init:[] ~f:(fun ~key:id ~data:node acc ->
     if uint64_equal parent_id (scope_id_get node) then
       node :: acc
     else
@@ -168,7 +187,7 @@ let get_unqualified_name
 (* Get a representation of the fully-qualified module name for [node].
  * The resulting list associates each component of the name with the scope
  * which it defines.  The head of the list is at the outermost scope. *)
-let get_fully_qualified_name_components nodes_table node
+let get_fully_qualified_name_components ~context node
   : (string * Uint64.t) list =
   let open PS.Node in
   let rec loop acc curr_node =
@@ -176,7 +195,7 @@ let get_fully_qualified_name_components nodes_table node
     if uint64_equal scope_id Uint64.zero then
       acc
     else
-      let parent = Hashtbl.find_exn nodes_table scope_id in
+      let parent = Hashtbl.find_exn context.Context.nodes scope_id in
       let node_name = get_unqualified_name ~parent ~child:curr_node in
       let node_id = id_get curr_node in
       loop ((node_name, node_id) :: acc) parent
@@ -185,15 +204,15 @@ let get_fully_qualified_name_components nodes_table node
 
 
 (* Get the fully-qualified name for [node]. *)
-let get_fully_qualified_name nodes_table node : string =
-  get_fully_qualified_name_components nodes_table node |>
+let get_fully_qualified_name ~context node : string =
+  get_fully_qualified_name_components ~context node |>
   List.map ~f:fst |>
   String.concat ~sep:"."
 
 
 (* Get a qualified module name for [node] which is suitable for use at the given
  * [scope_stack] position. *)
-let get_scope_relative_name nodes_table (scope_stack : Uint64.t list) node
+let get_scope_relative_name ~context (scope_stack : Uint64.t list) node
   : string =
   let rec pop_components components scope =
     match components, scope with
@@ -206,26 +225,27 @@ let get_scope_relative_name nodes_table (scope_stack : Uint64.t list) node
     | _ ->
         components
   in
-  let fq_name = get_fully_qualified_name_components nodes_table node in
+  let fq_name = get_fully_qualified_name_components ~context node in
   let rel_name = pop_components fq_name (List.rev scope_stack) in
   String.concat ~sep:"." (List.map rel_name ~f:fst)
 
 
-let make_unique_enum_module_name ~nodes_table enum_node =
+let make_unique_enum_module_name ~context enum_node =
   let uq_name = get_unqualified_name
-      ~parent:(Hashtbl.find_exn nodes_table (PS.Node.scope_id_get enum_node))
+      ~parent:(Hashtbl.find_exn context.Context.nodes
+          (PS.Node.scope_id_get enum_node))
       ~child:enum_node
   in
   let node_id = PS.Node.id_get enum_node in
   (String.capitalize uq_name) ^ "_" ^ (Uint64.to_string node_id)
 
 
-let make_unique_typename ~(mode : Mode.t) ~nodes_table node =
+let make_unique_typename ~context ~(mode : Mode.t) node =
   match PS.Node.get node with
   | PS.Node.Enum enum_def ->
       (* Enums don't have unique type names, they have unique module names.  This
          allows us to use the same enum constructor names without name collisions. *)
-      let unique_module_name = make_unique_enum_module_name ~nodes_table node in
+      let unique_module_name = make_unique_enum_module_name ~context node in
       unique_module_name ^ ".t"
   | _ ->
       let t_str =
@@ -234,7 +254,9 @@ let make_unique_typename ~(mode : Mode.t) ~nodes_table node =
         | Mode.Builder -> "builder_t"
       in
       let uq_name = get_unqualified_name
-        ~parent:(Hashtbl.find_exn nodes_table (PS.Node.scope_id_get node)) ~child:node
+          ~parent:(Hashtbl.find_exn context.Context.nodes
+              (PS.Node.scope_id_get node))
+          ~child:node
       in
       let node_id = PS.Node.id_get node in
       sprintf "%s_%s_%s" t_str uq_name (Uint64.to_string node_id)
@@ -243,8 +265,8 @@ let make_unique_typename ~(mode : Mode.t) ~nodes_table node =
 (* Determines whether a simple name for [node], as given by
  * [get_scope_relative_name], may be ambiguous for referring to the [node]
  * from the given [scope]. *)
-let is_node_naming_collision ~nodes_table ~scope node =
-  let target_name = get_scope_relative_name nodes_table scope node in
+let is_node_naming_collision ~context ~scope node =
+  let target_name = get_scope_relative_name ~context scope node in
   let target_scope_id = PS.Node.scope_id_get node in
   List.fold_left scope ~init:false
     ~f:(fun is_collision scope_id ->
@@ -254,14 +276,14 @@ let is_node_naming_collision ~nodes_table ~scope node =
         (* Skipping over the target node *)
         false
       else
-        Hashtbl.fold nodes_table ~init:false
+        Hashtbl.fold context.Context.nodes ~init:false
           ~f:(fun ~key:id ~data:other_node found ->
             if found then
               true
             else
               if uint64_equal scope_id (PS.Node.scope_id_get other_node) then
                 let candidate_name =
-                  get_scope_relative_name nodes_table scope other_node
+                  get_scope_relative_name ~context scope other_node
                 in
                 String.equal target_name candidate_name
               else
@@ -315,19 +337,19 @@ let is_node_naming_collision ~nodes_table ~scope node =
  * emitted in an unambiguous form which cannot be confused with Foo.Bar.Nested.
  * The test here is "at this scope, are there multiple nodes present with the
  * same name as the target node"? *)
-let make_disambiguated_type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
-    ~nodes_table ~scope ~tp node =
+let make_disambiguated_type_name ~context ~(mode : Mode.t) ~(scope_mode : Mode.t)
+    ~scope ~tp node =
   let node_id = PS.Node.id_get node in
   if List.mem scope node_id then
     (* The node of interest is a parent node of the node being generated.
        this is a case where an unambiguous type is emitted. *)
-    make_unique_typename ~mode ~nodes_table node
-  else if is_node_naming_collision ~nodes_table ~scope node then
+    make_unique_typename ~context ~mode node
+  else if is_node_naming_collision ~context ~scope node then
     (* A scope-relative name would be ambiguous due to the presence of
        another node with the same name.  Emit an unambiguous type. *)
-    make_unique_typename ~mode ~nodes_table node
+    make_unique_typename ~context ~mode node
   else
-    let module_name = get_scope_relative_name nodes_table scope node in
+    let module_name = get_scope_relative_name ~context scope node in
     let t_str =
       match PS.Type.get tp with
       | PS.Type.Enum _ ->
@@ -352,8 +374,8 @@ let make_disambiguated_type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
    [mode] indicates whether the generated type name represents a Reader or a
    Builder type.  [scope_mode] indicates whether the generated type name is
    to be referenced within the scope of a Reader or a Builder. *)
-let rec type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
-    nodes_table scope tp : string =
+let rec type_name ~context ~(mode : Mode.t) ~(scope_mode : Mode.t)
+    scope tp : string =
   let open PS.Type in
   match get tp with
   | Void    -> "unit"
@@ -374,7 +396,7 @@ let rec type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
       let list_type = List.element_type_get list_descr in
       sprintf "(%s, %s, %s) Capnp.Array.t"
         (if mode = Mode.Reader then "ro" else "rw")
-        (type_name ~mode ~scope_mode nodes_table scope list_type)
+        (type_name ~context ~mode ~scope_mode scope list_type)
         begin match (mode, scope_mode) with
         | (Mode.Reader, Mode.Reader)
         | (Mode.Builder, Mode.Builder) ->
@@ -386,18 +408,18 @@ let rec type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
         end
   | Enum enum_descr ->
       let enum_id = Enum.type_id_get enum_descr in
-      let enum_node = Hashtbl.find_exn nodes_table enum_id in
-      make_disambiguated_type_name ~mode ~scope_mode ~nodes_table
+      let enum_node = Hashtbl.find_exn context.Context.nodes enum_id in
+      make_disambiguated_type_name ~context ~mode ~scope_mode
         ~scope ~tp enum_node
   | Struct struct_descr ->
       let struct_id = Struct.type_id_get struct_descr in
-      let struct_node = Hashtbl.find_exn nodes_table struct_id in
-      make_disambiguated_type_name ~mode ~scope_mode ~nodes_table
+      let struct_node = Hashtbl.find_exn context.Context.nodes struct_id in
+      make_disambiguated_type_name ~context ~mode ~scope_mode
         ~scope ~tp struct_node
   | Interface iface_descr ->
       let iface_id = Interface.type_id_get iface_descr in
-      let iface_node = Hashtbl.find_exn nodes_table iface_id in
-      make_disambiguated_type_name ~mode ~scope_mode ~nodes_table
+      let iface_node = Hashtbl.find_exn context.Context.nodes iface_id in
+      make_disambiguated_type_name ~context ~mode ~scope_mode
         ~scope ~tp iface_node
   | AnyPointer ->
       begin match (mode, scope_mode) with
@@ -413,7 +435,7 @@ let rec type_name ~(mode : Mode.t) ~(scope_mode : Mode.t)
       failwith (sprintf "Unknown Type union discriminant %d" x)
 
 
-let generate_union_type ~(mode : Mode.t) nodes_table scope fields =
+let generate_union_type ~context ~(mode : Mode.t) scope fields =
   let open PS.Field in
   let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
     let field_name = String.capitalize (name_get field) in
@@ -425,15 +447,15 @@ let generate_union_type ~(mode : Mode.t) nodes_table scope fields =
             ("  | " ^ field_name) :: acc
         | _ ->
             ("  | " ^ field_name ^ " of " ^
-               (type_name ~mode ~scope_mode:mode nodes_table scope field_type))
+               (type_name ~context ~mode ~scope_mode:mode scope field_type))
             :: acc
         end
     | Group group ->
         let group_type_name =
           let group_id = Group.type_id_get group in
-          let group_node = Hashtbl.find_exn nodes_table group_id in
+          let group_node = Hashtbl.find_exn context.Context.nodes group_id in
           let group_module_name =
-            get_scope_relative_name nodes_table scope group_node
+            get_scope_relative_name ~context scope group_node
           in
           group_module_name ^ ".t"
         in
@@ -523,9 +545,9 @@ let generate_enum_sig ?unique_module_name enum_def =
 
 (* Recurse through the schema, collecting unique type names and type
    definitions for all the nodes. *)
-let rec collect_unique_types ?acc ~nodes_table node =
-  let child_type_names = List.concat_map (children_of nodes_table node)
-      ~f:(fun child -> collect_unique_types ~nodes_table child)
+let rec collect_unique_types ?acc ~context node =
+  let child_type_names = List.concat_map (children_of ~context node)
+      ~f:(fun child -> collect_unique_types ~context child)
   in
   let names =
     match acc with
@@ -540,11 +562,11 @@ let rec collect_unique_types ?acc ~nodes_table node =
       names
   | PS.Node.Struct _
   | PS.Node.Interface _ ->
-      let reader_name = make_unique_typename ~nodes_table
+      let reader_name = make_unique_typename ~context
           ~mode:Mode.Reader node
       in
       let reader_type = "ro RA_.StructStorage.t option" in
-      let builder_name = make_unique_typename ~nodes_table
+      let builder_name = make_unique_typename ~context
           ~mode:Mode.Builder node
       in
       let builder_type = "rw BA_.NC.StructStorage.t" in
@@ -555,11 +577,11 @@ let rec collect_unique_types ?acc ~nodes_table node =
 
 (* Recurse through the schema, emitting uniquely-named modules for
    all enum types. *)
-let rec collect_unique_enums ?(toplevel = true) ~is_sig ~nodes_table ~node_name node =
-  let child_decls = List.concat_map (children_of nodes_table node)
+let rec collect_unique_enums ?(toplevel = true) ~is_sig ~context ~node_name node =
+  let child_decls = List.concat_map (children_of ~context node)
       ~f:(fun child_node ->
         let child_name = get_unqualified_name ~parent:node ~child:child_node in
-        collect_unique_enums ~toplevel:false ~is_sig ~nodes_table
+        collect_unique_enums ~toplevel:false ~is_sig ~context
           ~node_name:child_name child_node)
   in
   let parent_decl =
@@ -571,7 +593,7 @@ let rec collect_unique_enums ?(toplevel = true) ~is_sig ~nodes_table ~node_name 
     | PS.Node.Interface _ ->
         []
     | PS.Node.Enum enum_def ->
-        let unique_module_name = make_unique_enum_module_name ~nodes_table node in
+        let unique_module_name = make_unique_enum_module_name ~context node in
         let body = generate_enum_sig enum_def in
         let codecs =
           if is_sig then

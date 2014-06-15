@@ -31,6 +31,7 @@
 open Core.Std
 
 module PS        = GenCommon.PS
+module Context   = GenCommon.Context
 module Mode      = GenCommon.Mode
 module C         = Capnp
 module RC        = C.Runtime.Common.Make(GenCommon.M)
@@ -47,11 +48,11 @@ let api_of_mode mode =
 
 
 (* Generate an accessor for decoding an enum type. *)
-let generate_enum_getter ~nodes_table ~enum_node ~mode
+let generate_enum_getter ~context ~enum_node ~mode
     ~field_name ~field_ofs ~default =
   let api_module = api_of_mode mode in
   let unique_module_name =
-    GenCommon.make_unique_enum_module_name ~nodes_table enum_node
+    GenCommon.make_unique_enum_module_name ~context enum_node
   in [
     "let " ^ field_name ^ "_get x =";
     sprintf "  let discr = %s.get_data_field x \
@@ -65,10 +66,10 @@ let generate_enum_getter ~nodes_table ~enum_node ~mode
 
 
 (* Generate an accessor for setting the value of an enum. *)
-let generate_enum_safe_setter ~nodes_table ~enum_node ~field_name
+let generate_enum_safe_setter ~context ~enum_node ~field_name
     ~field_ofs ~default ~discr_str =
   let unique_module_name =
-    GenCommon.make_unique_enum_module_name ~nodes_table enum_node
+    GenCommon.make_unique_enum_module_name ~context enum_node
   in [
     "let " ^ field_name ^ "_set x e =";
     sprintf
@@ -83,10 +84,10 @@ let generate_enum_safe_setter ~nodes_table ~enum_node ~field_name
 
 (* Generate an accessor for setting the value of an enum, permitting values
    which are not defined in the schema. *)
-let generate_enum_unsafe_setter ~nodes_table ~enum_node ~field_name
+let generate_enum_unsafe_setter ~context ~enum_node ~field_name
     ~field_ofs ~default ~discr_str =
   let unique_module_name =
-    GenCommon.make_unique_enum_module_name ~nodes_table enum_node
+    GenCommon.make_unique_enum_module_name ~context enum_node
   in [
     "let " ^ field_name ^ "_set_unsafe x e ="; sprintf
       "  BA_.get_data_field %sx ~f:(BA_.set_uint16 \
@@ -101,10 +102,10 @@ let generate_enum_unsafe_setter ~nodes_table ~enum_node ~field_name
 (* There is no get_enum() or get_enum_list() in the runtime API,
    because the enum values are schema-dependent.  This function
    will generate something appropriate for localized use. *)
-let generate_enum_runtime_getters ~nodes_table ~mode enum_node =
+let generate_enum_runtime_getters ~context ~mode enum_node =
   let api_module = api_of_mode mode in
   let unique_module_name =
-    GenCommon.make_unique_enum_module_name ~nodes_table enum_node
+    GenCommon.make_unique_enum_module_name ~context enum_node
   in
   let get_enum_list =
     match mode with
@@ -137,9 +138,9 @@ let generate_enum_runtime_getters ~nodes_table ~mode enum_node =
 (* There is no set_enum() or set_enum_list() in the runtime API,
    because the enum values are schema-dependent.  This function
    will generate something appropriate for localized use. *)
-let generate_enum_runtime_setters ~nodes_table enum_node =
+let generate_enum_runtime_setters ~context enum_node =
   let unique_module_name =
-    GenCommon.make_unique_enum_module_name ~nodes_table enum_node
+    GenCommon.make_unique_enum_module_name ~context enum_node
   in [
     "let set_enum ~byte_ofs value data =";
     "  BA_.set_uint16 ~default:0 ~byte_ofs (" ^ unique_module_name ^
@@ -160,7 +161,7 @@ let generate_enum_runtime_setters ~nodes_table enum_node =
 (* Generate a set of decoder functions for reading elements from a Cap'n Proto
    List<T>.  The resulting decoders could be passed as an argument to
    [Reader.get_list] in order to generate a getter for a list field. *)
-let rec generate_list_element_decoder ~nodes_table ~scope list_def =
+let rec generate_list_element_decoder ~context ~scope list_def =
   let make_terminal_decoder element_name = [
       "let decoders = RA_.ListDecoders.Pointer (fun slice ->";
       "  RA_.get_" ^ element_name ^ "_list (Some slice))";
@@ -188,7 +189,7 @@ let rec generate_list_element_decoder ~nodes_table ~scope list_def =
   | List inner_list_def ->
       let inner_decoder_decl =
         apply_indent ~indent:"  "
-          (generate_list_element_decoder ~nodes_table ~scope inner_list_def)
+          (generate_list_element_decoder ~context ~scope inner_list_def)
       in [
         "let decoders = RA_.ListDecoders.Pointer (fun slice ->";
       ] @ inner_decoder_decl @ [
@@ -197,10 +198,10 @@ let rec generate_list_element_decoder ~nodes_table ~scope list_def =
       ]
   | Enum enum_def ->
       let enum_id = PS.Type.Enum.type_id_get enum_def in
-      let enum_node = Hashtbl.find_exn nodes_table enum_id in
+      let enum_node = Hashtbl.find_exn context.Context.nodes enum_id in
       let enum_getters =
         apply_indent ~indent:"  "
-          (generate_enum_runtime_getters ~nodes_table ~mode:Mode.Reader enum_node)
+          (generate_enum_runtime_getters ~context ~mode:Mode.Reader enum_node)
       in [
         "let decoders =";
       ] @ enum_getters @ [
@@ -220,7 +221,7 @@ let rec generate_list_element_decoder ~nodes_table ~scope list_def =
    elements from/to a Cap'n Proto List<T>.  The resulting codecs could
    be passed as an argument to [Builder.get_list] in order to generate
    a getter for a list field. *)
-let rec generate_list_element_codecs ~nodes_table ~scope list_def =
+let rec generate_list_element_codecs ~context ~scope list_def =
   let make_terminal_codecs element_name = [
       "let codecs =";
       "  let decode slice = BA_.get_" ^ element_name ^ "_list slice in";
@@ -250,7 +251,7 @@ let rec generate_list_element_codecs ~nodes_table ~scope list_def =
   | Struct struct_def ->
       let data_words, pointer_words =
         let id = PS.Type.Struct.type_id_get struct_def in
-        let node = Hashtbl.find_exn nodes_table id in
+        let node = Hashtbl.find_exn context.Context.nodes id in
         match PS.Node.get node with
         | PS.Node.Struct struct_def ->
             (PS.Node.Struct.data_word_count_get struct_def,
@@ -272,7 +273,7 @@ let rec generate_list_element_codecs ~nodes_table ~scope list_def =
   | List inner_list_def ->
       let inner_codecs_decl =
         apply_indent ~indent:"  "
-          (generate_list_element_codecs ~nodes_table ~scope inner_list_def)
+          (generate_list_element_codecs ~context ~scope inner_list_def)
       in [
         "let codecs ="; ] @ inner_codecs_decl @ [
         "  let decode slice = BA_.get_list ~codecs slice in";
@@ -282,14 +283,14 @@ let rec generate_list_element_codecs ~nodes_table ~scope list_def =
       ]
   | Enum enum_def ->
       let enum_id = PS.Type.Enum.type_id_get enum_def in
-      let enum_node = Hashtbl.find_exn nodes_table enum_id in
+      let enum_node = Hashtbl.find_exn context.Context.nodes enum_id in
       let enum_getters =
         apply_indent ~indent:"  "
-          (generate_enum_runtime_getters ~nodes_table ~mode:Mode.Builder enum_node)
+          (generate_enum_runtime_getters ~context ~mode:Mode.Builder enum_node)
       in
       let enum_setters =
         apply_indent ~indent:"  "
-          (generate_enum_runtime_setters ~nodes_table enum_node)
+          (generate_enum_runtime_setters ~context enum_node)
       in [
         "let codecs ="; ] @ enum_getters @ enum_setters @ [
         "  RA_.ListDecoders.Pointer (get_enum_list, set_enum_list)";
@@ -304,7 +305,7 @@ let rec generate_list_element_codecs ~nodes_table ~scope list_def =
 
 
 (* Generate an accessor for retrieving a list of the given type. *)
-let generate_list_getters ~nodes_table ~scope ~list_type ~mode
+let generate_list_getters ~context ~scope ~list_type ~mode
     ~field_name ~field_ofs ~default_str =
   let api_module = api_of_mode mode in
   let make_primitive_accessor element_name = [
@@ -345,7 +346,7 @@ let generate_list_getters ~nodes_table ~scope ~list_type ~mode
         | Mode.Builder ->
             let data_words, pointer_words =
               let id = PS.Type.Struct.type_id_get struct_def in
-              let node = Hashtbl.find_exn nodes_table id in
+              let node = Hashtbl.find_exn context.Context.nodes id in
               match PS.Node.get node with
               | PS.Node.Struct struct_def ->
                   (PS.Node.Struct.data_word_count_get struct_def,
@@ -368,7 +369,7 @@ let generate_list_getters ~nodes_table ~scope ~list_type ~mode
         | Mode.Reader ->
             let decoder_declaration =
               apply_indent ~indent:"  "
-                (generate_list_element_decoder ~nodes_table ~scope list_def)
+                (generate_list_element_decoder ~context ~scope list_def)
             in [
               "let " ^ field_name ^ "_get x =";
             ] @ decoder_declaration @ [
@@ -379,7 +380,7 @@ let generate_list_getters ~nodes_table ~scope ~list_type ~mode
         | Mode.Builder ->
             let codecs_declaration =
               apply_indent ~indent:"  "
-                (generate_list_element_codecs ~nodes_table ~scope list_def)
+                (generate_list_element_codecs ~context ~scope list_def)
             in [
               "let " ^ field_name ^ "_get x =";
             ] @ codecs_declaration @ [
@@ -391,9 +392,9 @@ let generate_list_getters ~nodes_table ~scope ~list_type ~mode
         end
     | Enum enum_def ->
         let enum_id = Enum.type_id_get enum_def in
-        let enum_node = Hashtbl.find_exn nodes_table enum_id in
+        let enum_node = Hashtbl.find_exn context.Context.nodes enum_id in
         let unique_module_name =
-          GenCommon.make_unique_enum_module_name ~nodes_table enum_node
+          GenCommon.make_unique_enum_module_name ~context enum_node
         in
         begin match mode with
         | Mode.Reader -> [
@@ -440,7 +441,7 @@ let generate_list_getters ~nodes_table ~scope ~list_type ~mode
 
 
 (* Generate accessors for setting or initializing a list of the given type. *)
-let generate_list_setters ~nodes_table ~scope ~list_type
+let generate_list_setters ~context ~scope ~list_type
     ~discr_str ~field_name ~field_ofs =
   let make_primitive_setters element_name = [
     "let " ^ field_name ^ "_set x v =";
@@ -474,7 +475,7 @@ let generate_list_setters ~nodes_table ~scope ~list_type
     | Struct struct_def ->
         let data_words, pointer_words =
           let id = PS.Type.Struct.type_id_get struct_def in
-          let node = Hashtbl.find_exn nodes_table id in
+          let node = Hashtbl.find_exn context.Context.nodes id in
           match PS.Node.get node with
           | PS.Node.Struct struct_def ->
               (PS.Node.Struct.data_word_count_get struct_def,
@@ -501,7 +502,7 @@ let generate_list_setters ~nodes_table ~scope ~list_type
     | List list_def ->
         let codecs_declaration =
           apply_indent ~indent:"  "
-            (generate_list_element_codecs ~nodes_table ~scope list_def)
+            (generate_list_element_codecs ~context ~scope list_def)
         in [
           "let " ^ field_name ^ "_set x v =";
         ] @ codecs_declaration @ [
@@ -516,9 +517,9 @@ let generate_list_setters ~nodes_table ~scope ~list_type
         ]
     | Enum enum_def ->
         let enum_id = Enum.type_id_get enum_def in
-        let enum_node = Hashtbl.find_exn nodes_table enum_id in
+        let enum_node = Hashtbl.find_exn context.Context.nodes enum_id in
         let unique_module_name =
-          GenCommon.make_unique_enum_module_name ~nodes_table enum_node
+          GenCommon.make_unique_enum_module_name ~context enum_node
         in
         let codecs = [
           "  let slice_decoder slice =";
@@ -574,8 +575,8 @@ let generate_list_setters ~nodes_table ~scope ~list_type
    fields... we just blindly set all the fields to binary zero.
 
    The resulting lines are returned in reverse order. *)
-let rec generate_clear_group_fields_rev ~acc ~nodes_table ~group_id =
-  let node = Hashtbl.find_exn nodes_table group_id in
+let rec generate_clear_group_fields_rev ~acc ~context ~group_id =
+  let node = Hashtbl.find_exn context.Context.nodes group_id in
   match PS.Node.get node with
   | PS.Node.Struct struct_def ->
       let () = assert (PS.Node.Struct.is_group_get struct_def) in
@@ -593,7 +594,7 @@ let rec generate_clear_group_fields_rev ~acc ~nodes_table ~group_id =
         match PS.Field.get field with
         | PS.Field.Group group ->
             let group_id = PS.Field.Group.type_id_get group in
-            generate_clear_group_fields_rev ~acc:lines ~nodes_table ~group_id
+            generate_clear_group_fields_rev ~acc:lines ~context ~group_id
         | PS.Field.Slot slot ->
             let field_ofs = PS.Field.Slot.offset_get_int_exn slot in
             let tp = PS.Field.Slot.type_get slot in
@@ -664,7 +665,7 @@ let rec generate_clear_group_fields_rev ~acc ~nodes_table ~group_id =
 
 
 (* Generate the accessors for a single field. *)
-let generate_one_field_accessors ~nodes_table ~node_id ~scope
+let generate_one_field_accessors ~context ~node_id ~scope
     ~mode ~discr_ofs field =
   let api_module = api_of_mode mode in
   let field_name = GenCommon.underscore_name (PS.Field.name_get field) in
@@ -685,7 +686,7 @@ let generate_one_field_accessors ~nodes_table ~node_id ~scope
           let clear_fields =
             apply_indent ~indent:"  "
               (List.rev
-                (generate_clear_group_fields_rev ~acc:[] ~nodes_table
+                (generate_clear_group_fields_rev ~acc:[] ~context
                   ~group_id:(PS.Field.Group.type_id_get group)))
           in
           let set_discriminant =
@@ -1026,23 +1027,23 @@ let generate_one_field_accessors ~nodes_table ~node_id ~scope
               "let has_" ^ field_name ^ " x =";
               sprintf "  %s.get_pointer_field x %u ~f:%s.has_field"
                 api_module field_ofs api_module;
-              ] @ (generate_list_getters ~nodes_table ~scope ~list_type
+              ] @ (generate_list_getters ~context ~scope ~list_type
                 ~mode ~field_name ~field_ofs ~default_str)
             in
-            let setters = generate_list_setters ~nodes_table ~scope ~list_type
+            let setters = generate_list_setters ~context ~scope ~list_type
               ~discr_str ~field_name ~field_ofs
             in
             (getters, setters)
         | (PS.Type.Enum enum_def, PS.Value.Enum val_uint16) ->
             let enum_id = PS.Type.Enum.type_id_get enum_def in
-            let enum_node = Hashtbl.find_exn nodes_table enum_id in
-            let getters = generate_enum_getter ~nodes_table ~enum_node
+            let enum_node = Hashtbl.find_exn context.Context.nodes enum_id in
+            let getters = generate_enum_getter ~context ~enum_node
                 ~mode ~field_name ~field_ofs ~default:val_uint16
             in
             let setters =
-              (generate_enum_safe_setter ~nodes_table ~enum_node
+              (generate_enum_safe_setter ~context ~enum_node
                 ~field_name ~field_ofs ~default:val_uint16 ~discr_str) @
-              (generate_enum_unsafe_setter ~nodes_table ~enum_node
+              (generate_enum_unsafe_setter ~context ~enum_node
                  ~field_name ~field_ofs ~default:val_uint16 ~discr_str)
             in
             (getters, setters)
@@ -1063,7 +1064,7 @@ let generate_one_field_accessors ~nodes_table ~node_id ~scope
             in
             let data_words, pointer_words =
               let id = PS.Type.Struct.type_id_get struct_def in
-              let node = Hashtbl.find_exn nodes_table id in
+              let node = Hashtbl.find_exn context.Context.nodes id in
               match PS.Node.get node with
               | PS.Node.Struct struct_def ->
                   (PS.Node.Struct.data_word_count_get struct_def,
@@ -1201,7 +1202,7 @@ let generate_one_field_accessors ~nodes_table ~node_id ~scope
 
 
 (* Generate a function for unpacking a capnp union type as an OCaml variant. *)
-let generate_union_getter ~nodes_table ~scope ~mode struct_def fields =
+let generate_union_getter ~context ~scope ~mode struct_def fields =
   match fields with
   | [] ->
       (* If there are no union fields, then suppress the union type *)
@@ -1243,24 +1244,24 @@ let generate_union_getter ~nodes_table ~scope ~mode struct_def fields =
       in
       let undefined_name = GenCommon.mangle_field_undefined fields in
       let footer = [ sprintf "  | v -> %s v" undefined_name ] in
-      (GenCommon.generate_union_type ~mode nodes_table scope fields) @
+      (GenCommon.generate_union_type ~context ~mode scope fields) @
         header @ cases @ footer
 
 
 (* Generate accessors for getting and setting a list of fields of a struct,
  * regardless of whether or not the fields are packed into a union.  (Getters
  * for fields packed inside a union are not exposed in the module signature.) *)
-let generate_accessors ~nodes_table ~node ~scope ~mode struct_def fields =
+let generate_accessors ~context ~node ~scope ~mode struct_def fields =
   let discr_ofs = PS.Node.Struct.discriminant_offset_get_int_exn struct_def in
   let node_id = PS.Node.id_get node in
   List.fold_left fields ~init:[] ~f:(fun acc field ->
-    let x = generate_one_field_accessors ~nodes_table ~node_id ~scope
+    let x = generate_one_field_accessors ~context ~node_id ~scope
         ~mode ~discr_ofs field in
     x @ acc)
 
 
 (* FIXME: clean up redundant logic with [generate_list_element_decoder] *)
-let generate_list_constant ~nodes_table ~scope ~node_id ~list_name list_def =
+let generate_list_constant ~context ~scope ~node_id ~list_name list_def =
   let declare_decoders element_name = [
     "let decoders = RA_." ^ element_name ^ "_list_decoders in";
     ]
@@ -1287,7 +1288,7 @@ let generate_list_constant ~nodes_table ~scope ~node_id ~list_name list_def =
     | List inner_list_def ->
         let inner_decoder_decl =
           apply_indent ~indent:"  "
-            (generate_list_element_decoder ~nodes_table ~scope inner_list_def)
+            (generate_list_element_decoder ~context ~scope inner_list_def)
         in [
           "let decoders = RA_.ListDecoders.Pointer (fun slice ->";
         ] @ inner_decoder_decl @ [
@@ -1295,9 +1296,9 @@ let generate_list_constant ~nodes_table ~scope ~node_id ~list_name list_def =
         ]
     | Enum enum_def ->
       let enum_id = PS.Type.Enum.type_id_get enum_def in
-      let enum_node = Hashtbl.find_exn nodes_table enum_id in
+      let enum_node = Hashtbl.find_exn context.Context.nodes enum_id in
         let unique_module_name =
-          GenCommon.make_unique_enum_module_name ~nodes_table enum_node
+          GenCommon.make_unique_enum_module_name ~context enum_node
         in [
           "let decoders =";
           "  RA_.ListDecoders.Bytes2 (fun slice ->";
@@ -1320,7 +1321,7 @@ let generate_list_constant ~nodes_table ~scope ~node_id ~list_name list_def =
 
 
 (* Generate a definition for a constant. *)
-let generate_constant ~nodes_table ~scope ~node ~node_name const_def =
+let generate_constant ~context ~scope ~node ~node_name const_def =
   let const_type = PS.Node.Const.type_get const_def in
   let const_val  = PS.Node.Const.value_get const_def in
   let open PS in
@@ -1354,14 +1355,14 @@ let generate_constant ~nodes_table ~scope ~node ~node_name const_def =
   | (Type.List list_def, Value.List _) ->
       let node_id = PS.Node.id_get node in
       let list_name = GenCommon.underscore_name node_name in
-      generate_list_constant ~nodes_table ~scope ~node_id ~list_name list_def
+      generate_list_constant ~context ~scope ~node_id ~list_name list_def
   | (Type.Enum _, Value.Enum enum_val) ->
       let const_type = PS.Node.Const.type_get const_def in
       let enum_node =
         match PS.Type.get const_type with
         | PS.Type.Enum enum_def ->
             let enum_id = PS.Type.Enum.type_id_get enum_def in
-            Hashtbl.find_exn nodes_table enum_id
+            Hashtbl.find_exn context.Context.nodes enum_id
         | _ ->
             failwith "Decoded non-enum node where enum node was expected."
       in
@@ -1372,7 +1373,7 @@ let generate_constant ~nodes_table ~scope ~node ~node_name const_def =
       in
       let undefined_name = GenCommon.mangle_enum_undefined enumerants in
       let scope_relative_name =
-        GenCommon.get_scope_relative_name nodes_table scope enum_node in
+        GenCommon.get_scope_relative_name ~context scope enum_node in
       if enum_val >= C.Array.length enumerants then
         [ sprintf "%s.%s %u" scope_relative_name
             (String.capitalize undefined_name) enum_val ]
@@ -1425,7 +1426,7 @@ let generate_constant ~nodes_table ~scope ~node ~node_name const_def =
  * out what module prefixes are required to properly qualify a type.
  *
  * Raises: Failure if the children of this node contain a cycle. *)
-let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~mode
+let rec generate_struct_node ~context ~scope ~nested_modules ~mode
     ~node struct_def =
   let unsorted_fields =
     C.Array.to_list (PS.Node.Struct.fields_get struct_def)
@@ -1441,17 +1442,17 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~mode
   let union_accessors =
     (* Emit accessor functions first, because they are required for the
        variant-based code emitted by [generate_union_getter]. *)
-    (generate_accessors ~nodes_table ~node ~scope ~mode struct_def union_fields) @
-      (generate_union_getter ~nodes_table ~scope ~mode struct_def union_fields)
+    (generate_accessors ~context ~node ~scope ~mode struct_def union_fields) @
+      (generate_union_getter ~context ~scope ~mode struct_def union_fields)
   in
   let non_union_accessors =
-    generate_accessors ~nodes_table ~node ~scope ~mode struct_def non_union_fields
+    generate_accessors ~context ~node ~scope ~mode struct_def non_union_fields
   in
   let unique_reader = GenCommon.make_unique_typename ~mode:Mode.Reader
-      ~nodes_table node
+      ~context node
   in
   let unique_builder = GenCommon.make_unique_typename ~mode:Mode.Builder
-      ~nodes_table node
+      ~context node
   in
   let header =
     match mode with
@@ -1498,7 +1499,7 @@ let rec generate_struct_node ~nodes_table ~scope ~nested_modules ~mode
  * Raises: Failure if the children of this node contain a cycle. *)
 and generate_node
     ~(suppress_module_wrapper : bool)
-    ~(nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
+    ~(context : Context.codegen_context_t)
     ~(scope : Uint64.t list)
     ~(mode : Mode.t)
     ~(node_name : string)
@@ -1506,13 +1507,13 @@ and generate_node
 : string list =
   let node_id = PS.Node.id_get node in
   let generate_nested_modules () =
-    match Topsort.topological_sort nodes_table
-            (GenCommon.children_of nodes_table node) with
+    match Topsort.topological_sort context.Context.nodes
+            (GenCommon.children_of ~context node) with
     | Some child_nodes ->
         List.concat_map child_nodes ~f:(fun child ->
           let child_name = GenCommon.get_unqualified_name ~parent:node ~child in
           let child_node_id = PS.Node.id_get child in
-          generate_node ~suppress_module_wrapper:false ~nodes_table
+          generate_node ~suppress_module_wrapper:false ~context
             ~scope:(child_node_id :: scope) ~mode ~node_name:child_name child)
     | None ->
         let error_msg = sprintf
@@ -1528,7 +1529,7 @@ and generate_node
   | PS.Node.Struct struct_def ->
       let nested_modules = generate_nested_modules () in
       let body =
-        generate_struct_node ~nodes_table ~scope ~nested_modules ~mode
+        generate_struct_node ~context ~scope ~nested_modules ~mode
           ~node struct_def
       in
       if suppress_module_wrapper then
@@ -1539,7 +1540,7 @@ and generate_node
           [ "end" ]
   | PS.Node.Enum enum_def ->
       let unique_module_name =
-        GenCommon.make_unique_enum_module_name ~nodes_table node
+        GenCommon.make_unique_enum_module_name ~context node
       in
       let body =
         (generate_nested_modules ()) @
@@ -1562,7 +1563,7 @@ and generate_node
   | PS.Node.Const const_def -> [
       "let " ^ (GenCommon.underscore_name node_name) ^ " =";
     ] @ (apply_indent ~indent:"  "
-          (generate_constant ~nodes_table ~scope ~node ~node_name const_def))
+          (generate_constant ~context ~scope ~node ~node_name const_def))
   | PS.Node.Annotation annot_def ->
       generate_nested_modules ()
   | PS.Node.Undefined x ->
@@ -1571,7 +1572,7 @@ and generate_node
 
 (* Update the default-value context with default values associated with
    the specified struct. *)
-let update_defaults_context_struct ~nodes_table ~context ~node ~struct_def =
+let update_defaults_context_struct ~context ~defaults_context ~node ~struct_def =
   let fields = PS.Node.Struct.fields_get struct_def in
   C.Array.iter fields ~f:(fun field ->
     let field_name = GenCommon.underscore_name (PS.Field.name_get field) in
@@ -1590,7 +1591,7 @@ let update_defaults_context_struct ~nodes_table ~context ~node ~struct_def =
                 begin match ReaderApi.deref_struct_pointer pointer_slice with
                 | Some default_storage ->
                     let ident = Defaults.make_ident node_id field_name in
-                    Defaults.add_struct context ident default_storage
+                    Defaults.add_struct defaults_context ident default_storage
                 | None ->
                     ()
                 end
@@ -1603,7 +1604,7 @@ let update_defaults_context_struct ~nodes_table ~context ~node ~struct_def =
                 begin match ReaderApi.deref_list_pointer pointer_slice with
                 | Some default_storage ->
                     let ident = Defaults.make_ident node_id field_name in
-                    Defaults.add_list context ident default_storage
+                    Defaults.add_list defaults_context ident default_storage
                 | None ->
                     ()
                 end
@@ -1618,7 +1619,7 @@ let update_defaults_context_struct ~nodes_table ~context ~node ~struct_def =
                     ()
                 | _ ->
                     let ident = Defaults.make_ident node_id field_name in
-                    Defaults.add_pointer context ident pointer_slice
+                    Defaults.add_pointer defaults_context ident pointer_slice
                 end
             | None ->
                 ()
@@ -1632,7 +1633,7 @@ let update_defaults_context_struct ~nodes_table ~context ~node ~struct_def =
 
 (* Update the default-value context with default values associated with
    the specified constant. *)
-let update_defaults_context_constant ~nodes_table ~context
+let update_defaults_context_constant ~context ~defaults_context
     ~node ~node_name ~const_def =
   let node_id = PS.Node.id_get node in
   let name = GenCommon.underscore_name node_name in
@@ -1645,7 +1646,7 @@ let update_defaults_context_constant ~nodes_table ~context
           begin match ReaderApi.deref_struct_pointer pointer_slice with
           | Some default_storage ->
               let ident = Defaults.make_ident node_id name in
-              Defaults.add_struct context ident default_storage
+              Defaults.add_struct defaults_context ident default_storage
           | None ->
               failwith (sprintf
                   "Struct constant \"%s\" has unexpected type."
@@ -1660,7 +1661,7 @@ let update_defaults_context_constant ~nodes_table ~context
           begin match ReaderApi.deref_list_pointer pointer_slice with
           | Some default_storage ->
               let ident = Defaults.make_ident node_id name in
-              Defaults.add_list context ident default_storage
+              Defaults.add_list defaults_context ident default_storage
           | None ->
               failwith (sprintf
                   "List constant \"%s\" has unexpected type."
@@ -1673,7 +1674,7 @@ let update_defaults_context_constant ~nodes_table ~context
       begin match pointer_slice_opt with
       | Some pointer_slice ->
           let ident = Defaults.make_ident node_id name in
-          Defaults.add_pointer context ident pointer_slice
+          Defaults.add_pointer defaults_context ident pointer_slice
       | None ->
           assert false
       end
@@ -1685,33 +1686,33 @@ let update_defaults_context_constant ~nodes_table ~context
    and fill the context with all the default values associated with the
    node (recursively). *)
 let rec build_defaults_context
-    ?(context : Defaults.t option)
-    ~(nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
+    ?(defaults_context : Defaults.t option)
+    ~(context : Context.codegen_context_t)
     ~(node_name : string)
     (node : PS.Node.t)
   : Defaults.t =
   let ctx =
-    match context with
+    match defaults_context with
     | Some x -> x
     | None -> Defaults.create ()
   in
-  let child_nodes = GenCommon.children_of nodes_table node in
+  let child_nodes = GenCommon.children_of ~context node in
   let () = List.iter child_nodes ~f:(fun child_node ->
       let child_name = GenCommon.get_unqualified_name
           ~parent:node ~child:child_node
       in
-      let _ = build_defaults_context ~context:ctx ~nodes_table
+      let _ = build_defaults_context ~defaults_context:ctx ~context
           ~node_name:child_name child_node in ())
   in
   match PS.Node.get node with
   | PS.Node.Struct struct_def ->
-      let () = update_defaults_context_struct ~nodes_table
-          ~context:ctx ~node ~struct_def
+      let () = update_defaults_context_struct ~context
+          ~defaults_context:ctx ~node ~struct_def
       in
       ctx
   | PS.Node.Const const_def ->
-      let () = update_defaults_context_constant ~nodes_table
-          ~context:ctx ~node ~node_name ~const_def
+      let () = update_defaults_context_constant ~context
+          ~defaults_context:ctx ~node ~node_name ~const_def
       in
       ctx
   | PS.Node.File

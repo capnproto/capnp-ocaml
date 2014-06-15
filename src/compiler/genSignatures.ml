@@ -30,22 +30,23 @@
 
 open Core.Std
 
-module PS   = GenCommon.PS
-module Mode = GenCommon.Mode
-module C    = Capnp
+module PS      = GenCommon.PS
+module Context = GenCommon.Context
+module Mode    = GenCommon.Mode
+module C = Capnp
 
 let sprintf = Printf.sprintf
 let apply_indent = GenCommon.apply_indent
 
 
 (* Generate a function for unpacking a capnp union type as an OCaml variant. *)
-let generate_union_getter ~nodes_table ~scope ~mode fields =
+let generate_union_getter ~context ~scope ~mode fields =
   match fields with
   | [] ->
       (* If there are no union fields, then suppress the union type *)
       []
   | _ ->
-      (GenCommon.generate_union_type ~mode nodes_table scope fields) @
+      (GenCommon.generate_union_type ~context ~mode scope fields) @
         [ "val get : t -> unnamed_union_t" ]
 
 
@@ -54,15 +55,15 @@ type accessor_t =
   | Setter of string list
 
 
-let generate_one_field_accessors ~nodes_table ~scope ~mode field
+let generate_one_field_accessors ~context ~scope ~mode field
   : accessor_t list =
   let field_name = GenCommon.underscore_name (PS.Field.name_get field) in
   match PS.Field.get field with
   | PS.Field.Group group ->
       let group_id = PS.Field.Group.type_id_get group in
-      let group_node = Hashtbl.find_exn nodes_table group_id in
+      let group_node = Hashtbl.find_exn context.Context.nodes group_id in
       let group_name =
-        GenCommon.get_scope_relative_name nodes_table scope group_node
+        GenCommon.get_scope_relative_name ~context scope group_node
       in [
         Getter [
           sprintf "val %s_get : t -> %s.t"
@@ -119,11 +120,11 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode field
           Getter [
             sprintf "val %s_get : t -> %s"
               field_name
-              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp); ];
           Setter [
             sprintf "val %s_set : t -> %s -> unit"
               field_name
-              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp); ];
         ]
       | Text
       | Data -> [
@@ -132,11 +133,11 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode field
           Getter [
             sprintf "val %s_get : t -> %s"
               field_name
-              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp); ];
           Setter [
             sprintf "val %s_set : t -> %s -> unit"
               field_name
-              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp); ];
         ]
       | Interface _ -> [
           Getter [
@@ -148,12 +149,12 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode field
           Getter [
             sprintf "val %s_get : t -> %s"
               field_name
-              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp); ];
           Setter [
             sprintf "val %s_set : t -> %s -> %s"
               field_name
-              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp)
-              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp)
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp); ];
         ]
       | List list_descr ->
           let list_type = List.element_type_get list_descr in [
@@ -162,52 +163,49 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode field
           Getter [
             sprintf "val %s_get : t -> %s"
               field_name
-              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp); ];
           Getter [
             sprintf "val %s_get_list : t -> %s list"
               field_name
-              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope list_type); ];
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope list_type); ];
           Getter [
             sprintf "val %s_get_array : t -> %s array"
               field_name
-              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope list_type); ];
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope list_type); ];
           Setter [
             (* FIXME: should allow setting from a Reader *)
             sprintf "val %s_set : t -> %s -> %s"
               field_name
-              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp)
-              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp)
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp); ];
           Setter [
             sprintf "val %s_set_list : t -> %s list -> %s"
               field_name
-              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope list_type)
-              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope list_type)
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp); ];
           Setter [
             sprintf "val %s_set_array : t -> %s array -> %s"
               field_name
-              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope list_type)
-              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope list_type)
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp); ];
           Setter [
             sprintf "val %s_init : t -> int -> %s"
               field_name
-              (GenCommon.type_name ~mode ~scope_mode:mode
-                 nodes_table scope tp); ];
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp); ];
         ]
       | Enum _ -> [
           Getter [
             sprintf "val %s_get : t -> %s"
               field_name
-              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp); ];
           Setter [
             sprintf "val %s_set : t -> %s -> unit"
               field_name
-              (GenCommon.type_name ~mode ~scope_mode:mode
-                 nodes_table scope tp); ];
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp); ];
           Setter [
             sprintf "val %s_set_unsafe : t -> %s -> unit"
               field_name
-              (GenCommon.type_name ~mode ~scope_mode:mode
-                 nodes_table scope tp); ];
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp); ];
         ]
       | Struct _ -> [
           Getter [
@@ -215,26 +213,26 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode field
           Getter [
             sprintf "val %s_get : t -> %s"
               field_name
-              (GenCommon.type_name ~mode ~scope_mode:mode nodes_table scope tp); ];
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp); ];
           Setter [
             sprintf "val %s_set_reader : t -> %s -> %s"
               field_name
-              (GenCommon.type_name ~mode:Mode.Reader ~scope_mode:Mode.Builder
-                 nodes_table scope tp)
-              (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                 nodes_table scope tp); ];
+              (GenCommon.type_name ~context ~mode:Mode.Reader
+                 ~scope_mode:Mode.Builder scope tp)
+              (GenCommon.type_name ~context ~mode:Mode.Builder
+                 ~scope_mode:Mode.Builder scope tp); ];
           Setter [
             sprintf "val %s_set_builder : t -> %s -> %s"
               field_name
-              (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                 nodes_table scope tp)
-              (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                 nodes_table scope tp); ];
+              (GenCommon.type_name ~context ~mode:Mode.Builder
+                 ~scope_mode:Mode.Builder scope tp)
+              (GenCommon.type_name ~context ~mode:Mode.Builder
+                 ~scope_mode:Mode.Builder scope tp); ];
           Setter [
             sprintf "val %s_init : t -> %s"
               field_name
-              (GenCommon.type_name ~mode:Mode.Builder ~scope_mode:Mode.Builder
-                 nodes_table scope tp); ];
+              (GenCommon.type_name ~context ~mode:Mode.Builder
+                 ~scope_mode:Mode.Builder scope tp); ];
         ]
       | Undefined x ->
           failwith (sprintf "Unknown Type union discriminant %d" x)
@@ -246,11 +244,11 @@ let generate_one_field_accessors ~nodes_table ~scope ~mode field
 (* Generate accessors for getting or setting the selected fields.  The specified
    filter function allows the caller to restrict the result to getter or setter
    functions. *)
-let generate_accessors ~nodes_table ~scope ~mode
+let generate_accessors ~context ~scope ~mode
     ~(f : accessor_t -> bool) fields
   : string list =
   List.fold_left fields ~init:[] ~f:(fun acc field ->
-    let accessors = generate_one_field_accessors ~nodes_table ~scope ~mode field in
+    let accessors = generate_one_field_accessors ~context ~scope ~mode field in
     let filtered_accessors = List.fold_left accessors ~init:[]
         ~f:(fun acc accessor ->
           if f accessor then
@@ -268,7 +266,7 @@ let generate_accessors ~nodes_table ~scope ~mode
  * out what module prefixes are required to properly qualify a type.
  *
  * Raises: Failure if the children of this node contain a cycle. *)
-let generate_struct_node ~nodes_table ~scope ~nested_modules
+let generate_struct_node ~context ~scope ~nested_modules
     ~mode ~node struct_def : string list =
   let unsorted_fields =
     C.Array.to_list (PS.Node.Struct.fields_get struct_def)
@@ -282,12 +280,12 @@ let generate_struct_node ~nodes_table ~scope ~nested_modules
         (PS.Field.discriminant_value_get field) <> PS.Field.no_discriminant)
   in
   let union_accessors =
-    (generate_union_getter ~nodes_table ~scope ~mode union_fields) @
+    (generate_union_getter ~context ~scope ~mode union_fields) @
        begin match mode with
        | Mode.Reader ->
            []
        | Mode.Builder ->
-           generate_accessors ~nodes_table ~scope ~mode
+           generate_accessors ~context ~scope ~mode
              ~f:(function Getter _ -> false | Setter _ -> true) union_fields
        end
   in
@@ -297,13 +295,13 @@ let generate_struct_node ~nodes_table ~scope ~nested_modules
       | Mode.Reader  -> (function Getter _ -> true | Setter _ -> false)
       | Mode.Builder -> (fun x -> true)
     in
-    generate_accessors ~nodes_table ~scope ~mode ~f:selector non_union_fields
+    generate_accessors ~context ~scope ~mode ~f:selector non_union_fields
   in
   let unique_reader = GenCommon.make_unique_typename ~mode:Mode.Reader
-      ~nodes_table node
+      ~context node
   in
   let unique_builder = GenCommon.make_unique_typename ~mode:Mode.Builder
-      ~nodes_table node
+      ~context node
   in
   let header =
     match mode with
@@ -343,7 +341,7 @@ let generate_struct_node ~nodes_table ~scope ~nested_modules
  * Raises: Failure if the children of this node contain a cycle. *)
 let rec generate_node
     ~(suppress_module_wrapper : bool)
-    ~(nodes_table : (Uint64.t, PS.Node.t) Hashtbl.t)
+    ~(context : Context.codegen_context_t)
     ~(scope : Uint64.t list)
     ~(mode : Mode.t)
     ~(node_name : string)
@@ -352,13 +350,13 @@ let rec generate_node
   let open PS.Node in
   let node_id = id_get node in
   let generate_nested_modules () =
-    match Topsort.topological_sort nodes_table
-            (GenCommon.children_of nodes_table node) with
+    match Topsort.topological_sort context.Context.nodes
+            (GenCommon.children_of ~context node) with
     | Some child_nodes ->
         List.concat_map child_nodes ~f:(fun child ->
           let child_name = GenCommon.get_unqualified_name ~parent:node ~child in
           let child_node_id = id_get child in
-          generate_node ~suppress_module_wrapper:false ~nodes_table
+          generate_node ~suppress_module_wrapper:false ~context
             ~scope:(child_node_id :: scope) ~mode ~node_name:child_name child)
     | None ->
         let error_msg = sprintf
@@ -374,7 +372,7 @@ let rec generate_node
   | Struct struct_def ->
       let nested_modules = generate_nested_modules () in
       let body =
-        generate_struct_node ~nodes_table ~scope ~nested_modules ~mode 
+        generate_struct_node ~context ~scope ~nested_modules ~mode 
           ~node struct_def
       in
       if suppress_module_wrapper then
@@ -408,8 +406,8 @@ let rec generate_node
   | Const const_def -> [
       sprintf "val %s : %s"
         (GenCommon.underscore_name node_name)
-        (GenCommon.type_name ~mode:Mode.Reader ~scope_mode:mode
-           nodes_table scope (Const.type_get const_def));
+        (GenCommon.type_name ~context ~mode:Mode.Reader ~scope_mode:mode
+           scope (Const.type_get const_def));
     ]
   | Annotation annot_def ->
       generate_nested_modules ()
