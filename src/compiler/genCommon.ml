@@ -372,25 +372,48 @@ let make_disambiguated_type_name ~context ~(mode : Mode.t) ~(scope_mode : Mode.t
        another node with the same name.  Emit an unambiguous type. *)
     make_unique_typename ~context ~mode node
   else
-    let module_name = get_scope_relative_name ~context scope node in
-    let t_str =
-      match PS.Type.get tp with
-      | PS.Type.Enum _ ->
-          (* Enum types are identical across reader and builder, no need
-             to distinguish between them *)
-          ".t"
-      | _ ->
-          begin match (mode, scope_mode) with
-          | (Mode.Reader, Mode.Reader)
-          | (Mode.Builder, Mode.Builder) ->
-              ".t"
-          | (Mode.Reader, Mode.Builder) ->
-              ".reader_t"
-          | (Mode.Builder, Mode.Reader) ->
-              ".builder_t"
-          end
+    let rec loop_node_scope n =
+      let scope_id = PS.Node.scope_id_get n in
+      if scope_id = Uint64.zero then
+        None
+      else
+        match List.find_map context.Context.imports ~f:(fun import ->
+            if uint64_equal import.Context.id scope_id then
+              Some import.Context.schema_name
+            else
+              None) with
+        | Some import_name ->
+            Some import_name
+        | None ->
+            let parent = Hashtbl.find_exn context.Context.nodes scope_id in
+            loop_node_scope parent
     in
-    module_name ^ t_str
+    match loop_node_scope node with
+    | Some import_name ->
+        (* This type comes from an import.  Emit a unique typename qualified
+           with the proper import. *)
+        let uq_name = make_unique_typename ~context ~mode node in
+        import_name ^ "." ^ uq_name
+    | None ->
+        let module_name = get_scope_relative_name ~context scope node in
+        let t_str =
+          match PS.Type.get tp with
+          | PS.Type.Enum _ ->
+              (* Enum types are identical across reader and builder, no need
+                 to distinguish between them *)
+              ".t"
+          | _ ->
+              begin match (mode, scope_mode) with
+              | (Mode.Reader, Mode.Reader)
+              | (Mode.Builder, Mode.Builder) ->
+                  ".t"
+              | (Mode.Reader, Mode.Builder) ->
+                  ".reader_t"
+              | (Mode.Builder, Mode.Reader) ->
+                  ".builder_t"
+              end
+        in
+        module_name ^ t_str
 
 
 (* Construct an ocaml name for the given schema-defined type.
