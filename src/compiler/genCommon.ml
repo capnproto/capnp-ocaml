@@ -313,6 +313,27 @@ let is_node_naming_collision ~context ~scope node =
                 false))
 
 
+(* Find the import which provides the specified node, if any. *)
+let rec find_import_providing_node ~context node : Context.import_t option =
+  let rec loop_node_scope n =
+    let scope_id = PS.Node.scope_id_get n in
+    if scope_id = Uint64.zero then
+      None
+    else
+      match List.find_map context.Context.imports ~f:(fun import ->
+          if uint64_equal import.Context.id scope_id then
+            Some import
+          else
+            None) with
+      | Some import ->
+          Some import
+      | None ->
+          let parent = Hashtbl.find_exn context.Context.nodes scope_id in
+          loop_node_scope parent
+  in
+  loop_node_scope node
+
+
 (* When modules refer to types defined in other modules, readability dictates
  * that we use OtherModule.t/OtherModule.reader_t/OtherModule.builder_t as
  * the preferred type name.  However, consider the case of nested modules:
@@ -372,28 +393,12 @@ let make_disambiguated_type_name ~context ~(mode : Mode.t) ~(scope_mode : Mode.t
        another node with the same name.  Emit an unambiguous type. *)
     make_unique_typename ~context ~mode node
   else
-    let rec loop_node_scope n =
-      let scope_id = PS.Node.scope_id_get n in
-      if scope_id = Uint64.zero then
-        None
-      else
-        match List.find_map context.Context.imports ~f:(fun import ->
-            if uint64_equal import.Context.id scope_id then
-              Some import.Context.schema_name
-            else
-              None) with
-        | Some import_name ->
-            Some import_name
-        | None ->
-            let parent = Hashtbl.find_exn context.Context.nodes scope_id in
-            loop_node_scope parent
-    in
-    match loop_node_scope node with
-    | Some import_name ->
+    match find_import_providing_node ~context node with
+    | Some import ->
         (* This type comes from an import.  Emit a unique typename qualified
            with the proper import. *)
         let uq_name = make_unique_typename ~context ~mode node in
-        import_name ^ "." ^ uq_name
+        import.Context.schema_name ^ "." ^ uq_name
     | None ->
         let module_name = get_scope_relative_name ~context scope node in
         let t_str =
@@ -414,6 +419,49 @@ let make_disambiguated_type_name ~context ~(mode : Mode.t) ~(scope_mode : Mode.t
               end
         in
         module_name ^ t_str
+
+
+(* Determine whether the given type references an abstract type from
+   one of the imports.  (In that case GenModules will need to emit
+   Obj.magic to punch through the abstract type barrier.) *)
+let rec uses_imported_abstract_type ~context (tp : PS.Type.t) : bool =
+  let open PS.Type in
+  match get tp with
+  | Void       -> false
+  | Bool       -> false
+  | Int8       -> false
+  | Int16      -> false
+  | Int32      -> false
+  | Int64      -> false
+  | Uint8      -> false
+  | Uint16     -> false
+  | Uint32     -> false
+  | Uint64     -> false
+  | Float32    -> false
+  | Float64    -> false
+  | Text       -> false
+  | Data       -> false
+  | Enum _     -> false
+  | AnyPointer -> false
+  | List list_descr ->
+      let contained_type = List.element_type_get list_descr in
+      uses_imported_abstract_type ~context contained_type
+  | Struct struct_descr ->
+      let struct_id = Struct.type_id_get struct_descr in
+      let struct_node = Hashtbl.find_exn context.Context.nodes struct_id in
+      begin match find_import_providing_node ~context struct_node with
+      | Some _ -> true
+      | None -> false
+      end
+  | Interface iface_descr ->
+      let iface_id = Interface.type_id_get iface_descr in
+      let iface_node = Hashtbl.find_exn context.Context.nodes iface_id in
+      begin match find_import_providing_node ~context iface_node with
+      | Some _ -> true
+      | None -> false
+      end
+  | Undefined x ->
+      failwith (sprintf "Unknown Type union discriminant %d" x)
 
 
 (* Construct an ocaml name for the given schema-defined type.
