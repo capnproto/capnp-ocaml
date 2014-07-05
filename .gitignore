@@ -21,3 +21,7 @@ src/tests/run-tests.run
 src/tests/test.mli
 src/tests/test.ml
 src/tests/.capnp-repo
+src/tests/testLists.mli
+src/tests/testLists.ml
+src/tests/c2b2b.mli
+src/tests/c2b2b.ml

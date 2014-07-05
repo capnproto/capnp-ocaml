@@ -29,21 +29,24 @@
 
 (* Inspired by encoding-test.c++, as found in the capnproto source. *)
 
+open Core.Std
+
 module SM = Capnp.Message.Make(Capnp.StringStorage)
 module T  = Test.Make(SM)
+module TL = TestLists.Make(SM)
 
 open OUnit2
 
 
 let assert_float_equal f1 f2 eps =
-  let f1_abs = abs_float f1 in
-  let f2_abs = abs_float f2 in
+  let f1_abs = Float.abs f1 in
+  let f2_abs = Float.abs f2 in
   let largest = max f1_abs f2_abs in
-  let delta = abs_float (f1 -. f2) in
+  let delta = Float.abs (f1 -. f2) in
   assert_bool "floating point equality" (delta <= largest *. 3.0 *. eps)
 
 let assert_float32_equal f1 f2 = assert_float_equal f1 f2 1.192092896e-07
-let assert_float64_equal f1 f2 = assert_float_equal f1 f2 epsilon_float
+let assert_float64_equal f1 f2 = assert_float_equal f1 f2 Float.epsilon
 
 
 let init_test_message (s : T.Builder.TestAllTypes.t) : unit =
@@ -134,8 +137,8 @@ let init_test_message (s : T.Builder.TestAllTypes.t) : unit =
   let _ = u_int16_list_set_list s [ 33333; 44444 ] in
   let _ = u_int32_list_set_list s [ Uint32.of_int 3333333333 ] in
   let _ = u_int64_list_set_list s [ Uint64.of_string "11111111111111111111" ] in
-  let _ = float32_list_set_list s [ 5555.5; infinity; neg_infinity; nan ] in
-  let _ = float64_list_set_list s [ 7777.75; infinity; neg_infinity; nan ] in
+  let _ = float32_list_set_list s [ 5555.5; Float.infinity; Float.neg_infinity; Float.nan ] in
+  let _ = float64_list_set_list s [ 7777.75; Float.infinity; Float.neg_infinity; Float.nan ] in
   let _ = text_list_set_list s [ "plugh"; "xyzzy"; "thud" ] in
   let _ = data_list_set_list s [ "oops"; "exhausted"; "rfc3092" ] in
   let () =
@@ -354,17 +357,17 @@ module Check_test_message
       let list_reader = float32_list_get s in
       assert_equal 4 (Capnp.Array.length list_reader);
       assert_float32_equal 5555.5 (Capnp.Array.get list_reader 0);
-      assert_equal infinity (Capnp.Array.get list_reader 1);
-      assert_equal neg_infinity (Capnp.Array.get list_reader 2);
-      assert_equal (Pervasives.compare nan (Capnp.Array.get list_reader 3)) 0
+      assert_equal Float.infinity (Capnp.Array.get list_reader 1);
+      assert_equal Float.neg_infinity (Capnp.Array.get list_reader 2);
+      assert_equal (Pervasives.compare Float.nan (Capnp.Array.get list_reader 3)) 0
     in
     let () =
       let list_reader = float64_list_get s in
       assert_equal 4 (Capnp.Array.length list_reader);
       assert_float64_equal 7777.75 (Capnp.Array.get list_reader 0);
-      assert_equal infinity (Capnp.Array.get list_reader 1);
-      assert_equal neg_infinity (Capnp.Array.get list_reader 2);
-      assert_equal (Pervasives.compare nan (Capnp.Array.get list_reader 3)) 0
+      assert_equal Float.infinity (Capnp.Array.get list_reader 1);
+      assert_equal Float.neg_infinity (Capnp.Array.get list_reader 2);
+      assert_equal (Pervasives.compare Float.nan (Capnp.Array.get list_reader 3)) 0
     in
     assert_equal [ "plugh"; "xyzzy"; "thud" ] (text_list_get_list s);
     assert_equal [ "oops"; "exhausted"; "rfc3092" ] (data_list_get_list s);
@@ -1215,6 +1218,141 @@ let test_upgrade_struct_in_builder ctx =
   ()
 
 
+let check_upgraded_list message expected_data expected_pointers =
+  let () =
+    let tnvl = TL.Builder.TestNewVersionList.of_message message in
+    let builder_list = TL.Builder.TestNewVersionList.a_get tnvl in
+    assert_equal (Capnp.Array.length builder_list) (Array.length expected_data);
+    let module R = T.Reader.TestNewVersion in
+    let module B = T.Builder.TestNewVersion in
+    for i = 0 to Array.length expected_data - 1 do
+      let builder = Capnp.Array.get builder_list i in
+      assert_equal expected_data.(i) (B.old1_get builder);
+      assert_equal expected_pointers.(i) (B.old2_get builder);
+
+      (* Other fields shouldn't be set *)
+      let reader = B.to_reader builder in
+      assert_equal 0L (R.old1_get (R.old3_get reader));
+      assert_equal "" (R.old2_get (R.old3_get reader));
+      assert_equal 987L (R.new1_get reader);
+      assert_equal "baz" (R.new2_get reader);
+
+      (* Write some new data *)
+      B.old1_set_int_exn builder (i * 123);
+      B.old2_set builder (Printf.sprintf "qux%d" i);
+      B.new1_set_int_exn builder (i * 456);
+      B.new2_set builder (Printf.sprintf "corge%d" i);
+    done
+  in
+
+  (* Read the newly-written data back as TestOldVersion to ensure
+     it was updated. *)
+  let () =
+    let tovl = TL.Builder.TestOldVersionList.of_message message in
+    let builder_list = TL.Builder.TestOldVersionList.a_get tovl in
+    assert_equal (Capnp.Array.length builder_list) (Array.length expected_data);
+    let module R = T.Reader.TestOldVersion in
+    let module B = T.Builder.TestOldVersion in
+    for i = 0 to Array.length expected_data - 1 do
+      let builder = Capnp.Array.get builder_list i in
+      assert_equal (B.old1_get_int_exn builder) (i * 123);
+      assert_equal (B.old2_get builder) (Printf.sprintf "qux%d" i);
+    done
+  in
+
+  (* Also read back as TestNewVersion again. *)
+  let () =
+    let tnvl = TL.Builder.TestNewVersionList.of_message message in
+    let builder_list = TL.Builder.TestNewVersionList.a_get tnvl in
+    assert_equal (Capnp.Array.length builder_list) (Array.length expected_data);
+    let module R = T.Reader.TestNewVersion in
+    let module B = T.Builder.TestNewVersion in
+    for i = 0 to Array.length expected_data - 1 do
+      let builder = Capnp.Array.get builder_list i in
+      assert_equal (B.old1_get_int_exn builder) (i * 123);
+      assert_equal (B.old2_get builder) (Printf.sprintf "qux%d" i);
+      assert_equal (B.new1_get_int_exn builder) (i * 456);
+      assert_equal (B.new2_get builder) (Printf.sprintf "corge%d" i);
+    done
+  in
+  ()
+
+
+let test_upgrade_list_in_builder ctx =
+  let () =
+    let root = TL.Builder.VoidList.init_root () in
+    let (_ : (_, _, _) Capnp.Array.t) =
+        TL.Builder.VoidList.a_set_list root [ (); (); (); (); ] in
+    assert_equal (TL.Builder.VoidList.a_get_list root) [ (); (); (); (); ];
+    check_upgraded_list (TL.Builder.VoidList.to_message root)
+      [| 0L; 0L; 0L; 0L |] [| ""; ""; ""; "" |];
+  in
+
+  let () =
+    let root = TL.Builder.UInt8List.init_root () in
+    let a = TL.Builder.UInt8List.a_set_list root [ 0x12; 0x23; 0x33; 0x44 ] in
+    assert_equal (TL.Builder.UInt8List.a_get_list root) [ 0x12; 0x23; 0x33; 0x44 ];
+    check_upgraded_list (TL.Builder.UInt8List.to_message root)
+      [| 0x12L; 0x23L; 0x33L; 0x44L |] [| ""; ""; ""; "" |];
+    (* old location zero'd during upgrade *)
+    assert_equal (Capnp.Array.to_list a) [ 0; 0; 0; 0 ];
+  in
+
+  let () =
+    let root = TL.Builder.UInt16List.init_root () in
+    let a = TL.Builder.UInt16List.a_set_list root
+        [ 0x5612; 0x7823; 0xab33; 0xcd44 ]
+    in
+    assert_equal (TL.Builder.UInt16List.a_get_list root)
+      [ 0x5612; 0x7823; 0xab33; 0xcd44 ];
+    check_upgraded_list (TL.Builder.UInt16List.to_message root)
+      [| 0x5612L; 0x7823L; 0xab33L; 0xcd44L |] [| ""; ""; ""; "" |];
+    (* old location zero'd during upgrade *)
+    assert_equal (Capnp.Array.to_list a) [ 0; 0; 0; 0 ];
+  in
+
+  let () =
+    let u32_list = (List.map ~f:Uint32.of_int
+        [ 0x17595612; 0x29347823; 0x5923ab32; 0x1a39cd45 ])
+    in
+    let root = TL.Builder.UInt32List.init_root () in
+    let a = TL.Builder.UInt32List.a_set_list root u32_list in
+    assert_equal (TL.Builder.UInt32List.a_get_list root) u32_list;
+    check_upgraded_list (TL.Builder.UInt32List.to_message root)
+      (Array.of_list
+         (List.map ~f:(fun x -> x |> Uint32.to_int32 |> Int64.of_int32) u32_list))
+      [| ""; ""; ""; "" |];
+    (* old location zero'd during upgrade *)
+    assert_equal (Capnp.Array.to_list a)
+      [ Uint32.zero; Uint32.zero; Uint32.zero; Uint32.zero ]
+  in
+
+  let () =
+    let u64_list = (List.map ~f:Uint64.of_int
+        [0x1234abcd8735fe21; 0x7173bc0e1923af36])
+    in
+    let root = TL.Builder.UInt64List.init_root () in
+    let a = TL.Builder.UInt64List.a_set_list root u64_list in
+    assert_equal (TL.Builder.UInt64List.a_get_list root) u64_list;
+    check_upgraded_list (TL.Builder.UInt64List.to_message root)
+      (Array.of_list (List.map ~f:Uint64.to_int64 u64_list))
+      [| ""; "" |];
+    (* old location zero'd during upgrade *)
+    assert_equal (Capnp.Array.to_list a) [ Uint64.zero; Uint64.zero; ]
+  in
+
+  let () =
+    let root = TL.Builder.TextList.init_root () in
+    let a = TL.Builder.TextList.a_set_list root [ "foo"; "bar"; "baz" ] in
+    assert_equal (TL.Builder.TextList.a_get_list root) [ "foo"; "bar"; "baz" ];
+    check_upgraded_list (TL.Builder.TextList.to_message root)
+      [| 0L; 0L; 0L |] [| "foo"; "bar"; "baz" |];
+    (* old location zero'd during upgrade *)
+    assert_equal (Capnp.Array.to_list a) [ ""; ""; "" ]
+  in
+  ()
+
+
 
 let encoding_suite =
   "all_types" >::: [
@@ -1230,6 +1368,7 @@ let encoding_suite =
     "list defaults" >:: test_list_defaults;
     "build list defaults" >:: test_build_list_defaults;
     "upgrade struct in builder" >:: test_upgrade_struct_in_builder;
+    "upgrade list in builder" >:: test_upgrade_list_in_builder;
   ]
 
 let () = run_test_tt_main encoding_suite

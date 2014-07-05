@@ -6,9 +6,11 @@ OCAML_LIBS += ../runtime/libcapnp
 NATIVE_ENABLED = false
 
 TEST_MODULES = \
+  c2b2b \
   test \
+  testLists \
   testStringStorage \
-	testMisc \
+  testMisc \
   testEncoding
 
 PROGRAM = run-tests
@@ -16,7 +18,7 @@ PROGRAM = run-tests
 # We will check out a local copy of the capnproto repo in order to generate
 # code based on the "test.capnp" schema.
 COMPILER = ../compiler/capnpc-ocaml
-CAPNPROTO_REPO = https://github.com/kentonv/capnproto.git 
+CAPNPROTO_REPO = https://github.com/kentonv/capnproto.git
 CAPNPROTO_REVISION = 25509cf4f1fe6b3f5a6faa2f42b865f7571db8c4
 
 .capnp-repo:
@@ -24,17 +26,26 @@ CAPNPROTO_REVISION = 25509cf4f1fe6b3f5a6faa2f42b865f7571db8c4
 	pushd $$REPO_DIR && git checkout $(CAPNPROTO_REVISION) && popd && \
 	echo "$$REPO_DIR" > .capnp-repo'
 
+c2b2b.mli c2b2b.ml: $(COMPILER) .capnp-repo
+	bash -c 'REPO_DIR=`cat .capnp-repo` && \
+	capnp compile -o $(COMPILER) -I $$REPO_DIR/c++/src \
+		$$REPO_DIR/c++/src/capnp/c++.capnp'
+
 test.mli test.ml: $(COMPILER) .capnp-repo
 	bash -c 'REPO_DIR=`cat .capnp-repo` && \
 	capnp compile -o $(COMPILER) -I $$REPO_DIR/c++/src \
 		$$REPO_DIR/c++/src/capnp/test.capnp'
+
+testLists.mli testLists.ml: $(COMPILER) .capnp-repo testLists.capnp
+	bash -c 'REPO_DIR=`cat .capnp-repo` && \
+	capnp compile -o $(COMPILER) -I $$REPO_DIR/c++/src testLists.capnp'
 
 OCamlProgram($(PROGRAM), $(TEST_MODULES))
 
 .PHONY: test-clean test-distclean
 
 test-clean:
-	rm -f $(PROGRAM)$(EXE) $(PROGRAM).opt $(PROGRAM).byte \
+	rm -f $(PROGRAM)$(EXE) $(PROGRAM).opt $(PROGRAM).run \
 		*.cmi *.cmo *.cmx *.cma *.cmxa *.cmxs *.a *.o \
 		test.mli test.ml
 	bash -c 'if [ -f .capnp-repo ]; then \
