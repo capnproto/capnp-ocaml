@@ -8,8 +8,9 @@ RUNTIME_MODULES =   \
   farPointer        \
   innerArray        \
   listPointer       \
-	listStorageType   \
+  listStorageType   \
   message           \
+  messageSig        \
   messageStorage    \
   otherPointer      \
   pointer           \

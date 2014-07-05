@@ -47,7 +47,7 @@ module DefaultsMessage = Message.Make(StringStorage)
 module DC = Common.Make(DefaultsMessage)
 
 (* NM == "native message" *)
-module Make (NM : Message.S) = struct
+module Make (NM : MessageSig.S) = struct
   module RReader = Reader.Make(NM)
   module NC = Common.Make(NM)
 

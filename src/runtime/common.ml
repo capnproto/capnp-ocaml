@@ -35,7 +35,7 @@ open Core.Std
 let sizeof_uint32 = 4
 let sizeof_uint64 = 8
 
-module Make (MessageWrapper : Message.S) = struct
+module Make (MessageWrapper : MessageSig.S) = struct
   let invalid_msg = Message.invalid_msg
   type ro = Message.ro
   type rw = Message.rw

@@ -49,7 +49,7 @@ end
 
    Most of the builder operations are tied to the RWM types.  The exceptional
    cases are functions that make a copy from a source to a destination. *)
-module Make (ROM : Message.S) (RWM : Message.S) = struct
+module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
   module ROC = Common.Make(ROM)
   module RWC = Common.Make(RWM)
   module RReader = Reader.Make(RWM)

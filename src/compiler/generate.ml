@@ -76,12 +76,12 @@ let sig_s_footer = [
 
 
 let functor_sig unique_type_sharing_constraints = [
-  "module Make (MessageWrapper : Capnp.Message.S) :";
+  "module Make (MessageWrapper : Capnp.MessageSig.S) :";
   "  (S with type 'cap message_t = 'cap MessageWrapper.Message.t";
   "    and type Reader.pointer_t = ro MessageWrapper.Slice.t option";
   "    and type Builder.pointer_t = rw MessageWrapper.Slice.t)";
   "";
-  "module MakeUnsafe (MessageWrapper : Capnp.Message.S) :";
+  "module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) :";
   "  (S with type 'cap message_t = 'cap MessageWrapper.Message.t";
   "    and type Reader.pointer_t = ro MessageWrapper.Slice.t option";
   "    and type Builder.pointer_t = rw MessageWrapper.Slice.t"; ] @
@@ -91,7 +91,7 @@ let functor_sig unique_type_sharing_constraints = [
 ]
 
 let mod_header ~context = [
-  "module MakeUnsafe (MessageWrapper : Capnp.Message.S) = struct";
+  "module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct";
   "  let invalid_msg = Capnp.Message.invalid_msg";
   "";
   "  module RA_ = Capnp.Runtime.Reader.Make(MessageWrapper)";
@@ -127,7 +127,7 @@ let mod_footer = [
   "  end";
   "end";
   "";
-  "module Make (MessageWrapper : Capnp.Message.S) = MakeUnsafe(MessageWrapper)";
+  "module Make (MessageWrapper : Capnp.MessageSig.S) = MakeUnsafe(MessageWrapper)";
   "";
 ]
 
