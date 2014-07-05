@@ -403,29 +403,63 @@ module Make (MessageWrapper : MessageSig.S) = struct
                 "decoded List<pointer> a different list type was expected"
           end
       | ListStorageType.Composite (data_words, pointer_words) ->
+          let data_size     = data_words * sizeof_uint64 in
+          let pointers_size = pointer_words * sizeof_uint64 in
+          let total_size    = data_size + pointers_size in
+          let make_storage ls i =
+            (* Skip over the composite tag word *)
+            let content_offset =
+              ls.ListStorage.storage.Slice.start + sizeof_uint64
+            in
+            let data = {
+              ls.ListStorage.storage with
+              Slice.start = content_offset + (i * total_size);
+              Slice.len = data_size;
+            } in
+            let pointers = {
+              data with
+              Slice.start = Slice.get_end data;
+              Slice.len   = pointers_size;
+            } in
+            { StructStorage.data; StructStorage.pointers; }
+          in
+          let make_bytes_handler ~size ~decode =
+            if data_words = 0 then
+              invalid_msg
+                "decoded List<composite> with empty data region where data was expected"
+            else
+              (fun ls i ->
+                let struct_storage = make_storage ls i in
+                let slice = {
+                  struct_storage.StructStorage.data with
+                  Slice.len = size
+                } in
+                decode slice)
+          in
           begin match decoders with
+          | ListDecoders.Empty decode ->
+              fun ls i -> decode ()
+          | ListDecoders.Bit decode ->
+              if data_words = 0 then
+                invalid_msg
+                  "decoded List<composite> with empty data region where data was expected"
+              else
+                fun ls i ->
+                  let struct_storage = make_storage ls i in
+                  let first_byte = Slice.get_uint8 struct_storage.StructStorage.data 0 in
+                  let is_set = (first_byte land 0x1) <> 0 in
+                  decode is_set
+          | ListDecoders.Bytes1 decode ->
+              make_bytes_handler ~size:1 ~decode
+          | ListDecoders.Bytes2 decode ->
+              make_bytes_handler ~size:2 ~decode
+          | ListDecoders.Bytes4 decode ->
+              make_bytes_handler ~size:4 ~decode
+          | ListDecoders.Bytes8 decode ->
+              make_bytes_handler ~size:8 ~decode
           | ListDecoders.Struct struct_decoders ->
-              let element_data_size     = data_words * sizeof_uint64 in
-              let element_pointers_size = pointer_words * sizeof_uint64 in
-              let element_size          = element_data_size + element_pointers_size in
               fun ls i ->
-                (* Skip over the composite tag word *)
-                let content_offset =
-                  ls.ListStorage.storage.Slice.start + sizeof_uint64
-                in
-                let struct_storage =
-                  let data = {
-                    ls.ListStorage.storage with
-                    Slice.start = content_offset + (i * element_size);
-                    Slice.len = element_data_size;
-                  } in
-                  let pointers = {
-                    data with
-                    Slice.start = Slice.get_end data;
-                    Slice.len   = element_pointers_size;
-                  } in
-                  { StructStorage.data; StructStorage.pointers; }
-                in
+                let struct_storage = make_storage ls i in
                 struct_decoders.ListDecoders.composite struct_storage
           | _ ->
               invalid_msg
@@ -570,14 +604,71 @@ module Make (MessageWrapper : MessageSig.S) = struct
             } in
             { StructStorage.data; StructStorage.pointers; }
           in
+          let make_bytes_handlers ~size ~decode ~encode =
+            if data_words = 0 then
+              invalid_msg
+                "decoded List<composite> with empty data region where data was expected"
+            else
+              let get ls i =
+                let struct_storage = make_storage ls i in
+                let slice = {
+                  struct_storage.StructStorage.data with
+                  Slice.len = size
+                } in
+                decode slice
+              in
+              let set ls i v =
+                let struct_storage = make_storage ls i in
+                let slice = {
+                  struct_storage.StructStorage.data with
+                  Slice.len = size
+                } in
+                encode v slice
+              in
+              (get, set)
+          in
           begin match codecs with
+          | ListCodecs.Empty (decode, encode) ->
+              let get ls i   = decode () in
+              let set ls i v = encode v in
+              (get, set)
+          | ListCodecs.Bit (decode, encode) ->
+              if data_words = 0 then
+                invalid_msg
+                  "decoded List<composite> with empty data region where data was expected"
+              else
+                let get ls i =
+                  let struct_storage = make_storage ls i in
+                  let first_byte = Slice.get_uint8 struct_storage.StructStorage.data 0 in
+                  let is_set = (first_byte land 0x1) <> 0 in
+                  decode is_set
+                in
+                let set ls i v =
+                  let struct_storage = make_storage ls i in
+                  let first_byte =
+                    Slice.get_uint8 struct_storage.StructStorage.data 0
+                  in
+                  let first_byte =
+                    if encode v then first_byte lor 0x1 else first_byte land 0xfe
+                  in
+                  Slice.set_uint8 struct_storage.StructStorage.data 0 first_byte
+                in
+                (get, set)
+          | ListCodecs.Bytes1 (decode, encode) ->
+              make_bytes_handlers ~size:1 ~decode ~encode
+          | ListCodecs.Bytes2 (decode, encode) ->
+              make_bytes_handlers ~size:2 ~decode ~encode
+          | ListCodecs.Bytes4 (decode, encode) ->
+              make_bytes_handlers ~size:4 ~decode ~encode
+          | ListCodecs.Bytes8 (decode, encode) ->
+              make_bytes_handlers ~size:8 ~decode ~encode
           | ListCodecs.Struct { ListCodecs.composite = (decode, encode); _ } ->
               let get ls i = decode (make_storage ls i) in
               let set ls i v = encode v (make_storage ls i) in
               (get, set)
           | _ ->
               invalid_msg
-                "decoded List<composite> a different list type was expected"
+                "decoded List<composite> where a different list type was expected"
           end
     in {
       InnerArray.length;
@@ -653,6 +744,14 @@ module Make (MessageWrapper : MessageSig.S) = struct
     let storage      = list_storage.ListStorage.storage in
     let storage_type = list_storage.ListStorage.storage_type in
     match list_storage.ListStorage.storage_type with
+    | ListStorageType.Empty ->
+        fun i ->
+          let slice = {
+            storage with
+            Slice.start = storage.Slice.start;
+            Slice.len   = 0;
+          } in
+          struct_of_bytes_slice slice
     | ListStorageType.Bytes1
     | ListStorageType.Bytes2
     | ListStorageType.Bytes4
@@ -693,9 +792,9 @@ module Make (MessageWrapper : MessageSig.S) = struct
             Slice.len   = pointers_size;
           } in
           { StructStorage.data; StructStorage.pointers }
-    | _ ->
+    | ListStorageType.Bit ->
         invalid_msg
-          "decoded unexpected list type where List<struct> was expected"
+          "decoded List<Bool> where List<struct> was expected"
 
 end
 

@@ -391,6 +391,8 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
     let needs_upgrade =
       let open Common in
       match list_storage.RWC.ListStorage.storage_type with
+      | ListStorageType.Empty ->
+          data_words * sizeof_uint64 > 0 || pointer_words > 0
       | ListStorageType.Bytes1
       | ListStorageType.Bytes2
       | ListStorageType.Bytes4
@@ -403,9 +405,8 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
           data_words > 0 || pointer_words > 1
       | ListStorageType.Composite (orig_data_words, orig_pointer_words) ->
           data_words > orig_data_words || pointer_words > orig_pointer_words
-      | ListStorageType.Empty
       | ListStorageType.Bit ->
-          invalid_msg "decoded non-struct list where struct list was expected"
+          invalid_msg "decoded List<Bool> where struct list was expected"
     in
     if needs_upgrade then
       let message = pointer_bytes.RWM.Slice.msg in
@@ -419,20 +420,8 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
         shallow_copy_struct ~src:(src_struct_of_index i)
           ~dest:(dest_struct_of_index i)
       done;
-      let content_slice =
-        match list_storage.RWC.ListStorage.storage_type with
-        | ListStorageType.Composite _ ->
-            (* Composite lists prefix the storage region with a tag word,
-               which we can zero out as well. *)
-            { list_storage.RWC.ListStorage.storage with
-              RWM.Slice.start =
-                list_storage.RWC.ListStorage.storage.RWM.Slice.start - sizeof_uint64;
-              RWM.Slice.len =
-                list_storage.RWC.ListStorage.storage.RWM.Slice.len + sizeof_uint64; }
-        | _ ->
-            list_storage.RWC.ListStorage.storage
-      in
       let () = init_list_pointer pointer_bytes new_storage in
+      let content_slice = list_storage.RWC.ListStorage.storage in
       let () = RWM.Slice.zero_out content_slice
           ~ofs:0 ~len:content_slice.RWM.Slice.len
       in
@@ -742,8 +731,8 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
     : rw RWC.ListStorage.t =
     let dest_storage =
       let (dest_data_words, dest_pointer_words) =
-        let open Common in
         match src.ROC.ListStorage.storage_type with
+        | ListStorageType.Empty
         | ListStorageType.Bytes1
         | ListStorageType.Bytes2
         | ListStorageType.Bytes4
@@ -752,7 +741,6 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
             (data_words, pointer_words)
         | ListStorageType.Composite (src_data_words, src_pointer_words) ->
             (max data_words src_data_words, max pointer_words src_pointer_words)
-        | ListStorageType.Empty
         | ListStorageType.Bit ->
             invalid_msg
               "decoded unexpected list type where List<struct> was expected"
