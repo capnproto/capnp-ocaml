@@ -611,11 +611,11 @@ let rec collect_unique_types ?acc ~context node =
       let reader_name = make_unique_typename ~context
           ~mode:Mode.Reader node
       in
-      let reader_type = "ro RA_.StructStorage.t option" in
+      let reader_type = "ro MessageWrapper.StructStorage.t option" in
       let builder_name = make_unique_typename ~context
           ~mode:Mode.Builder node
       in
-      let builder_type = "rw BA_.NC.StructStorage.t" in
+      let builder_type = "rw MessageWrapper.StructStorage.t" in
       (builder_name, builder_type) :: (reader_name, reader_type) :: names
   | PS.Node.Undefined x ->
       failwith (sprintf "Unknown Node union discriminant %u" x)

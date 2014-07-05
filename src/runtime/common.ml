@@ -35,59 +35,11 @@ open Core.Std
 let sizeof_uint32 = 4
 let sizeof_uint64 = 8
 
-
-module ListStorageType = struct
-  type t =
-    (** list(void), no storage required *)
-    | Empty
-
-    (** list(bool), tightly packed bits *)
-    | Bit
-
-    (** either primitive values or a data-only struct *)
-    | Bytes1
-    | Bytes2
-    | Bytes4
-    | Bytes8
-
-    (** either a pointer to an external object, or a pointer-only struct *)
-    | Pointer
-
-    (** typical struct; parameters are per-element word size for data section
-        and pointers section, respectively *)
-    | Composite of int * int
-
-  let get_byte_count storage_type =
-    match storage_type with
-    | Empty   -> 0
-    | Bit     -> assert false
-    | Bytes1  -> 1
-    | Bytes2  -> 2
-    | Bytes4  -> 4
-    | Bytes8  -> 8
-    | Pointer -> 8
-    | Composite (data_words, pointer_words) ->
-        (data_words + pointer_words) * sizeof_uint64
-
-  let to_string storage_type =
-    match storage_type with
-    | Empty   -> "ListStorageType.Empty"
-    | Bit     -> "ListStorageType.Bit"
-    | Bytes1  -> "ListStorageType.Bytes1"
-    | Bytes2  -> "ListStorageType.Bytes2"
-    | Bytes4  -> "ListStorageType.Bytes4"
-    | Bytes8  -> "ListStorageType.Bytes8"
-    | Pointer -> "ListStorageType.Pointer"
-    | Composite (dw, pw) ->
-        Printf.sprintf "(ListStorageType.Composite (%u, %u))" dw pw
-end
-
-
-
 module Make (MessageWrapper : Message.S) = struct
   let invalid_msg = Message.invalid_msg
   type ro = Message.ro
   type rw = Message.rw
+
   include MessageWrapper
 
   let bounds_check_slice_exn ?err (slice : 'cap Slice.t) : unit =
@@ -107,62 +59,22 @@ module Make (MessageWrapper : Message.S) = struct
       ()
 
 
-  module StructStorage = struct
-    (** Storage associated with a cap'n proto struct. *)
-    type 'cap t = {
-      data     : 'cap Slice.t;  (** Storage for struct fields stored by value *)
-      pointers : 'cap Slice.t;  (** Storage for struct fields stored by reference *)
-    }
-
-    (** Get the range of bytes associated with a pointer stored in a struct. *)
-    let get_pointer
-        (struct_storage : 'cap t)
-        (word : int)           (* Struct-relative pointer index *)
-      : 'cap Slice.t option =  (* Returns None if storage is too small for this word *)
-      let pointers = struct_storage.pointers in
-      let start = word * sizeof_uint64 in
-      let len   = sizeof_uint64 in
-      if start + len <= pointers.Slice.len then
-        Some {
-          pointers with
-          Slice.start = pointers.Slice.start + start;
-          Slice.len   = len
-        }
-      else
-        None
-
-    let readonly (struct_storage : 'cap t) : ro t = {
-      data     = Slice.readonly struct_storage.data;
-      pointers = Slice.readonly struct_storage.pointers;
-    }
-
-  end
-
-
-  module ListStorage = struct
-    (** Storage associated with a cap'n proto list. *)
-    type 'cap t = {
-      storage      : 'cap Slice.t;      (** Range of bytes used to hold list elements *)
-      storage_type : ListStorageType.t; (** Describes the list packing format *)
-      num_elements : int;               (** Number of list elements *)
-    }
-
-    let readonly (list_storage : 'cap t) : ro t = {
-      storage      = Slice.readonly list_storage.storage;
-      storage_type = list_storage.storage_type;
-      num_elements = list_storage.num_elements;
-    }
-  end
-
-
-  module Object = struct
-    type 'cap t =
-      | None
-      | List of 'cap ListStorage.t
-      | Struct of 'cap StructStorage.t
-      | Capability of Uint32.t
-  end
-
+  (** Get the range of bytes associated with a pointer stored in a struct. *)
+  let ss_get_pointer
+      (struct_storage : 'cap StructStorage.t)
+      (word : int)           (* Struct-relative pointer index *)
+    : 'cap Slice.t option =  (* Returns None if storage is too small for this word *)
+    let pointers = struct_storage.StructStorage.pointers in
+    let start = word * sizeof_uint64 in
+    let len   = sizeof_uint64 in
+    if start + len <= pointers.Slice.len then
+      Some {
+        pointers with
+        Slice.start = pointers.Slice.start + start;
+        Slice.len   = len
+      }
+    else
+      None
 
   (* Given a range of eight bytes corresponding to a cap'n proto pointer,
      decode the information stored in the pointer. *)

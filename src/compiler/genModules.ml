@@ -387,7 +387,7 @@ let generate_list_getters ~context ~scope ~list_type ~mode
               sprintf "  BA_.get_pointer_field x %u ~f:(BA_.get_list%s"
                 field_ofs
                 default_str;
-              "    ~storage_type:Capnp.Runtime.Common.ListStorageType.Pointer ~codecs)";
+              "    ~storage_type:Capnp.Runtime.ListStorageType.Pointer ~codecs)";
             ]
         end
     | Enum enum_def ->
@@ -419,7 +419,7 @@ let generate_list_getters ~context ~scope ~list_type ~mode
             "  in";
             sprintf "  BA_.get_pointer_field x %u ~f:(BA_.get_list%s"
               field_ofs default_str;
-            "    ~storage_type:Capnp.Runtime.Common.ListStorageType.Bytes2";
+            "    ~storage_type:Capnp.Runtime.ListStorageType.Bytes2";
             "    ~codecs:(BA_.NC.ListCodecs.Bytes2 (slice_decoder, slice_encoder)))";
             ]
         end
@@ -508,12 +508,12 @@ let generate_list_setters ~context ~scope ~list_type
         ] @ codecs_declaration @ [
           sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.set_list v"
             discr_str field_ofs;
-          "    ~storage_type:Capnp.Runtime.Common.ListStorageType.Pointer ~codecs)";
+          "    ~storage_type:Capnp.Runtime.ListStorageType.Pointer ~codecs)";
           "let " ^ field_name ^ "_init x n =";
         ] @ codecs_declaration @ [
           sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.init_list n"
             discr_str field_ofs;
-          "    ~storage_type:Capnp.Runtime.Common.ListStorageType.Pointer ~codecs)";
+          "    ~storage_type:Capnp.Runtime.ListStorageType.Pointer ~codecs)";
         ]
     | Enum enum_def ->
         let enum_id = Enum.type_id_get enum_def in
@@ -535,13 +535,13 @@ let generate_list_setters ~context ~scope ~list_type
         ] @ codecs @ [
           sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.set_list v"
             discr_str field_ofs;
-          "    ~storage_type:Capnp.Runtime.Common.ListStorageType.Bytes2";
+          "    ~storage_type:Capnp.Runtime.ListStorageType.Bytes2";
           "    ~codecs:(BA_.NC.ListCodecs.Bytes2 (slice_decoder, slice_encoder)))";
           "let " ^ field_name ^ "_init x n =";
         ] @ codecs @ [
           sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.init_list n"
             discr_str field_ofs;
-          "    ~storage_type:Capnp.Runtime.Common.ListStorageType.Bytes2";
+          "    ~storage_type:Capnp.Runtime.ListStorageType.Bytes2";
           "    ~codecs:(BA_.NC.ListCodecs.Bytes2 (slice_decoder, slice_encoder)))";
         ]
     | Interface _ -> [

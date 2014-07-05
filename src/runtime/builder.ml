@@ -67,7 +67,7 @@ module Make (NM : Message.S) = struct
       (src : string)
     : rw NC.ListStorage.t =
     let list_storage = BOps.alloc_list_storage dest_message
-        Common.ListStorageType.Bytes1
+        ListStorageType.Bytes1
         (String.length src + (if null_terminated then 1 else 0))
     in
     let (_ : int) = String.fold src ~init:0 ~f:(fun ofs c ->
@@ -500,7 +500,7 @@ module Make (NM : Message.S) = struct
   (* Zero-initialize list storage of the given length and storage type, 
      associating it with the specified list pointer. *)
   let init_list_storage
-      ~(storage_type : Common.ListStorageType.t)
+      ~(storage_type : ListStorageType.t)
       ~(num_elements : int)
       (pointer_bytes : rw NM.Slice.t)
     : rw NC.ListStorage.t =
@@ -514,7 +514,7 @@ module Make (NM : Message.S) = struct
   let get_list
       ?(struct_sizes : BuilderOps.StructSizes.t option)
       ?(default : ro DC.ListStorage.t option)
-      ~(storage_type : Common.ListStorageType.t)
+      ~(storage_type : ListStorageType.t)
       ~(codecs : 'a NC.ListCodecs.t)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, 'a, rw NC.ListStorage.t) InnerArray.t =
@@ -536,98 +536,98 @@ module Make (NM : Message.S) = struct
       ?(default : ro DC.ListStorage.t option)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, unit, rw NC.ListStorage.t) InnerArray.t =
-    get_list ?default ~storage_type:Common.ListStorageType.Empty
+    get_list ?default ~storage_type:ListStorageType.Empty
       ~codecs:void_list_codecs pointer_bytes
 
   let get_bit_list
       ?(default : ro DC.ListStorage.t option)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, bool, rw NC.ListStorage.t) InnerArray.t =
-    get_list ?default ~storage_type:Common.ListStorageType.Bit
+    get_list ?default ~storage_type:ListStorageType.Bit
       ~codecs:bit_list_codecs pointer_bytes
 
   let get_int8_list
       ?(default : ro DC.ListStorage.t option)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, int, rw NC.ListStorage.t) InnerArray.t =
-    get_list ?default ~storage_type:Common.ListStorageType.Bytes1
+    get_list ?default ~storage_type:ListStorageType.Bytes1
       ~codecs:int8_list_codecs pointer_bytes
 
   let get_int16_list
       ?(default : ro DC.ListStorage.t option)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, int, rw NC.ListStorage.t) InnerArray.t =
-    get_list ?default ~storage_type:Common.ListStorageType.Bytes2
+    get_list ?default ~storage_type:ListStorageType.Bytes2
       ~codecs:int16_list_codecs pointer_bytes
 
   let get_int32_list
       ?(default : ro DC.ListStorage.t option)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, int32, rw NC.ListStorage.t) InnerArray.t =
-    get_list ?default ~storage_type:Common.ListStorageType.Bytes4
+    get_list ?default ~storage_type:ListStorageType.Bytes4
       ~codecs:int32_list_codecs pointer_bytes
 
   let get_int64_list
       ?(default : ro DC.ListStorage.t option)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, int64, rw NC.ListStorage.t) InnerArray.t =
-    get_list ?default ~storage_type:Common.ListStorageType.Bytes8
+    get_list ?default ~storage_type:ListStorageType.Bytes8
       ~codecs:int64_list_codecs pointer_bytes
 
   let get_uint8_list
       ?(default : ro DC.ListStorage.t option)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, int, rw NC.ListStorage.t) InnerArray.t =
-    get_list ?default ~storage_type:Common.ListStorageType.Bytes1
+    get_list ?default ~storage_type:ListStorageType.Bytes1
       ~codecs:uint8_list_codecs pointer_bytes
 
   let get_uint16_list
       ?(default : ro DC.ListStorage.t option)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, int, rw NC.ListStorage.t) InnerArray.t =
-    get_list ?default ~storage_type:Common.ListStorageType.Bytes2
+    get_list ?default ~storage_type:ListStorageType.Bytes2
       ~codecs:uint16_list_codecs pointer_bytes
 
   let get_uint32_list
       ?(default : ro DC.ListStorage.t option)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, Uint32.t, rw NC.ListStorage.t) InnerArray.t =
-    get_list ?default ~storage_type:Common.ListStorageType.Bytes4
+    get_list ?default ~storage_type:ListStorageType.Bytes4
       ~codecs:uint32_list_codecs pointer_bytes
 
   let get_uint64_list
       ?(default : ro DC.ListStorage.t option)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, Uint64.t, rw NC.ListStorage.t) InnerArray.t =
-    get_list ?default ~storage_type:Common.ListStorageType.Bytes8
+    get_list ?default ~storage_type:ListStorageType.Bytes8
       ~codecs:uint64_list_codecs pointer_bytes
 
   let get_float32_list
       ?(default : ro DC.ListStorage.t option)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, float, rw NC.ListStorage.t) InnerArray.t =
-    get_list ?default ~storage_type:Common.ListStorageType.Bytes4
+    get_list ?default ~storage_type:ListStorageType.Bytes4
       ~codecs:float32_list_codecs pointer_bytes
 
   let get_float64_list
       ?(default : ro DC.ListStorage.t option)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, float, rw NC.ListStorage.t) InnerArray.t =
-    get_list ?default ~storage_type:Common.ListStorageType.Bytes8
+    get_list ?default ~storage_type:ListStorageType.Bytes8
       ~codecs:float64_list_codecs pointer_bytes
 
   let get_text_list
       ?(default : ro DC.ListStorage.t option)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, string, rw NC.ListStorage.t) InnerArray.t =
-    get_list ?default ~storage_type:Common.ListStorageType.Pointer
+    get_list ?default ~storage_type:ListStorageType.Pointer
       ~codecs:text_list_codecs pointer_bytes
 
   let get_blob_list
       ?(default : ro DC.ListStorage.t option)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, string, rw NC.ListStorage.t) InnerArray.t =
-    get_list ?default ~storage_type:Common.ListStorageType.Pointer
+    get_list ?default ~storage_type:ListStorageType.Pointer
       ~codecs:blob_list_codecs pointer_bytes
 
   let get_struct_list
@@ -640,7 +640,7 @@ module Make (NM : Message.S) = struct
       BuilderOps.StructSizes.data_words;
       BuilderOps.StructSizes.pointer_words }
       ?default ~storage_type:(
-        Common.ListStorageType.Composite (data_words, pointer_words))
+        ListStorageType.Composite (data_words, pointer_words))
       ~codecs:struct_list_codecs pointer_bytes
 
   let get_struct
@@ -717,7 +717,7 @@ module Make (NM : Message.S) = struct
 
   let set_list_from_storage
       ?(struct_sizes : BuilderOps.StructSizes.t option)
-      ~(storage_type : Common.ListStorageType.t)
+      ~(storage_type : ListStorageType.t)
       ~(codecs : 'a NC.ListCodecs.t)
       (value : 'cap NC.ListStorage.t option)
       (pointer_bytes : rw NM.Slice.t)
@@ -737,7 +737,7 @@ module Make (NM : Message.S) = struct
 
   let set_list
       ?(struct_sizes : BuilderOps.StructSizes.t option)
-      ~(storage_type : Common.ListStorageType.t)
+      ~(storage_type : ListStorageType.t)
       ~(codecs : 'a NC.ListCodecs.t)
       (value : ('cap1, 'a, 'cap2 NC.ListStorage.t) InnerArray.t)
       (pointer_bytes : rw NM.Slice.t)
@@ -750,98 +750,98 @@ module Make (NM : Message.S) = struct
       (value : ('cap1, unit, 'cap2 NC.ListStorage.t) InnerArray.t)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, unit, rw NC.ListStorage.t) InnerArray.t =
-    set_list ~storage_type:Common.ListStorageType.Empty ~codecs:void_list_codecs
+    set_list ~storage_type:ListStorageType.Empty ~codecs:void_list_codecs
       value pointer_bytes
 
   let set_bit_list
       (value : ('cap1, bool, 'cap2 NC.ListStorage.t) InnerArray.t)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, bool, rw NC.ListStorage.t) InnerArray.t =
-    set_list ~storage_type:Common.ListStorageType.Bit ~codecs:bit_list_codecs
+    set_list ~storage_type:ListStorageType.Bit ~codecs:bit_list_codecs
       value pointer_bytes
 
   let set_int8_list
       (value : ('cap1, int, 'cap2 NC.ListStorage.t) InnerArray.t)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, int, 'cap NC.ListStorage.t) InnerArray.t =
-    set_list ~storage_type:Common.ListStorageType.Bytes1 ~codecs:int8_list_codecs
+    set_list ~storage_type:ListStorageType.Bytes1 ~codecs:int8_list_codecs
       value pointer_bytes
 
   let set_int16_list
       (value : ('cap1, int, 'cap2 NC.ListStorage.t) InnerArray.t)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, int, 'cap NC.ListStorage.t) InnerArray.t =
-    set_list ~storage_type:Common.ListStorageType.Bytes2 ~codecs:int16_list_codecs
+    set_list ~storage_type:ListStorageType.Bytes2 ~codecs:int16_list_codecs
       value pointer_bytes
 
   let set_int32_list
       (value : ('cap1, int32, 'cap NC.ListStorage.t) InnerArray.t)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, int32, rw NC.ListStorage.t) InnerArray.t =
-    set_list ~storage_type:Common.ListStorageType.Bytes4 ~codecs:int32_list_codecs
+    set_list ~storage_type:ListStorageType.Bytes4 ~codecs:int32_list_codecs
       value pointer_bytes
 
   let set_int64_list
       (value : ('cap1, int64, 'cap2 NC.ListStorage.t) InnerArray.t)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, int64, rw NC.ListStorage.t) InnerArray.t =
-    set_list ~storage_type:Common.ListStorageType.Bytes8 ~codecs:int64_list_codecs
+    set_list ~storage_type:ListStorageType.Bytes8 ~codecs:int64_list_codecs
       value pointer_bytes
 
   let set_uint8_list
       (value : ('cap1, int, 'cap2 NC.ListStorage.t) InnerArray.t)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, int, rw NC.ListStorage.t) InnerArray.t =
-    set_list ~storage_type:Common.ListStorageType.Bytes1 ~codecs:uint8_list_codecs
+    set_list ~storage_type:ListStorageType.Bytes1 ~codecs:uint8_list_codecs
       value pointer_bytes
 
   let set_uint16_list
       (value : ('cap1, int, 'cap2 NC.ListStorage.t) InnerArray.t)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, int, rw NC.ListStorage.t) InnerArray.t =
-    set_list ~storage_type:Common.ListStorageType.Bytes2 ~codecs:uint16_list_codecs
+    set_list ~storage_type:ListStorageType.Bytes2 ~codecs:uint16_list_codecs
       value pointer_bytes
 
   let set_uint32_list
       (value : ('cap1, Uint32.t, 'cap2 NC.ListStorage.t) InnerArray.t)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, Uint32.t, rw NC.ListStorage.t) InnerArray.t =
-    set_list ~storage_type:Common.ListStorageType.Bytes4 ~codecs:uint32_list_codecs
+    set_list ~storage_type:ListStorageType.Bytes4 ~codecs:uint32_list_codecs
       value pointer_bytes
 
   let set_uint64_list
       (value : ('cap1, Uint64.t, 'cap2 NC.ListStorage.t) InnerArray.t)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, Uint64.t, rw NC.ListStorage.t) InnerArray.t =
-    set_list ~storage_type:Common.ListStorageType.Bytes8 ~codecs:uint64_list_codecs
+    set_list ~storage_type:ListStorageType.Bytes8 ~codecs:uint64_list_codecs
       value pointer_bytes
 
   let set_float32_list
       (value : ('cap1, float, 'cap2 NC.ListStorage.t) InnerArray.t)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, float, rw NC.ListStorage.t) InnerArray.t =
-    set_list ~storage_type:Common.ListStorageType.Bytes4 ~codecs:float32_list_codecs
+    set_list ~storage_type:ListStorageType.Bytes4 ~codecs:float32_list_codecs
       value pointer_bytes
 
   let set_float64_list
       (value : ('cap1, float, 'cap2 NC.ListStorage.t) InnerArray.t)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, float, rw NC.ListStorage.t) InnerArray.t =
-    set_list ~storage_type:Common.ListStorageType.Bytes8 ~codecs:float64_list_codecs
+    set_list ~storage_type:ListStorageType.Bytes8 ~codecs:float64_list_codecs
       value pointer_bytes
 
   let set_text_list
       (value : ('cap1, string, 'cap2 NC.ListStorage.t) InnerArray.t)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, string, rw NC.ListStorage.t) InnerArray.t =
-    set_list ~storage_type:Common.ListStorageType.Pointer ~codecs:text_list_codecs
+    set_list ~storage_type:ListStorageType.Pointer ~codecs:text_list_codecs
       value pointer_bytes
 
   let set_blob_list
       (value : ('cap1, string, 'cap2 NC.ListStorage.t) InnerArray.t)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, string, rw NC.ListStorage.t) InnerArray.t =
-    set_list ~storage_type:Common.ListStorageType.Pointer ~codecs:blob_list_codecs
+    set_list ~storage_type:ListStorageType.Pointer ~codecs:blob_list_codecs
       value pointer_bytes
 
   let set_struct_list
@@ -854,7 +854,7 @@ module Make (NM : Message.S) = struct
     set_list ~struct_sizes:{
       BuilderOps.StructSizes.data_words;
       BuilderOps.StructSizes.pointer_words }
-      ~storage_type:(Common.ListStorageType.Composite (data_words, pointer_words))
+      ~storage_type:(ListStorageType.Composite (data_words, pointer_words))
       ~codecs:struct_list_codecs value pointer_bytes
 
   let set_struct
@@ -906,7 +906,7 @@ module Make (NM : Message.S) = struct
     set_blob s pointer_bytes
 
   let init_list
-      ~(storage_type : Common.ListStorageType.t)
+      ~(storage_type : ListStorageType.t)
       ~(codecs : 'a NC.ListCodecs.t)
       (num_elements : int)
       (pointer_bytes : rw NM.Slice.t)
@@ -919,98 +919,98 @@ module Make (NM : Message.S) = struct
       (num_elements : int)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, unit, rw NC.ListStorage.t) InnerArray.t =
-    init_list ~storage_type:Common.ListStorageType.Empty ~codecs:void_list_codecs
+    init_list ~storage_type:ListStorageType.Empty ~codecs:void_list_codecs
       num_elements pointer_bytes
 
   let init_bit_list
       (num_elements : int)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, bool, rw NC.ListStorage.t) InnerArray.t =
-    init_list ~storage_type:Common.ListStorageType.Bit ~codecs:bit_list_codecs
+    init_list ~storage_type:ListStorageType.Bit ~codecs:bit_list_codecs
       num_elements pointer_bytes
 
   let init_int8_list
       (num_elements : int)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, int, rw NC.ListStorage.t) InnerArray.t =
-    init_list ~storage_type:Common.ListStorageType.Bytes1 ~codecs:int8_list_codecs
+    init_list ~storage_type:ListStorageType.Bytes1 ~codecs:int8_list_codecs
       num_elements pointer_bytes
 
   let init_int16_list
       (num_elements : int)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, int, rw NC.ListStorage.t) InnerArray.t =
-    init_list ~storage_type:Common.ListStorageType.Bytes2 ~codecs:int16_list_codecs
+    init_list ~storage_type:ListStorageType.Bytes2 ~codecs:int16_list_codecs
       num_elements pointer_bytes
 
   let init_int32_list
       (num_elements : int)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, int32, rw NC.ListStorage.t) InnerArray.t =
-    init_list ~storage_type:Common.ListStorageType.Bytes4 ~codecs:int32_list_codecs
+    init_list ~storage_type:ListStorageType.Bytes4 ~codecs:int32_list_codecs
       num_elements pointer_bytes
 
   let init_int64_list
       (num_elements : int)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, int64, rw NC.ListStorage.t) InnerArray.t =
-    init_list ~storage_type:Common.ListStorageType.Bytes8 ~codecs:int64_list_codecs
+    init_list ~storage_type:ListStorageType.Bytes8 ~codecs:int64_list_codecs
       num_elements pointer_bytes
 
   let init_uint8_list
       (num_elements : int)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, int, rw NC.ListStorage.t) InnerArray.t =
-    init_list ~storage_type:Common.ListStorageType.Bytes1 ~codecs:uint8_list_codecs
+    init_list ~storage_type:ListStorageType.Bytes1 ~codecs:uint8_list_codecs
       num_elements pointer_bytes
 
   let init_uint16_list
       (num_elements : int)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, int, rw NC.ListStorage.t) InnerArray.t =
-    init_list ~storage_type:Common.ListStorageType.Bytes2 ~codecs:uint16_list_codecs
+    init_list ~storage_type:ListStorageType.Bytes2 ~codecs:uint16_list_codecs
       num_elements pointer_bytes
 
   let init_uint32_list
       (num_elements : int)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, Uint32.t, rw NC.ListStorage.t) InnerArray.t =
-    init_list ~storage_type:Common.ListStorageType.Bytes4 ~codecs:uint32_list_codecs
+    init_list ~storage_type:ListStorageType.Bytes4 ~codecs:uint32_list_codecs
       num_elements pointer_bytes
 
   let init_uint64_list
       (num_elements : int)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, Uint64.t, rw NC.ListStorage.t) InnerArray.t =
-    init_list ~storage_type:Common.ListStorageType.Bytes8 ~codecs:uint64_list_codecs
+    init_list ~storage_type:ListStorageType.Bytes8 ~codecs:uint64_list_codecs
       num_elements pointer_bytes
 
   let init_float32_list
       (num_elements : int)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, float, rw NC.ListStorage.t) InnerArray.t =
-    init_list ~storage_type:Common.ListStorageType.Bytes4 ~codecs:float32_list_codecs
+    init_list ~storage_type:ListStorageType.Bytes4 ~codecs:float32_list_codecs
       num_elements pointer_bytes
 
   let init_float64_list
       (num_elements : int)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, float, rw NC.ListStorage.t) InnerArray.t =
-    init_list ~storage_type:Common.ListStorageType.Bytes8 ~codecs:float64_list_codecs
+    init_list ~storage_type:ListStorageType.Bytes8 ~codecs:float64_list_codecs
       num_elements pointer_bytes
 
   let init_text_list
       (num_elements : int)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, string, rw NC.ListStorage.t) InnerArray.t =
-    init_list ~storage_type:Common.ListStorageType.Pointer ~codecs:text_list_codecs
+    init_list ~storage_type:ListStorageType.Pointer ~codecs:text_list_codecs
       num_elements pointer_bytes
 
   let init_blob_list
       (num_elements : int)
       (pointer_bytes : rw NM.Slice.t)
     : (rw, string, rw NC.ListStorage.t) InnerArray.t =
-    init_list ~storage_type:Common.ListStorageType.Pointer ~codecs:blob_list_codecs
+    init_list ~storage_type:ListStorageType.Pointer ~codecs:blob_list_codecs
       num_elements pointer_bytes
 
   let init_struct_list
@@ -1020,7 +1020,7 @@ module Make (NM : Message.S) = struct
       (pointer_bytes : rw NM.Slice.t)
     : (rw, rw NC.StructStorage.t, rw NC.ListStorage.t) InnerArray.t =
     init_list ~storage_type:(
-      Common.ListStorageType.Composite (data_words, pointer_words))
+      ListStorageType.Composite (data_words, pointer_words))
       ~codecs:struct_list_codecs num_elements pointer_bytes
 
   let init_struct

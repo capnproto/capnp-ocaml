@@ -96,7 +96,7 @@ module Make (ROM : Message.S) (RWM : Message.S) = struct
   (* Allocate storage for a list within the specified message. *)
   let alloc_list_storage
       (message : rw RWM.Message.t)
-      (storage_type : Common.ListStorageType.t)
+      (storage_type : ListStorageType.t)
       (num_elements : int)
     : rw RWC.ListStorage.t =
     let storage =
@@ -226,7 +226,7 @@ module Make (ROM : Message.S) (RWM : Message.S) = struct
     in
     let pointer_element_count =
       match list_storage.RWC.ListStorage.storage_type with
-      | Common.ListStorageType.Composite (data_words, pointer_words) ->
+      | ListStorageType.Composite (data_words, pointer_words) ->
           list_storage.RWC.ListStorage.num_elements * (data_words + pointer_words)
       | _ ->
           list_storage.RWC.ListStorage.num_elements
@@ -253,7 +253,7 @@ module Make (ROM : Message.S) (RWM : Message.S) = struct
       let init_far_pointer_tag tag_slice =
         let pointer_element_count =
           match list_storage.RWC.ListStorage.storage_type with
-          | Common.ListStorageType.Composite (data_words, pointer_words) ->
+          | ListStorageType.Composite (data_words, pointer_words) ->
               list_storage.RWC.ListStorage.num_elements * (data_words + pointer_words)
           | _ ->
               list_storage.RWC.ListStorage.num_elements
@@ -410,7 +410,7 @@ module Make (ROM : Message.S) (RWM : Message.S) = struct
     if needs_upgrade then
       let message = pointer_bytes.RWM.Slice.msg in
       let new_storage = alloc_list_storage message
-          (Common.ListStorageType.Composite (data_words, pointer_words))
+          (ListStorageType.Composite (data_words, pointer_words))
           list_storage.RWC.ListStorage.num_elements
       in
       let src_struct_of_index  = RWC.make_struct_of_list_index list_storage in
@@ -421,7 +421,7 @@ module Make (ROM : Message.S) (RWM : Message.S) = struct
       done;
       let content_slice =
         match list_storage.RWC.ListStorage.storage_type with
-        | Common.ListStorageType.Composite _ ->
+        | ListStorageType.Composite _ ->
             (* Composite lists prefix the storage region with a tag word,
                which we can zero out as well. *)
             { list_storage.RWC.ListStorage.storage with
@@ -758,7 +758,7 @@ module Make (ROM : Message.S) (RWM : Message.S) = struct
               "decoded unexpected list type where List<struct> was expected"
       in
       alloc_list_storage dest_message
-        (Common.ListStorageType.Composite (dest_data_words, dest_pointer_words))
+        (ListStorageType.Composite (dest_data_words, dest_pointer_words))
         src.ROC.ListStorage.num_elements
     in
     let src_struct_of_list_index  = ROC.make_struct_of_list_index src in

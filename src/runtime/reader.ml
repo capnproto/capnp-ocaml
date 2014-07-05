@@ -363,7 +363,7 @@ module Make (MessageWrapper : Message.S) = struct
     let pointer_opt =
       match struct_storage_opt with
       | Some struct_storage ->
-          StructStorage.get_pointer struct_storage pointer_word
+          ss_get_pointer struct_storage pointer_word
       | None ->
           None
     in

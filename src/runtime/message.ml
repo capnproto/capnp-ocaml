@@ -244,6 +244,28 @@ module type S = sig
     include SLICE with type 'a segment_t := 'a Segment.t
                    and type 'a message_t := 'a Message.t
   end
+
+  module StructStorage : sig
+    type 'cap t = { data : 'cap Slice.t; pointers : 'cap Slice.t; }
+    val readonly : 'cap t -> ro t
+  end
+
+  module ListStorage : sig
+    type 'cap t = {
+      storage : 'cap Slice.t;
+      storage_type : ListStorageType.t;
+      num_elements : int;
+    }
+    val readonly : 'cap t -> ro t
+  end
+
+  module Object : sig
+    type 'cap t =
+      | None
+      | List of 'cap ListStorage.t
+      | Struct of 'cap StructStorage.t
+      | Capability of Uint32.t
+  end
 end
 
 
@@ -536,6 +558,42 @@ module Make (Storage : MessageStorage.S) = struct
       done
 
   end   (* module Slice *)
+
+  module StructStorage = struct
+    (** Storage associated with a cap'n proto struct. *)
+    type 'cap t = {
+      data     : 'cap Slice.t;  (** Storage for struct fields stored by value *)
+      pointers : 'cap Slice.t;  (** Storage for struct fields stored by reference *)
+    }
+
+    let readonly (struct_storage : 'cap t) : ro t = {
+      data     = Slice.readonly struct_storage.data;
+      pointers = Slice.readonly struct_storage.pointers;
+    }
+  end
+
+  module ListStorage = struct
+    (** Storage associated with a cap'n proto list. *)
+    type 'cap t = {
+      storage      : 'cap Slice.t;      (** Range of bytes used to hold list elements *)
+      storage_type : ListStorageType.t; (** Describes the list packing format *)
+      num_elements : int;               (** Number of list elements *)
+    }
+
+    let readonly (list_storage : 'cap t) : ro t = {
+      storage      = Slice.readonly list_storage.storage;
+      storage_type = list_storage.storage_type;
+      num_elements = list_storage.num_elements;
+    }
+  end
+
+  module Object = struct
+    type 'cap t =
+      | None
+      | List of 'cap ListStorage.t
+      | Struct of 'cap StructStorage.t
+      | Capability of Uint32.t
+  end
 end
 
 

@@ -45,10 +45,9 @@ let sig_s_header ~context = [
   "  type 'cap message_t";
   "";
 ] @ (List.concat_map context.Context.imports ~f:(fun import -> [
-      "  module " ^ import.Context.schema_name ^ " : sig";
-      "    include " ^ import.Context.module_name ^ ".S with";
-      "      type 'cap message_t = 'cap message_t";
-      "  end";
+      "  module " ^ import.Context.schema_name ^ " : " ^
+        import.Context.module_name ^ ".S with";
+      "    type 'cap message_t = 'cap message_t";
       "";
     ]))
 
@@ -76,16 +75,23 @@ let sig_s_footer = [
 ]
 
 
-let functor_sig = [
+let functor_sig unique_type_sharing_constraints = [
   "module Make (MessageWrapper : Capnp.Message.S) :";
   "  (S with type 'cap message_t = 'cap MessageWrapper.Message.t";
   "    and type Reader.pointer_t = ro MessageWrapper.Slice.t option";
   "    and type Builder.pointer_t = rw MessageWrapper.Slice.t)";
   "";
+  "module MakeUnsafe (MessageWrapper : Capnp.Message.S) :";
+  "  (S with type 'cap message_t = 'cap MessageWrapper.Message.t";
+  "    and type Reader.pointer_t = ro MessageWrapper.Slice.t option";
+  "    and type Builder.pointer_t = rw MessageWrapper.Slice.t"; ] @
+  unique_type_sharing_constraints @ [
+  ")";
+  "";
 ]
 
 let mod_header ~context = [
-  "module Make (MessageWrapper : Capnp.Message.S) = struct";
+  "module MakeUnsafe (MessageWrapper : Capnp.Message.S) = struct";
   "  let invalid_msg = Capnp.Message.invalid_msg";
   "";
   "  module RA_ = Capnp.Runtime.Reader.Make(MessageWrapper)";
@@ -94,15 +100,15 @@ let mod_header ~context = [
   "  type 'cap message_t = 'cap MessageWrapper.Message.t";
   ""; ] @ (List.concat_map context.Context.imports ~f:(fun import -> [
       "  module " ^ import.Context.schema_name ^ " = " ^
-          import.Context.module_name ^ ".Make(MessageWrapper)";
+          import.Context.module_name ^ ".MakeUnsafe(MessageWrapper)";
       "";
     ]))
 
 let mod_reader_header = [
   "";
   "  module Reader = struct";
-  "    type array_t = ro RA_.ListStorage.t";
-  "    type builder_array_t = rw RA_.ListStorage.t";
+  "    type array_t = ro MessageWrapper.ListStorage.t";
+  "    type builder_array_t = rw MessageWrapper.ListStorage.t";
   "    type pointer_t = ro MessageWrapper.Slice.t option";
   "";
 ]
@@ -120,6 +126,9 @@ let mod_divide_reader_builder = [
 let mod_footer = [
   "  end";
   "end";
+  "";
+  "module Make (MessageWrapper : Capnp.Message.S) = MakeUnsafe(MessageWrapper)";
+  "";
 ]
 
 
@@ -175,6 +184,10 @@ let compile
         (GenCommon.collect_unique_enums ~is_sig:true ~context
            ~node_name:requested_filename requested_file_node)
     in
+    let unique_type_sharing_constraints = (List.rev_map
+        (GenCommon.collect_unique_types ~context requested_file_node)
+        ~f:(fun (name, tp) -> "    and type " ^ name ^ " = " ^ tp)) @ [""]
+    in
     let mod_unique_types = (List.rev_map
         (GenCommon.collect_unique_types ~context requested_file_node)
         ~f:(fun (name, tp) -> "  type " ^ name ^ " = " ^ tp)) @ [""]
@@ -201,7 +214,7 @@ let compile
       sig_s_footer
     in
     let sig_file_content =
-      string_of_lines (sig_s @ functor_sig)
+      string_of_lines (sig_s @ (functor_sig unique_type_sharing_constraints))
     in
     let mod_file_content =
       let defaults_context =

@@ -239,7 +239,30 @@ module type S = sig
     include SLICE with type 'a segment_t := 'a Segment.t
                    and type 'a message_t := 'a Message.t
   end
+
+  module StructStorage : sig
+    type 'cap t = { data : 'cap Slice.t; pointers : 'cap Slice.t; }
+    val readonly : 'cap t -> ro t
+  end
+
+  module ListStorage : sig
+    type 'cap t = {
+      storage : 'cap Slice.t;
+      storage_type : ListStorageType.t;
+      num_elements : int;
+    }
+    val readonly : 'cap t -> ro t
+  end
+
+  module Object : sig
+    type 'cap t =
+      | None
+      | List of 'cap ListStorage.t
+      | Struct of 'cap StructStorage.t
+      | Capability of Uint32.t
+  end
 end
+
 
 module Make (Storage : MessageStorage.S) :
   (S with type Segment.storage_t = Storage.t

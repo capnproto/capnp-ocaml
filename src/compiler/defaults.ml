@@ -60,6 +60,8 @@ module DC = Capnp.Runtime.Common.Make(GenCommon.M)
 module M = GenCommon.M
 
 module Common = Capnp.Runtime.Common
+module ListStorageType = Capnp.Runtime.ListStorageType
+
 let sizeof_uint64 = Common.sizeof_uint64
 
 type t = {
@@ -234,8 +236,8 @@ let emit_instantiate_builder_lists list_array : string list =
         (Int.to_string list_storage.storage.M.Slice.start) ^ ";";
       "    DefaultsMessage_.Slice.len = " ^
         (Int.to_string list_storage.storage.M.Slice.len) ^ "; };";
-      "  DefaultsCommon_.ListStorage.storage_type = Capnp.Runtime.Common." ^
-        (Common.ListStorageType.to_string list_storage.storage_type) ^ ";";
+      "  DefaultsCommon_.ListStorage.storage_type = Capnp.Runtime." ^
+        (ListStorageType.to_string list_storage.storage_type) ^ ";";
       "  DefaultsCommon_.ListStorage.num_elements = " ^
         (Int.to_string list_storage.num_elements) ^ ";";
       "}";
