@@ -734,13 +734,13 @@ module Make (MessageWrapper : MessageSig.S) = struct
           else
             list_storage.num_elements
         in
-        let buf = String.create result_byte_count in
+        let buf = Bytes.create result_byte_count in
         let () =
           for i = 0 to result_byte_count - 1 do
-            buf.[i] <- Char.of_int_exn (Slice.get_uint8 list_storage.storage i)
+            Bytes.set buf i (Char.of_int_exn (Slice.get_uint8 list_storage.storage i))
           done
         in
-        buf
+        Bytes.to_string buf
     | _ ->
         invalid_msg "decoded non-UInt8 list where string data was expected"
 

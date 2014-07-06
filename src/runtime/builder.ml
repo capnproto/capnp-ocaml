@@ -43,7 +43,7 @@ let invalid_msg = Message.invalid_msg
 let sizeof_uint64 = Common.sizeof_uint64
 
 (* "DefaultsMessage" meaning "the type of messages that store default values" *)
-module DefaultsMessage = Message.Make(StringStorage)
+module DefaultsMessage = Message.Make(BytesStorage)
 module DC = Common.Make(DefaultsMessage)
 
 (* NM == "native message" *)

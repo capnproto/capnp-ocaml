@@ -32,7 +32,7 @@ type rw
 
 module type SEGMENT = sig
   (** [storage_t] is the type of the underlying storage associated with
-      this segment (e.g. "string"). *)
+      this segment (e.g. "bytes"). *)
   type storage_t
 
   (** ['cap t] is the type of a message segment.  The ['cap] annotation is
@@ -101,7 +101,7 @@ end
 
 module type MESSAGE = sig
   (** [storage_t] is the type of the underlying storage associated with
-      this segment (e.g. "string"). *)
+      this segment (e.g. "bytes"). *)
   type storage_t
 
   type -'cap segment_t

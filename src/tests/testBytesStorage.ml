@@ -28,7 +28,7 @@
  ******************************************************************************)
 
 
-module SM = Capnp.Message.Make(Capnp.StringStorage)
+module SM = Capnp.Message.Make(Capnp.BytesStorage)
 open OUnit2
 
 
@@ -41,7 +41,9 @@ let assert_raises_invalid_arg f =
 
 
 let uint8_suite =
-  let short_msg = SM.Message.of_storage ["\x11\x00\xff\x44\x55\x66\x77\x88"] in
+  let short_msg = SM.Message.of_storage
+      [ Bytes.of_string "\x11\x00\xff\x44\x55\x66\x77\x88" ]
+  in
   let short_slice = {
     SM.Slice.msg        = short_msg;
     SM.Slice.segment_id = 0;
@@ -99,7 +101,9 @@ let uint8_suite =
 
 
 let uint16_suite =
-  let short_msg = SM.Message.of_storage ["\x11\x00\x00\xff\xff\x66\x77\x88"] in
+  let short_msg = SM.Message.of_storage
+      [ Bytes.of_string "\x11\x00\x00\xff\xff\x66\x77\x88" ]
+  in
   let short_slice = {
     SM.Slice.msg        = short_msg;
     SM.Slice.segment_id = 0;
@@ -157,7 +161,9 @@ let uint16_suite =
 
 
 let uint32_suite =
-  let short_msg = SM.Message.of_storage ["\x11\x22\x33\x44\x55\x66\x77\x88"] in
+  let short_msg = SM.Message.of_storage
+      [ Bytes.of_string "\x11\x22\x33\x44\x55\x66\x77\x88" ]
+  in
   let short_slice = {
     SM.Slice.msg        = short_msg;
     SM.Slice.segment_id = 0;
@@ -208,6 +214,7 @@ let uint32_suite =
 
 let uint64_suite =
   let short_msg = SM.Message.of_storage [
+    Bytes.of_string
       "\x11\x22\x33\x44\x55\x66\x77\x88\
        \x99\xaa\xbb\xcc\xdd\xee\xff\xa5"
   ] in
@@ -260,7 +267,9 @@ let uint64_suite =
 
 
 let int8_suite =
-  let short_msg = SM.Message.of_storage ["\x11\x00\xff\x44\x55\x66\x77\x88"] in
+  let short_msg = SM.Message.of_storage
+      [ Bytes.of_string "\x11\x00\xff\x44\x55\x66\x77\x88"]
+  in
   let short_slice = {
     SM.Slice.msg        = short_msg;
     SM.Slice.segment_id = 0;
@@ -317,7 +326,9 @@ let int8_suite =
   ]
 
 let int16_suite =
-  let short_msg = SM.Message.of_storage ["\x11\x00\x00\xff\xff\x66\x77\x88"] in
+  let short_msg = SM.Message.of_storage
+      [ Bytes.of_string "\x11\x00\x00\xff\xff\x66\x77\x88" ]
+  in
   let short_slice = {
     SM.Slice.msg        = short_msg;
     SM.Slice.segment_id = 0;
@@ -375,7 +386,9 @@ let int16_suite =
 
 
 let int32_suite =
-  let short_msg = SM.Message.of_storage ["\x11\x22\x33\x44\x55\x66\x77\x88"] in
+  let short_msg = SM.Message.of_storage
+      [ Bytes.of_string "\x11\x22\x33\x44\x55\x66\x77\x88" ]
+  in
   let short_slice = {
     SM.Slice.msg        = short_msg;
     SM.Slice.segment_id = 0;
@@ -422,6 +435,7 @@ let int32_suite =
 
 let int64_suite =
   let short_msg = SM.Message.of_storage [
+    Bytes.of_string
       "\x11\x22\x33\x44\x55\x66\x77\x5a\
        \x99\xaa\xbb\xcc\xdd\xee\xff\xa5"
   ] in

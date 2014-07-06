@@ -29,42 +29,14 @@
 
 
 module FramingError : sig
-  type t =
+  type t = CodecsSig.FramingError.t =
     | Incomplete    (** less than a full frame is available *)
     | Unsupported   (** frame header describes a segment count or segment size that
                         is too large for the implementation *)
 end
 
-
-module type DECODER = sig
-  (** The type of streams containing framed messages. *)
-  type t
-
-  (** [empty ()] returns a new stream containing no data. *)
-  val empty : unit -> t
-
-  (** [of_string buf] returns a new stream which is filled with the contents
-      of the given buffer. *)
-  val of_string : string -> t
-
-  (** [add_fragment stream fragment] adds a new fragment to the stream for
-      decoding.  Fragments are processed in FIFO order. *)
-  val add_fragment : t -> string -> unit
-
-  (** [is_empty stream] determines whether or not the stream contains any
-      data which has not yet been fully decoded. *)
-  val is_empty : t -> bool
-
-  (** [get_next_frame] attempts to decode the next frame from the stream.
-      A successful decode removes the data from the stream and returns the
-      frame as a [string list] with one list element for every segment within
-      the message. *)
-  val get_next_frame : t -> (string list, FramingError.t) Core.Std.Result.t
-end
-
-
 module FramedStream : sig
-  include DECODER
+  include CodecsSig.DECODER
 
   (** A streaming decoder for the Cap'n Proto "standard serialization"
       (non-packed message segments prefixed by framing information). *)
@@ -72,39 +44,40 @@ end
 
 
 module PackedStream : sig
-  include DECODER
+  include CodecsSig.DECODER
 
   (** A streaming decoder for "packed" messages (i.e. messages encoded
       using "standard serialization" and then compressed with the
       standard packing method). *)
 end
 
+
 (** [serialize_fold message ~init f] generates an ordered sequence of
-    string fragments corresponding to a Cap'n Proto framed message
+    bytes fragments corresponding to a Cap'n Proto framed message
     using the standard serialization.  The return value is the result
     of folding [f] across the resulting sequence of fragments. *)
-val serialize_fold : string list -> init:'acc -> f:('acc -> string -> 'acc) -> 'acc
+val serialize_fold : Bytes.t list -> init:'acc -> f:('acc -> Bytes.t -> 'acc) -> 'acc
 
-(** [serialize_iter message ~f] generates an ordered sequence of string
+(** [serialize_iter message ~f] generates an ordered sequence of bytes
     fragments corresponding to a Cap'n Proto framed message using the standard
     serialization.  [f] is applied to each fragment in turn. *)
-val serialize_iter : string list -> f:(string -> unit) -> unit
+val serialize_iter : Bytes.t list -> f:(Bytes.t -> unit) -> unit
 
-(** [serialize message] constructs a string containing the [message] segments
+(** [serialize message] constructs a buffer containing the [message] segments
     with a standard serialization framing header. *)
-val serialize : string list -> string
+val serialize : Bytes.t list -> string
 
 (** [pack_fold message ~init f] generates an ordered sequence of
-    string fragments corresponding to a packed Cap'n Proto message.
+    bytes fragments corresponding to a packed Cap'n Proto message.
     The return value is the result of folding [f] across the resulting
     sequence of fragments. *)
-val pack_fold : string list -> init:'acc -> f:('acc -> string -> 'acc) -> 'acc
+val pack_fold : Bytes.t list -> init:'acc -> f:('acc -> Bytes.t -> 'acc) -> 'acc
 
-(** [pack_iter message ~f] generates an ordered sequence of string
+(** [pack_iter message ~f] generates an ordered sequence of bytes
     fragments corresponding to a packed Cap'n Proto message.  [f] is applied
     to each fragment in turn. *)
-val pack_iter : string list -> f:(string -> unit) -> unit
+val pack_iter : Bytes.t list -> f:(Bytes.t -> unit) -> unit
 
-(** [pack message] constructs a string containing a packed Cap'n Proto message. *)
-val pack : string list -> string
+(** [pack message] constructs a buffer containing a packed Cap'n Proto message. *)
+val pack : Bytes.t list -> string
 

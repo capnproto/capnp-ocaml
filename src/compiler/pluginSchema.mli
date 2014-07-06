@@ -996,58 +996,7 @@ end
 module Make (MessageWrapper : Capnp.MessageSig.S) :
   (S with type 'cap message_t = 'cap MessageWrapper.Message.t
     and type Reader.pointer_t = ro MessageWrapper.Slice.t option
-    and type Builder.pointer_t = rw MessageWrapper.Slice.t)
-
-module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) :
-  (S with type 'cap message_t = 'cap MessageWrapper.Message.t
-    and type Reader.pointer_t = ro MessageWrapper.Slice.t option
     and type Builder.pointer_t = rw MessageWrapper.Slice.t
-    and type reader_t_Slot_14133145859926553711 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_Slot_14133145859926553711 = rw MessageWrapper.StructStorage.t
-    and type reader_t_Group_14626792032033250577 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_Group_14626792032033250577 = rw MessageWrapper.StructStorage.t
-    and type reader_t_Ordinal_13515537513213004774 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_Ordinal_13515537513213004774 = rw MessageWrapper.StructStorage.t
-    and type reader_t_Field_11145653318641710175 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_Field_11145653318641710175 = rw MessageWrapper.StructStorage.t
-    and type reader_t_Import_12560611460656617445 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_Import_12560611460656617445 = rw MessageWrapper.StructStorage.t
-    and type reader_t_RequestedFile_14981803260258615394 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_RequestedFile_14981803260258615394 = rw MessageWrapper.StructStorage.t
-    and type reader_t_CodeGeneratorRequest_13818529054586492878 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_CodeGeneratorRequest_13818529054586492878 = rw MessageWrapper.StructStorage.t
-    and type reader_t_NestedNode_16050641862814319170 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_NestedNode_16050641862814319170 = rw MessageWrapper.StructStorage.t
-    and type reader_t_Interface_16728431493453586831 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_Interface_16728431493453586831 = rw MessageWrapper.StructStorage.t
-    and type reader_t_Const_12793219851699983392 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_Const_12793219851699983392 = rw MessageWrapper.StructStorage.t
-    and type reader_t_Annotation_17011813041836786320 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_Annotation_17011813041836786320 = rw MessageWrapper.StructStorage.t
-    and type reader_t_Enum_13063450714778629528 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_Enum_13063450714778629528 = rw MessageWrapper.StructStorage.t
-    and type reader_t_Struct_11430331134483579957 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_Struct_11430331134483579957 = rw MessageWrapper.StructStorage.t
-    and type reader_t_Node_16610026722781537303 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_Node_16610026722781537303 = rw MessageWrapper.StructStorage.t
-    and type reader_t_Value_14853958794117909659 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_Value_14853958794117909659 = rw MessageWrapper.StructStorage.t
-    and type reader_t_Enumerant_10919677598968879693 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_Enumerant_10919677598968879693 = rw MessageWrapper.StructStorage.t
-    and type reader_t_Annotation_17422339044421236034 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_Annotation_17422339044421236034 = rw MessageWrapper.StructStorage.t
-    and type reader_t_Method_10736806783679155584 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_Method_10736806783679155584 = rw MessageWrapper.StructStorage.t
-    and type reader_t_Struct_12410354185295152851 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_Struct_12410354185295152851 = rw MessageWrapper.StructStorage.t
-    and type reader_t_List_9792858745991129751 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_List_9792858745991129751 = rw MessageWrapper.StructStorage.t
-    and type reader_t_Interface_17116997365232503999 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_Interface_17116997365232503999 = rw MessageWrapper.StructStorage.t
-    and type reader_t_Enum_11389172934837766057 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_Enum_11389172934837766057 = rw MessageWrapper.StructStorage.t
-    and type reader_t_Type_15020482145304562784 = ro MessageWrapper.StructStorage.t option
-    and type builder_t_Type_15020482145304562784 = rw MessageWrapper.StructStorage.t
-
+    and module C2b2b_13688829037717245569 = C2b2b.Make(MessageWrapper)
 )
 

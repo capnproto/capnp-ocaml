@@ -9,8 +9,8 @@ TEST_MODULES = \
   c2b2b \
   test \
   test_import \
+  testBytesStorage \
   testLists \
-  testStringStorage \
   testMisc \
   testEncoding
 

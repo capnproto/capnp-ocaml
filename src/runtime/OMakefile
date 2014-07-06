@@ -2,8 +2,10 @@
 RUNTIME_MODULES =   \
   builder           \
   builderOps        \
+  bytesStorage      \
   cArray            \
   codecs            \
+  codecsSig         \
   common            \
   farPointer        \
   innerArray        \
@@ -15,7 +17,6 @@ RUNTIME_MODULES =   \
   otherPointer      \
   pointer           \
   reader            \
-  stringStorage     \
   structPointer     \
   util
 

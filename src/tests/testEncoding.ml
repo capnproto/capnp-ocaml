@@ -31,7 +31,7 @@
 
 open Core.Std
 
-module SM  = Capnp.Message.Make(Capnp.StringStorage)
+module SM  = Capnp.Message.Make(Capnp.BytesStorage)
 module T   = Test.Make(SM)
 module TL  = TestLists.Make(SM)
 module TI  = Test_import.Make(SM)
@@ -441,14 +441,14 @@ let test_encode_decode ctx =
 
 
 let test_decode_defaults ctx =
-  let null_root = "\x00\x00\x00\x00\x00\x00\x00\x00" in
+  let null_root = Bytes.of_string "\x00\x00\x00\x00\x00\x00\x00\x00" in
   let message = SM.Message.readonly (SM.Message.of_storage [ null_root ]) in
   let reader = T.Reader.TestDefaults.of_message message in
   Reader_check_test_defaults.f reader
 
 
 let test_init_defaults ctx =
-  let null_root = "\x00\x00\x00\x00\x00\x00\x00\x00" in
+  let null_root = Bytes.of_string "\x00\x00\x00\x00\x00\x00\x00\x00" in
   let message = SM.Message.of_storage [ null_root ] in
   let builder = T.Builder.TestDefaults.of_message message in
   (* First pass initializes [message] with defaults *)

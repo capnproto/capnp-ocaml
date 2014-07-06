@@ -998,7 +998,7 @@ module DefaultsCommon_  = Capnp.Runtime.Builder.DC
 
 let _builder_defaults_message =
   let message_segments = [
-    "\
+    Bytes.of_string "\
     \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
     \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
     \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
@@ -1007,7 +1007,7 @@ let _builder_defaults_message =
   DefaultsMessage_.Message.readonly
     (DefaultsMessage_.Message.of_storage message_segments)
 
-module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
+module Make (MessageWrapper : Capnp.MessageSig.S) = struct
   let invalid_msg = Capnp.Message.invalid_msg
 
   module RA_ = Capnp.Runtime.Reader.Make(MessageWrapper)
@@ -1015,7 +1015,7 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
 
   type 'cap message_t = 'cap MessageWrapper.Message.t
 
-  module C2b2b_13688829037717245569 = C2b2b.MakeUnsafe(MessageWrapper)
+  module C2b2b_13688829037717245569 = C2b2b.Make(MessageWrapper)
 
   type reader_t_Slot_14133145859926553711 = ro MessageWrapper.StructStorage.t option
   type builder_t_Slot_14133145859926553711 = rw MessageWrapper.StructStorage.t
@@ -1157,10 +1157,10 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
       module List = struct
         type t = reader_t_List_9792858745991129751
         type builder_t = builder_t_List_9792858745991129751
-        let has_element_type x =
-          RA_.get_pointer_field x 0 ~f:RA_.has_field
-        let element_type_get x =
-          RA_.get_pointer_field x 0 ~f:(RA_.get_struct)
+        let has_element_type x = 
+          (RA_.get_pointer_field x 0 ~f:RA_.has_field)
+        let element_type_get x = 
+          (RA_.get_pointer_field x 0 ~f:(RA_.get_struct))
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
       end
@@ -1343,10 +1343,10 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
         RA_.get_data_field x ~f:(RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:0)
       let id_get_int_exn x =
         Uint64.to_int (id_get x)
-      let has_value x =
-        RA_.get_pointer_field x 0 ~f:RA_.has_field
-      let value_get x =
-        RA_.get_pointer_field x 0 ~f:(RA_.get_struct)
+      let has_value x = 
+        (RA_.get_pointer_field x 0 ~f:RA_.has_field)
+      let value_get x = 
+        (RA_.get_pointer_field x 0 ~f:(RA_.get_struct))
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       let of_builder x = Some (RA_.StructStorage.readonly x)
     end
@@ -1367,10 +1367,10 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
         RA_.get_data_field x ~f:(RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:16)
       let result_struct_type_get_int_exn x =
         Uint64.to_int (result_struct_type_get x)
-      let has_annotations x =
-        RA_.get_pointer_field x 1 ~f:RA_.has_field
-      let annotations_get x =
-        RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list)
+      let has_annotations x = 
+        (RA_.get_pointer_field x 1 ~f:RA_.has_field)
+      let annotations_get x = 
+        (RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list))
       let annotations_get_list x =
         Capnp.Array.to_list (annotations_get x)
       let annotations_get_array x =
@@ -1387,10 +1387,10 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
         RA_.get_pointer_field x 0 ~f:(RA_.get_text ~default:"")
       let code_order_get x =
         RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:0)
-      let has_annotations x =
-        RA_.get_pointer_field x 1 ~f:RA_.has_field
-      let annotations_get x =
-        RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list)
+      let has_annotations x = 
+        (RA_.get_pointer_field x 1 ~f:RA_.has_field)
+      let annotations_get x = 
+        (RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list))
       let annotations_get_list x =
         Capnp.Array.to_list (annotations_get x)
       let annotations_get_array x =
@@ -1438,14 +1438,14 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
           RA_.get_data_field x ~f:(RA_.get_uint32 ~default:Uint32.zero ~byte_ofs:4)
         let offset_get_int_exn x =
           Uint32.to_int (offset_get x)
-        let has_type x =
-          RA_.get_pointer_field x 2 ~f:RA_.has_field
-        let type_get x =
-          RA_.get_pointer_field x 2 ~f:(RA_.get_struct)
-        let has_default_value x =
-          RA_.get_pointer_field x 3 ~f:RA_.has_field
-        let default_value_get x =
-          RA_.get_pointer_field x 3 ~f:(RA_.get_struct)
+        let has_type x = 
+          (RA_.get_pointer_field x 2 ~f:RA_.has_field)
+        let type_get x = 
+          (RA_.get_pointer_field x 2 ~f:(RA_.get_struct))
+        let has_default_value x = 
+          (RA_.get_pointer_field x 3 ~f:RA_.has_field)
+        let default_value_get x = 
+          (RA_.get_pointer_field x 3 ~f:(RA_.get_struct))
         let had_explicit_default_get x =
           RA_.get_data_field x ~f:(RA_.get_bit ~default:false ~byte_ofs:16 ~bit_ofs:0)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -1468,10 +1468,10 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
         RA_.get_pointer_field x 0 ~f:(RA_.get_text ~default:"")
       let code_order_get x =
         RA_.get_data_field x ~f:(RA_.get_uint16 ~default:0 ~byte_ofs:0)
-      let has_annotations x =
-        RA_.get_pointer_field x 1 ~f:RA_.has_field
-      let annotations_get x =
-        RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list)
+      let has_annotations x = 
+        (RA_.get_pointer_field x 1 ~f:RA_.has_field)
+      let annotations_get x = 
+        (RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list))
       let annotations_get_list x =
         Capnp.Array.to_list (annotations_get x)
       let annotations_get_array x =
@@ -1503,10 +1503,10 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
           RA_.get_data_field x ~f:(RA_.get_uint32 ~default:Uint32.zero ~byte_ofs:32)
         let discriminant_offset_get_int_exn x =
           Uint32.to_int (discriminant_offset_get x)
-        let has_fields x =
-          RA_.get_pointer_field x 3 ~f:RA_.has_field
-        let fields_get x =
-          RA_.get_pointer_field x 3 ~f:(RA_.get_struct_list)
+        let has_fields x = 
+          (RA_.get_pointer_field x 3 ~f:RA_.has_field)
+        let fields_get x = 
+          (RA_.get_pointer_field x 3 ~f:(RA_.get_struct_list))
         let fields_get_list x =
           Capnp.Array.to_list (fields_get x)
         let fields_get_array x =
@@ -1517,10 +1517,10 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
       module Enum = struct
         type t = reader_t_Enum_13063450714778629528
         type builder_t = builder_t_Enum_13063450714778629528
-        let has_enumerants x =
-          RA_.get_pointer_field x 3 ~f:RA_.has_field
-        let enumerants_get x =
-          RA_.get_pointer_field x 3 ~f:(RA_.get_struct_list)
+        let has_enumerants x = 
+          (RA_.get_pointer_field x 3 ~f:RA_.has_field)
+        let enumerants_get x = 
+          (RA_.get_pointer_field x 3 ~f:(RA_.get_struct_list))
         let enumerants_get_list x =
           Capnp.Array.to_list (enumerants_get x)
         let enumerants_get_array x =
@@ -1531,10 +1531,10 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
       module Annotation = struct
         type t = reader_t_Annotation_17011813041836786320
         type builder_t = builder_t_Annotation_17011813041836786320
-        let has_type x =
-          RA_.get_pointer_field x 3 ~f:RA_.has_field
-        let type_get x =
-          RA_.get_pointer_field x 3 ~f:(RA_.get_struct)
+        let has_type x = 
+          (RA_.get_pointer_field x 3 ~f:RA_.has_field)
+        let type_get x = 
+          (RA_.get_pointer_field x 3 ~f:(RA_.get_struct))
         let targets_file_get x =
           RA_.get_data_field x ~f:(RA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:0)
         let targets_const_get x =
@@ -1565,30 +1565,30 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
       module Const = struct
         type t = reader_t_Const_12793219851699983392
         type builder_t = builder_t_Const_12793219851699983392
-        let has_type x =
-          RA_.get_pointer_field x 3 ~f:RA_.has_field
-        let type_get x =
-          RA_.get_pointer_field x 3 ~f:(RA_.get_struct)
-        let has_value x =
-          RA_.get_pointer_field x 4 ~f:RA_.has_field
-        let value_get x =
-          RA_.get_pointer_field x 4 ~f:(RA_.get_struct)
+        let has_type x = 
+          (RA_.get_pointer_field x 3 ~f:RA_.has_field)
+        let type_get x = 
+          (RA_.get_pointer_field x 3 ~f:(RA_.get_struct))
+        let has_value x = 
+          (RA_.get_pointer_field x 4 ~f:RA_.has_field)
+        let value_get x = 
+          (RA_.get_pointer_field x 4 ~f:(RA_.get_struct))
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
       end
       module Interface = struct
         type t = reader_t_Interface_16728431493453586831
         type builder_t = builder_t_Interface_16728431493453586831
-        let has_methods x =
-          RA_.get_pointer_field x 3 ~f:RA_.has_field
-        let methods_get x =
-          RA_.get_pointer_field x 3 ~f:(RA_.get_struct_list)
+        let has_methods x = 
+          (RA_.get_pointer_field x 3 ~f:RA_.has_field)
+        let methods_get x = 
+          (RA_.get_pointer_field x 3 ~f:(RA_.get_struct_list))
         let methods_get_list x =
           Capnp.Array.to_list (methods_get x)
         let methods_get_array x =
           Capnp.Array.to_array (methods_get x)
-        let has_extends x =
-          RA_.get_pointer_field x 4 ~f:RA_.has_field
+        let has_extends x = 
+          (RA_.get_pointer_field x 4 ~f:RA_.has_field)
         let extends_get x =
           RA_.get_pointer_field x 4 ~f:(RA_.get_uint64_list)
         let extends_get_list x =
@@ -1651,18 +1651,18 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
         RA_.get_data_field x ~f:(RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:16)
       let scope_id_get_int_exn x =
         Uint64.to_int (scope_id_get x)
-      let has_nested_nodes x =
-        RA_.get_pointer_field x 1 ~f:RA_.has_field
-      let nested_nodes_get x =
-        RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list)
+      let has_nested_nodes x = 
+        (RA_.get_pointer_field x 1 ~f:RA_.has_field)
+      let nested_nodes_get x = 
+        (RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list))
       let nested_nodes_get_list x =
         Capnp.Array.to_list (nested_nodes_get x)
       let nested_nodes_get_array x =
         Capnp.Array.to_array (nested_nodes_get x)
-      let has_annotations x =
-        RA_.get_pointer_field x 2 ~f:RA_.has_field
-      let annotations_get x =
-        RA_.get_pointer_field x 2 ~f:(RA_.get_struct_list)
+      let has_annotations x = 
+        (RA_.get_pointer_field x 2 ~f:RA_.has_field)
+      let annotations_get x = 
+        (RA_.get_pointer_field x 2 ~f:(RA_.get_struct_list))
       let annotations_get_list x =
         Capnp.Array.to_list (annotations_get x)
       let annotations_get_array x =
@@ -1698,10 +1698,10 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
           RA_.get_pointer_field x 0 ~f:RA_.has_field
         let filename_get x =
           RA_.get_pointer_field x 0 ~f:(RA_.get_text ~default:"")
-        let has_imports x =
-          RA_.get_pointer_field x 1 ~f:RA_.has_field
-        let imports_get x =
-          RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list)
+        let has_imports x = 
+          (RA_.get_pointer_field x 1 ~f:RA_.has_field)
+        let imports_get x = 
+          (RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list))
         let imports_get_list x =
           Capnp.Array.to_list (imports_get x)
         let imports_get_array x =
@@ -1709,18 +1709,18 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
       end
-      let has_nodes x =
-        RA_.get_pointer_field x 0 ~f:RA_.has_field
-      let nodes_get x =
-        RA_.get_pointer_field x 0 ~f:(RA_.get_struct_list)
+      let has_nodes x = 
+        (RA_.get_pointer_field x 0 ~f:RA_.has_field)
+      let nodes_get x = 
+        (RA_.get_pointer_field x 0 ~f:(RA_.get_struct_list))
       let nodes_get_list x =
         Capnp.Array.to_list (nodes_get x)
       let nodes_get_array x =
         Capnp.Array.to_array (nodes_get x)
-      let has_requested_files x =
-        RA_.get_pointer_field x 1 ~f:RA_.has_field
-      let requested_files_get x =
-        RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list)
+      let has_requested_files x = 
+        (RA_.get_pointer_field x 1 ~f:RA_.has_field)
+      let requested_files_get x = 
+        (RA_.get_pointer_field x 1 ~f:(RA_.get_struct_list))
       let requested_files_get_list x =
         Capnp.Array.to_list (requested_files_get x)
       let requested_files_get_array x =
@@ -1785,16 +1785,16 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
       module List = struct
         type t = builder_t_List_9792858745991129751
         type reader_t = reader_t_List_9792858745991129751
-        let has_element_type x =
-          BA_.get_pointer_field x 0 ~f:BA_.has_field
-        let element_type_get x =
-          BA_.get_pointer_field x 0 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1)
-        let element_type_set_reader x v =
-          BA_.get_pointer_field x 0 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 v)
-        let element_type_set_builder x v =
-          BA_.get_pointer_field x 0 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (Some v))
-        let element_type_init x =
-          BA_.get_pointer_field x 0 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1)
+        let has_element_type x = 
+          (BA_.get_pointer_field x 0 ~f:BA_.has_field)
+        let element_type_get x = 
+          (BA_.get_pointer_field x 0 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1))
+        let element_type_set_reader x v = 
+          (BA_.get_pointer_field x 0 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (v)))
+        let element_type_set_builder x v = 
+          (BA_.get_pointer_field x 0 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (Some (v))))
+        let element_type_init x = 
+          (BA_.get_pointer_field x 0 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1))
         let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
         let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
         let to_reader x = Some (RA_.StructStorage.readonly x)
@@ -2115,16 +2115,16 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
       let id_set x v =
         BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:0 v)
       let id_set_int_exn x v = id_set x (Uint64.of_int v)
-      let has_value x =
-        BA_.get_pointer_field x 0 ~f:BA_.has_field
-      let value_get x =
-        BA_.get_pointer_field x 0 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1)
-      let value_set_reader x v =
-        BA_.get_pointer_field x 0 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 v)
-      let value_set_builder x v =
-        BA_.get_pointer_field x 0 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (Some v))
-      let value_init x =
-        BA_.get_pointer_field x 0 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1)
+      let has_value x = 
+        (BA_.get_pointer_field x 0 ~f:BA_.has_field)
+      let value_get x = 
+        (BA_.get_pointer_field x 0 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1))
+      let value_set_reader x v = 
+        (BA_.get_pointer_field x 0 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (v)))
+      let value_set_builder x v = 
+        (BA_.get_pointer_field x 0 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (Some (v))))
+      let value_init x = 
+        (BA_.get_pointer_field x 0 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1))
       let of_message x = BA_.get_root_struct ~data_words:1 ~pointer_words:1 x
       let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
       let to_reader x = Some (RA_.StructStorage.readonly x)
@@ -2158,18 +2158,18 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
       let result_struct_type_set x v =
         BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:16 v)
       let result_struct_type_set_int_exn x v = result_struct_type_set x (Uint64.of_int v)
-      let has_annotations x =
-        BA_.get_pointer_field x 1 ~f:BA_.has_field
-      let annotations_get x =
-        BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1)
+      let has_annotations x = 
+        (BA_.get_pointer_field x 1 ~f:BA_.has_field)
+      let annotations_get x = 
+        (BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1))
       let annotations_get_list x =
         Capnp.Array.to_list (annotations_get x)
       let annotations_get_array x =
         Capnp.Array.to_array (annotations_get x)
-      let annotations_set x v =
-        BA_.get_pointer_field x 1 ~f:(BA_.set_struct_list ~data_words:1 ~pointer_words:1 v)
-      let annotations_init x n =
-        BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n)
+      let annotations_set x v = 
+        (BA_.get_pointer_field x 1 ~f:(BA_.set_struct_list ~data_words:1 ~pointer_words:1 (v)))
+      let annotations_init x n = 
+        (BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n))
       let annotations_set_list x v =
         let builder = annotations_init x (List.length v) in
         let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -2197,18 +2197,18 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
         BA_.get_data_field x ~f:(BA_.get_uint16 ~default:0 ~byte_ofs:0)
       let code_order_set_exn x v =
         BA_.get_data_field x ~f:(BA_.set_uint16 ~default:0 ~byte_ofs:0 v)
-      let has_annotations x =
-        BA_.get_pointer_field x 1 ~f:BA_.has_field
-      let annotations_get x =
-        BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1)
+      let has_annotations x = 
+        (BA_.get_pointer_field x 1 ~f:BA_.has_field)
+      let annotations_get x = 
+        (BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1))
       let annotations_get_list x =
         Capnp.Array.to_list (annotations_get x)
       let annotations_get_array x =
         Capnp.Array.to_array (annotations_get x)
-      let annotations_set x v =
-        BA_.get_pointer_field x 1 ~f:(BA_.set_struct_list ~data_words:1 ~pointer_words:1 v)
-      let annotations_init x n =
-        BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n)
+      let annotations_set x v = 
+        (BA_.get_pointer_field x 1 ~f:(BA_.set_struct_list ~data_words:1 ~pointer_words:1 (v)))
+      let annotations_init x n = 
+        (BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n))
       let annotations_set_list x v =
         let builder = annotations_init x (List.length v) in
         let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -2279,26 +2279,26 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
         let offset_set x v =
           BA_.get_data_field x ~f:(BA_.set_uint32 ~default:Uint32.zero ~byte_ofs:4 v)
         let offset_set_int_exn x v = offset_set x (Uint32.of_int v)
-        let has_type x =
-          BA_.get_pointer_field x 2 ~f:BA_.has_field
-        let type_get x =
-          BA_.get_pointer_field x 2 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1)
-        let type_set_reader x v =
-          BA_.get_pointer_field x 2 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 v)
-        let type_set_builder x v =
-          BA_.get_pointer_field x 2 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (Some v))
-        let type_init x =
-          BA_.get_pointer_field x 2 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1)
-        let has_default_value x =
-          BA_.get_pointer_field x 3 ~f:BA_.has_field
-        let default_value_get x =
-          BA_.get_pointer_field x 3 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1)
-        let default_value_set_reader x v =
-          BA_.get_pointer_field x 3 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 v)
-        let default_value_set_builder x v =
-          BA_.get_pointer_field x 3 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (Some v))
-        let default_value_init x =
-          BA_.get_pointer_field x 3 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1)
+        let has_type x = 
+          (BA_.get_pointer_field x 2 ~f:BA_.has_field)
+        let type_get x = 
+          (BA_.get_pointer_field x 2 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1))
+        let type_set_reader x v = 
+          (BA_.get_pointer_field x 2 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (v)))
+        let type_set_builder x v = 
+          (BA_.get_pointer_field x 2 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (Some (v))))
+        let type_init x = 
+          (BA_.get_pointer_field x 2 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1))
+        let has_default_value x = 
+          (BA_.get_pointer_field x 3 ~f:BA_.has_field)
+        let default_value_get x = 
+          (BA_.get_pointer_field x 3 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1))
+        let default_value_set_reader x v = 
+          (BA_.get_pointer_field x 3 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (v)))
+        let default_value_set_builder x v = 
+          (BA_.get_pointer_field x 3 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (Some (v))))
+        let default_value_init x = 
+          (BA_.get_pointer_field x 3 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1))
         let had_explicit_default_get x =
           BA_.get_data_field x ~f:(BA_.get_bit ~default:false ~byte_ofs:16 ~bit_ofs:0)
         let had_explicit_default_set x v =
@@ -2369,18 +2369,18 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
         BA_.get_data_field x ~f:(BA_.get_uint16 ~default:0 ~byte_ofs:0)
       let code_order_set_exn x v =
         BA_.get_data_field x ~f:(BA_.set_uint16 ~default:0 ~byte_ofs:0 v)
-      let has_annotations x =
-        BA_.get_pointer_field x 1 ~f:BA_.has_field
-      let annotations_get x =
-        BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1)
+      let has_annotations x = 
+        (BA_.get_pointer_field x 1 ~f:BA_.has_field)
+      let annotations_get x = 
+        (BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1))
       let annotations_get_list x =
         Capnp.Array.to_list (annotations_get x)
       let annotations_get_array x =
         Capnp.Array.to_array (annotations_get x)
-      let annotations_set x v =
-        BA_.get_pointer_field x 1 ~f:(BA_.set_struct_list ~data_words:1 ~pointer_words:1 v)
-      let annotations_init x n =
-        BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n)
+      let annotations_set x v = 
+        (BA_.get_pointer_field x 1 ~f:(BA_.set_struct_list ~data_words:1 ~pointer_words:1 (v)))
+      let annotations_init x n = 
+        (BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n))
       let annotations_set_list x v =
         let builder = annotations_init x (List.length v) in
         let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -2444,18 +2444,18 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
         let discriminant_offset_set x v =
           BA_.get_data_field x ~f:(BA_.set_uint32 ~default:Uint32.zero ~byte_ofs:32 v)
         let discriminant_offset_set_int_exn x v = discriminant_offset_set x (Uint32.of_int v)
-        let has_fields x =
-          BA_.get_pointer_field x 3 ~f:BA_.has_field
-        let fields_get x =
-          BA_.get_pointer_field x 3 ~f:(BA_.get_struct_list ~data_words:3 ~pointer_words:4)
+        let has_fields x = 
+          (BA_.get_pointer_field x 3 ~f:BA_.has_field)
+        let fields_get x = 
+          (BA_.get_pointer_field x 3 ~f:(BA_.get_struct_list ~data_words:3 ~pointer_words:4))
         let fields_get_list x =
           Capnp.Array.to_list (fields_get x)
         let fields_get_array x =
           Capnp.Array.to_array (fields_get x)
-        let fields_set x v =
-          BA_.get_pointer_field x 3 ~f:(BA_.set_struct_list ~data_words:3 ~pointer_words:4 v)
-        let fields_init x n =
-          BA_.get_pointer_field x 3 ~f:(BA_.init_struct_list ~data_words:3 ~pointer_words:4 n)
+        let fields_set x v = 
+          (BA_.get_pointer_field x 3 ~f:(BA_.set_struct_list ~data_words:3 ~pointer_words:4 (v)))
+        let fields_init x n = 
+          (BA_.get_pointer_field x 3 ~f:(BA_.init_struct_list ~data_words:3 ~pointer_words:4 n))
         let fields_set_list x v =
           let builder = fields_init x (List.length v) in
           let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -2473,18 +2473,18 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
       module Enum = struct
         type t = builder_t_Enum_13063450714778629528
         type reader_t = reader_t_Enum_13063450714778629528
-        let has_enumerants x =
-          BA_.get_pointer_field x 3 ~f:BA_.has_field
-        let enumerants_get x =
-          BA_.get_pointer_field x 3 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:2)
+        let has_enumerants x = 
+          (BA_.get_pointer_field x 3 ~f:BA_.has_field)
+        let enumerants_get x = 
+          (BA_.get_pointer_field x 3 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:2))
         let enumerants_get_list x =
           Capnp.Array.to_list (enumerants_get x)
         let enumerants_get_array x =
           Capnp.Array.to_array (enumerants_get x)
-        let enumerants_set x v =
-          BA_.get_pointer_field x 3 ~f:(BA_.set_struct_list ~data_words:1 ~pointer_words:2 v)
-        let enumerants_init x n =
-          BA_.get_pointer_field x 3 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:2 n)
+        let enumerants_set x v = 
+          (BA_.get_pointer_field x 3 ~f:(BA_.set_struct_list ~data_words:1 ~pointer_words:2 (v)))
+        let enumerants_init x n = 
+          (BA_.get_pointer_field x 3 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:2 n))
         let enumerants_set_list x v =
           let builder = enumerants_init x (List.length v) in
           let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -2502,16 +2502,16 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
       module Annotation = struct
         type t = builder_t_Annotation_17011813041836786320
         type reader_t = reader_t_Annotation_17011813041836786320
-        let has_type x =
-          BA_.get_pointer_field x 3 ~f:BA_.has_field
-        let type_get x =
-          BA_.get_pointer_field x 3 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1)
-        let type_set_reader x v =
-          BA_.get_pointer_field x 3 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 v)
-        let type_set_builder x v =
-          BA_.get_pointer_field x 3 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (Some v))
-        let type_init x =
-          BA_.get_pointer_field x 3 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1)
+        let has_type x = 
+          (BA_.get_pointer_field x 3 ~f:BA_.has_field)
+        let type_get x = 
+          (BA_.get_pointer_field x 3 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1))
+        let type_set_reader x v = 
+          (BA_.get_pointer_field x 3 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (v)))
+        let type_set_builder x v = 
+          (BA_.get_pointer_field x 3 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (Some (v))))
+        let type_init x = 
+          (BA_.get_pointer_field x 3 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1))
         let targets_file_get x =
           BA_.get_data_field x ~f:(BA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:0)
         let targets_file_set x v =
@@ -2569,26 +2569,26 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
       module Const = struct
         type t = builder_t_Const_12793219851699983392
         type reader_t = reader_t_Const_12793219851699983392
-        let has_type x =
-          BA_.get_pointer_field x 3 ~f:BA_.has_field
-        let type_get x =
-          BA_.get_pointer_field x 3 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1)
-        let type_set_reader x v =
-          BA_.get_pointer_field x 3 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 v)
-        let type_set_builder x v =
-          BA_.get_pointer_field x 3 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (Some v))
-        let type_init x =
-          BA_.get_pointer_field x 3 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1)
-        let has_value x =
-          BA_.get_pointer_field x 4 ~f:BA_.has_field
-        let value_get x =
-          BA_.get_pointer_field x 4 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1)
-        let value_set_reader x v =
-          BA_.get_pointer_field x 4 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 v)
-        let value_set_builder x v =
-          BA_.get_pointer_field x 4 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (Some v))
-        let value_init x =
-          BA_.get_pointer_field x 4 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1)
+        let has_type x = 
+          (BA_.get_pointer_field x 3 ~f:BA_.has_field)
+        let type_get x = 
+          (BA_.get_pointer_field x 3 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1))
+        let type_set_reader x v = 
+          (BA_.get_pointer_field x 3 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (v)))
+        let type_set_builder x v = 
+          (BA_.get_pointer_field x 3 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (Some (v))))
+        let type_init x = 
+          (BA_.get_pointer_field x 3 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1))
+        let has_value x = 
+          (BA_.get_pointer_field x 4 ~f:BA_.has_field)
+        let value_get x = 
+          (BA_.get_pointer_field x 4 ~f:(BA_.get_struct ~data_words:2 ~pointer_words:1))
+        let value_set_reader x v = 
+          (BA_.get_pointer_field x 4 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (v)))
+        let value_set_builder x v = 
+          (BA_.get_pointer_field x 4 ~f:(BA_.set_struct ~data_words:2 ~pointer_words:1 (Some (v))))
+        let value_init x = 
+          (BA_.get_pointer_field x 4 ~f:(BA_.init_struct ~data_words:2 ~pointer_words:1))
         let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
         let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
         let to_reader x = Some (RA_.StructStorage.readonly x)
@@ -2598,18 +2598,18 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
       module Interface = struct
         type t = builder_t_Interface_16728431493453586831
         type reader_t = reader_t_Interface_16728431493453586831
-        let has_methods x =
-          BA_.get_pointer_field x 3 ~f:BA_.has_field
-        let methods_get x =
-          BA_.get_pointer_field x 3 ~f:(BA_.get_struct_list ~data_words:3 ~pointer_words:2)
+        let has_methods x = 
+          (BA_.get_pointer_field x 3 ~f:BA_.has_field)
+        let methods_get x = 
+          (BA_.get_pointer_field x 3 ~f:(BA_.get_struct_list ~data_words:3 ~pointer_words:2))
         let methods_get_list x =
           Capnp.Array.to_list (methods_get x)
         let methods_get_array x =
           Capnp.Array.to_array (methods_get x)
-        let methods_set x v =
-          BA_.get_pointer_field x 3 ~f:(BA_.set_struct_list ~data_words:3 ~pointer_words:2 v)
-        let methods_init x n =
-          BA_.get_pointer_field x 3 ~f:(BA_.init_struct_list ~data_words:3 ~pointer_words:2 n)
+        let methods_set x v = 
+          (BA_.get_pointer_field x 3 ~f:(BA_.set_struct_list ~data_words:3 ~pointer_words:2 (v)))
+        let methods_init x n = 
+          (BA_.get_pointer_field x 3 ~f:(BA_.init_struct_list ~data_words:3 ~pointer_words:2 n))
         let methods_set_list x v =
           let builder = methods_init x (List.length v) in
           let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -2618,8 +2618,8 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
           let builder = methods_init x (Array.length v) in
           let () = Array.iteri (fun i a -> Capnp.Array.set builder i a) v in
           builder
-        let has_extends x =
-          BA_.get_pointer_field x 4 ~f:BA_.has_field
+        let has_extends x = 
+          (BA_.get_pointer_field x 4 ~f:BA_.has_field)
         let extends_get x =
           BA_.get_pointer_field x 4 ~f:(BA_.get_uint64_list)
         let extends_get_list x =
@@ -2844,18 +2844,18 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
       let scope_id_set x v =
         BA_.get_data_field x ~f:(BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:16 v)
       let scope_id_set_int_exn x v = scope_id_set x (Uint64.of_int v)
-      let has_nested_nodes x =
-        BA_.get_pointer_field x 1 ~f:BA_.has_field
-      let nested_nodes_get x =
-        BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1)
+      let has_nested_nodes x = 
+        (BA_.get_pointer_field x 1 ~f:BA_.has_field)
+      let nested_nodes_get x = 
+        (BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1))
       let nested_nodes_get_list x =
         Capnp.Array.to_list (nested_nodes_get x)
       let nested_nodes_get_array x =
         Capnp.Array.to_array (nested_nodes_get x)
-      let nested_nodes_set x v =
-        BA_.get_pointer_field x 1 ~f:(BA_.set_struct_list ~data_words:1 ~pointer_words:1 v)
-      let nested_nodes_init x n =
-        BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n)
+      let nested_nodes_set x v = 
+        (BA_.get_pointer_field x 1 ~f:(BA_.set_struct_list ~data_words:1 ~pointer_words:1 (v)))
+      let nested_nodes_init x n = 
+        (BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n))
       let nested_nodes_set_list x v =
         let builder = nested_nodes_init x (List.length v) in
         let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -2864,18 +2864,18 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
         let builder = nested_nodes_init x (Array.length v) in
         let () = Array.iteri (fun i a -> Capnp.Array.set builder i a) v in
         builder
-      let has_annotations x =
-        BA_.get_pointer_field x 2 ~f:BA_.has_field
-      let annotations_get x =
-        BA_.get_pointer_field x 2 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1)
+      let has_annotations x = 
+        (BA_.get_pointer_field x 2 ~f:BA_.has_field)
+      let annotations_get x = 
+        (BA_.get_pointer_field x 2 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1))
       let annotations_get_list x =
         Capnp.Array.to_list (annotations_get x)
       let annotations_get_array x =
         Capnp.Array.to_array (annotations_get x)
-      let annotations_set x v =
-        BA_.get_pointer_field x 2 ~f:(BA_.set_struct_list ~data_words:1 ~pointer_words:1 v)
-      let annotations_init x n =
-        BA_.get_pointer_field x 2 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n)
+      let annotations_set x v = 
+        (BA_.get_pointer_field x 2 ~f:(BA_.set_struct_list ~data_words:1 ~pointer_words:1 (v)))
+      let annotations_init x n = 
+        (BA_.get_pointer_field x 2 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n))
       let annotations_set_list x v =
         let builder = annotations_init x (List.length v) in
         let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -2931,18 +2931,18 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
           BA_.get_pointer_field x 0 ~f:(BA_.get_text ~default:"")
         let filename_set x v =
           BA_.get_pointer_field x 0 ~f:(BA_.set_text v)
-        let has_imports x =
-          BA_.get_pointer_field x 1 ~f:BA_.has_field
-        let imports_get x =
-          BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1)
+        let has_imports x = 
+          (BA_.get_pointer_field x 1 ~f:BA_.has_field)
+        let imports_get x = 
+          (BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:1))
         let imports_get_list x =
           Capnp.Array.to_list (imports_get x)
         let imports_get_array x =
           Capnp.Array.to_array (imports_get x)
-        let imports_set x v =
-          BA_.get_pointer_field x 1 ~f:(BA_.set_struct_list ~data_words:1 ~pointer_words:1 v)
-        let imports_init x n =
-          BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n)
+        let imports_set x v = 
+          (BA_.get_pointer_field x 1 ~f:(BA_.set_struct_list ~data_words:1 ~pointer_words:1 (v)))
+        let imports_init x n = 
+          (BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:1 n))
         let imports_set_list x v =
           let builder = imports_init x (List.length v) in
           let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -2957,18 +2957,18 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:1 ~pointer_words:2 ()
       end
-      let has_nodes x =
-        BA_.get_pointer_field x 0 ~f:BA_.has_field
-      let nodes_get x =
-        BA_.get_pointer_field x 0 ~f:(BA_.get_struct_list ~data_words:5 ~pointer_words:5)
+      let has_nodes x = 
+        (BA_.get_pointer_field x 0 ~f:BA_.has_field)
+      let nodes_get x = 
+        (BA_.get_pointer_field x 0 ~f:(BA_.get_struct_list ~data_words:5 ~pointer_words:5))
       let nodes_get_list x =
         Capnp.Array.to_list (nodes_get x)
       let nodes_get_array x =
         Capnp.Array.to_array (nodes_get x)
-      let nodes_set x v =
-        BA_.get_pointer_field x 0 ~f:(BA_.set_struct_list ~data_words:5 ~pointer_words:5 v)
-      let nodes_init x n =
-        BA_.get_pointer_field x 0 ~f:(BA_.init_struct_list ~data_words:5 ~pointer_words:5 n)
+      let nodes_set x v = 
+        (BA_.get_pointer_field x 0 ~f:(BA_.set_struct_list ~data_words:5 ~pointer_words:5 (v)))
+      let nodes_init x n = 
+        (BA_.get_pointer_field x 0 ~f:(BA_.init_struct_list ~data_words:5 ~pointer_words:5 n))
       let nodes_set_list x v =
         let builder = nodes_init x (List.length v) in
         let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -2977,18 +2977,18 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
         let builder = nodes_init x (Array.length v) in
         let () = Array.iteri (fun i a -> Capnp.Array.set builder i a) v in
         builder
-      let has_requested_files x =
-        BA_.get_pointer_field x 1 ~f:BA_.has_field
-      let requested_files_get x =
-        BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:2)
+      let has_requested_files x = 
+        (BA_.get_pointer_field x 1 ~f:BA_.has_field)
+      let requested_files_get x = 
+        (BA_.get_pointer_field x 1 ~f:(BA_.get_struct_list ~data_words:1 ~pointer_words:2))
       let requested_files_get_list x =
         Capnp.Array.to_list (requested_files_get x)
       let requested_files_get_array x =
         Capnp.Array.to_array (requested_files_get x)
-      let requested_files_set x v =
-        BA_.get_pointer_field x 1 ~f:(BA_.set_struct_list ~data_words:1 ~pointer_words:2 v)
-      let requested_files_init x n =
-        BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:2 n)
+      let requested_files_set x v = 
+        (BA_.get_pointer_field x 1 ~f:(BA_.set_struct_list ~data_words:1 ~pointer_words:2 (v)))
+      let requested_files_init x n = 
+        (BA_.get_pointer_field x 1 ~f:(BA_.init_struct_list ~data_words:1 ~pointer_words:2 n))
       let requested_files_set_list x v =
         let builder = requested_files_init x (List.length v) in
         let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -3005,6 +3005,4 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
     end
   end
 end
-
-module Make (MessageWrapper : Capnp.MessageSig.S) = MakeUnsafe(MessageWrapper)
 

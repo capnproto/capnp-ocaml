@@ -28,62 +28,37 @@
  ******************************************************************************)
 
 
-open Core.Std
-open EndianString
+module FramingError = struct
+  type t =
+    | Incomplete    (** less than a full frame is available *)
+    | Unsupported   (** frame header describes a segment count or segment size that
+                        is too large for the implementation *)
+end
 
-type t = string
 
-let alloc size = String.make size '\x00'
-let release x = ()
+module type DECODER = sig
+  (** The type of streams containing framed messages. *)
+  type t
 
-let length = String.length
+  (** [empty ()] returns a new stream containing no data. *)
+  val empty : unit -> t
 
-let get_uint8      = LittleEndian.get_uint8
-let get_uint16     = LittleEndian.get_uint16
-let get_uint32 s i = Uint32.of_int32 (LittleEndian.get_int32 s i)
-let get_uint64 s i = Uint64.of_int64 (LittleEndian.get_int64 s i)
+  (** [of_bytes buf] returns a new stream which is filled with the contents
+      of the given buffer. *)
+  val of_string : string -> t
 
-let get_int8  = LittleEndian.get_int8
-let get_int16 = LittleEndian.get_int16
-let get_int32 = LittleEndian.get_int32
-let get_int64 = LittleEndian.get_int64
+  (** [add_fragment stream fragment] adds a new fragment to the stream for
+      decoding.  Fragments are processed in FIFO order. *)
+  val add_fragment : t -> string -> unit
 
-let set_uint32 s i v = LittleEndian.set_int32 s i (Uint32.to_int32 v)
-let set_uint64 s i v = LittleEndian.set_int64 s i (Uint64.to_int64 v)
+  (** [is_empty stream] determines whether or not the stream contains any
+      data which has not yet been fully decoded. *)
+  val is_empty : t -> bool
 
-let set_int32 = LittleEndian.set_int32
-let set_int64 = LittleEndian.set_int64
-
-let set_uint8 s i v =
-  if v < 0 || v > 0xff then
-    invalid_arg "StringStorage.set_uint8"
-  else
-    (* Not a typo!  [LittleEndian.set_int8] "writes the least significant
-       8 bits of [v]", which is the behavior we want from [set_uint8]. *)
-    LittleEndian.set_int8 s i v
-
-let set_uint16 s i v =
-  if v < 0 || v > 0xffff then
-    invalid_arg "StringStorage.set_uint16"
-  else
-    LittleEndian.set_int16 s i v
-
-let set_int8 s i v =
-  if v < -128 || v > 127 then
-    invalid_arg "StringStorage.set_int8"
-  else
-    LittleEndian.set_int8 s i v
-
-let set_int16 s i v =
-  if v < -32768 || v > 32767 then
-    invalid_arg "StringStorage.set_int16"
-  else
-    let u16 =
-      if v < 0 then
-        (1 lsl 16) - (-v)
-      else
-        v
-    in
-    LittleEndian.set_int16 s i u16
-
+  (** [get_next_frame] attempts to decode the next frame from the stream.
+      A successful decode removes the data from the stream and returns the
+      frame as a [string list] with one list element for every segment within
+      the message. *)
+  val get_next_frame : t -> (string list, FramingError.t) Core.Std.Result.t
+end
 

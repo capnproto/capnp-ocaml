@@ -32,36 +32,10 @@ open Core.Std
 
 
 module FramingError = struct
-  type t =
-    | Incomplete    (* less than a full frame is available *)
-    | Unsupported   (* frame describes a segment count or segment size that is too large *)
-end
-
-
-module type DECODER = sig
-  (** The type of streams containing framed messages. *)
-  type t
-
-  (** [empty ()] returns a new stream containing no data. *)
-  val empty : unit -> t
-
-  (** [of_string buf] returns a new stream which is filled with the contents
-      of the given buffer. *)
-  val of_string : string -> t
-
-  (** [add_fragment stream fragment] adds a new fragment to the stream for
-      decoding.  Fragments are processed in FIFO order. *)
-  val add_fragment : t -> string -> unit
-
-  (** [is_empty stream] determines whether or not the stream contains any
-      data which has not yet been fully decoded. *)
-  val is_empty : t -> bool
-
-  (** [get_next_frame] attempts to decode the next frame from the stream.
-      A successful decode removes the data from the stream and returns the
-      frame as a [string list] with one list element for every segment within
-      the message. *)
-  val get_next_frame : t -> (string list, FramingError.t) Core.Std.Result.t
+  type t = CodecsSig.FramingError.t =
+    | Incomplete    (** less than a full frame is available *)
+    | Unsupported   (** frame header describes a segment count or segment size that
+                        is too large for the implementation *)
 end
 
 
@@ -128,17 +102,17 @@ end = struct
     if stream.fragments_size < size then
       None
     else
-      let buf = String.create size in
+      let buf = Bytes.create size in
       let () =
         let ofs = ref 0 in
         while !ofs < size do
           let bytes_remaining = size - !ofs in
           let fragment = Dequeue.dequeue_front_exn stream.fragments in
           let bytes_from_fragment = min bytes_remaining (String.length fragment) in
-          String.blit
-            ~src:fragment ~src_pos:0
-            ~dst:buf ~dst_pos:!ofs
-            ~len:bytes_from_fragment;
+          Bytes.blit
+            (Bytes.of_string fragment) 0
+            buf !ofs
+            bytes_from_fragment;
           begin if bytes_from_fragment < String.length fragment then
             let remainder = Util.str_slice ~start:bytes_from_fragment fragment in
             Dequeue.enqueue_front stream.fragments remainder
@@ -147,7 +121,7 @@ end = struct
         done;
         stream.fragments_size <- stream.fragments_size - size;
       in
-      Some buf
+      Some (Bytes.to_string buf)
 
   let remove_at_least stream size =
     if stream.fragments_size < size then
@@ -229,7 +203,7 @@ module FramedStream = struct
        you how long the full header is *)
     match FragmentBuffer.peek_exact stream.fragment_buffer 4 with
     | Some partial_header ->
-        let segment_count_u32 = StringStorage.get_uint32 partial_header 0 in
+        let segment_count_u32 = BytesStorage.get_uint32 partial_header 0 in
         begin try
           let segment_count = 1 + (Uint32.to_int segment_count_u32) in
           let frame_header_size =
@@ -256,7 +230,7 @@ module FramedStream = struct
         Result.Error FramingError.Incomplete
 
   and unpack_frame stream incomplete_frame =
-    let segment_count_u32 = StringStorage.get_uint32 incomplete_frame.frame_header 0 in
+    let segment_count_u32 = BytesStorage.get_uint32 incomplete_frame.frame_header 0 in
     let segment_count = 1 + (Uint32.to_int segment_count_u32) in
     let segments_decoded = Res.Array.length incomplete_frame.complete_segments in
     if segments_decoded = segment_count then
@@ -264,7 +238,7 @@ module FramedStream = struct
       Result.Ok (Res.Array.to_list incomplete_frame.complete_segments)
     else
       let () = assert (segments_decoded < segment_count) in
-      let segment_size_words_u32 = StringStorage.get_uint32
+      let segment_size_words_u32 = BytesStorage.get_uint32
           incomplete_frame.frame_header (4 + (4 * segments_decoded))
       in
       begin try
@@ -374,19 +348,19 @@ module PackedStream = struct
             try_apply ~required_byte_count:(1 + literal_bytes_required)
               ~f:(fun () ->
                 let src_ofs = ref (ofs + 1) in
-                let output_word = String.create 8 in
+                let output_word = Bytes.create 8 in
                 let rec loop i =
                   if i = 8 then
                     let () = FramedStream.add_fragment stream.unpacked
-                        output_word in
+                        (Bytes.to_string output_word) in
                     unpack_aux buf !src_ofs
                   else
                     let () =
                       if (c_int land (1 lsl i)) <> 0 then begin
-                        output_word.[i] <- buf.[!src_ofs];
+                        Bytes.set output_word i buf.[!src_ofs];
                         src_ofs := !src_ofs + 1
                       end else
-                        output_word.[i] <- '\x00'
+                        Bytes.set output_word i '\x00'
                     in
                     loop (i + 1)
                 in
@@ -423,22 +397,23 @@ end
 let make_header message =
   let buf = Buffer.create 8 in
   let () = List.iter message ~f:(fun segment ->
-      let size_buf = String.create 4 in
-      let () = StringStorage.set_uint32 size_buf 0
+      let size_buf = Bytes.create 4 in
+      let () = BytesStorage.set_uint32 size_buf 0
           (Uint32.of_int (String.length segment))
       in
-      Buffer.add_string buf size_buf)
+      Buffer.add_string buf (Bytes.to_string size_buf))
   in
   let segment_sizes = Buffer.contents buf in
   let segment_count = (String.length segment_sizes) / 4 in
   if segment_count = 0 then
     invalid_arg "make_header requires nonempty message"
   else
-    let count_buf = String.create 4 in
-    let () = StringStorage.set_uint32 count_buf 0
+    let count_buf = Bytes.create 4 in
+    let () = BytesStorage.set_uint32 count_buf 0
         (Uint32.of_int (segment_count - 1))
     in
     (* pad out to a word boundary *)
+    let count_buf = Bytes.to_string count_buf in
     if segment_count mod 2 = 0 then
       count_buf ^ segment_sizes ^ (String.make 4 '\x00')
     else
@@ -480,15 +455,17 @@ let pack_string s =
     if ofs = String.length s then
       Buffer.contents buf
     else
-      loop_bytes ~tag_byte:0 ~output_buf:(String.create 9) ~output_count:1
+      loop_bytes ~tag_byte:0 ~output_buf:(Bytes.create 9) ~output_count:1
         ~ofs 0
 
   (* Loop across bytes within a word, emitting a tag byte followed by
      a variable number of literal bytes *)
   and loop_bytes ~tag_byte ~output_buf ~output_count ~ofs bit =
     if bit = 8 then
-      let () = output_buf.[0] <- Char.of_int_exn tag_byte in
-      let () = Buffer.add_substring buf output_buf 0 output_count in
+      let () = Bytes.set output_buf 0 (Char.of_int_exn tag_byte) in
+      let () = Buffer.add_substring buf
+        (Bytes.to_string output_buf) 0 output_count
+      in
       if tag_byte = 0 then
         loop_zero_words ~count:0 (ofs + 8)
       else if tag_byte = 0xff then
@@ -499,7 +476,7 @@ let pack_string s =
       if s.[ofs + bit] = '\x00' then
         loop_bytes ~tag_byte ~output_buf ~output_count ~ofs (bit + 1)
       else
-        let () = output_buf.[output_count] <- s.[ofs + bit] in
+        let () = Bytes.set output_buf output_count s.[ofs + bit] in
         loop_bytes
           ~tag_byte:(tag_byte lor (1 lsl bit))
           ~output_buf ~output_count:(output_count + 1)
