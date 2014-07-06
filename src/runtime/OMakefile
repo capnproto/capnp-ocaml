@@ -32,8 +32,10 @@ INSTALL_FILES = \
   libcapnp.cmxs \
   libcapnp.a \
   codecs.mli \
+  codecsSig.ml \
   cArray.mli \
   message.mli \
+  messageSig.ml \
   messageStorage.ml \
   META
 
