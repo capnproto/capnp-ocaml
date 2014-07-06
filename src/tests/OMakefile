@@ -8,6 +8,7 @@ NATIVE_ENABLED = false
 TEST_MODULES = \
   c2b2b \
   test \
+  test_import \
   testLists \
   testStringStorage \
   testMisc \
@@ -35,6 +36,11 @@ test.mli test.ml: $(COMPILER) .capnp-repo
 	bash -c 'REPO_DIR=`cat .capnp-repo` && \
 	capnp compile -o $(COMPILER) -I $$REPO_DIR/c++/src \
 		$$REPO_DIR/c++/src/capnp/test.capnp'
+
+test_import.mli test_import.ml: $(COMPILER) .capnp-repo
+	bash -c 'REPO_DIR=`cat .capnp-repo` && \
+	capnp compile -o $(COMPILER) -I $$REPO_DIR/c++/src \
+	$$REPO_DIR/c++/src/capnp/test-import.capnp'
 
 testLists.mli testLists.ml: $(COMPILER) .capnp-repo testLists.capnp
 	bash -c 'REPO_DIR=`cat .capnp-repo` && \

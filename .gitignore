@@ -25,3 +25,5 @@ src/tests/testLists.mli
 src/tests/testLists.ml
 src/tests/c2b2b.mli
 src/tests/c2b2b.ml
+src/tests/test_import.mli
+src/tests/test_import.ml

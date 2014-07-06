@@ -31,9 +31,10 @@
 
 open Core.Std
 
-module SM = Capnp.Message.Make(Capnp.StringStorage)
-module T  = Test.Make(SM)
-module TL = TestLists.Make(SM)
+module SM  = Capnp.Message.Make(Capnp.StringStorage)
+module T   = Test.Make(SM)
+module TL  = TestLists.Make(SM)
+module TI  = Test_import.Make(SM)
 
 open OUnit2
 
@@ -1350,8 +1351,219 @@ let test_upgrade_list_in_builder ctx =
     (* old location zero'd during upgrade *)
     assert_equal (Capnp.Array.to_list a) [ ""; ""; "" ]
   in
+
+  let () =
+    let (message, orig) =
+      let root = TL.Builder.TestOldVersionList.init_root () in
+      let a = TL.Builder.TestOldVersionList.a_init root 3 in
+      let open T.Builder.TestOldVersion in
+      old1_set (Capnp.Array.get a 0) 0x1234567890abcdefL;
+      old1_set (Capnp.Array.get a 1) 0x234567890abcdef1L;
+      old1_set (Capnp.Array.get a 2) 0x34567890abcdef12L;
+      old2_set (Capnp.Array.get a 0) "foo";
+      old2_set (Capnp.Array.get a 1) "bar";
+      old2_set (Capnp.Array.get a 2) "baz";
+      (TL.Builder.TestOldVersionList.to_message root, a)
+    in
+    let () =
+      let root = TL.Reader.VoidList.of_message message in
+      assert_equal (TL.Reader.VoidList.a_get_list root) [ (); (); () ];
+    in
+    let () =
+      let root = TL.Reader.BoolList.of_message message in
+      assert_equal (TL.Reader.BoolList.a_get_list root) [ true; true; false ];
+    in
+    let () =
+      let root = TL.Reader.UInt8List.of_message message in
+      assert_equal (TL.Reader.UInt8List.a_get_list root) [ 0xef; 0xf1; 0x12 ];
+    in
+    let () =
+      let root = TL.Reader.UInt16List.of_message message in
+      assert_equal (TL.Reader.UInt16List.a_get_list root) [ 0xcdef; 0xdef1; 0xef12 ];
+    in
+    let () =
+      let root = TL.Reader.UInt32List.of_message message in
+      assert_equal (TL.Reader.UInt32List.a_get_list root)
+        (List.map ~f:Uint32.of_string [ "0x90abcdef"; "0x0abcdef1"; "0xabcdef12" ])
+    in
+    let () =
+      let root = TL.Reader.UInt64List.of_message message in
+      assert_equal (TL.Reader.UInt64List.a_get_list root)
+        (List.map ~f:Uint64.of_string
+           ["0x1234567890abcdef"; "0x234567890abcdef1"; "0x34567890abcdef12" ])
+    in
+    let () =
+      let root = TL.Reader.TextList.of_message message in
+      assert_equal (TL.Reader.TextList.a_get_list root) [ "foo"; "bar"; "baz" ]
+    in
+    check_upgraded_list message
+      [| 0x1234567890abcdefL; 0x234567890abcdef1L; 0x34567890abcdef12L |]
+      [| "foo"; "bar"; "baz" |];
+    (* old location zero'd during upgrade *)
+    let module R = T.Reader.TestOldVersion in
+    assert_equal (List.map ~f:(fun x -> x |> R.of_builder |> R.old1_get)
+        (Capnp.Array.to_list orig)) [ 0L; 0L; 0L ];
+    assert_equal (List.map ~f:(fun x -> x |> R.of_builder |> R.old2_get)
+        (Capnp.Array.to_list orig)) [ ""; ""; "" ]
+  in
   ()
 
+
+let test_nested_types_encoding ctx =
+  let open T.Reader.TestNestedTypes in
+  let reader = of_builder (T.Builder.TestNestedTypes.init_root ()) in
+  assert_equal NestedEnum.Bar (outer_nested_enum_get reader);
+  assert_equal NestedStruct.NestedEnum.Quux (inner_nested_enum_get reader);
+
+  let nested = nested_struct_get reader in
+  assert_equal NestedEnum.Bar
+    (NestedStruct.outer_nested_enum_get nested);
+  assert_equal NestedStruct.NestedEnum.Quux
+    (NestedStruct.inner_nested_enum_get nested)
+
+
+let test_imports ctx =
+  let () =
+    let root = TI.Builder.TestImport.init_root () in
+    let () = init_test_message (TI.Builder.TestImport.field_init root) in
+    let reader = TI.Builder.TestImport.to_reader root in
+    Reader_check_test_message.f (TI.Reader.TestImport.field_get reader)
+  in
+  ()
+
+let test_constants ctx =
+  let open T.Reader.TestConstants in
+  assert_equal () void_const;
+  assert_equal true bool_const;
+  assert_equal (-123) int8_const;
+  assert_equal (-12345) int16_const;
+  assert_equal (-12345678l) int32_const;
+  assert_equal (-123456789012345L) int64_const;
+  assert_equal 234 uint8_const;
+  assert_equal 45678 uint16_const;
+  assert_equal (Uint32.of_int 3456789012) uint32_const;
+  assert_equal (Uint64.of_string "12345678901234567890") uint64_const;
+  assert_float32_equal 1234.5 float32_const;
+  assert_float64_equal (-123e45) float64_const;
+  assert_equal "foo" text_const;
+  assert_equal "bar" data_const;
+  let () =
+    let open T.Reader.TestAllTypes in
+    assert_equal () (void_field_get struct_const);
+    assert_equal true (bool_field_get struct_const);
+    assert_equal (-12) (int8_field_get struct_const);
+    assert_equal 3456 (int16_field_get struct_const);
+    assert_equal (-78901234l) (int32_field_get struct_const);
+    assert_equal 56789012345678L (int64_field_get struct_const);
+    assert_equal 90 (u_int8_field_get struct_const);
+    assert_equal 1234 (u_int16_field_get struct_const);
+    assert_equal (Uint32.of_int 56789012) (u_int32_field_get struct_const);
+    assert_equal (Uint64.of_string "345678901234567890") (u_int64_field_get struct_const);
+    assert_float32_equal (-1.25e-10) (float32_field_get struct_const);
+    assert_float64_equal 345.0 (float64_field_get struct_const);
+    assert_equal "baz" (text_field_get struct_const);
+    assert_equal "qux" (data_field_get struct_const);
+    assert_equal "nested" (text_field_get (struct_field_get struct_const));
+    assert_equal "really nested"
+      (struct_const |> struct_field_get |> struct_field_get |> text_field_get);
+    assert_equal T.Reader.TestEnum.Baz (enum_field_get struct_const);
+
+    assert_equal (void_list_get_list struct_const) [ (); (); () ];
+    assert_equal (bool_list_get_list struct_const) [ false; true; false; true; true ];
+    assert_equal (int8_list_get_list struct_const) [ 12; -34; -0x80; 0x7f ];
+    assert_equal (int16_list_get_list struct_const) [ 1234; -5678; -0x8000; 0x7fff ];
+    assert_equal (int32_list_get_list struct_const)
+      [ 12345678l; -90123456l; -0x80000000l; 0x7fffffffl ];
+    assert_equal (int64_list_get_list struct_const)
+      [ 123456789012345L; -678901234567890L; -0x8000000000000000L; 0x7fffffffffffffffL ];
+    assert_equal (u_int8_list_get_list struct_const) [ 12; 34; 0; 0xff ];
+    assert_equal (u_int16_list_get_list struct_const) [ 1234; 5678; 0; 0xffff ];
+    assert_equal (u_int32_list_get_list struct_const) (List.map ~f:Uint32.of_string
+        [ "12345678"; "90123456"; "0"; "0xffffffff" ]);
+    assert_equal (u_int64_list_get_list struct_const) (List.map ~f:Uint64.of_string
+        [ "123456789012345"; "678901234567890"; "0"; "0xffffffffffffffff" ]);
+    List.iter2_exn (float32_list_get_list struct_const) 
+      [ 0.0; 1234567.0; 1e37; -1e37; 1e-37; -1e-37 ] ~f:assert_float32_equal;
+    List.iter2_exn (float64_list_get_list struct_const)
+      [ 0.0; 123456789012345.0; 1e306; -1e306; 1e-306; -1e-306 ] ~f:assert_float64_equal;
+    assert_equal (text_list_get_list struct_const) [ "quux"; "corge"; "grault" ];
+    assert_equal (data_list_get_list struct_const) [ "garply"; "waldo"; "fred" ];
+    assert_equal 3 (Capnp.Array.length (struct_list_get struct_const));
+    assert_equal "x structlist 1"
+      (text_field_get (Capnp.Array.get (struct_list_get struct_const) 0));
+    assert_equal "x structlist 2"
+      (text_field_get (Capnp.Array.get (struct_list_get struct_const) 1));
+    assert_equal "x structlist 3"
+      (text_field_get (Capnp.Array.get (struct_list_get struct_const) 2));
+    assert_equal (enum_list_get_list struct_const)
+      [ T.Reader.TestEnum.Qux; T.Reader.TestEnum.Bar; T.Reader.TestEnum.Grault ]
+  in
+  assert_equal T.Reader.TestEnum.Corge enum_const;
+
+  assert_equal 6 (Capnp.Array.length void_list_const);
+  assert_equal (Capnp.Array.to_list bool_list_const) [ true; false; false; true ];
+  assert_equal (Capnp.Array.to_list int8_list_const) [ 111; -111 ];
+  assert_equal (Capnp.Array.to_list int16_list_const) [ 11111; -11111 ];
+  assert_equal (Capnp.Array.to_list int32_list_const)
+    [ 111111111l; -111111111l ];
+  assert_equal (Capnp.Array.to_list int64_list_const)
+    [ 1111111111111111111L; -1111111111111111111L ];
+  assert_equal (Capnp.Array.to_list uint8_list_const) [ 111; 222 ];
+  assert_equal (Capnp.Array.to_list uint16_list_const) [ 33333; 44444 ];
+  assert_equal (Capnp.Array.to_list uint32_list_const)
+    [ Uint32.of_string "3333333333" ];
+  assert_equal (Capnp.Array.to_list uint64_list_const)
+    [ Uint64.of_string "11111111111111111111" ];
+
+  assert_equal 4 (Capnp.Array.length float32_list_const);
+  assert_float32_equal 5555.5 (Capnp.Array.get float32_list_const 0);
+  assert_equal Float.infinity (Capnp.Array.get float32_list_const 1);
+  assert_equal Float.neg_infinity (Capnp.Array.get float32_list_const 2);
+  assert_bool "nan"
+    ((Capnp.Array.get float32_list_const 3) <> (Capnp.Array.get float32_list_const 3));
+
+  assert_equal 4 (Capnp.Array.length float64_list_const);
+  assert_float64_equal 7777.75 (Capnp.Array.get float64_list_const 0);
+  assert_equal Float.infinity (Capnp.Array.get float64_list_const 1);
+  assert_equal Float.neg_infinity (Capnp.Array.get float64_list_const 2);
+  assert_bool "nan"
+    ((Capnp.Array.get float64_list_const 3) <> (Capnp.Array.get float64_list_const 3));
+
+  assert_equal (Capnp.Array.to_list text_list_const)
+    [ "plugh"; "xyzzy"; "thud" ];
+  assert_equal (Capnp.Array.to_list data_list_const)
+    [ "oops"; "exhausted"; "rfc3092" ];
+
+  let () =
+    let open T.Reader.TestAllTypes in
+    assert_equal 3 (Capnp.Array.length struct_list_const);
+    assert_equal "structlist 1" (text_field_get (Capnp.Array.get struct_list_const 0));
+    assert_equal "structlist 2" (text_field_get (Capnp.Array.get struct_list_const 1));
+    assert_equal "structlist 3" (text_field_get (Capnp.Array.get struct_list_const 2))
+  in
+  assert_equal (Capnp.Array.to_list enum_list_const)
+    [ T.Reader.TestEnum.Foo; T.Reader.TestEnum.Garply ]
+
+
+let test_global_constants ctx =
+  let open T.Reader.TestAllTypes in
+  assert_equal (Uint32.of_int 12345) T.Reader.global_int;
+  assert_equal "foobar" T.Reader.global_text;
+  assert_equal 54321l (int32_field_get T.Reader.global_struct);
+  assert_equal (Uint32.of_int 12345)
+    (u_int32_field_get T.Reader.derived_constant);
+  assert_equal "foo"
+    (text_field_get T.Reader.derived_constant);
+  let sub = struct_field_get T.Reader.derived_constant in
+  assert_equal (text_list_get_list sub)
+    [ "quux"; "corge"; "grault" ];
+  assert_equal (int16_list_get_list T.Reader.derived_constant)
+    [ 11111; -11111 ];
+  let list_reader = struct_list_get T.Reader.derived_constant in
+  assert_equal 3 (Capnp.Array.length list_reader);
+  assert_equal "structlist 1" (text_field_get (Capnp.Array.get list_reader 0));
+  assert_equal "structlist 2" (text_field_get (Capnp.Array.get list_reader 1));
+  assert_equal "structlist 3" (text_field_get (Capnp.Array.get list_reader 2))
 
 
 let encoding_suite =
@@ -1369,6 +1581,10 @@ let encoding_suite =
     "build list defaults" >:: test_build_list_defaults;
     "upgrade struct in builder" >:: test_upgrade_struct_in_builder;
     "upgrade list in builder" >:: test_upgrade_list_in_builder;
+    "nested types encoding" >:: test_nested_types_encoding;
+    "test imports" >:: test_imports;
+    "test constants" >:: test_constants;
+    "test global constants" >:: test_global_constants;
   ]
 
 let () = run_test_tt_main encoding_suite

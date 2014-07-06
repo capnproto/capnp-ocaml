@@ -743,7 +743,7 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
             (max data_words src_data_words, max pointer_words src_pointer_words)
         | ListStorageType.Bit ->
             invalid_msg
-              "decoded unexpected list type where List<struct> was expected"
+              "decoded unexpected list type where List<composite> was expected"
       in
       alloc_list_storage dest_message
         (ListStorageType.Composite (dest_data_words, dest_pointer_words))
