@@ -226,7 +226,7 @@ val foo_get : t -> Foo.t
     @return reference to the content of field [foo]
 
     @raise Message.Invalid_message if the message is ill-formatted *)
-val foo_set : t -> Reader.Foo.t -> Builder.Foo.t
+val foo_set_reader : t -> Reader.Foo.t -> Builder.Foo.t
 
 (** [foo_set_builder s v] sets the content of field [foo] by making a deep
     copy of the Builder-typed structure.
@@ -234,7 +234,7 @@ val foo_set : t -> Reader.Foo.t -> Builder.Foo.t
     @return reference to the content of field [foo]
 
     @raise Message.Invalid_message if the message is ill-formatted *)
-val foo_set : t -> Builder.Foo.t -> Builder.Foo.t
+val foo_set_builder : t -> Builder.Foo.t -> Builder.Foo.t
 --------------------------------------------------------------------------------
 
 List Fields
