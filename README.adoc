@@ -1,0 +1,436 @@
+capnp-ocaml
+===========
+
+This is an http://ocaml.org[OCaml] code generator plugin for the
+http://kentonv.github.io/capnproto[Cap\'n Proto] serialization framework.
+
+This plugin is roughly feature-complete for the Cap\'n Proto basic serialization.
+The RPC feature set is not supported at this time.
+
+Design Notes
+------------
+The generated code follows the general Cap\'n Proto convention of using the
+serialized message format as the in-memory data structure representation. This
+enables the "infinitely faster" performance characteristic, but it also means
+that the generated code is not directly compatible with OCaml records, arrays,
+etc.
+
+The generated code is functorized over the underlying message format. This
+enables client code to operate equally well on messages stored as--for
+example--OCaml `bytes` buffers or OCaml `Bigarray` (perhaps most interesting
+for applications involving `mmap()`).
+
+Generated Code
+--------------
+The Cap\'n Proto types are mapped to OCaml types as follows:
+
+.Type mapping
+[width="50%",cols="2",options="header"]
+|================================================
+| Cap\'n Proto Type | OCaml Type
+| `Void`            | `unit`
+| `Bool`            | `bool`
+| `Int8`            | `int`
+| `Int16`           | `int`
+| `Int32`           | `int32`
+| `Int64`           | `int64`
+| `UInt8`           | `int`
+| `UInt16`          | `int`
+| `UInt32`          | `Uint32.t` (from https://github.com/andrenth/ocaml-uint[`uint`] library)
+| `UInt64`          | `Uint64.t` (from https://github.com/andrenth/ocaml-uint[`uint`] library)
+| `Float32`         | `float`
+| `Float64`         | `float`
+| `Text`            | `string`
+| `Data`            | `string`
+| `List<T>`         | `('a, T, 'b) Capnp.Array.t`
+|================================================
+
+The `Capnp.Array` module is roughly API-compatible with OCaml arrays and
+provides similar performance characteristics.
+
+A Cap\'n Proto struct maps to an OCaml module.  The generated module hierarchy
+reflects the hierarchy of structs specified in the schema file.  For example,
+the Cap\'n Proto schema
+--------------------------------------------------------------------------------
+@0xbdb65202adbdc4a0;
+
+struct Outer1 {
+  struct Inner {
+  }
+}
+
+struct Outer2 {
+}
+--------------------------------------------------------------------------------
+would yield a generated module with the signature
+--------------------------------------------------------------------------------
+module type S = sig
+  module Reader : sig
+    module Outer1 : sig
+      type t
+
+      module Inner : sig
+        type t
+
+        (* Read-only accessors for Inner.t *)
+        ...
+      end
+
+      (* Read-only accessors for Outer1.t *)
+      ...
+    end
+
+    module Outer2 : sig
+      type t
+
+      (* Read-only accessors for Outer2.t *)
+      ...
+    end
+    ...
+  end
+
+  module Reader : sig
+    module Outer1 : sig
+      type t
+
+      module Inner : sig
+        type t
+
+        (* Read/write accessors for Inner.t *)
+        ...
+      end
+
+      (* Read/write accessors for Outer1.t *)
+      ...
+    end
+
+    module Outer2 : sig
+      type t
+
+      (* Read/write accessors for Outer2.t *)
+      ...
+    end
+    ...
+  end
+end
+--------------------------------------------------------------------------------
+The `Reader` and `Builder` submodules provide read-only and read/write message
+accessors, respectively.  The accessors for struct fields are constructed as
+follows:
+
+Primitive Fields
+~~~~~~~~~~~~~~~~
+A struct field `foo` of primitive type will result in generation of the
+following accessors:
+--------------------------------------------------------------------------------
+(* for field 'foo' of type Void *)
+val foo_get : t -> unit
+val foo_set : t -> unit -> unit
+
+(* for field 'foo' of type Bool *)
+val foo_get : t -> bool
+val foo_set : t -> bool -> unit
+
+(* for field 'foo' of type Float32 or Float64 *)
+val foo_get : t -> float
+val foo_set : t -> float -> unit
+
+(* for field 'foo' of type Text or Data *)
+val has_foo : t -> bool
+val foo_get : t -> string
+val foo_set : t -> string -> unit
+
+(* for field 'foo' of type Int8 *)
+val foo_get : t -> int
+(* Raise [Invalid_argument] if out of Int8 range *)
+val foo_set_exn : t -> int -> unit
+
+(* for field 'foo' of type Int16 *)
+val foo_get : t -> int
+(* Raise [Invalid_argument] if out of Int16 range *)
+val foo_set_exn : t -> int -> unit
+
+(* for field 'foo' of type Int32 *)
+val foo_get : t -> int32
+(* Raise [Message.Out_of_int_range] if not representable as int *)
+val foo_get_int_exn : t -> int
+val foo_set : t -> int32 -> unit
+(* Raise [Invalid_argument] if out of Int32 range *)
+val foo_set_int_exn : t -> int -> unit
+
+(* for field 'foo' of type Int64 *)
+val foo_get : t -> int64
+(* Raise [Message.Out_of_int_range] if not representable as int *)
+val foo_get_int_exn : t -> int
+val foo_set : t -> int64 -> unit
+val foo_set_int : t -> int
+
+(* for field 'foo' of type UInt8 *)
+val foo_get : t -> int
+(* Raise [Invalid_argument] if out of UInt8 range *)
+val foo_set_exn : t -> int -> unit
+
+(* for field 'foo' of type UInt16 *)
+val foo_get : t -> int
+(* Raise [Invalid_argument] if out of UInt16 range *)
+val foo_set_exn : t -> int -> unit
+
+(* for field 'foo' of type UInt32 *)
+val foo_get : t -> Uint32.t
+(* Raise [Message.Out_of_int_range] if not representable as int *)
+val foo_get_int_exn : t -> int
+val foo_set : t -> Uint32.t -> unit
+(* Raise [Invalid_argument] if out of UInt32 range *)
+val foo_set_int_exn : t -> int -> unit
+
+(* for field 'foo' of type UInt64 *)
+val foo_get : t -> Uint64.t
+(* Raise [Message.Out_of_int_range] if not representable as int *)
+val foo_get_int_exn : t -> int
+val foo_set : t -> Uint64.t -> unit
+(* Raise [Invalid_argument] if out of UInt64 range *)
+val foo_set_int_exn : t -> int -> unit
+--------------------------------------------------------------------------------
+`_get` accessors will be available in both the `Reader` and the `Builder`
+modules; `_set` accessors will be available only for `Builder` types.
+
+Embedded Struct Fields
+~~~~~~~~~~~~~~~~~~~~~~
+A struct field `foo` which is of struct type will result in generation of
+the following accessors:
+--------------------------------------------------------------------------------
+(* Assuming that field foo has generated type Foo.t... *)
+
+(** [has_foo s] returns [true] if field [foo] was set in structure [s]. *)
+val has_foo : t -> bool
+
+(** [foo_init s] initializes the value of field [foo] to the default value
+    for its type.
+
+    @return a reference to the content of field [foo] *)
+val foo_init : t -> Foo.t
+
+(** [foo_get s] gets a reference to the content of field [foo].  (For the
+    Builder implementation, this also default-initializes the structure
+    and causes [has_foo s] to return [true].)
+
+    @raise Message.Invalid_message if the message is ill-formatted *)
+val foo_get : t -> Foo.t
+
+(** [foo_set_reader s v] sets the content of field [foo] by making a deep
+    copy of the Reader-typed structure.
+
+    @return reference to the content of field [foo]
+
+    @raise Message.Invalid_message if the message is ill-formatted *)
+val foo_set : t -> Reader.Foo.t -> Builder.Foo.t
+
+(** [foo_set_builder s v] sets the content of field [foo] by making a deep
+    copy of the Builder-typed structure.
+
+    @return reference to the content of field [foo]
+
+    @raise Message.Invalid_message if the message is ill-formatted *)
+val foo_set : t -> Builder.Foo.t -> Builder.Foo.t
+--------------------------------------------------------------------------------
+
+List Fields
+~~~~~~~~~~~
+A struct field `foo` which is of list type will result in generation of
+the following accessors:
+--------------------------------------------------------------------------------
+(* Assuming that field foo contains values of type Inner... *)
+
+(** [has_foo s] returns [true] if field [foo] was set in structure [s]. *)
+val has_foo : t -> bool
+
+(** [foo_init s n] initializes field [foo] to a zero-initialized list of
+    length [n] (i.e. primitive types are initialized as zero, struct types
+    are initialized as the default value for the struct type).
+
+    @return a reference to the content of field [foo] *)
+val foo_init : t -> int -> (rw, Inner.t, 'a) Capnp.Array.t
+
+(** [foo_get s] gets a reference to the content of field [foo].  (For the
+    Builder implementation, this also default-initializes the list and
+    causes [has_foo s] to return [true].
+
+    @raise Message.Invalid_message if the message is ill-formatted *)
+val foo_get : t -> ('cap, Inner.t, 'arr) Capnp.Array.t
+
+(** [foo_get_list s] creates an OCaml list containing the content of
+    field [foo].
+
+    @raise Message.Invalid_message if the message is ill-formatted *)
+val foo_get_list : t -> Inner.t list
+
+(** [foo_get_array s] creates an OCaml array containing the content of
+    field [foo].
+
+    @raise Message.Invalid_message if the message is ill-formatted *)
+val foo_get_array : t -> Inner.t array
+
+(** [foo_set s v] sets the content of field [foo] by creating a deep copy
+    of list [v].  (This may result in reallocation of [foo], which may
+    lead to poor performance.)
+
+    @return a reference to the content of field [foo]
+
+    @raise Message.Invalid_message if the message is ill-formatted *)
+val foo_set : t -> ('cap, Inner.t, 'a) Capnp.Array.t ->
+                (rw, Inner.t, 'b) Capnp.Array.t
+
+(** [foo_set_list s v] sets the content of field [foo] from OCaml list [v].
+    (This may result in reallocation of [foo], which may lead to poor
+    performance.
+
+    @return a reference to the content of field [foo]
+
+    @raise Message.Invalid_message if the message is ill-formatted *)
+val foo_set_list : t -> Inner.t list -> (rw, Inner.t, 'b) Capnp.Array.t
+
+(** [foo_set_array s v] sets the content of field [foo] from OCaml array [v].
+    (This may result in reallocation of [foo], which may lead to poor
+    performance.
+
+    @return a reference to the content of field [foo]
+
+    @raise Message.Invalid_message if the message is ill-formatted *)
+val foo_set_array : t -> Inner.t array -> (rw, Inner.t, 'b) Capnp.Array.t
+--------------------------------------------------------------------------------
+
+Union Fields
+~~~~~~~~~~~~
+Cap\'n Proto has first-class support for union (sum) types.  These are mapped
+to OCaml variants in a straightforward way.  To retrieve a union value,
+use the generated `get` function which will return a variant specifying which
+of the possible fields is present.  To set a union value, use the generated
+`get_foo` functions which simultaneously set the field value and set the
+union discriminant.
+
+Variant constructors are generated simply by capitalizing the first letters of
+the associated union fields.  In addition, to allow forward compatibility
+the constructor `Undefined of int` is added to the variant type definition.
+This constructor value is returned whenever an unknown union discriminant is
+decoded.
+
+Enum Fields
+~~~~~~~~~~~
+Enums map to OCaml variants in the way one would expect.  Enum fields within
+structs will lead to generation of `foo_get` and `foo_set` accessors which
+work just like the accessors for other primitive types.
+
+Additional Operations on Structs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In addition to field accessors, modules associated with structs also
+contain the following functions:
+--------------------------------------------------------------------------------
+(* Assuming that the struct is called Bar... *)
+
+(** [of_message m] parses message [m] to retrieve the root struct.
+
+    @return a reference to the content of the root struct
+
+    @raise Message.Invalid_message if the message is ill-formatted *)
+val of_message : 'cap message_t -> t
+
+(** [of_builder b] converts a read/write reference to the struct into
+    a read-only interface.  (Found only in the Reader module. *)
+val of_builder : Builder.Bar.t -> Reader.Bar.t
+
+(** [to_reader b] converts a read/write reference to the struct into
+    a read-only interface.  (Found only in the Builder module. *)
+val to_reader : Builder.Bar.t -> Reader.Bar.t
+
+(** [init_root ?message_size ()] constructs a new message and
+    initializes an instance of this struct type as the root struct
+    of the message.  The optional [message_size] can be used to set
+    the initial message size.
+
+    @return a reference to the content of the root struct *)
+val init_root : ?message_size:int -> unit -> Bar.t
+
+(** [to_message s] retrieves the underlying message which is used as
+    the backing store for struct [s]. *)
+val to_message : t -> rw message_t
+--------------------------------------------------------------------------------
+
+Generating Code
+---------------
+You will need to
+http://kentonv.github.io/capnproto/install.html[install the Cap\'n Proto compiler].
+Once the Cap\'n Proto compiler and capnp-ocaml are both installed, you should be
+able to use `capnp compile -o ocaml yourSchemaFile.capnp` in order to generate
+`yourSchemaFile.mli` and `yourSchemaFile.ml`.  These modules will link against
+OCaml packages `core`, `uint`, `ocplib-endian`, `res`, and of course `capnp`.
+
+Instantiating the Modules
+-------------------------
+The modules generated by capnp-ocaml are functors which take the underlying
+message type as input.
+
+In principle, messages can be stored using any underlying data structure that
+satisfies the `Capnp.MessageStorage.S` signature.  At present, capnp-ocaml
+contains one implementation: `Capnp.BytesStorage` provides message storage in
+the form of native OCaml `bytes` buffers.  This module makes it easy to
+retrieve messages in a format suitable for use with file I/O, socket I/O,
+etc.
+
+To instantiate your code using BytesStorage, you could use the following
+pattern:
+--------------------------------------------------------------------------------
+module BytesMessage = Capnp.Message.Make(Capnp.BytesStorage)
+module YSF = YourSchemaFile.Make(BytesMessage)
+
+let root_struct = YSF.Builder.Foo.init_root () in
+(* ... *)
+--------------------------------------------------------------------------------
+
+I Need to See an Example
+------------------------
+I should really put together some trivial example code.  But in the meantime,
+the https://github.com/pelzlpj/capnp-ocaml/tree/master/src/tests[tests]
+subdirectory may be helpful to look at.
+
+
+Installation
+------------
+capnp-ocaml requires OCaml >= 4.01.
+
+You should be able to install capnp-ocaml with
+http://opam.ocaml.org[OPAM] using using `opam install capnp`.
+
+If you prefer to compile manually, you will need OMake, Findlib, and OCaml
+packages `core`, `uint`, `ocplib-endian`, and `res`.  Run `omake` to build
+both the compiler and the runtime library, and then use `omake install`
+to copy them into appropriate places within your filesystem.
+
+Contact
+-------
+pelzlpj at gmail dot com
+
+License
+-------
+Copyright (c) 2013-2014, Paul Pelzl
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation and/or
+   other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
