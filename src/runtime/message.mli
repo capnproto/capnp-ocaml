@@ -39,6 +39,13 @@ module Make (Storage : MessageStorage.S) :
     be completed because the message appears to be ill-formed. *)
 exception Invalid_message of string
 
+(** [Out_of_int_range] is raised by convenience accessor functions when a getter
+    retrieves a value which cannot be expressed as an OCaml int. *)
+exception Out_of_int_range of string
+
 (** [invalid_msg err] is equivalent to [raise (Invalid_message err)]. *)
 val invalid_msg : string -> 'a
+
+(** [out_of_int_range err] is equivalent to [raise (Out_of_int_range err)]. *)
+val out_of_int_range : string -> 'a
 

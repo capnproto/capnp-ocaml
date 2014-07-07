@@ -819,7 +819,7 @@ let generate_one_field_accessors ~context ~node_id ~scope
                 (Int32.to_string a)
                 (field_ofs * 4);
               "let " ^ field_name ^ "_get_int_exn x =";
-              "  Int32.to_int (" ^ field_name ^ "_get x)";
+              "  RA_.int_of_int32_exn (" ^ field_name ^ "_get x)";
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v =";
@@ -829,7 +829,7 @@ let generate_one_field_accessors ~context ~node_id ~scope
                 (Int32.to_string a)
                 (field_ofs * 4);
               "let " ^ field_name ^ "_set_int_exn x v = " ^
-                field_name ^ "_set x (Int32.of_int v)";
+                field_name ^ "_set x (RA_.int32_of_int_exn v)";
             ] in
             (getters, setters)
         | (PS.Type.Int64, PS.Value.Int64 a) ->
@@ -842,7 +842,7 @@ let generate_one_field_accessors ~context ~node_id ~scope
                 (Int64.to_string a)
                 (field_ofs * 8);
               "let " ^ field_name ^ "_get_int_exn x =";
-              "  Int64.to_int (" ^ field_name ^ "_get x)";
+              "  RA_.int_of_int64_exn (" ^ field_name ^ "_get x)";
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v =";
@@ -851,7 +851,7 @@ let generate_one_field_accessors ~context ~node_id ~scope
                 discr_str
                 (Int64.to_string a)
                 (field_ofs * 8);
-              "let " ^ field_name ^ "_set_int_exn x v = " ^
+              "let " ^ field_name ^ "_set_int x v = " ^
                 field_name ^ "_set x (Int64.of_int v)";
             ] in
             (getters, setters)
@@ -908,8 +908,8 @@ let generate_one_field_accessors ~context ~node_id ~scope
                 default
                 (field_ofs * 4);
               "let " ^ field_name ^ "_get_int_exn x =";
-              "  Uint32.to_int (" ^ field_name ^ "_get x)";
-            ] in 
+              "  RA_.int_of_uint32_exn (" ^ field_name ^ "_get x)";
+            ] in
             let setters = [
               "let " ^ field_name ^ "_set x v =";
               sprintf "  BA_.get_data_field %sx ~f:(BA_.set_uint32 \
@@ -918,7 +918,7 @@ let generate_one_field_accessors ~context ~node_id ~scope
                 default
                 (field_ofs * 4);
               "let " ^ field_name ^ "_set_int_exn x v = " ^
-                field_name ^ "_set x (Uint32.of_int v)";
+                field_name ^ "_set x (RA_.uint32_of_int_exn v)";
             ] in
             (getters, setters)
         | (PS.Type.Uint64, PS.Value.Uint64 a) ->
@@ -937,7 +937,7 @@ let generate_one_field_accessors ~context ~node_id ~scope
                 default
                 (field_ofs * 8);
               "let " ^ field_name ^ "_get_int_exn x =";
-              "  Uint64.to_int (" ^ field_name ^ "_get x)";
+              "  RA_.int_of_uint64_exn (" ^ field_name ^ "_get x)";
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v =";
@@ -947,7 +947,7 @@ let generate_one_field_accessors ~context ~node_id ~scope
                 default
                 (field_ofs * 8);
               "let " ^ field_name ^ "_set_int_exn x v = " ^
-                field_name ^ "_set x (Uint64.of_int v)";
+                field_name ^ "_set x (RA_.uint64_of_int_exn v)";
             ] in
             (getters, setters)
         | (PS.Type.Float32, PS.Value.Float32 a) ->

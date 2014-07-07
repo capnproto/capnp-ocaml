@@ -95,7 +95,7 @@ let generate_one_field_accessors ~context ~scope ~mode field
           Getter [ "val " ^ field_name ^ "_get : t -> int64"; ];
           Getter [ "val " ^ field_name ^ "_get_int_exn : t -> int"; ];
           Setter [ "val " ^ field_name ^ "_set : t -> int64 -> unit"; ];
-          Setter [ "val " ^ field_name ^ "_set_int_exn : t -> int -> unit"; ];
+          Setter [ "val " ^ field_name ^ "_set_int : t -> int -> unit"; ];
         ]
       | Uint32 -> [
           Getter [ "val " ^ field_name ^ "_get : t -> Uint32.t"; ];

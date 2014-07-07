@@ -36,7 +36,8 @@ let sizeof_uint32 = 4
 let sizeof_uint64 = 8
 
 module Make (MessageWrapper : MessageSig.S) = struct
-  let invalid_msg = Message.invalid_msg
+  let invalid_msg      = Message.invalid_msg
+  let out_of_int_range = Message.out_of_int_range
   type ro = Message.ro
   type rw = Message.rw
 

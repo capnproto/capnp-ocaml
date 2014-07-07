@@ -49,6 +49,20 @@ let assert_float_equal f1 f2 eps =
 let assert_float32_equal f1 f2 = assert_float_equal f1 f2 1.192092896e-07
 let assert_float64_equal f1 f2 = assert_float_equal f1 f2 Float.epsilon
 
+let assert_raises_invalid_arg f =
+  try
+    let _ = f () in
+    assert_failure "did not raise Invalid_argument"
+  with Invalid_argument _ ->
+    ()
+
+let assert_raises_out_of_int_range f =
+  try
+    let _ = f () in
+    assert_failure "did not raise Out_of_int_range"
+  with Capnp.Message.Out_of_int_range _ ->
+    ()
+
 
 let init_test_message (s : T.Builder.TestAllTypes.t) : unit =
   let open T.Builder.TestAllTypes in
@@ -1239,9 +1253,9 @@ let check_upgraded_list message expected_data expected_pointers =
       assert_equal "baz" (R.new2_get reader);
 
       (* Write some new data *)
-      B.old1_set_int_exn builder (i * 123);
+      B.old1_set_int builder (i * 123);
       B.old2_set builder (Printf.sprintf "qux%d" i);
-      B.new1_set_int_exn builder (i * 456);
+      B.new1_set_int builder (i * 456);
       B.new2_set builder (Printf.sprintf "corge%d" i);
     done
   in
@@ -1566,6 +1580,51 @@ let test_global_constants ctx =
   assert_equal "structlist 3" (text_field_get (Capnp.Array.get list_reader 2))
 
 
+let test_int_accessors ctx =
+  let module R = T.Reader.TestAllTypes in
+  let module B = T.Builder.TestAllTypes in
+  let root  = B.init_root () in
+  let rroot = R.of_builder root in
+
+  B.int64_field_set_int root Int.max_value;
+  assert_equal (B.int64_field_get_int_exn root) Int.max_value;
+  assert_equal (R.int64_field_get_int_exn rroot) Int.max_value;
+  B.int64_field_set root (Int64.(+) (Int64.of_int Int.max_value) Int64.one);
+  assert_raises_out_of_int_range (fun () -> B.int64_field_get_int_exn root);
+  assert_raises_out_of_int_range (fun () -> R.int64_field_get_int_exn rroot);
+
+  B.int64_field_set_int root Int.min_value;
+  assert_equal (B.int64_field_get_int_exn root) Int.min_value;
+  assert_equal (R.int64_field_get_int_exn rroot) Int.min_value;
+  B.int64_field_set root (Int64.(-) (Int64.of_int Int.min_value) Int64.one);
+  assert_raises_out_of_int_range (fun () -> B.int64_field_get_int_exn root);
+  assert_raises_out_of_int_range (fun () -> R.int64_field_get_int_exn rroot);
+
+  B.u_int64_field_set_int_exn root Int.max_value;
+  assert_equal (B.u_int64_field_get_int_exn root) Int.max_value;
+  assert_equal (R.u_int64_field_get_int_exn rroot) Int.max_value;
+  B.u_int64_field_set root (Uint64.add (Uint64.of_int Int.max_value) Uint64.one);
+  assert_raises_out_of_int_range (fun () -> B.u_int64_field_get_int_exn root);
+  assert_raises_out_of_int_range (fun () -> R.u_int64_field_get_int_exn rroot);
+
+  (* Assuming tests are running on 64-bit... *)
+
+  B.int32_field_set_int_exn root (-0x80000000);
+  B.int32_field_set_int_exn root 0x7fffffff;
+  assert_raises_invalid_arg (fun () -> B.int32_field_set_int_exn root (-0x80000001));
+  assert_raises_invalid_arg (fun () -> B.int32_field_set_int_exn root 0x80000000);
+
+  B.u_int32_field_set_int_exn root 0;
+  B.u_int32_field_set_int_exn root 0xffffffff;
+  assert_raises_invalid_arg (fun () -> B.u_int32_field_set_int_exn root 0x100000000);
+  assert_raises_invalid_arg (fun () -> B.u_int32_field_set_int_exn root (-1));
+
+  B.u_int64_field_set_int_exn root 0;
+  B.u_int64_field_set_int_exn root Int.max_value;
+  assert_raises_invalid_arg (fun () -> B.u_int64_field_set_int_exn root (-1))
+
+
+
 let encoding_suite =
   "all_types" >::: [
     "encode/decode" >:: test_encode_decode;
@@ -1585,6 +1644,7 @@ let encoding_suite =
     "test imports" >:: test_imports;
     "test constants" >:: test_constants;
     "test global constants" >:: test_global_constants;
+    "test int accessors" >:: test_int_accessors;
   ]
 
 let () = run_test_tt_main encoding_suite
