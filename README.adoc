@@ -63,6 +63,7 @@ struct Outer2 {
 }
 --------------------------------------------------------------------------------
 would yield a generated module with the signature
+[source,ocaml]
 --------------------------------------------------------------------------------
 module type S = sig
   module Reader : sig
@@ -122,6 +123,7 @@ Primitive Fields
 ~~~~~~~~~~~~~~~~
 A struct field `foo` of primitive type will result in generation of the
 following accessors:
+[source,ocaml]
 --------------------------------------------------------------------------------
 (* for field 'foo' of type Void *)
 val foo_get : t -> unit
@@ -198,6 +200,7 @@ Embedded Struct Fields
 ~~~~~~~~~~~~~~~~~~~~~~
 A struct field `foo` which is of struct type will result in generation of
 the following accessors:
+[source,ocaml]
 --------------------------------------------------------------------------------
 (* Assuming that field foo has generated type Foo.t... *)
 
@@ -238,6 +241,7 @@ List Fields
 ~~~~~~~~~~~
 A struct field `foo` which is of list type will result in generation of
 the following accessors:
+[source,ocaml]
 --------------------------------------------------------------------------------
 (* Assuming that field foo contains values of type Inner... *)
 
@@ -324,6 +328,7 @@ Additional Operations on Structs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In addition to field accessors, modules associated with structs also
 contain the following functions:
+[source,ocaml]
 --------------------------------------------------------------------------------
 (* Assuming that the struct is called Bar... *)
 
@@ -378,6 +383,7 @@ etc.
 
 To instantiate your code using BytesStorage, you could use the following
 pattern:
+[source,ocaml]
 --------------------------------------------------------------------------------
 module BytesMessage = Capnp.Message.Make(Capnp.BytesStorage)
 module YSF = YourSchemaFile.Make(BytesMessage)
