@@ -90,7 +90,7 @@ module type S = sig
     ...
   end
 
-  module Reader : sig
+  module Builder : sig
     module Outer1 : sig
       type t
 
