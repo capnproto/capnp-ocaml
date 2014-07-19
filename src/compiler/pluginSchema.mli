@@ -561,7 +561,7 @@ module type S = sig
       val int32_set : t -> int32 -> unit
       val int32_set_int_exn : t -> int -> unit
       val int64_set : t -> int64 -> unit
-      val int64_set_int_exn : t -> int -> unit
+      val int64_set_int : t -> int -> unit
       val uint8_set_exn : t -> int -> unit
       val uint16_set_exn : t -> int -> unit
       val uint32_set : t -> Uint32.t -> unit

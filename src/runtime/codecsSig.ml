@@ -51,6 +51,10 @@ module type DECODER = sig
       decoding.  Fragments are processed in FIFO order. *)
   val add_fragment : t -> string -> unit
 
+  (** [bytes_available stream] obtains the number of bytes in the stream
+      which have not yet been fully decoded. *)
+  val bytes_available : t -> int
+
   (** [is_empty stream] determines whether or not the stream contains any
       data which has not yet been fully decoded. *)
   val is_empty : t -> bool

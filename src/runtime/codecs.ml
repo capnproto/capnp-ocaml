@@ -186,6 +186,17 @@ module FramedStream = struct
   let add_fragment stream fragment =
     FragmentBuffer.add_fragment stream.fragment_buffer fragment
 
+  let bytes_available stream =
+    match stream.decoder_state with
+    | IncompleteHeader ->
+        FragmentBuffer.byte_count stream.fragment_buffer
+    | IncompleteFrame partial_frame ->
+        (String.length partial_frame.frame_header) +
+        (Res.Array.fold_left (fun acc x -> acc + (String.length x))
+           0
+           partial_frame.complete_segments) +
+        (FragmentBuffer.byte_count stream.fragment_buffer)
+
   let is_empty stream =
     match stream.decoder_state with
     | IncompleteHeader ->
@@ -203,9 +214,15 @@ module FramedStream = struct
        you how long the full header is *)
     match FragmentBuffer.peek_exact stream.fragment_buffer 4 with
     | Some partial_header ->
-        let segment_count_u32 = BytesStorage.get_uint32 partial_header 0 in
         begin try
-          let segment_count = 1 + (Uint32.to_int segment_count_u32) in
+          let segment_count =
+            Util.int_of_uint32_exn (BytesStorage.get_uint32 partial_header 0)
+          in
+          let () =
+            if segment_count > (Int.max_value / 4) - 2 then
+              Util.out_of_int_range "Uint32.to_int"
+          in
+          let segment_count = segment_count + 1 in
           let frame_header_size =
             let word_size = 8 in
             (Util.ceil_ratio (4 * (segment_count + 1)) word_size) * word_size
@@ -223,7 +240,7 @@ module FramedStream = struct
           | None ->
               Result.Error FramingError.Incomplete
           end
-        with Invalid_argument _ ->
+        with Util.Out_of_int_range _ ->
           Result.Error FramingError.Unsupported
         end
     | None ->
@@ -382,6 +399,12 @@ module PackedStream = struct
 
   let add_fragment stream fragment =
     FragmentBuffer.add_fragment stream.packed fragment
+
+  let bytes_available stream =
+    (* This isn't a very meaningful number, except maybe for the
+       purpose of bounding the amount of memory in use... *)
+    (FragmentBuffer.byte_count stream.packed) +
+    (FramedStream.bytes_available stream.unpacked)
 
   let is_empty stream =
     (FragmentBuffer.byte_count stream.packed = 0) &&

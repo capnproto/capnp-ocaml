@@ -165,7 +165,7 @@ let emit_literal_seg (segment : string) (wrap : int) : string list =
     else
       loop line_start (line_end + 1)
   in
-  "Bytes.of_string \"\\" :: (loop 0 (min wrap (String.length literal)))
+  "Bytes.unsafe_of_string \"\\" :: (loop 0 (min wrap (String.length literal)))
 
 
 (* Generate appropriate code for instantiating a message which contains

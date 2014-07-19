@@ -31,7 +31,7 @@
 open Core.Std
 open Capnp
 
-module M  = GenCommon.M
+module M  = BytesMessage
 module PS = GenCommon.PS
 
 module ExitCode = struct
@@ -42,30 +42,32 @@ end
 
 let main () : int =
   let () = In_channel.set_binary_mode In_channel.stdin true in
-  let bytes = In_channel.input_all In_channel.stdin in
-  let module FS = Codecs.FramedStream in
-  let stream = FS.of_string bytes in
-  match FS.get_next_frame stream with
-  | Result.Ok segments ->
-      let () = assert (FS.is_empty stream) in
-      let open M in
-      let message = Message.readonly (Message.of_storage segments) in
-      let request = PS.CodeGeneratorRequest.of_message message in
-      begin try
-        let () = Generate.compile request in
-        ExitCode.success
-      with (Failure msg) as e ->
-        let bs = Exn.backtrace () in
-        let es = Exn.to_string e in
-        let () = prerr_endline es in
-        let () = prerr_endline bs in
+  try
+    begin match IO.read_single_message_from_channel
+                  ~compression:`None In_channel.stdin with
+    | Some message ->
+        let message = M.Message.readonly message in
+        let request = PS.CodeGeneratorRequest.of_message message in
+        begin try
+          let () = Generate.compile request in
+          ExitCode.success
+        with (Failure msg) as e ->
+          let bs = Exn.backtrace () in
+          let es = Exn.to_string e in
+          let () = prerr_endline es in
+          let () = prerr_endline bs in
+          ExitCode.general_error
+        end
+    | None ->
+        let () = Printf.printf
+            "Could not decode a complete CodeGeneratorRequest message.\n"
+        in
         ExitCode.general_error
-      end
-  | Result.Error Codecs.FramingError.Incomplete ->
-      let () = Printf.printf "incomplete message\n" in
-      ExitCode.general_error
-  | Result.Error Codecs.FramingError.Unsupported ->
-      let () = Printf.printf "unsupported message\n" in
+    end
+  with IO.Unsupported_message_frame ->
+      let () = Printf.printf
+          "CodeGeneratorRequest message header describes unsupported message size.\n"
+      in
       ExitCode.general_error
 
 

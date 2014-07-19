@@ -23,7 +23,7 @@ module DefaultsCommon_  = Capnp.Runtime.Builder.DC
 
 let _builder_defaults_message =
   let message_segments = [
-    "\
+    Bytes.unsafe_of_string "\
     \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
     \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
     \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
@@ -32,7 +32,7 @@ let _builder_defaults_message =
   DefaultsMessage_.Message.readonly
     (DefaultsMessage_.Message.of_storage message_segments)
 
-module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
+module Make (MessageWrapper : Capnp.MessageSig.S) = struct
   let invalid_msg = Capnp.Message.invalid_msg
 
   module RA_ = Capnp.Runtime.Reader.Make(MessageWrapper)
@@ -63,6 +63,4 @@ module MakeUnsafe (MessageWrapper : Capnp.MessageSig.S) = struct
 
   end
 end
-
-module Make (MessageWrapper : Capnp.MessageSig.S) = MakeUnsafe(MessageWrapper)
 

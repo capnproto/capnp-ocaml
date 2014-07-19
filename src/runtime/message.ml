@@ -363,7 +363,7 @@ end
 module BytesMessage = Make(BytesStorage)
 
 exception Invalid_message of string
-exception Out_of_int_range of string
+exception Out_of_int_range = Util.Out_of_int_range
 let invalid_msg s = raise (Invalid_message s)
 let out_of_int_range s = raise (Out_of_int_range s)
 

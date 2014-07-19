@@ -30,6 +30,10 @@
 
 open Core.Std
 
+exception Out_of_int_range of string
+let out_of_int_range s = raise (Out_of_int_range s)
+
+
 (* Decode [num] as a signed integer of width [n] bits, using two's complement
    representation of negative numbers. *)
 let decode_signed n num =
@@ -85,4 +89,77 @@ let str_slice ?(start : int option) ?(stop : int option) (s : string)
     | None   -> String.length s
   in
   String.sub s real_start (real_stop - real_start)
+
+
+let int_of_int32_exn : int32 -> int =
+  if Sys.word_size = 32 then
+    let max_val = Int32.of_int_exn Int.max_value in
+    let min_val = Int32.of_int_exn Int.min_value in
+    (fun i32 ->
+       if Int32.compare i32 min_val < 0 ||
+          Int32.compare i32 max_val > 0 then
+         out_of_int_range "Int32"
+       else
+         Caml.Int32.to_int i32)
+  else
+    Caml.Int32.to_int
+
+let int_of_int64_exn : int64 -> int =
+  let max_val = Int64.of_int_exn Int.max_value in
+  let min_val = Int64.of_int_exn Int.min_value in
+  (fun i64 ->
+     if Int64.compare i64 min_val < 0 ||
+        Int64.compare i64 max_val > 0 then
+       out_of_int_range "Int64"
+     else
+       Caml.Int64.to_int i64)
+
+let int_of_uint32_exn : Uint32.t -> int =
+  if Sys.word_size = 32 then
+    let max_val = Uint32.of_int Int.max_value in
+    (fun u32 ->
+       if Uint32.compare u32 max_val > 0 then
+         out_of_int_range "UInt32"
+       else
+         Uint32.to_int u32)
+  else
+    Uint32.to_int
+
+let int_of_uint64_exn : Uint64.t -> int =
+  let max_val = Uint64.of_int Int.max_value in
+  (fun u64 ->
+     if Uint64.compare u64 max_val > 0 then
+       out_of_int_range "UInt64"
+     else
+       Uint64.to_int u64)
+
+let int32_of_int_exn : int -> int32 =
+  if Sys.word_size = 64 then
+    let max_val = Int32.to_int_exn (Int32.max_value) in
+    let min_val = Int32.to_int_exn (Int32.min_value) in
+    (fun i ->
+       if i < min_val || i > max_val then
+         invalid_arg "Int32.of_int"
+       else
+         Caml.Int32.of_int i)
+  else
+    Caml.Int32.of_int
+
+let uint32_of_int_exn : int -> Uint32.t =
+  if Sys.word_size = 64 then
+    let max_val = Uint32.to_int (Uint32.max_int) in
+    (fun i ->
+       if i < 0 || i > max_val then
+         invalid_arg "Uint32.of_int"
+       else
+         Uint32.of_int i)
+  else
+    Uint32.of_int
+
+let uint64_of_int_exn i =
+  if i < 0 then
+    invalid_arg "Uint64.of_int"
+  else
+    Uint64.of_int i
+
 
