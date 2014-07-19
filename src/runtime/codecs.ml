@@ -110,7 +110,7 @@ end = struct
           let fragment = Dequeue.dequeue_front_exn stream.fragments in
           let bytes_from_fragment = min bytes_remaining (String.length fragment) in
           Bytes.blit
-            (Bytes.of_string fragment) 0
+            (Bytes.unsafe_of_string fragment) 0
             buf !ofs
             bytes_from_fragment;
           begin if bytes_from_fragment < String.length fragment then
@@ -121,7 +121,7 @@ end = struct
         done;
         stream.fragments_size <- stream.fragments_size - size;
       in
-      Some (Bytes.to_string buf)
+      Some (Bytes.unsafe_to_string buf)
 
   let remove_at_least stream size =
     if stream.fragments_size < size then
@@ -394,14 +394,14 @@ module PackedStream = struct
 end
 
 
-let make_header message =
+let make_header segments =
   let buf = Buffer.create 8 in
-  let () = List.iter message ~f:(fun segment ->
+  let () = List.iter segments ~f:(fun segment ->
       let size_buf = Bytes.create 4 in
       let () = BytesStorage.set_uint32 size_buf 0
           (Uint32.of_int (String.length segment))
       in
-      Buffer.add_string buf (Bytes.to_string size_buf))
+      Buffer.add_string buf (Bytes.unsafe_to_string size_buf))
   in
   let segment_sizes = Buffer.contents buf in
   let segment_count = (String.length segment_sizes) / 4 in
@@ -413,7 +413,7 @@ let make_header message =
         (Uint32.of_int (segment_count - 1))
     in
     (* pad out to a word boundary *)
-    let count_buf = Bytes.to_string count_buf in
+    let count_buf = Bytes.unsafe_to_string count_buf in
     if segment_count mod 2 = 0 then
       count_buf ^ segment_sizes ^ (String.make 4 '\x00')
     else
@@ -421,8 +421,9 @@ let make_header message =
 
 
 let serialize_fold message ~init ~f =
-  let header = make_header message in
-  List.fold_left message ~init:(f init header) ~f
+  let segments = Message.BytesMessage.Message.to_storage message in
+  let header = make_header segments in
+  List.fold_left segments ~init:(f init header) ~f
 
 
 let serialize_iter message ~f =
@@ -430,7 +431,8 @@ let serialize_iter message ~f =
 
 
 let serialize message =
-  (make_header message) ^ (String.concat ~sep:"" message)
+  let segments = Message.BytesMessage.Message.to_storage message in
+  (make_header segments) ^ (String.concat ~sep:"" segments)
 
 
 let count_zeros ~start ~stop s =

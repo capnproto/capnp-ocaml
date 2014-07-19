@@ -56,28 +56,31 @@ end
     bytes fragments corresponding to a Cap'n Proto framed message
     using the standard serialization.  The return value is the result
     of folding [f] across the resulting sequence of fragments. *)
-val serialize_fold : Bytes.t list -> init:'acc -> f:('acc -> Bytes.t -> 'acc) -> 'acc
+val serialize_fold : 'cap Message.BytesMessage.Message.t ->
+  init:'acc -> f:('acc -> Bytes.t -> 'acc) -> 'acc
 
 (** [serialize_iter message ~f] generates an ordered sequence of bytes
     fragments corresponding to a Cap'n Proto framed message using the standard
     serialization.  [f] is applied to each fragment in turn. *)
-val serialize_iter : Bytes.t list -> f:(Bytes.t -> unit) -> unit
+val serialize_iter : 'cap Message.BytesMessage.Message.t ->
+  f:(Bytes.t -> unit) -> unit
 
 (** [serialize message] constructs a buffer containing the [message] segments
     with a standard serialization framing header. *)
-val serialize : Bytes.t list -> string
+val serialize : 'cap Message.BytesMessage.Message.t -> string
 
 (** [pack_fold message ~init f] generates an ordered sequence of
     bytes fragments corresponding to a packed Cap'n Proto message.
     The return value is the result of folding [f] across the resulting
     sequence of fragments. *)
-val pack_fold : Bytes.t list -> init:'acc -> f:('acc -> Bytes.t -> 'acc) -> 'acc
+val pack_fold : 'cap Message.BytesMessage.Message.t -> init:'acc ->
+  f:('acc -> string -> 'acc) -> 'acc
 
-(** [pack_iter message ~f] generates an ordered sequence of bytes
-    fragments corresponding to a packed Cap'n Proto message.  [f] is applied
+(** [pack_iter message ~f] generates an ordered sequence of string fragments
+    corresponding to a packed Cap'n Proto message.  [f] is applied
     to each fragment in turn. *)
-val pack_iter : Bytes.t list -> f:(Bytes.t -> unit) -> unit
+val pack_iter : 'cap Message.BytesMessage.Message.t -> f:(string -> unit) -> unit
 
 (** [pack message] constructs a buffer containing a packed Cap'n Proto message. *)
-val pack : Bytes.t list -> string
+val pack : 'cap Message.BytesMessage.Message.t -> string
 

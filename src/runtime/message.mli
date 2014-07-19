@@ -35,6 +35,12 @@ module Make (Storage : MessageStorage.S) :
   (MessageSig.S with type Segment.storage_t = Storage.t
       and type Message.storage_t = Storage.t)
 
+(** [BytesMessage] is the standard message format based on OCaml
+    [bytes] buffers. *)
+module BytesMessage :
+  (MessageSig.S with type Segment.storage_t = Bytes.t
+                 and type Message.storage_t = Bytes.t)
+
 (** [Invalid_message] is raised by accessor functions whenever the access cannot
     be completed because the message appears to be ill-formed. *)
 exception Invalid_message of string

@@ -360,6 +360,7 @@ module Make (Storage : MessageStorage.S) = struct
   end
 end
 
+module BytesMessage = Make(BytesStorage)
 
 exception Invalid_message of string
 exception Out_of_int_range of string
