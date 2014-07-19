@@ -248,6 +248,11 @@ let compile
     let () = Out_channel.with_file (ml_filename requested_filename)
         ~f:(fun chan -> Out_channel.output_string chan mod_file_content)
     in
+    let () = Printf.printf "%s --> %s %s\n"
+        requested_filename
+        (mli_filename requested_filename)
+        (ml_filename requested_filename)
+    in
     ())
 
 

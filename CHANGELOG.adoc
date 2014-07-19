@@ -7,6 +7,7 @@ capnp-ocaml 2.0.0
   instead of `Bytes.t list`.
 * New module `IO`: functions for moving message data through various types of I/O
   channels.
+* Compiler now says something about files it created.
 
 capnp-ocaml 1.0.1
 -----------------
