@@ -164,6 +164,26 @@ val write_message_to_channel : compression:compression_t ->
   'cap Message.BytesMessage.Message.t -> Pervasives.out_channel -> unit
 
 
+(** [write_message_to_file ~compression message filename] writes the specified
+    [message] to a file with the given [filename], using the requested
+    [compression] method.  The optional [perm] specifies the file creation
+    mode, in case a new file must be created. *)
+val write_message_to_file : ?perm:int -> compression:compression_t ->
+  'cap Message.BytesMessage.Message.t -> string -> unit
+
+
+(** As [write_message_to_file], but the file is constructed transactionally
+    by writing to a temporary file and renaming to the [filename], and
+    [Unix.fsync] is used carefully to ensure durability of the write.
+
+    The overhead of [rename] and [fsync] may lead to reduced throughput
+    relative to [write_message_to_file].
+
+    @raise Unix.Unix_error if [write], [fsync], or [rename] operations fail. *)
+val write_message_to_file_robust : ?perm:int -> compression:compression_t ->
+  'cap Message.BytesMessage.Message.t -> string -> unit
+
+
 (** [read_single_message_from_fd ~compression fd] attempts to read a single
     message from the specified file descriptor, using the given [compression]
     method.  If [restart] is set to [true] (default), then writes failing
@@ -201,4 +221,15 @@ val read_single_message_from_fd : ?restart:bool -> compression:compression_t ->
     count or segment size that is too large for the implementation *)
 val read_single_message_from_channel : compression:compression_t ->
   Pervasives.in_channel -> Message.rw Message.BytesMessage.Message.t option
+
+
+(** [read_message_from_file ~compression filename] attempts to read a
+    message from the file with the given [filename], using the requested
+    [compression] method.
+
+    @return Some message, or None if the file does not contain a complete
+    message frame. *)
+val read_message_from_file : compression:compression_t -> string ->
+  Message.rw Message.BytesMessage.Message.t option
+
 

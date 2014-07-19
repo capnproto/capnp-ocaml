@@ -235,6 +235,37 @@ let write_message_to_channel ~compression message chan =
   done
 
 
+let write_message_to_file ?perm ~compression message filename =
+  Out_channel.with_file filename ~binary:true ?perm ~f:(fun oc ->
+    write_message_to_channel ~compression message oc)
+
+
+let write_message_to_file_robust ?perm ~compression message filename =
+  let parent_dir = Filename.dirname filename in
+  let tmp_prefix = Filename.concat parent_dir (filename ^ "-tmp") in
+  let (tmp_filename, tmp_fd) = Unix.mkstemp tmp_prefix in
+  let () = Exn.protectx tmp_fd ~finally:Unix.close ~f:(fun fd ->
+      let () = write_message_to_fd ~restart:true ~compression message fd in
+      Unix.fsync fd)
+  in
+  let () = Unix.rename ~src:tmp_filename ~dst:filename in
+  let () =
+    (* [mkstemp] always creates as 0o600, so we may need to touch up permissions *)
+    match perm with
+    | Some perm ->
+        Unix.chmod filename perm
+    | None ->
+        ()
+  in
+  (* Attempt to sync directory metadata, so the rename is durably
+     recorded.  May not work as expected on all platforms, so
+     suppress errors. *)
+  try
+    Unix.with_file parent_dir ~mode:[Unix.O_RDONLY] ~f:Unix.fsync
+  with Unix.Unix_error (_, _, _) ->
+    ()
+
+
 let read_single_message_fd ~restart context fd =
   let rec read_loop () =
     try
@@ -291,5 +322,10 @@ let read_single_message_from_channel ~compression chan =
   | `Packing ->
       let context = create_packed_read_context_for_channel chan in
       loop context
+
+
+let read_message_from_file ~compression filename =
+  In_channel.with_file filename ~binary:true ~f:(fun ic ->
+    read_single_message_from_channel ~compression ic)
 
 
