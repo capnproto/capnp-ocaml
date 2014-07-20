@@ -8,6 +8,7 @@ RUNTIME_MODULES =   \
   codecsSig         \
   common            \
   farPointer        \
+  fragmentBuffer    \
   innerArray        \
   iO                \
   listPointer       \
@@ -16,6 +17,7 @@ RUNTIME_MODULES =   \
   messageSig        \
   messageStorage    \
   otherPointer      \
+  packing           \
   pointer           \
   reader            \
   structPointer     \
