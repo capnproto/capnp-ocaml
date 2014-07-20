@@ -206,8 +206,11 @@ let make_header segments =
   let buf = Buffer.create 8 in
   let () = List.iter segments ~f:(fun segment ->
       let size_buf = Bytes.create 4 in
+      let seg_len = Bytes.length segment in
+      let () = assert ((seg_len mod 8) = 0) in
+      let seg_word_count = seg_len / 8 in
       let () = BytesStorage.set_uint32 size_buf 0
-          (Uint32.of_int (String.length segment))
+          (Util.uint32_of_int_exn seg_word_count)
       in
       Buffer.add_string buf (Bytes.unsafe_to_string size_buf))
   in
@@ -218,7 +221,7 @@ let make_header segments =
   else
     let count_buf = Bytes.create 4 in
     let () = BytesStorage.set_uint32 count_buf 0
-        (Uint32.of_int (segment_count - 1))
+        (Util.uint32_of_int_exn (segment_count - 1))
     in
     (* pad out to a word boundary *)
     let count_buf = Bytes.unsafe_to_string count_buf in
