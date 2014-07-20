@@ -107,5 +107,34 @@ let packing_suite =
     "sparse" >:: t9;
   ]
 
+
+(* Generator for characters with a distribution that resembles real
+   cap'n proto data, with lots of zeros. *)
+let random_char_generator () =
+  let r = Random.int 6 in
+  if r = 0 then
+    Char.of_int_exn (Random.int 256)
+  else
+    '\x00'
+
+
+let test_random ctx =
+  let rec string_gen () =
+    let s = Quickcheck.sg ~char_gen:random_char_generator () in
+    (* input string must be word-aligned *)
+    Capnp.Runtime.Util.str_slice ~stop:((String.length s) land (lnot 0x7)) s
+  in
+  Quickcheck.laws_exn "unpack(pack(x)) = x" 2000 string_gen (fun s ->
+    let packed = Capnp.Runtime.Packing.pack_string s in
+    let unpacked = Capnp.Runtime.Packing.unpack_string packed in
+    unpacked = s)
+
+
+let random_packing_suite =
+  "random packing" >::: [
+    "pack_string/unpack_string" >:: test_random;
+  ]
+
 let () = run_test_tt_main packing_suite
+let () = run_test_tt_main random_packing_suite
 
