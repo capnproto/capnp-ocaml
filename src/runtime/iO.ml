@@ -241,8 +241,7 @@ let write_message_to_file ?perm ~compression message filename =
 
 
 let write_message_to_file_robust ?perm ~compression message filename =
-  let parent_dir = Filename.dirname filename in
-  let tmp_prefix = Filename.concat parent_dir (filename ^ "-tmp") in
+  let tmp_prefix = filename ^ "-tmp" in
   let (tmp_filename, tmp_fd) = Unix.mkstemp tmp_prefix in
   let () = Exn.protectx tmp_fd ~finally:Unix.close ~f:(fun fd ->
       let () = write_message_to_fd ~restart:true ~compression message fd in
@@ -260,6 +259,7 @@ let write_message_to_file_robust ?perm ~compression message filename =
   (* Attempt to sync directory metadata, so the rename is durably
      recorded.  May not work as expected on all platforms, so
      suppress errors. *)
+  let parent_dir = Filename.dirname filename in
   try
     Unix.with_file parent_dir ~mode:[Unix.O_RDONLY] ~f:Unix.fsync
   with Unix.Unix_error (_, _, _) ->
