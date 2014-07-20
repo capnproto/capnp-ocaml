@@ -92,7 +92,8 @@ module FramedStream = struct
   let rec get_next_frame stream =
     match stream.decoder_state with
     | IncompleteHeader -> unpack_header stream
-    | IncompleteFrame incomplete_frame -> unpack_frame stream incomplete_frame
+    | IncompleteFrame incomplete_frame ->
+        unpack_frame stream incomplete_frame
 
   and unpack_header stream =
     (* First four bytes of the header contain a segment count, which tells
@@ -133,18 +134,20 @@ module FramedStream = struct
 
   and unpack_frame stream incomplete_frame =
     let segment_count_u32 = BytesStorage.get_uint32 incomplete_frame.frame_header 0 in
-    let segment_count = 1 + (Uint32.to_int segment_count_u32) in
+    let segment_count = 1 + (Util.int_of_uint32_exn segment_count_u32) in
     let segments_decoded = Res.Array.length incomplete_frame.complete_segments in
     if segments_decoded = segment_count then
       let () = stream.decoder_state <- IncompleteHeader in
-      Result.Ok (Res.Array.to_list incomplete_frame.complete_segments)
+      let string_segments = Res.Array.to_list incomplete_frame.complete_segments in
+      let bytes_segments = List.map string_segments ~f:Bytes.unsafe_of_string in
+      Result.Ok (Message.BytesMessage.Message.of_storage bytes_segments)
     else
       let () = assert (segments_decoded < segment_count) in
       let segment_size_words_u32 = BytesStorage.get_uint32
           incomplete_frame.frame_header (4 + (4 * segments_decoded))
       in
       begin try
-        let segment_size = 8 * (Uint32.to_int segment_size_words_u32) in
+        let segment_size = 8 * (Util.int_of_uint32_exn segment_size_words_u32) in
         begin match FragmentBuffer.remove_exact stream.fragment_buffer
                       segment_size with
         | Some segment ->

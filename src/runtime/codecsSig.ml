@@ -63,6 +63,7 @@ module type DECODER = sig
       A successful decode removes the data from the stream and returns the
       frame as a [string list] with one list element for every segment within
       the message. *)
-  val get_next_frame : t -> (string list, FramingError.t) Core.Std.Result.t
+  val get_next_frame : t ->
+    (Message.rw Message.BytesMessage.Message.t, FramingError.t) Core.Std.Result.t
 end
 

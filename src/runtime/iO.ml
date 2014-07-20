@@ -125,7 +125,8 @@ module ReadContext = struct
     add_fragment : 'stream -> string -> unit;
 
     (** Function for getting a frame from the stream *)
-    get_next_frame : 'stream -> (string list, Codecs.FramingError.t) Result.t;
+    get_next_frame : 'stream ->
+      (Message.rw Message.BytesMessage.Message.t, Codecs.FramingError.t) Result.t;
   }
 
   let create_standard ~read fd = {
@@ -150,8 +151,8 @@ module ReadContext = struct
 
   let dequeue_message context =
     match context.get_next_frame context.stream with
-    | Result.Ok segments ->
-        Some (Message.BytesMessage.Message.of_storage segments)
+    | Result.Ok message ->
+        Some message
     | Result.Error Codecs.FramingError.Incomplete ->
         None
     | Result.Error Codecs.FramingError.Unsupported ->
