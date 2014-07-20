@@ -91,6 +91,7 @@ let remove_at_least stream size =
     while Buffer.length buffer < size do
       Buffer.add_string buffer (Dequeue.dequeue_front_exn stream.fragments)
     done;
+    stream.fragments_size <- stream.fragments_size - (Buffer.length buffer);
     Some (Buffer.contents buffer)
   end
 

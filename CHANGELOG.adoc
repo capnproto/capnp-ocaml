@@ -9,6 +9,7 @@ capnp-ocaml 2.0.0
   channels.
 * Compiler now says something about files it created.
 * Module `Codecs`: correct a packing inefficiency with literal bytes.
+* Module `Codecs`: fix infinite loop in `PackedStream` decoding.
 
 capnp-ocaml 1.0.1
 -----------------

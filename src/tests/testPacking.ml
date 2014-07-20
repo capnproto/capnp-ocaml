@@ -32,7 +32,8 @@ open OUnit2
 
 
 let expect_packs_to unpacked packed =
-  assert_equal packed (Capnp.Runtime.Packing.pack_string unpacked)
+  assert_equal packed (Capnp.Runtime.Packing.pack_string unpacked);
+  assert_equal unpacked (Capnp.Runtime.Packing.unpack_string packed)
 
 
 let packing_suite =

@@ -151,7 +151,7 @@ let unpack ~(packed : FragmentBuffer.t) ~(unpacked : FragmentBuffer.t) : unit =
       if String.length buf >= required_byte_count + ofs then
         f ()
       else
-        let unconsumed_bytes = Util.str_slice ~stop:ofs buf in
+        let unconsumed_bytes = Util.str_slice ~start:ofs buf in
         let bytes_missing =
           required_byte_count - (String.length unconsumed_bytes)
         in
@@ -184,9 +184,8 @@ let unpack ~(packed : FragmentBuffer.t) ~(unpacked : FragmentBuffer.t) : unit =
                   Util.str_slice ~start:(ofs + 10)
                     ~stop:(ofs + 10 + extra_bytes_required) buf
                 in
-                let () = FragmentBuffer.add_fragment unpacked
-                    (first_literal_word ^ other_literal_words)
-                in
+                let () = FragmentBuffer.add_fragment unpacked first_literal_word in
+                let () = FragmentBuffer.add_fragment unpacked other_literal_words in
                 unpack_aux buf (ofs + 10 + extra_bytes_required)))
       | c ->
           (* Followed by one literal byte for every bit set *)
