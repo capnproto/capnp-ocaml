@@ -117,40 +117,38 @@ let random_char_generator () =
   else
     '\x00'
 
+let capnp_string_gen () =
+  let s = Quickcheck.sg ~char_gen:random_char_generator () in
+  (* input string must be word-aligned *)
+  Capnp.Runtime.Util.str_slice ~stop:((String.length s) land (lnot 0x7)) s
 
-let test_random ctx =
-  let rec string_gen () =
-    let s = Quickcheck.sg ~char_gen:random_char_generator () in
-    (* input string must be word-aligned *)
-    Capnp.Runtime.Util.str_slice ~stop:((String.length s) land (lnot 0x7)) s
-  in
-  Quickcheck.laws_exn "unpack(pack(x)) = x" 2000 string_gen (fun s ->
+
+let test_random_pack_unpack ctx =
+  Quickcheck.laws_exn "unpack(pack(x)) = x" 2000 capnp_string_gen (fun s ->
     let packed = Capnp.Runtime.Packing.pack_string s in
     let unpacked = Capnp.Runtime.Packing.unpack_string packed in
     unpacked = s)
 
 
-let test_random_fragmented ctx =
-  let rec string_gen () =
-    let s = Quickcheck.sg ~char_gen:random_char_generator () in
-    (* input string must be word-aligned *)
-    Capnp.Runtime.Util.str_slice ~stop:((String.length s) land (lnot 0x7)) s
+let fragment (s : string) (add_fragment : string -> unit) =
+  let open Capnp.Runtime in
+  let rec loop ofs =
+    if ofs = String.length s then
+      ()
+    else
+      let next_ofs = min (String.length s) (ofs + (Random.int 100)) in
+      let () = add_fragment (Util.str_slice ~start:ofs ~stop:next_ofs s) in
+      loop next_ofs
   in
-  Quickcheck.laws_exn "unpack(fragment(pack(x))) = x" 2000 string_gen (fun s ->
+  loop 0
+
+
+let test_random_pack_unpack_fragmented ctx =
+  Quickcheck.laws_exn "unpack(fragment(pack(x))) = x" 2000 capnp_string_gen (fun s ->
     let open Capnp.Runtime in
     let packed = Packing.pack_string s in
     let packed_fragments = FragmentBuffer.empty () in
-    let rec loop ofs =
-      if ofs = String.length packed then
-        ()
-      else
-        let next_ofs = min (String.length packed) (ofs + (Random.int 100)) in
-        let () = FragmentBuffer.add_fragment packed_fragments
-          (Util.str_slice ~start:ofs ~stop:next_ofs packed)
-        in
-        loop next_ofs
-    in
-    loop 0;
+    let () = fragment packed (FragmentBuffer.add_fragment packed_fragments) in
     let unpacked_fragments = FragmentBuffer.empty () in
     let () = Packing.unpack ~packed:packed_fragments
         ~unpacked:unpacked_fragments
@@ -167,11 +165,68 @@ let test_random_fragmented ctx =
 
 
 let random_packing_suite =
-  "random packing" >::: [
-    "pack_string/unpack_string" >:: test_random;
-    "fragmented pack_string/unpack_string" >:: test_random_fragmented
+  "random_packing" >::: [
+    "pack_string_unpack_string" >:: test_random_pack_unpack;
+    "fragmented_pack_string_unpack_string" >:: test_random_pack_unpack_fragmented
   ]
+
+
+let test_random_serialize_deserialize ctx =
+  let message_gen () =
+    let segments =
+      List.rev_map (List.range 0 (1 + (Random.int 25)))
+        ~f:(fun (_ : int) -> Bytes.unsafe_of_string (capnp_string_gen ()))
+    in
+    Capnp.BytesMessage.Message.of_storage segments
+  in
+  Quickcheck.laws_exn "deserialize(fragment(serialize(x))) = x"
+      2000 message_gen (fun m ->
+    let open Capnp.Runtime in
+    let serialized = Codecs.serialize m in
+    let ser_fragments = Codecs.FramedStream.empty () in
+    let () = fragment serialized (Codecs.FramedStream.add_fragment ser_fragments) in
+    let trailing_data = capnp_string_gen () in
+    let () = Codecs.FramedStream.add_fragment ser_fragments trailing_data in
+    match Codecs.FramedStream.get_next_frame ser_fragments with
+    | Result.Ok decoded_message ->
+        let () = assert (Codecs.FramedStream.bytes_available ser_fragments =
+          (String.length trailing_data)) in
+        (Message.BytesMessage.Message.to_storage m) =
+          (Message.BytesMessage.Message.to_storage decoded_message)
+    | Result.Error _ ->
+        assert false)
+
+
+let test_random_serialize_deserialize_packed ctx =
+  let message_gen () =
+    let segments =
+      List.rev_map (List.range 0 (1 + (Random.int 25)))
+        ~f:(fun (_ : int) -> Bytes.unsafe_of_string (capnp_string_gen ()))
+    in
+    Capnp.BytesMessage.Message.of_storage segments
+  in
+  Quickcheck.laws_exn "deserialize_unpack(fragment(serialize_pack(x))) = x"
+      2000 message_gen (fun m ->
+    let open Capnp.Runtime in
+    let packed = Codecs.pack m in
+    let pack_fragments = Codecs.PackedStream.empty () in
+    let () = fragment packed (Codecs.PackedStream.add_fragment pack_fragments) in
+    match Codecs.PackedStream.get_next_frame pack_fragments with
+    | Result.Ok decoded_message ->
+        (Message.BytesMessage.Message.to_storage m) =
+          (Message.BytesMessage.Message.to_storage decoded_message)
+    | Result.Error _ ->
+        assert false)
+
+
+let random_serialize_suite =
+  "random_serialization_deserialization" >::: [
+    "serialize_deserialize_message" >:: test_random_serialize_deserialize;
+    "serialize_deserialize_packed_message" >:: test_random_serialize_deserialize_packed;
+  ]
+
 
 let () = run_test_tt_main packing_suite
 let () = run_test_tt_main random_packing_suite
+let () = run_test_tt_main random_serialize_suite
 

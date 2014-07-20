@@ -10,10 +10,10 @@ TEST_MODULES = \
   test \
   test_import \
   testBytesStorage \
+  testCodecs \
   testLists \
   testMisc \
-  testEncoding \
-  testPacking
+  testEncoding
 
 PROGRAM = run-tests
 
