@@ -130,9 +130,46 @@ let test_random ctx =
     unpacked = s)
 
 
+let test_random_fragmented ctx =
+  let rec string_gen () =
+    let s = Quickcheck.sg ~char_gen:random_char_generator () in
+    (* input string must be word-aligned *)
+    Capnp.Runtime.Util.str_slice ~stop:((String.length s) land (lnot 0x7)) s
+  in
+  Quickcheck.laws_exn "unpack(fragment(pack(x))) = x" 2000 string_gen (fun s ->
+    let open Capnp.Runtime in
+    let packed = Packing.pack_string s in
+    let packed_fragments = FragmentBuffer.empty () in
+    let rec loop ofs =
+      if ofs = String.length packed then
+        ()
+      else
+        let next_ofs = min (String.length packed) (ofs + (Random.int 100)) in
+        let () = FragmentBuffer.add_fragment packed_fragments
+          (Util.str_slice ~start:ofs ~stop:next_ofs packed)
+        in
+        loop next_ofs
+    in
+    loop 0;
+    let unpacked_fragments = FragmentBuffer.empty () in
+    let () = Packing.unpack ~packed:packed_fragments
+        ~unpacked:unpacked_fragments
+    in
+    let () = assert (FragmentBuffer.byte_count packed_fragments = 0) in
+    let bytes_avail = FragmentBuffer.byte_count unpacked_fragments in
+    let unpacked =
+      match FragmentBuffer.remove_at_least unpacked_fragments bytes_avail with
+      | Some v -> v
+      | None -> assert false
+    in
+    let () = assert (FragmentBuffer.byte_count unpacked_fragments = 0) in
+    unpacked = s)
+
+
 let random_packing_suite =
   "random packing" >::: [
     "pack_string/unpack_string" >:: test_random;
+    "fragmented pack_string/unpack_string" >:: test_random_fragmented
   ]
 
 let () = run_test_tt_main packing_suite
