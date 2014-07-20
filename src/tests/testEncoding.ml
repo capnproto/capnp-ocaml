@@ -31,10 +31,10 @@
 
 open Core.Std
 
-module SM  = Capnp.Message.Make(Capnp.BytesStorage)
-module T   = Test.Make(SM)
-module TL  = TestLists.Make(SM)
-module TI  = Test_import.Make(SM)
+module BM  = Capnp.BytesMessage
+module T   = Test.Make(BM)
+module TL  = TestLists.Make(BM)
+module TI  = Test_import.Make(BM)
 
 open OUnit2
 
@@ -456,14 +456,14 @@ let test_encode_decode ctx =
 
 let test_decode_defaults ctx =
   let null_root = Bytes.of_string "\x00\x00\x00\x00\x00\x00\x00\x00" in
-  let message = SM.Message.readonly (SM.Message.of_storage [ null_root ]) in
+  let message = BM.Message.readonly (BM.Message.of_storage [ null_root ]) in
   let reader = T.Reader.TestDefaults.of_message message in
   Reader_check_test_defaults.f reader
 
 
 let test_init_defaults ctx =
   let null_root = Bytes.of_string "\x00\x00\x00\x00\x00\x00\x00\x00" in
-  let message = SM.Message.of_storage [ null_root ] in
+  let message = BM.Message.of_storage [ null_root ] in
   let builder = T.Builder.TestDefaults.of_message message in
   (* First pass initializes [message] with defaults *)
   let () = Builder_check_test_defaults.f builder in
@@ -490,19 +490,19 @@ let init_union (setter : T.Builder.TestUnion.t -> 'a) =
      the values of the four union discriminants. *)
   let builder = T.Builder.TestUnion.init_root ~message_size:1024 () in
   let _ = setter builder in
-  let message = SM.Message.readonly (T.Builder.TestUnion.to_message builder) in
-  let segment = SM.Message.get_segment message 0 in
+  let message = BM.Message.readonly (T.Builder.TestUnion.to_message builder) in
+  let segment = BM.Message.get_segment message 0 in
 
   (* Find the offset of the first set bit after the union discriminants. *)
   let bit_offset =
     let starting_byte = 16 in
     let rec loop byte_ofs bit_ofs =
-      if byte_ofs = SM.Segment.length segment then
+      if byte_ofs = BM.Segment.length segment then
         None
       else if bit_ofs = 8 then
         loop (byte_ofs + 1) 0
       else
-        let byte_val = SM.Segment.get_uint8 segment byte_ofs in
+        let byte_val = BM.Segment.get_uint8 segment byte_ofs in
         if ((1 lsl bit_ofs) land byte_val) <> 0 then
           Some ((8 * (byte_ofs - starting_byte)) + bit_ofs)
         else
@@ -510,10 +510,10 @@ let init_union (setter : T.Builder.TestUnion.t -> 'a) =
     in
     loop starting_byte 0
   in
-  ([ SM.Segment.get_uint16 segment 8;
-     SM.Segment.get_uint16 segment 10;
-     SM.Segment.get_uint16 segment 12;
-     SM.Segment.get_uint16 segment 14; ],
+  ([ BM.Segment.get_uint16 segment 8;
+     BM.Segment.get_uint16 segment 10;
+     BM.Segment.get_uint16 segment 12;
+     BM.Segment.get_uint16 segment 14; ],
    bit_offset)
 
 

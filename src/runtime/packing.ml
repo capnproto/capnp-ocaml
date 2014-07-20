@@ -62,7 +62,7 @@ let pack_string (s : string) : string =
     if bit = 8 then
       let () = Bytes.set output_buf 0 (Char.of_int_exn tag_byte) in
       let () = Buffer.add_substring buf
-        (Bytes.to_string output_buf) 0 output_count
+        (Bytes.unsafe_to_string output_buf) 0 output_count
       in
       if tag_byte = 0 then
         loop_zero_words ~count:0 (ofs + 8)
@@ -83,7 +83,7 @@ let pack_string (s : string) : string =
   (* Emitting a run of zeros *)
   and loop_zero_words ~count ofs =
     let () = assert (ofs <= String.length s) in
-    if ofs + 8 >= String.length s || count = 0xff ||
+    if ofs + 8 > String.length s || count = 0xff ||
        count_zeros ~start:ofs ~stop:(ofs + 8) s <> 8 then
       let () = Buffer.add_char buf (Char.of_int_exn count) in
       loop_words ofs
@@ -95,7 +95,7 @@ let pack_string (s : string) : string =
      packing efficiency. *)
   and loop_literal_words ~count ~lit_buf ofs =
     let () = assert (ofs <= String.length s) in
-    if ofs + 8 >= String.length s || count = 0xff then
+    if ofs + 8 > String.length s || count = 0xff then
       let () = Buffer.add_char buf (Char.of_int_exn count) in
       let () = Buffer.add_buffer buf lit_buf in
       loop_words ofs
@@ -215,5 +215,22 @@ let unpack ~(packed : FragmentBuffer.t) ~(unpacked : FragmentBuffer.t) : unit =
     end
   in
   unpack_aux "" 0
+
+
+(* Provided for testing purposes only. *)
+let unpack_string (s : string) : string =
+  let packed = FragmentBuffer.of_string s in
+  let unpacked = FragmentBuffer.empty () in
+  let () = unpack ~packed ~unpacked in
+  let () = assert (FragmentBuffer.byte_count packed = 0) in
+  let bytes_avail = FragmentBuffer.byte_count unpacked in
+  let result =
+    match FragmentBuffer.remove_at_least unpacked bytes_avail with
+    | Some v -> v
+    | None -> assert false
+  in
+  let () = assert (FragmentBuffer.byte_count unpacked = 0) in
+  let () = assert (String.length result = bytes_avail) in
+  result
 
 

@@ -123,34 +123,13 @@ let add_pointer defaults ident pointer_bytes =
   Res.Array.add_one defaults.pointers (ident, dest)
 
 
-let hex_table = [|
-  '0'; '1'; '2'; '3'; '4'; '5'; '6'; '7';
-  '8'; '9'; 'a'; 'b'; 'c'; 'd'; 'e'; 'f';
-|]
-
-(* [String.escaped] produces valid data, but it's not the easiest to try to read
-   the octal format.  Generate hex instead. *)
-let make_literal s =
-  let result = Bytes.create ((String.length s) * 4) in
-  for i = 0 to String.length s - 1 do
-    let byte = Char.to_int s.[i] in
-    let upper_nibble = (byte lsr 4) land 0xf in
-    let lower_nibble = byte land 0xf in
-    Bytes.set result ((4 * i) + 0) '\\';
-    Bytes.set result ((4 * i) + 1) 'x';
-    Bytes.set result ((4 * i) + 2) hex_table.(upper_nibble);
-    Bytes.set result ((4 * i) + 3) hex_table.(lower_nibble);
-  done;
-  Bytes.to_string result
-
-
 (* Emit a semicolon-delimited string literal, wrapping at approximately the specified
    word wrap boundary.  We use the end-of-line-backslash to emit a string literal
    which spans multiple lines.  Escaped literals for binary data can contain lots
    of backslashes, so we may stretch a line slightly to avoid breaking in the
    middle of a literal backslash. *)
 let emit_literal_seg (segment : string) (wrap : int) : string list =
-  let literal = make_literal segment in
+  let literal = Capnp.Runtime.Util.make_hex_literal segment in
   let lines = Res.Array.empty () in
   let rec loop line_start line_end =
     let () = assert (line_end  <= String.length literal) in

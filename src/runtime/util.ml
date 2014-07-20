@@ -163,3 +163,24 @@ let uint64_of_int_exn i =
     Uint64.of_int i
 
 
+let hex_table = [|
+  '0'; '1'; '2'; '3'; '4'; '5'; '6'; '7';
+  '8'; '9'; 'a'; 'b'; 'c'; 'd'; 'e'; 'f';
+|]
+
+(* [String.escaped] produces valid data, but it's not the easiest to try to read
+   the octal format.  Generate hex instead. *)
+let make_hex_literal s =
+  let result = Bytes.create ((String.length s) * 4) in
+  for i = 0 to String.length s - 1 do
+    let byte = Char.to_int s.[i] in
+    let upper_nibble = (byte lsr 4) land 0xf in
+    let lower_nibble = byte land 0xf in
+    Bytes.set result ((4 * i) + 0) '\\';
+    Bytes.set result ((4 * i) + 1) 'x';
+    Bytes.set result ((4 * i) + 2) hex_table.(upper_nibble);
+    Bytes.set result ((4 * i) + 3) hex_table.(lower_nibble);
+  done;
+  Bytes.to_string result
+
+

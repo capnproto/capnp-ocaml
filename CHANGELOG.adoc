@@ -8,6 +8,7 @@ capnp-ocaml 2.0.0
 * New module `IO`: functions for moving message data through various types of I/O
   channels.
 * Compiler now says something about files it created.
+* Module `Codecs`: correct a packing inefficiency with literal bytes.
 
 capnp-ocaml 1.0.1
 -----------------

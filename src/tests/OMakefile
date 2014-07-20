@@ -12,7 +12,8 @@ TEST_MODULES = \
   testBytesStorage \
   testLists \
   testMisc \
-  testEncoding
+  testEncoding \
+  testPacking
 
 PROGRAM = run-tests
 
