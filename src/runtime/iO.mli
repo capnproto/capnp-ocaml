@@ -28,8 +28,6 @@
  ******************************************************************************)
 
 
-type compression_t = [ `None | `Packing ]
-
 exception Unsupported_message_frame
 
 module WriteContext : sig
@@ -43,7 +41,7 @@ module WriteContext : sig
       attempting to write a substring from the [buf] and returning the number
       of bytes actually written. *)
   val create : write:('a -> buf:string -> pos:int -> len:int -> int) ->
-    compression:compression_t -> 'a -> 'a t
+    compression:Codecs.compression_t -> 'a -> 'a t
 
   (** [enqueue_message context message] places the [message] in the outgoing
       queue of the write [context].  No data will be written to the underlying
@@ -59,29 +57,25 @@ module WriteContext : sig
 
       @return the number of bytes actually written *)
   val write : 'a t -> int
+
+  (** [write_message context message] places the [message] in the outgoing
+      queue of the write [context], then invokes [write] in a loop until all
+      queued data has been written. *)
+  val write_message : 'a t -> 'cap Message.BytesMessage.Message.t -> unit
 end
 
 
 module ReadContext : sig
-  type ('a, 'stream) t
+  type 'a t
 
-  (** [create_standard ~read descr] creates a new context for reading data from the
-      specified descriptor using the standard serialization (i.e. not compressed).
-
-      The semantics of the [read] function shall mimic that of [Unix.read],
-      attempting to read into a substring of the [buf] and returning the number
-      of bytes actually read. *)
-  val create_standard : read:('a -> buf:Bytes.t -> pos:int -> len:int -> int) ->
-    'a -> ('a, Codecs.FramedStream.t) t
-
-  (** [create_packed ~read descr] creates a new context for reading data from the
-      specified descriptor using the standard packing.
+  (** [create ~read ~compression descr] creates a new context for reading data
+      from the specified descriptor using the specified [compression] method.
 
       The semantics of the [read] function shall mimic that of [Unix.read],
       attempting to read into a substring of the [buf] and returning the number
       of bytes actually read. *)
-  val create_packed : read:('a -> buf:Bytes.t -> pos:int -> len:int -> int) ->
-    'a -> ('a, Codecs.PackedStream.t) t
+  val create : read:('a -> buf:Bytes.t -> pos:int -> len:int -> int) ->
+    compression:Codecs.compression_t -> 'a -> 'a t
 
   (** [dequeue_message context] attempts to remove a complete message from the
       incoming queue of the read [context].  No data will be read from the
@@ -89,17 +83,17 @@ module ReadContext : sig
 
       @raise Unsupported_message_frame if the frame header describes a segment
       count or segment size that is too large for the implementation *)
-  val dequeue_message : ('a, 'stream) t -> Message.rw Message.BytesMessage.Message.t option
+  val dequeue_message : 'a t -> Message.rw Message.BytesMessage.Message.t option
 
   (** [bytes_available context] obtains the number of bytes already read which
       are currently stored in the read [context]. *)
-  val bytes_available : ('a, 'stream) t -> int
+  val bytes_available : 'a t -> int
 
   (** [read context] attempts to read some data from the underlying descriptor,
       storing it in the read [context].
 
       @return the number of bytes actually read *)
-  val read : ('a, 'stream) t -> int
+  val read : 'a t -> int
 end
 
 
@@ -107,44 +101,30 @@ end
     messages to the given file descriptor using the specified [compression] format.
     If [restart] is set to [true] (default), then writes failing with error
     code Unix.EINTR will be automatically restarted. *)
-val create_write_context_for_fd : ?restart:bool -> compression:compression_t ->
+val create_write_context_for_fd : ?restart:bool -> compression:Codecs.compression_t ->
   Unix.file_descr -> Unix.file_descr WriteContext.t
 
 
 (** [create_write_context_for_channel ~compression chan] creates a context for
     writing messages to the given buffered output channel using the specified
     [compression] format. *)
-val create_write_context_for_channel : compression:compression_t ->
+val create_write_context_for_channel : compression:Codecs.compression_t ->
   Pervasives.out_channel -> Pervasives.out_channel WriteContext.t
 
 
-(** [create_standard_read_context_for_fd fd] creates a context for reading messages
-    from the given file descriptor using the standard serialization (i.e.
-    not compressed).  If [restart] is set to [true] (default), then writes
-    failing with error code Unix.EINTR will be automatically restarted. *)
-val create_standard_read_context_for_fd : ?restart:bool -> Unix.file_descr ->
-  (Unix.file_descr, Codecs.FramedStream.t) ReadContext.t
+(** [create_read_context_for_fd ~compression fd] creates a context for reading
+    messages from the given file descriptor using the specified [compression]
+    method. If [restart] is set to [true] (default), then writes failing with
+    error code Unix.EINTR will be automatically restarted. *)
+val create_read_context_for_fd : ?restart:bool -> compression:Codecs.compression_t ->
+  Unix.file_descr -> Unix.file_descr ReadContext.t
 
 
-(** [create_packed_read_context_for_fd fd] creates a context for reading messages
-    from the given file descriptor using the standard packing.  If [restart]
-    is set to [true] (default), then writes failing with error code Unix.EINTR
-    will be automatically restarted. *)
-val create_standard_read_context_for_fd : ?restart:bool -> Unix.file_descr ->
-  (Unix.file_descr, Codecs.FramedStream.t) ReadContext.t
-
-
-(** [create_standard_read_context_for_channel chan] creates a context for
-    reading messages from the given input channel using the standard serialization
-    (i.e. not compressed). *)
-val create_standard_read_context_for_channel : Pervasives.in_channel ->
-  (Pervasives.in_channel, Codecs.FramedStream.t) ReadContext.t
-
-
-(** [create_packed_read_context_for_channel chan] creates a context for
-    reading messages from the given input channel using the standard packing. *)
-val create_packed_read_context_for_channel : Pervasives.in_channel ->
-  (Pervasives.in_channel, Codecs.PackedStream.t) ReadContext.t
+(** [create_read_context_for_channel ~compression chan] creates a context for
+    reading messages from the given input channel using the specified
+    [compression] method. *)
+val create_read_context_for_channel : compression:Codecs.compression_t ->
+  Pervasives.in_channel -> Pervasives.in_channel ReadContext.t
 
 
 (** [write_message_to_fd ~compression message fd] writes the specified [message] to
@@ -152,15 +132,17 @@ val create_packed_read_context_for_channel : Pervasives.in_channel ->
     If [restart] is set to [true] (default), then writes failing with error
     code Unix.EINTR will be automatically restarted.
 
+    EAGAIN/EWOULDBLOCK are handled automatically.
+
     @raise Unix.Unix_error if a write fails *)
-val write_message_to_fd : ?restart:bool -> compression:compression_t ->
+val write_message_to_fd : ?restart:bool -> compression:Codecs.compression_t ->
   'cap Message.BytesMessage.Message.t -> Unix.file_descr -> unit
 
 
 (** [write_message_to_channel ~compression message chan] writes the specified
     [message] to the given buffered I/O channel, using the specified [compression]
     method. *)
-val write_message_to_channel : compression:compression_t ->
+val write_message_to_channel : compression:Codecs.compression_t ->
   'cap Message.BytesMessage.Message.t -> Pervasives.out_channel -> unit
 
 
@@ -168,7 +150,7 @@ val write_message_to_channel : compression:compression_t ->
     [message] to a file with the given [filename], using the requested
     [compression] method.  The optional [perm] specifies the file creation
     mode, in case a new file must be created. *)
-val write_message_to_file : ?perm:int -> compression:compression_t ->
+val write_message_to_file : ?perm:int -> compression:Codecs.compression_t ->
   'cap Message.BytesMessage.Message.t -> string -> unit
 
 
@@ -180,7 +162,7 @@ val write_message_to_file : ?perm:int -> compression:compression_t ->
     relative to [write_message_to_file].
 
     @raise Unix.Unix_error if [write], [fsync], or [rename] operations fail. *)
-val write_message_to_file_robust : ?perm:int -> compression:compression_t ->
+val write_message_to_file_robust : ?perm:int -> compression:Codecs.compression_t ->
   'cap Message.BytesMessage.Message.t -> string -> unit
 
 
@@ -188,6 +170,8 @@ val write_message_to_file_robust : ?perm:int -> compression:compression_t ->
     message from the specified file descriptor, using the given [compression]
     method.  If [restart] is set to [true] (default), then writes failing
     with error code Unix.EINTR will be automatically restarted.
+
+    EAGAIN/EWOULDBLOCK are handled automatically.
 
     This function is appropriate to use only when 0 or 1 messages are expected
     to be available from the descriptor; if additional messages are available,
@@ -201,7 +185,7 @@ val write_message_to_file_robust : ?perm:int -> compression:compression_t ->
 
     @raise Unsupported_message_frame if the frame header describes a segment
     count or segment size that is too large for the implementation *)
-val read_single_message_from_fd : ?restart:bool -> compression:compression_t ->
+val read_single_message_from_fd : ?restart:bool -> compression:Codecs.compression_t ->
   Unix.file_descr -> Message.rw Message.BytesMessage.Message.t option
 
 
@@ -219,7 +203,7 @@ val read_single_message_from_fd : ?restart:bool -> compression:compression_t ->
 
     @raise Unsupported_message_frame if the frame header describes a segment
     count or segment size that is too large for the implementation *)
-val read_single_message_from_channel : compression:compression_t ->
+val read_single_message_from_channel : compression:Codecs.compression_t ->
   Pervasives.in_channel -> Message.rw Message.BytesMessage.Message.t option
 
 
@@ -229,7 +213,7 @@ val read_single_message_from_channel : compression:compression_t ->
 
     @return Some message, or None if the file does not contain a complete
     message frame. *)
-val read_message_from_file : compression:compression_t -> string ->
+val read_message_from_file : compression:Codecs.compression_t -> string ->
   Message.rw Message.BytesMessage.Message.t option
 
 

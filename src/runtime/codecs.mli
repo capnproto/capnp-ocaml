@@ -28,27 +28,49 @@
  ******************************************************************************)
 
 
+type compression_t = [ `None | `Packing ]
+
+
 module FramingError : sig
-  type t = CodecsSig.FramingError.t =
+  type t =
     | Incomplete    (** less than a full frame is available *)
     | Unsupported   (** frame header describes a segment count or segment size that
                         is too large for the implementation *)
 end
 
+
 module FramedStream : sig
-  include CodecsSig.DECODER
+  (** The type of streams containing framed messages. *)
+  type t
 
-  (** A streaming decoder for the Cap'n Proto "standard serialization"
-      (non-packed message segments prefixed by framing information). *)
-end
+  (** [empty compression] returns a new stream for decoding data stored
+      with the given [compression] method.  The stream initially contains
+      no data. *)
+  val empty : compression_t -> t
 
+  (** [of_string ~compression buf] returns a new stream which is filled with
+      the contents of the given buffer, where the buffer contains data
+      compressed with the specified [compression] method. *)
+  val of_string : compression:compression_t -> string -> t
 
-module PackedStream : sig
-  include CodecsSig.DECODER
+  (** [add_fragment stream fragment] adds a new fragment to the stream for
+      decoding.  Fragments are processed in FIFO order. *)
+  val add_fragment : t -> string -> unit
 
-  (** A streaming decoder for "packed" messages (i.e. messages encoded
-      using "standard serialization" and then compressed with the
-      standard packing method). *)
+  (** [bytes_available stream] obtains the number of bytes in the stream
+      which have not yet been fully decoded. *)
+  val bytes_available : t -> int
+
+  (** [is_empty stream] determines whether or not the stream contains any
+      data which has not yet been fully decoded. *)
+  val is_empty : t -> bool
+
+  (** [get_next_frame] attempts to decode the next frame from the stream.
+      A successful decode removes the data from the stream and returns the
+      frame as a [string list] with one list element for every segment within
+      the message. *)
+  val get_next_frame : t ->
+    (Message.rw Message.BytesMessage.Message.t, FramingError.t) Core.Std.Result.t
 end
 
 

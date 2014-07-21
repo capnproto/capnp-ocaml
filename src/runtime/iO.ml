@@ -101,56 +101,41 @@ module WriteContext = struct
             context.first_fragment_pos + bytes_written
       in
       bytes_written
+
+  let write_message context message =
+    let () = enqueue_message context message in
+    while bytes_remaining context > 0 do
+      let (_ : int) = write context in
+      ()
+    done
+
 end
 
 
 module ReadContext = struct
-  type ('a, 'stream) t = {
+  type 'a t = {
     (** File descriptor we're writing to *)
     fd : 'a;
 
     (** Stream format *)
-    stream : 'stream;
+    stream : Codecs.FramedStream.t;
 
     (** Function for reading from the descriptor *)
     read : 'a -> buf:Bytes.t -> pos:int -> len:int -> int;
 
     (** Persistent read buffer *)
     read_buf : Bytes.t;
-
-    (** Function for getting the available byte count *)
-    bytes_available : 'stream -> int;
-
-    (** Function for adding some data to the stream *)
-    add_fragment : 'stream -> string -> unit;
-
-    (** Function for getting a frame from the stream *)
-    get_next_frame : 'stream ->
-      (Message.rw Message.BytesMessage.Message.t, Codecs.FramingError.t) Result.t;
   }
 
-  let create_standard ~read fd = {
+  let create ~read ~compression fd = {
     fd;
-    stream = Codecs.FramedStream.empty ();
+    stream = Codecs.FramedStream.empty compression;
     read;
     read_buf = Bytes.create (64 * 1024);    (* Size of ocaml internal Unix buffer *)
-    bytes_available = Codecs.FramedStream.bytes_available;
-    add_fragment = Codecs.FramedStream.add_fragment;
-    get_next_frame = Codecs.FramedStream.get_next_frame;
-  }
-
-  let create_packed ~read fd = {
-    fd;
-    stream = Codecs.PackedStream.empty ();
-    read;
-    read_buf = Bytes.create (64 * 1024);    (* Size of ocaml internal Unix buffer *)
-    bytes_available = Codecs.PackedStream.bytes_available;
-    add_fragment = Codecs.PackedStream.add_fragment;
-    get_next_frame = Codecs.PackedStream.get_next_frame;
   }
 
   let dequeue_message context =
-    match context.get_next_frame context.stream with
+    match Codecs.FramedStream.get_next_frame context.stream with
     | Result.Ok message ->
         Some message
     | Result.Error Codecs.FramingError.Incomplete ->
@@ -158,15 +143,19 @@ module ReadContext = struct
     | Result.Error Codecs.FramingError.Unsupported ->
         raise Unsupported_message_frame
 
-  let bytes_available context = context.bytes_available context.stream
+  let bytes_available context =
+    Codecs.FramedStream.bytes_available context.stream
 
   let read context =
     let bytes_read = context.read context.fd ~buf:context.read_buf
         ~pos:0 ~len:(Bytes.length context.read_buf)
     in
     if bytes_read > 0 then
-      let substr = String.sub context.read_buf ~pos:0 ~len:bytes_read in
-      let () = context.add_fragment context.stream substr in
+      let str_buf = Bytes.unsafe_to_string context.read_buf in
+      let substr = Bytes.unsafe_to_string
+          (String.sub str_buf ~pos:0 ~len:bytes_read)
+      in
+      let () = Codecs.FramedStream.add_fragment context.stream substr in
       bytes_read
     else
       bytes_read
@@ -188,25 +177,15 @@ let create_write_context_for_channel ~compression chan =
   WriteContext.create ~write:chan_write ~compression chan
 
 
-let create_standard_read_context_for_fd ?(restart = true) fd =
+let create_read_context_for_fd ?(restart = true) ~compression fd =
   let unix_read fd' ~buf ~pos ~len =
     Unix.read fd' ~restart ~buf ~pos ~len
   in
-  ReadContext.create_standard ~read:unix_read fd
+  ReadContext.create ~read:unix_read ~compression fd
 
 
-let create_packed_read_context_for_fd ?(restart = true) fd =
-  let unix_read fd' ~buf ~pos ~len =
-    Unix.read fd' ~restart ~buf ~pos ~len
-  in
-  ReadContext.create_packed ~read:unix_read fd
-
-
-let create_standard_read_context_for_channel chan =
-  ReadContext.create_standard ~read:In_channel.input chan
-
-let create_packed_read_context_for_channel chan =
-  ReadContext.create_packed ~read:In_channel.input chan
+let create_read_context_for_channel ~compression chan =
+  ReadContext.create ~read:In_channel.input ~compression chan
 
 
 let write_message_to_fd ?(restart = true) ~compression message fd =
@@ -229,11 +208,7 @@ let write_message_to_fd ?(restart = true) ~compression message fd =
 
 let write_message_to_channel ~compression message chan =
   let context = create_write_context_for_channel ~compression chan in
-  let () = WriteContext.enqueue_message context message in
-  while WriteContext.bytes_remaining context > 0 do
-    let (_ : int) = WriteContext.write context in
-    ()
-  done
+  WriteContext.write_message context message
 
 
 let write_message_to_file ?perm ~compression message filename =
@@ -267,7 +242,8 @@ let write_message_to_file_robust ?perm ~compression message filename =
     ()
 
 
-let read_single_message_fd ~restart context fd =
+let read_single_message_from_fd ?(restart = true) ~compression fd =
+  let context = create_read_context_for_fd ~restart ~compression fd in
   let rec read_loop () =
     try
       ReadContext.read context
@@ -294,18 +270,9 @@ let read_single_message_fd ~restart context fd =
   loop ()
 
 
-let read_single_message_from_fd ?(restart = true) ~compression fd =
-  match compression with
-  | `None ->
-      let context = create_standard_read_context_for_fd ~restart fd in
-      read_single_message_fd ~restart context fd
-  | `Packing ->
-      let context = create_packed_read_context_for_fd ~restart fd in
-      read_single_message_fd ~restart context fd
-
-
 let read_single_message_from_channel ~compression chan =
-  let rec loop context =
+  let context = create_read_context_for_channel ~compression chan in
+  let rec loop () =
     let bytes_read = ReadContext.read context in
     if bytes_read = 0 then
       None
@@ -314,15 +281,9 @@ let read_single_message_from_channel ~compression chan =
       | Some message ->
           Some message
       | None ->
-          loop context
+          loop ()
   in
-  match compression with
-  | `None ->
-      let context = create_standard_read_context_for_channel chan in
-      loop context
-  | `Packing ->
-      let context = create_packed_read_context_for_channel chan in
-      loop context
+  loop ()
 
 
 let read_message_from_file ~compression filename =

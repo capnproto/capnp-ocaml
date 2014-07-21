@@ -183,7 +183,7 @@ let test_random_serialize_deserialize ctx =
       2000 message_gen (fun m ->
     let open Capnp.Runtime in
     let serialized = Codecs.serialize m in
-    let ser_fragments = Codecs.FramedStream.empty () in
+    let ser_fragments = Codecs.FramedStream.empty `None in
     let () = fragment serialized (Codecs.FramedStream.add_fragment ser_fragments) in
     let trailing_data = capnp_string_gen () in
     let () = Codecs.FramedStream.add_fragment ser_fragments trailing_data in
@@ -209,9 +209,9 @@ let test_random_serialize_deserialize_packed ctx =
       2000 message_gen (fun m ->
     let open Capnp.Runtime in
     let packed = Codecs.pack m in
-    let pack_fragments = Codecs.PackedStream.empty () in
-    let () = fragment packed (Codecs.PackedStream.add_fragment pack_fragments) in
-    match Codecs.PackedStream.get_next_frame pack_fragments with
+    let pack_fragments = Codecs.FramedStream.empty `Packing in
+    let () = fragment packed (Codecs.FramedStream.add_fragment pack_fragments) in
+    match Codecs.FramedStream.get_next_frame pack_fragments with
     | Result.Ok decoded_message ->
         (Message.BytesMessage.Message.to_storage m) =
           (Message.BytesMessage.Message.to_storage decoded_message)

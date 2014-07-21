@@ -43,7 +43,7 @@ module type DECODER = sig
   (** [empty ()] returns a new stream containing no data. *)
   val empty : unit -> t
 
-  (** [of_bytes buf] returns a new stream which is filled with the contents
+  (** [of_string buf] returns a new stream which is filled with the contents
       of the given buffer. *)
   val of_string : string -> t
 

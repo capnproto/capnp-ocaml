@@ -31,15 +31,17 @@
 open Core.Std
 
 
+type compression_t = [ `None | `Packing ]
+
 module FramingError = struct
-  type t = CodecsSig.FramingError.t =
+  type t =
     | Incomplete    (** less than a full frame is available *)
     | Unsupported   (** frame header describes a segment count or segment size that
                         is too large for the implementation *)
 end
 
 
-module FramedStream = struct
+module UncompStream = struct
 
   type incomplete_frame_t = {
     frame_header      : string;
@@ -60,11 +62,6 @@ module FramedStream = struct
 
   let empty () = {
     fragment_buffer = FragmentBuffer.empty ();
-    decoder_state = IncompleteHeader;
-  }
-
-  let of_string s = {
-    fragment_buffer = FragmentBuffer.of_string s;
     decoder_state = IncompleteHeader;
   }
 
@@ -170,17 +167,12 @@ module PackedStream = struct
     packed : FragmentBuffer.t;
 
     (** Unpacked fragments waiting to be decoded as messages *)
-    unpacked : FramedStream.t;
+    unpacked : UncompStream.t;
   }
 
   let empty () = {
     packed = FragmentBuffer.empty ();
-    unpacked = FramedStream.empty ();
-  }
-
-  let of_string s = {
-    packed = FragmentBuffer.of_string s;
-    unpacked = FramedStream.empty ();
+    unpacked = UncompStream.empty ();
   }
 
   let add_fragment stream fragment =
@@ -190,17 +182,64 @@ module PackedStream = struct
     (* This isn't a very meaningful number, except maybe for the
        purpose of bounding the amount of memory in use... *)
     (FragmentBuffer.byte_count stream.packed) +
-    (FramedStream.bytes_available stream.unpacked)
+    (UncompStream.bytes_available stream.unpacked)
 
   let is_empty stream =
     (FragmentBuffer.byte_count stream.packed = 0) &&
-    (FramedStream.is_empty stream.unpacked)
+    (UncompStream.is_empty stream.unpacked)
 
   let get_next_frame stream =
     let () = Packing.unpack ~packed:stream.packed
-        ~unpacked:stream.unpacked.FramedStream.fragment_buffer
+        ~unpacked:stream.unpacked.UncompStream.fragment_buffer
     in
-    FramedStream.get_next_frame stream.unpacked
+    UncompStream.get_next_frame stream.unpacked
+
+end
+
+
+module FramedStream = struct
+  (* Using runtime dispatch here... makes the API much easier to use
+     relative to exposing different types for compressed and
+     uncompressed streams. *)
+  type t =
+    | NoPack of UncompStream.t
+    | Pack of PackedStream.t
+
+  let empty compression =
+    match compression with
+    | `None    -> NoPack (UncompStream.empty ())
+    | `Packing -> Pack   (PackedStream.empty ())
+
+  let of_string ~compression s =
+    match compression with
+    | `None ->
+        let stream = UncompStream.empty () in
+        let () = UncompStream.add_fragment stream s in
+        NoPack stream
+    | `Packing ->
+        let stream = PackedStream.empty () in
+        let () = PackedStream.add_fragment stream s in
+        Pack stream
+
+  let add_fragment stream fragment =
+    match stream with
+    | NoPack stream' -> UncompStream.add_fragment stream' fragment
+    | Pack stream'   -> PackedStream.add_fragment stream' fragment
+
+  let bytes_available stream =
+    match stream with
+    | NoPack stream' -> UncompStream.bytes_available stream'
+    | Pack stream'   -> PackedStream.bytes_available stream'
+
+  let is_empty stream =
+    match stream with
+    | NoPack stream' -> UncompStream.is_empty stream'
+    | Pack stream'   -> PackedStream.is_empty stream'
+
+  let get_next_frame stream =
+    match stream with
+    | NoPack stream' -> UncompStream.get_next_frame stream'
+    | Pack stream'   -> PackedStream.get_next_frame stream'
 
 end
 
