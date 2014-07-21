@@ -159,6 +159,21 @@ module ReadContext = struct
       bytes_read
     else
       bytes_read
+
+  let read_message context =
+    let rec loop () =
+      match dequeue_message context with
+      | Some message ->
+          Some message
+      | None ->
+          let bytes_read = read context in
+          if bytes_read = 0 then
+            None
+          else
+            loop ()
+    in
+    loop ()
+
 end
 
 

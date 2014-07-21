@@ -73,13 +73,16 @@ module ReadContext : sig
 
       The semantics of the [read] function shall mimic that of [Unix.read],
       attempting to read into a substring of the [buf] and returning the number
-      of bytes actually read. *)
+      of bytes actually read.  A read of length 0 indicates end-of-file. *)
   val create : read:('a -> buf:Bytes.t -> pos:int -> len:int -> int) ->
     compression:Codecs.compression_t -> 'a -> 'a t
 
   (** [dequeue_message context] attempts to remove a complete message from the
       incoming queue of the read [context].  No data will be read from the
       underlying descriptor.
+
+      @return None if there is insufficient data stored in the read context
+      to decode a complete message
 
       @raise Unsupported_message_frame if the frame header describes a segment
       count or segment size that is too large for the implementation *)
@@ -94,6 +97,18 @@ module ReadContext : sig
 
       @return the number of bytes actually read *)
   val read : 'a t -> int
+
+  (** [read_message context] attempts to remove a complete message from the
+      incoming queue of the read [context].  [read] may be invoked repeatedly
+      to provide enough buffered data to decode a complete message.
+
+      @return None if end-of-file was reached before a complete message could
+      be read
+
+      @raise Unsupported_message_frame if the frame header describes a segment
+      count or segment size that is too large for the implementation *)
+  val read_message : 'a t -> Message.rw Message.BytesMessage.Message.t option
+
 end
 
 
