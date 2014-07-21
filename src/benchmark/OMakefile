@@ -1,24 +1,22 @@
 OCAMLINCLUDES += ../runtime
 OCAML_LIBS += ../runtime/libcapnp
 
-# It's OK if tests run slowly; if something goes wrong, we want the
-# best possible backtrace support.
-NATIVE_ENABLED = false
-
-TEST_MODULES = \
+MODULES = \
   c2b2b \
-  test \
-  test_import \
-  testBytesStorage \
-  testCodecs \
-  testLists \
-  testMisc \
-  testEncoding
+  catrank \
+  carsales \
+  eval \
+  common \
+  fastRand \
+  testCaseSig \
+  capnpCarsales \
+  main
 
-PROGRAM = run-tests
+
+PROGRAM = bench
 
 # We will check out a local copy of the capnproto repo in order to generate
-# code based on the "test.capnp" schema.
+# code based on the benchmark schema.
 COMPILER = ../compiler/capnpc-ocaml
 CAPNPROTO_REPO = https://github.com/kentonv/capnproto.git
 CAPNPROTO_REVISION = 25509cf4f1fe6b3f5a6faa2f42b865f7571db8c4
@@ -28,28 +26,28 @@ CAPNPROTO_REVISION = 25509cf4f1fe6b3f5a6faa2f42b865f7571db8c4
 	pushd $$REPO_DIR && git checkout $(CAPNPROTO_REVISION) && popd && \
 	echo "$$REPO_DIR" > .capnp-repo'
 
-c2b2b.mli c2b2b.ml test.mli test.ml test_import.mli test_import.ml \
-testLists.mli testLists.ml: $(COMPILER) .capnp-repo
+c2b2b.mli c2b2b.ml catrank.mli catrank.ml carsales.mli carsales.ml \
+eval.mli eval.ml: $(COMPILER) .capnp-repo
 	bash -c 'REPO_DIR=`cat .capnp-repo` && \
 	capnp compile -o $(COMPILER) -I $$REPO_DIR/c++/src \
 		$$REPO_DIR/c++/src/capnp/c++.capnp \
-		$$REPO_DIR/c++/src/capnp/test.capnp \
-		$$REPO_DIR/c++/src/capnp/test-import.capnp \
-		testLists.capnp'
+		$$REPO_DIR/c++/src/capnp/benchmark/catrank.capnp \
+		$$REPO_DIR/c++/src/capnp/benchmark/carsales.capnp \
+		$$REPO_DIR/c++/src/capnp/benchmark/eval.capnp'
 
-OCamlProgram($(PROGRAM), $(TEST_MODULES))
+OCamlProgram($(PROGRAM), $(MODULES))
 
-.PHONY: test-clean test-distclean
+.PHONY: bench-clean bench-distclean
 
-test-clean:
+bench-clean:
 	rm -f $(PROGRAM)$(EXE) $(PROGRAM).opt $(PROGRAM).run \
-		*.cmi *.cmo *.cmx *.cma *.cmxa *.cmxs *.a *.o \
-		test.mli test.ml
+		*.cmi *.cmo *.cmx *.cma *.cmxa *.cmxs *.a *.o
 
-test-distclean: test-clean
+bench-distclean: bench-clean
 	rm -f *.omc
 	bash -c 'if [ -f .capnp-repo ]; then \
 		cat .capnp-repo | xargs rm -rf --preserve-root; \
 		rm .capnp-repo; \
 		fi'
+
 
