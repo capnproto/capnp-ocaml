@@ -39,6 +39,8 @@ let pass_by_pipe client_func server_func iters =
       assert (bytes_read = 8);
       let tp64 = EndianBytes.LittleEndian.get_int64 tp64_buf 0 in
       let throughput = throughput + (Int64.to_int_exn tp64) in
+      Unix.close client_to_server_read;
+      Unix.close server_to_client_write;
 
       let () = Unix.waitpid_exn child_pid in
       throughput
@@ -53,7 +55,7 @@ let () =
     ();
   *)
 
-  let module C = Common.SyncClient 
+  let module C = Common.AsyncClient
       (CapnpCarsales.TestCase)
       (CapnpCarsales.CS.Builder.ParkingLot)
       (CapnpCarsales.CS.Reader.TotalValue)
