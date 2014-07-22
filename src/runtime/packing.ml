@@ -41,75 +41,81 @@ let count_zeros ~start ~stop s =
   !sum
 
 
+(* Main loop across words of the message *)
+let rec pack_loop_words ~input ~ofs ~buf =
+  let () = assert (ofs <= String.length input) in
+  if ofs = String.length input then
+    Buffer.contents buf
+  else
+    pack_loop_bytes ~input ~ofs ~buf
+
+
+(* Loop across bytes within a word, emitting a tag byte followed by
+   a variable number of literal bytes *)
+and pack_loop_bytes ~input ~ofs ~buf =
+  let output_buf = Bytes.create 9 in
+  let tag_byte = ref 0 in
+  let output_count = ref 1 in
+  for bit = 0 to 7 do
+    let c = input.[ofs + bit] in
+    if c = '\x00' then
+      ()
+    else begin
+      let () = Bytes.set output_buf !output_count c in
+      tag_byte := !tag_byte lor (1 lsl bit);
+      output_count := !output_count + 1
+    end
+  done;
+  let () = Bytes.set output_buf 0 (Char.of_int_exn !tag_byte) in
+  let () = Buffer.add_substring buf
+    (Bytes.unsafe_to_string output_buf) 0 !output_count
+  in
+  if !tag_byte = 0 then
+    pack_loop_zero_words ~input ~ofs:(ofs + 8) ~count:0 ~buf
+  else if !tag_byte = 0xff then
+    pack_loop_literal_words ~input ~ofs:(ofs + 8) ~buf ~count:0
+      ~lit_buf:(Buffer.create 128)
+  else
+    pack_loop_words ~input ~ofs:(ofs + 8) ~buf
+
+
+(* Emitting a run of zeros *)
+and pack_loop_zero_words ~input ~ofs ~count ~buf =
+  let () = assert (ofs <= String.length input) in
+  if ofs + 8 > String.length input || count = 0xff ||
+     count_zeros ~start:ofs ~stop:(ofs + 8) input <> 8 then
+    let () = Buffer.add_char buf (Char.of_int_exn count) in
+    pack_loop_words ~input ~ofs ~buf
+  else
+    pack_loop_zero_words ~input ~ofs:(ofs + 8) ~count:(count + 1) ~buf
+
+
+(* Emitting a run of literal bytes.  This algorithm is only using
+   a single word of lookahead, which is fast but will not optimize
+   packing efficiency. *)
+and pack_loop_literal_words ~input ~ofs ~buf ~count ~lit_buf =
+  let () = assert (ofs <= String.length input) in
+  if ofs + 8 > String.length input || count = 0xff then
+    let () = Buffer.add_char buf (Char.of_int_exn count) in
+    let () = Buffer.add_buffer buf lit_buf in
+    pack_loop_words ~input ~ofs ~buf
+  else
+    let num_zeros = count_zeros ~start:ofs ~stop:(ofs + 8) input in
+    if num_zeros < 3 then
+      let () = Buffer.add_substring lit_buf input ofs 8 in
+      pack_loop_literal_words ~input ~ofs:(ofs + 8) ~buf ~count:(count + 1) ~lit_buf
+    else
+      let () = Buffer.add_char buf (Char.of_int_exn count) in
+      let () = Buffer.add_buffer buf lit_buf in
+      pack_loop_words ~input ~ofs ~buf
+
+
 (** Pack a word_aligned string. *)
 let pack_string (s : string) : string =
   (* String should be padded out to a word boundary *)
   let () = assert ((String.length s) mod 8 = 0) in
   let buf = Buffer.create ((String.length s) / 4) in
-
-  (* Main loop across words of the message *)
-  let rec loop_words ofs =
-    let () = assert (ofs <= String.length s) in
-    if ofs = String.length s then
-      Buffer.contents buf
-    else
-      loop_bytes ~tag_byte:0 ~output_buf:(Bytes.create 9) ~output_count:1
-        ~ofs 0
-
-  (* Loop across bytes within a word, emitting a tag byte followed by
-     a variable number of literal bytes *)
-  and loop_bytes ~tag_byte ~output_buf ~output_count ~ofs bit =
-    if bit = 8 then
-      let () = Bytes.set output_buf 0 (Char.of_int_exn tag_byte) in
-      let () = Buffer.add_substring buf
-        (Bytes.unsafe_to_string output_buf) 0 output_count
-      in
-      if tag_byte = 0 then
-        loop_zero_words ~count:0 (ofs + 8)
-      else if tag_byte = 0xff then
-        loop_literal_words ~count:0 ~lit_buf:(Buffer.create 128) (ofs + 8)
-      else
-        loop_words (ofs + 8)
-    else
-      if s.[ofs + bit] = '\x00' then
-        loop_bytes ~tag_byte ~output_buf ~output_count ~ofs (bit + 1)
-      else
-        let () = Bytes.set output_buf output_count s.[ofs + bit] in
-        loop_bytes
-          ~tag_byte:(tag_byte lor (1 lsl bit))
-          ~output_buf ~output_count:(output_count + 1)
-          ~ofs (bit + 1)
-
-  (* Emitting a run of zeros *)
-  and loop_zero_words ~count ofs =
-    let () = assert (ofs <= String.length s) in
-    if ofs + 8 > String.length s || count = 0xff ||
-       count_zeros ~start:ofs ~stop:(ofs + 8) s <> 8 then
-      let () = Buffer.add_char buf (Char.of_int_exn count) in
-      loop_words ofs
-    else
-      loop_zero_words ~count:(count + 1) (ofs + 8)
-
-  (* Emitting a run of literal bytes.  This algorithm is only using
-     a single word of lookahead, which is fast but will not optimize
-     packing efficiency. *)
-  and loop_literal_words ~count ~lit_buf ofs =
-    let () = assert (ofs <= String.length s) in
-    if ofs + 8 > String.length s || count = 0xff then
-      let () = Buffer.add_char buf (Char.of_int_exn count) in
-      let () = Buffer.add_buffer buf lit_buf in
-      loop_words ofs
-    else
-      let num_zeros = count_zeros ~start:ofs ~stop:(ofs + 8) s in
-      if num_zeros < 3 then
-        let () = Buffer.add_substring lit_buf s ofs 8 in
-        loop_literal_words ~count:(count + 1) ~lit_buf (ofs + 8)
-      else
-        let () = Buffer.add_char buf (Char.of_int_exn count) in
-        let () = Buffer.add_buffer buf lit_buf in
-        loop_words ofs
-  in
-  loop_words 0
+  pack_loop_words ~input:s ~ofs:0 ~buf
 
 
 let bits_set_lookup =
