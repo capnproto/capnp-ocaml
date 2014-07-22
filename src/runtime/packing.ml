@@ -134,86 +134,93 @@ let bits_set_lookup =
 let bits_set x = bits_set_lookup.(x)
 
 
-(** Unpack as much data as possible from the packed fragment buffer.
-    into the unpacked fragment buffer.
-
-    Note: this might be kind of slow due to heavy reliance on higher-order
-    functions with closures.  A less-elegant-but-faster implementation could
-    be worthwhile. *)
-let unpack ~(packed : FragmentBuffer.t) ~(unpacked : FragmentBuffer.t) : unit =
-  let rec unpack_aux buf ofs =
-    (* If at least [required_byte_count] bytes are available in the buffer,
-       then [f ()] is returned.  Otherwise, if the required number of bytes
-       can be obtained from the fragment buffer, then grab those bytes
-       and recurse into [unpack_aux] with a now-larger buffer.  Otherwise,
-       give back the buffer and stop. *)
-    let try_apply ~required_byte_count ~f =
-      if String.length buf >= required_byte_count + ofs then
-        f ()
-      else
-        let unconsumed_bytes = Util.str_slice ~start:ofs buf in
-        let bytes_missing =
-          required_byte_count - (String.length unconsumed_bytes)
-        in
-        match FragmentBuffer.remove_at_least packed bytes_missing with
-        | Some fragment ->
-            unpack_aux (unconsumed_bytes ^ fragment) 0
-        | None ->
-            FragmentBuffer.unremove packed unconsumed_bytes
-    in
-    try_apply ~required_byte_count:1 ~f:begin fun () ->
-      match buf.[ofs] with
-      | '\x00' ->
-          (* Followed by a count byte specifying number of zero words - 1 *)
-          try_apply ~required_byte_count:2 ~f:(fun () ->
-            let zero_word_count = 1 + (Char.to_int buf.[ofs + 1]) in
-            let zeros = String.make (zero_word_count * 8) '\x00' in
-            let () = FragmentBuffer.add_fragment unpacked zeros in
-            unpack_aux buf (ofs + 2))
-      | '\xff' ->
-          (* Followed by 8 literal bytes, followed by count byte *)
-          try_apply ~required_byte_count:10 ~f:(fun () ->
-            (* The count byte specifies number of literal words to copy *)
-            let extra_bytes_required = 8 * (Char.to_int buf.[ofs + 9]) in
-            try_apply ~required_byte_count:(10 + extra_bytes_required)
-              ~f:(fun () ->
-                let first_literal_word =
-                  Util.str_slice ~start:(ofs + 1) ~stop:(ofs + 9) buf
-                in
-                let other_literal_words =
-                  Util.str_slice ~start:(ofs + 10)
-                    ~stop:(ofs + 10 + extra_bytes_required) buf
-                in
-                let () = FragmentBuffer.add_fragment unpacked first_literal_word in
-                let () = FragmentBuffer.add_fragment unpacked other_literal_words in
-                unpack_aux buf (ofs + 10 + extra_bytes_required)))
-      | c ->
-          (* Followed by one literal byte for every bit set *)
-          let c_int = Char.to_int c in
-          let literal_bytes_required = bits_set c_int in
-          try_apply ~required_byte_count:(1 + literal_bytes_required)
-            ~f:(fun () ->
-              let src_ofs = ref (ofs + 1) in
-              let output_word = Bytes.create 8 in
-              let rec loop i =
-                if i = 8 then
-                  let () = FragmentBuffer.add_fragment unpacked
-                      (Bytes.unsafe_to_string output_word) in
-                  unpack_aux buf !src_ofs
-                else
-                  let () =
-                    if (c_int land (1 lsl i)) <> 0 then begin
-                      Bytes.set output_word i buf.[!src_ofs];
-                      src_ofs := !src_ofs + 1
-                    end else
-                      Bytes.set output_word i '\x00'
-                  in
-                  loop (i + 1)
-              in
-              loop 0)
-    end
+(* Consider coalescing the remaining bytes of [buf] with the next fragment in
+   the buffer. If this is large enough to satisfy the [required_bytes_count],
+   then proceed with [unpack_decode_tag].  Otherwise, put the remainder of
+   the buffer back into [packed] and give up. *)
+let rec unpack_coalesce_buffer_and_retry ~packed ~unpacked ~buf ~ofs
+    ~required_byte_count : unit =
+  let unconsumed_bytes = Util.str_slice ~start:ofs buf in
+  let bytes_missing =
+    required_byte_count - (String.length unconsumed_bytes)
   in
-  unpack_aux "" 0
+  match FragmentBuffer.remove_at_least packed bytes_missing with
+  | Some fragment ->
+      unpack_decode_tag ~packed ~unpacked ~buf:(unconsumed_bytes ^ fragment) ~ofs:0
+  | None ->
+      FragmentBuffer.unremove packed unconsumed_bytes
+
+
+(* Decode a tag byte and then attempt to decode all the bytes that are
+   associated with the tag. *)
+and unpack_decode_tag ~packed ~unpacked ~buf ~ofs =
+  if ofs = String.length buf then
+    unpack_coalesce_buffer_and_retry ~packed ~unpacked ~buf ~ofs ~required_byte_count:1
+  else
+    match buf.[ofs] with
+    | '\x00' ->
+        (* Followed by a count byte specifying number of zero words - 1 *)
+        let required_byte_count = 2 in
+        if String.length buf - ofs >= required_byte_count then
+          let zero_word_count = 1 + (Char.to_int buf.[ofs + 1]) in
+          let zeros = String.make (zero_word_count * 8) '\x00' in
+          let () = FragmentBuffer.add_fragment unpacked zeros in
+          unpack_decode_tag ~packed ~unpacked ~buf ~ofs:(ofs + 2)
+        else
+          unpack_coalesce_buffer_and_retry ~packed ~unpacked ~buf ~ofs
+            ~required_byte_count
+    | '\xff' ->
+        (* Followed by 8 literal bytes, followed by count byte *)
+        let required_byte_count = 10 in
+        if String.length buf - ofs >= required_byte_count then
+          (* The count byte specifies number of literal words to copy *)
+          let extra_bytes_required = 8 * (Char.to_int buf.[ofs + 9]) in
+          let required_byte_count' = required_byte_count + extra_bytes_required in
+          if String.length buf - ofs >= required_byte_count' then
+            let first_literal_word =
+              Util.str_slice ~start:(ofs + 1) ~stop:(ofs + 9) buf
+            in
+            let other_literal_words =
+              Util.str_slice ~start:(ofs + 10)
+                ~stop:(ofs + 10 + extra_bytes_required) buf
+            in
+            let () = FragmentBuffer.add_fragment unpacked first_literal_word in
+            let () = FragmentBuffer.add_fragment unpacked other_literal_words in
+            unpack_decode_tag ~packed ~unpacked ~buf ~ofs:(ofs + 10 + extra_bytes_required)
+          else
+            unpack_coalesce_buffer_and_retry ~packed ~unpacked ~buf ~ofs
+              ~required_byte_count:required_byte_count'
+        else
+          unpack_coalesce_buffer_and_retry ~packed ~unpacked ~buf ~ofs
+            ~required_byte_count
+    | c ->
+        (* Followed by one literal byte for every bit set *)
+        let c_int = Char.to_int c in
+        let literal_bytes_required = bits_set c_int in
+        let required_byte_count = 1 + literal_bytes_required in
+        if String.length buf - ofs >= required_byte_count then begin
+          let src_ofs = ref (ofs + 1) in
+          let output_word = Bytes.create 8 in
+          for i = 0 to 7 do
+            if (c_int land (1 lsl i)) <> 0 then begin
+              Bytes.set output_word i buf.[!src_ofs];
+              src_ofs := !src_ofs + 1
+            end else
+              Bytes.set output_word i '\x00'
+          done;
+          let () = FragmentBuffer.add_fragment unpacked
+              (Bytes.unsafe_to_string output_word)
+          in
+          unpack_decode_tag ~packed ~unpacked ~buf ~ofs:!src_ofs
+        end else
+          unpack_coalesce_buffer_and_retry ~packed ~unpacked ~buf ~ofs
+            ~required_byte_count
+
+
+(** Unpack as much data as possible from the packed fragment buffer.
+    into the unpacked fragment buffer. *)
+let unpack ~(packed : FragmentBuffer.t) ~(unpacked : FragmentBuffer.t) : unit =
+  unpack_decode_tag ~packed ~unpacked ~buf:"" ~ofs:0
 
 
 (* Provided for testing purposes only. *)
