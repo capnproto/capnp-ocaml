@@ -4,6 +4,8 @@ module IO = Capnp.IO
 module Codecs = Capnp.Codecs
 
 
+(* This is a wrapper for writing to a file descriptor and simultaneously
+   counting the number of bytes written. *)
 module CountingOutputStream = struct
   type t = {
     fd : Unix.File_descr.t;
@@ -20,13 +22,37 @@ module CountingOutputStream = struct
 end
 
 
+module type BENCHMARK_SIG = sig
+  val sync_client : input_fd:Unix.File_descr.t -> output_fd:Unix.File_descr.t ->
+    compression:Codecs.compression_t -> iters:int -> int
 
-module SyncClient
+  val async_client : input_fd:Unix.File_descr.t -> output_fd:Unix.File_descr.t ->
+    compression:Codecs.compression_t -> iters:int -> int
+
+  val server : input_fd:Unix.File_descr.t -> output_fd:Unix.File_descr.t ->
+    compression:Codecs.compression_t -> iters:int -> int
+
+  val pass_by_object : iters:int -> int
+
+  val pass_by_bytes : compression:Codecs.compression_t -> iters:int -> int
+end
+
+module Benchmark
     (TestCase : TestCaseSig.TEST_CASE)
+    (RequestReader : TestCaseSig.READER
+     with type t = TestCase.request_reader_t
+      and type builder_t = TestCase.request_builder_t)
     (RequestBuilder : TestCaseSig.BUILDER with type t = TestCase.request_builder_t)
-    (ResponseReader : TestCaseSig.READER with type t = TestCase.response_reader_t)
+    (ResponseReader : TestCaseSig.READER
+     with type t = TestCase.response_reader_t
+      and type builder_t = TestCase.response_builder_t)
+    (ResponseBuilder : TestCaseSig.BUILDER with type t = TestCase.response_builder_t)
+    : BENCHMARK_SIG
 = struct
-  let f
+
+  (* [sync_client] issues a randomized request and waits for the response,
+     looping up to the specified number of iterations. *)
+  let sync_client
       ~(input_fd : Unix.File_descr.t)
       ~(output_fd : Unix.File_descr.t)
       ~(compression : Codecs.compression_t)
@@ -54,15 +80,12 @@ module SyncClient
     done;
     out_stream.CountingOutputStream.throughput
 
-end
 
-
-module AsyncClient
-    (TestCase : TestCaseSig.TEST_CASE)
-    (RequestBuilder : TestCaseSig.BUILDER with type t = TestCase.request_builder_t)
-    (ResponseReader : TestCaseSig.READER with type t = TestCase.response_reader_t)
-= struct
-  let f
+  (* [async_client] issues randomized requests in a pipelined manner, matching
+     up the corresponding responses asynchronously.  Unlike the capnproto C++
+     benchmark, this runs in a single thread and uses a [select] loop to
+     determine appropriate times to write and read. *)
+  let async_client
       ~(input_fd : Unix.File_descr.t)
       ~(output_fd : Unix.File_descr.t)
       ~(compression : Codecs.compression_t)
@@ -127,15 +150,10 @@ module AsyncClient
     done;
     out_stream.CountingOutputStream.throughput
 
-end
 
-
-module Server
-    (TestCase : TestCaseSig.TEST_CASE)
-    (RequestReader : TestCaseSig.READER with type t = TestCase.request_reader_t)
-    (ResponseBuilder : TestCaseSig.BUILDER with type t = TestCase.response_builder_t)
-= struct
-  let f
+  (* [server] receives incoming requests one at a time, immediately writing
+     a response for each request in turn. *)
+  let server
       ~(input_fd : Unix.File_descr.t)
       ~(output_fd : Unix.File_descr.t)
       ~(compression : Codecs.compression_t)
@@ -159,21 +177,11 @@ module Server
     done;
     out_stream.CountingOutputStream.throughput
 
-end
 
-
-module PassByObject
-    (TestCase : TestCaseSig.TEST_CASE)
-    (RequestReader : TestCaseSig.READER
-     with type t = TestCase.request_reader_t
-      and type builder_t = TestCase.request_builder_t)
-    (RequestBuilder : TestCaseSig.BUILDER with type t = TestCase.request_builder_t)
-    (ResponseReader : TestCaseSig.READER
-     with type t = TestCase.response_reader_t
-      and type builder_t = TestCase.response_builder_t)
-    (ResponseBuilder : TestCaseSig.BUILDER with type t = TestCase.response_builder_t)
-= struct
-  let f ~(iters : int) : int =
+  (* [pass_by_object] constructs a randomized request and generates a response for
+     the request, looping up to the specified number of iterations.  Everything
+     happens synchronously in one process, and no serialization takes place. *)
+  let pass_by_object ~(iters : int) : int =
     let object_size_counter = ref 0 in
     for i = 0 to iters - 1 do
       let (req_builder, expectation) = TestCase.setup_request () in
@@ -193,17 +201,12 @@ module PassByObject
     done;
     !object_size_counter
 
-end
 
-
-module PassByBytes
-    (TestCase : TestCaseSig.TEST_CASE)
-    (RequestReader : TestCaseSig.READER with type t = TestCase.request_reader_t)
-    (RequestBuilder : TestCaseSig.BUILDER with type t = TestCase.request_builder_t)
-    (ResponseReader : TestCaseSig.READER with type t = TestCase.response_reader_t)
-    (ResponseBuilder : TestCaseSig.BUILDER with type t = TestCase.response_builder_t)
-= struct
-  let f ~(iters : int) ~(compression : Codecs.compression_t) =
+(* [pass_by_bytes] constructs a randomized request and generates a response for
+   the request, looping up to the specified number of iterations.  Everything
+   happens synchronously in one process.  The request and response are converted
+   from objects to strings and back, in both directions. *)
+  let pass_by_bytes ~(compression : Codecs.compression_t) ~(iters : int) =
     let throughput = ref 0 in
     for i = 0 to iters - 1 do
       let (req_builder, expectation) = TestCase.setup_request () in
@@ -244,6 +247,51 @@ module PassByBytes
 
     done;
     !throughput
+
 end
+
+
+(* [pass_by_pipe] forks off a child (client) process connected to the current
+   (server) process by a pipe.  The [client_func] and [server_func] are then
+   used to carry out a benchmark method using the provided pipe transport. *)
+let pass_by_pipe client_func server_func : int =
+  let (client_to_server_read, client_to_server_write) = Unix.pipe () in
+  let (server_to_client_read, server_to_client_write) = Unix.pipe () in
+  match Unix.fork () with
+  | `In_the_child ->
+      (* client *)
+      Unix.close client_to_server_read;
+      Unix.close server_to_client_write;
+
+      let throughput = client_func ~input_fd:server_to_client_read
+          ~output_fd:client_to_server_write
+      in
+      let tp64 = Int64.of_int throughput in
+      let buf = Bytes.create 8 in
+      let () = EndianBytes.LittleEndian.set_int64 buf 0 tp64 in
+      let bytes_written = Unix.write client_to_server_write
+          ~buf:(Bytes.unsafe_to_string buf)
+      in
+      assert (bytes_written = 8);
+      exit 0
+  | `In_the_parent child_pid ->
+      (* server *)
+      Unix.close client_to_server_write;
+      Unix.close server_to_client_read;
+
+      let throughput = server_func ~input_fd:client_to_server_read
+          ~output_fd:server_to_client_write
+      in
+
+      let tp64_buf = Bytes.create 8 in
+      let bytes_read = Unix.read client_to_server_read ~buf:tp64_buf in
+      assert (bytes_read = 8);
+      let tp64 = EndianBytes.LittleEndian.get_int64 tp64_buf 0 in
+      let throughput = throughput + (Int64.to_int_exn tp64) in
+      Unix.close client_to_server_read;
+      Unix.close server_to_client_write;
+
+      let () = Unix.waitpid_exn child_pid in
+      throughput
 
 

@@ -5,95 +5,78 @@ let printf = Printf.printf
 let fprintf = Printf.fprintf
 
 
-let pass_by_pipe client_func server_func iters =
-  let (client_to_server_read, client_to_server_write) = Unix.pipe () in
-  let (server_to_client_read, server_to_client_write) = Unix.pipe () in
-  match Unix.fork () with
-  | `In_the_child ->
-      (* client *)
-      Unix.close client_to_server_read;
-      Unix.close server_to_client_write;
+module BenchmarkRunner(BM : Methods.BENCHMARK_SIG) = struct
 
-      let throughput = client_func ~input_fd:server_to_client_read
-          ~output_fd:client_to_server_write ~iters
-      in
-      let tp64 = Int64.of_int throughput in
-      let buf = Bytes.create 8 in
-      let () = EndianBytes.LittleEndian.set_int64 buf 0 tp64 in
-      let bytes_written = Unix.write client_to_server_write
-          ~buf:(Bytes.unsafe_to_string buf)
-      in
-      assert (bytes_written = 8);
-      exit 0
-  | `In_the_parent child_pid ->
-      (* server *)
-      Unix.close client_to_server_write;
-      Unix.close server_to_client_read;
+  let f mode compression iters =
+    if mode = "client" then
+      BM.sync_client ~input_fd:Unix.stdin ~output_fd:Unix.stdout
+        ~compression ~iters
+    else if mode = "server" then
+      BM.server ~input_fd:Unix.stdin ~output_fd:Unix.stdout
+        ~compression ~iters
+    else if mode = "object" then
+      BM.pass_by_object ~iters
+    else if mode = "bytes" then
+      BM.pass_by_bytes ~compression ~iters
+    else if mode = "pipe" then
+      Methods.pass_by_pipe
+        (BM.sync_client ~compression ~iters)
+        (BM.server ~compression ~iters)
+    else if mode = "pipe-async" then
+      Methods.pass_by_pipe
+        (BM.async_client ~compression ~iters)
+        (BM.server ~compression ~iters)
+    else begin
+      fprintf stderr "Unknown mode: \"%s\"\n" mode;
+      exit 1
+    end
 
-      let throughput = server_func ~input_fd:client_to_server_read
-          ~output_fd:server_to_client_write ~iters
-      in
-
-      let tp64_buf = Bytes.create 8 in
-      let bytes_read = Unix.read client_to_server_read ~buf:tp64_buf in
-      assert (bytes_read = 8);
-      let tp64 = EndianBytes.LittleEndian.get_int64 tp64_buf 0 in
-      let throughput = throughput + (Int64.to_int_exn tp64) in
-      Unix.close client_to_server_read;
-      Unix.close server_to_client_write;
-
-      let () = Unix.waitpid_exn child_pid in
-      throughput
+end
 
 
 let () =
-  (*
   if Array.length Sys.argv <> 4 then begin
-    fprintf stderr "USAGE:  %s MODE COMPRESSION ITERATION_COUNT\n" argv.(0);
+    fprintf stderr "USAGE:  %s MODE COMPRESSION ITERATION_COUNT\n"
+      Sys.argv.(0);
     exit 1
-  end else
-    ();
-  *)
+  end;
 
-  let module C = Common.AsyncClient
-      (CapnpCarsales.TestCase)
-      (CapnpCarsales.CS.Builder.ParkingLot)
-      (CapnpCarsales.CS.Reader.TotalValue)
+  let name   = Filename.basename Sys.argv.(0) in
+  let mode   = Sys.argv.(1) in
+  let comp_s = Sys.argv.(2) in
+  let iter_s = Sys.argv.(3) in
+
+  let iters = Int.of_string iter_s in
+
+  let compression =
+    if comp_s = "none" then
+      `None
+    else if comp_s = "packed" then
+      `Packing
+    else begin
+      fprintf stderr "Unknown compression mode \"%s\".\n" comp_s;
+      exit 1
+    end
   in
 
-  let module S = Common.Server
-      (CapnpCarsales.TestCase)
-      (CapnpCarsales.CS.Reader.ParkingLot)
-      (CapnpCarsales.CS.Builder.TotalValue)
+  let throughput =
+    if name = "carsales" then
+      let module BM = Methods.Benchmark
+          (CapnpCarsales.TestCase)
+          (CapnpCarsales.CS.Reader.ParkingLot)
+          (CapnpCarsales.CS.Builder.ParkingLot)
+          (CapnpCarsales.CS.Reader.TotalValue)
+          (CapnpCarsales.CS.Builder.TotalValue)
+      in
+      let module BR = BenchmarkRunner(BM) in
+      BR.f mode compression iters
+    else begin
+      fprintf stderr "Unknown benchmark name \"%s\".\n" name;
+      exit 1
+    end
   in
 
-  let module PO = Common.PassByObject
-      (CapnpCarsales.TestCase)
-      (CapnpCarsales.CS.Reader.ParkingLot)
-      (CapnpCarsales.CS.Builder.ParkingLot)
-      (CapnpCarsales.CS.Reader.TotalValue)
-      (CapnpCarsales.CS.Builder.TotalValue)
-  in
-
-  let module PB = Common.PassByBytes
-      (CapnpCarsales.TestCase)
-      (CapnpCarsales.CS.Reader.ParkingLot)
-      (CapnpCarsales.CS.Builder.ParkingLot)
-      (CapnpCarsales.CS.Reader.TotalValue)
-      (CapnpCarsales.CS.Builder.TotalValue)
-  in
-
-
-  (*
-  let throughput = pass_by_pipe
-    (C.f ~compression:`None)
-    (S.f ~compression:`None)
-    1000
-  in
-  *)
-
-  let throughput = PB.f ~iters:1000 ~compression:`Packing in
-  printf "throughput: %d\n" throughput;
+  printf "%d\n" throughput;
   exit 0
 
 
