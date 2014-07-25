@@ -110,7 +110,7 @@ module UncompStream = struct
             let word_size = 8 in
             (Util.ceil_ratio (4 * (segment_count + 1)) word_size) * word_size
           in
-          (* Now we know the full header, so try to get the whole thing *)
+          (* Now we know the full header size, so try to get the whole thing *)
           begin match FragmentBuffer.remove_exact stream.fragment_buffer
                         frame_header_size with
           | Some frame_header ->
@@ -273,28 +273,28 @@ let make_header segments =
       count_buf ^ segment_sizes
 
 
-let serialize_fold message ~init ~f =
+let rec serialize_fold message ~compression ~init ~f =
   let segments = Message.BytesMessage.Message.to_storage message in
-  let header = make_header segments in
-  List.fold_left segments ~init:(f init header) ~f
+  match compression with
+  | `None ->
+      let header = make_header segments in
+      List.fold_left segments ~init:(f init header) ~f
+  | `Packing ->
+      serialize_fold message ~compression:`None ~init
+        ~f:(fun acc unpacked_fragment ->
+          f acc (Packing.pack_string unpacked_fragment))
 
 
-let serialize_iter message ~f =
-  serialize_fold message ~init:() ~f:(fun () s -> f s)
+let serialize_iter message ~compression ~f =
+  serialize_fold message ~compression ~init:() ~f:(fun () s -> f s)
 
 
-let serialize message =
-  let segments = Message.BytesMessage.Message.to_storage message in
-  (make_header segments) ^ (String.concat ~sep:"" segments)
+let rec serialize ~compression message=
+  match compression with
+  | `None ->
+      let segments = Message.BytesMessage.Message.to_storage message in
+      (make_header segments) ^ (String.concat ~sep:"" segments)
+  | `Packing ->
+      Packing.pack_string (serialize ~compression:`None message)
 
-
-let pack_fold message ~init ~f =
-  serialize_fold message ~init
-    ~f:(fun acc unpacked_fragment -> f acc (Packing.pack_string unpacked_fragment))
-
-let pack_iter message ~f =
-  pack_fold message ~init:() ~f:(fun () s -> f s)
-
-let pack message =
-  Packing.pack_string (serialize message)
 

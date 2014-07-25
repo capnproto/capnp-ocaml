@@ -64,16 +64,9 @@ module WriteContext = struct
   }
 
   let enqueue_message context message =
-    match context.comp with
-    | `None ->
-        Codecs.serialize_iter message ~f:(fun bytes_buf ->
-          let buf_copy = Bytes.to_string bytes_buf in
-          Dequeue.enqueue_back context.fragments buf_copy;
-          context.fragments_size <- context.fragments_size + (String.length buf_copy))
-    | `Packing ->
-        Codecs.pack_iter message ~f:(fun buf ->
-          Dequeue.enqueue_back context.fragments buf;
-          context.fragments_size <- context.fragments_size + (String.length buf))
+    Codecs.serialize_iter message ~compression:context.comp ~f:(fun buf ->
+      Dequeue.enqueue_back context.fragments buf;
+      context.fragments_size <- context.fragments_size + (String.length buf))
 
   let bytes_remaining context = context.fragments_size - context.first_fragment_pos
 

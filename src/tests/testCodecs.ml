@@ -182,7 +182,7 @@ let test_random_serialize_deserialize ctx =
   Quickcheck.laws_exn "deserialize(fragment(serialize(x))) = x"
       2000 message_gen (fun m ->
     let open Capnp.Runtime in
-    let serialized = Codecs.serialize m in
+    let serialized = Codecs.serialize ~compression:`None m in
     let ser_fragments = Codecs.FramedStream.empty `None in
     let () = fragment serialized (Codecs.FramedStream.add_fragment ser_fragments) in
     let trailing_data = capnp_string_gen () in
@@ -208,7 +208,7 @@ let test_random_serialize_deserialize_packed ctx =
   Quickcheck.laws_exn "deserialize_unpack(fragment(serialize_pack(x))) = x"
       2000 message_gen (fun m ->
     let open Capnp.Runtime in
-    let packed = Codecs.pack m in
+    let packed = Codecs.serialize ~compression:`Packing m in
     let pack_fragments = Codecs.FramedStream.empty `Packing in
     let () = fragment packed (Codecs.FramedStream.add_fragment pack_fragments) in
     match Codecs.FramedStream.get_next_frame pack_fragments with

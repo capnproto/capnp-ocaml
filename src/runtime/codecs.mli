@@ -74,35 +74,23 @@ module FramedStream : sig
 end
 
 
-(** [serialize_fold message ~init f] generates an ordered sequence of
-    bytes fragments corresponding to a Cap'n Proto framed message
-    using the standard serialization.  The return value is the result
+(** [serialize_fold message ~compression ~init ~f] generates an ordered sequence
+    of string fragments corresponding to a Cap'n Proto framed message, encoded
+    using the specified [compression] method.  The return value is the result
     of folding [f] across the resulting sequence of fragments. *)
 val serialize_fold : 'cap Message.BytesMessage.Message.t ->
-  init:'acc -> f:('acc -> Bytes.t -> 'acc) -> 'acc
+  compression:compression_t -> init:'acc -> f:('acc -> string  -> 'acc) -> 'acc
 
-(** [serialize_iter message ~f] generates an ordered sequence of bytes
-    fragments corresponding to a Cap'n Proto framed message using the standard
-    serialization.  [f] is applied to each fragment in turn. *)
+(** [serialize_iter message ~compression ~f] generates an ordered sequence of
+    string fragments corresponding to a Cap'n Proto framed message, encoded
+    using the specified [compression] method.  [f] is applied to each fragment
+    in turn. *)
 val serialize_iter : 'cap Message.BytesMessage.Message.t ->
-  f:(Bytes.t -> unit) -> unit
+  compression:compression_t -> f:(string -> unit) -> unit
 
-(** [serialize message] constructs a buffer containing the [message] segments
-    with a standard serialization framing header. *)
-val serialize : 'cap Message.BytesMessage.Message.t -> string
-
-(** [pack_fold message ~init f] generates an ordered sequence of
-    bytes fragments corresponding to a packed Cap'n Proto message.
-    The return value is the result of folding [f] across the resulting
-    sequence of fragments. *)
-val pack_fold : 'cap Message.BytesMessage.Message.t -> init:'acc ->
-  f:('acc -> string -> 'acc) -> 'acc
-
-(** [pack_iter message ~f] generates an ordered sequence of string fragments
-    corresponding to a packed Cap'n Proto message.  [f] is applied
-    to each fragment in turn. *)
-val pack_iter : 'cap Message.BytesMessage.Message.t -> f:(string -> unit) -> unit
-
-(** [pack message] constructs a buffer containing a packed Cap'n Proto message. *)
-val pack : 'cap Message.BytesMessage.Message.t -> string
+(** [serialize ~compression message] constructs a string containing the [message]
+    segments prefixed with the serialization framing header, encoded using the
+    specified [compression] method. *)
+val serialize : compression:compression_t ->
+  'cap Message.BytesMessage.Message.t -> string
 
