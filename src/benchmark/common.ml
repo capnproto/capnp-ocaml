@@ -20,6 +20,7 @@ module CountingOutputStream = struct
 end
 
 
+
 module SyncClient
     (TestCase : TestCaseSig.TEST_CASE)
     (RequestBuilder : TestCaseSig.BUILDER with type t = TestCase.request_builder_t)
@@ -28,7 +29,7 @@ module SyncClient
   let f
       ~(input_fd : Unix.File_descr.t)
       ~(output_fd : Unix.File_descr.t)
-      ~(compression : Capnp.Codecs.compression_t)
+      ~(compression : Codecs.compression_t)
       ~(iters : int)
     : int =
     let in_context = IO.create_read_context_for_fd ~compression input_fd in
@@ -64,7 +65,7 @@ module AsyncClient
   let f
       ~(input_fd : Unix.File_descr.t)
       ~(output_fd : Unix.File_descr.t)
-      ~(compression : Capnp.Codecs.compression_t)
+      ~(compression : Codecs.compression_t)
       ~(iters : int)
     : int =
     let in_context = IO.create_read_context_for_fd ~compression input_fd in
@@ -137,7 +138,7 @@ module Server
   let f
       ~(input_fd : Unix.File_descr.t)
       ~(output_fd : Unix.File_descr.t)
-      ~(compression : Capnp.Codecs.compression_t)
+      ~(compression : Codecs.compression_t)
       ~(iters : int)
     : int =
     let in_context = IO.create_read_context_for_fd ~compression input_fd in
@@ -160,5 +161,89 @@ module Server
 
 end
 
+
+module PassByObject
+    (TestCase : TestCaseSig.TEST_CASE)
+    (RequestReader : TestCaseSig.READER
+     with type t = TestCase.request_reader_t
+      and type builder_t = TestCase.request_builder_t)
+    (RequestBuilder : TestCaseSig.BUILDER with type t = TestCase.request_builder_t)
+    (ResponseReader : TestCaseSig.READER
+     with type t = TestCase.response_reader_t
+      and type builder_t = TestCase.response_builder_t)
+    (ResponseBuilder : TestCaseSig.BUILDER with type t = TestCase.response_builder_t)
+= struct
+  let f ~(iters : int) : int =
+    let object_size_counter = ref 0 in
+    for i = 0 to iters - 1 do
+      let (req_builder, expectation) = TestCase.setup_request () in
+      let resp_builder = TestCase.handle_request
+          (RequestReader.of_builder req_builder)
+      in
+      if not (TestCase.check_response (ResponseReader.of_builder resp_builder)
+            expectation) then
+        failwith "incorrect response."
+      else
+        ();
+      object_size_counter := !object_size_counter +
+        (Capnp.BytesMessage.Message.total_size
+           (RequestBuilder.to_message req_builder)) +
+        (Capnp.BytesMessage.Message.total_size
+           (ResponseBuilder.to_message resp_builder))
+    done;
+    !object_size_counter
+
+end
+
+
+module PassByBytes
+    (TestCase : TestCaseSig.TEST_CASE)
+    (RequestReader : TestCaseSig.READER with type t = TestCase.request_reader_t)
+    (RequestBuilder : TestCaseSig.BUILDER with type t = TestCase.request_builder_t)
+    (ResponseReader : TestCaseSig.READER with type t = TestCase.response_reader_t)
+    (ResponseBuilder : TestCaseSig.BUILDER with type t = TestCase.response_builder_t)
+= struct
+  let f ~(iters : int) ~(compression : Codecs.compression_t) =
+    let throughput = ref 0 in
+    for i = 0 to iters - 1 do
+      let (req_builder, expectation) = TestCase.setup_request () in
+      let flattened_request =
+        let req_message = RequestBuilder.to_message req_builder in
+        Codecs.serialize ~compression req_message
+      in
+      throughput := !throughput + (String.length flattened_request);
+
+      let req_stream = Codecs.FramedStream.of_string ~compression
+          flattened_request
+      in
+      let flattened_response =
+        match Codecs.FramedStream.get_next_frame req_stream with
+        | Result.Ok req_message ->
+            let resp_builder = TestCase.handle_request
+                (RequestReader.of_message req_message)
+            in
+            let resp_message = ResponseBuilder.to_message resp_builder in
+            Codecs.serialize ~compression resp_message
+        | Result.Error _ ->
+            failwith "failed to decode complete request."
+      in
+      throughput := !throughput + (String.length flattened_response);
+
+      let resp_stream = Codecs.FramedStream.of_string ~compression
+          flattened_response
+      in
+      match Codecs.FramedStream.get_next_frame resp_stream with
+      | Result.Ok resp_message ->
+          if not (TestCase.check_response (ResponseReader.of_message resp_message)
+                expectation) then
+            failwith "incorrect response."
+          else
+            ()
+      | Result.Error _ ->
+          failwith "failed to decode complete response."
+
+    done;
+    !throughput
+end
 
 

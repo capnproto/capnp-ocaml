@@ -13,7 +13,9 @@ end
 
 module type READER = sig
   type t
+  type builder_t
   val of_message : 'cap Capnp.BytesMessage.Message.t -> t
+  val of_builder : builder_t -> t
 end
 
 module type BUILDER = sig

@@ -67,11 +67,32 @@ let () =
       (CapnpCarsales.CS.Builder.TotalValue)
   in
 
+  let module PO = Common.PassByObject
+      (CapnpCarsales.TestCase)
+      (CapnpCarsales.CS.Reader.ParkingLot)
+      (CapnpCarsales.CS.Builder.ParkingLot)
+      (CapnpCarsales.CS.Reader.TotalValue)
+      (CapnpCarsales.CS.Builder.TotalValue)
+  in
+
+  let module PB = Common.PassByBytes
+      (CapnpCarsales.TestCase)
+      (CapnpCarsales.CS.Reader.ParkingLot)
+      (CapnpCarsales.CS.Builder.ParkingLot)
+      (CapnpCarsales.CS.Reader.TotalValue)
+      (CapnpCarsales.CS.Builder.TotalValue)
+  in
+
+
+  (*
   let throughput = pass_by_pipe
     (C.f ~compression:`None)
     (S.f ~compression:`None)
     1000
   in
+  *)
+
+  let throughput = PB.f ~iters:1000 ~compression:`Packing in
   printf "throughput: %d\n" throughput;
   exit 0
 
