@@ -67,8 +67,7 @@ module FramedStream : sig
 
   (** [get_next_frame] attempts to decode the next frame from the stream.
       A successful decode removes the data from the stream and returns the
-      frame as a [string list] with one list element for every segment within
-      the message. *)
+      frame data in the form of a BytesMessage. *)
   val get_next_frame : t ->
     (Message.rw Message.BytesMessage.Message.t, FramingError.t) Core.Std.Result.t
 end
