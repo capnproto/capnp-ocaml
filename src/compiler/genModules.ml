@@ -55,9 +55,8 @@ let generate_enum_getter ~context ~enum_node ~mode
     GenCommon.make_unique_enum_module_name ~context enum_node
   in [
     "let " ^ field_name ^ "_get x =";
-    sprintf "  let discr = %s.get_data_field x \
-             ~f:(%s.get_uint16 ~default:%u ~byte_ofs:%u) in"
-      api_module
+    "  let data = " ^ api_module ^ ".get_data_region x in";
+    sprintf "  let discr = %s.get_uint16 ~default:%u ~byte_ofs:%u data in"
       api_module
       default
       (field_ofs * 2);
@@ -72,10 +71,9 @@ let generate_enum_safe_setter ~context ~enum_node ~field_name
     GenCommon.make_unique_enum_module_name ~context enum_node
   in [
     "let " ^ field_name ^ "_set x e =";
+    "  let data = BA_.get_data_region " ^ discr_str ^ "x in";
     sprintf
-      "  BA_.get_data_field %sx ~f:(BA_.set_uint16 \
-       ~default:%u ~byte_ofs:%u (%s.encode_safe e))"
-      discr_str
+      "  BA_.set_uint16 ~default:%u ~byte_ofs:%u (%s.encode_safe e) data"
       default
       (field_ofs * 2)
       unique_module_name;
@@ -89,10 +87,10 @@ let generate_enum_unsafe_setter ~context ~enum_node ~field_name
   let unique_module_name =
     GenCommon.make_unique_enum_module_name ~context enum_node
   in [
-    "let " ^ field_name ^ "_set_unsafe x e ="; sprintf
-      "  BA_.get_data_field %sx ~f:(BA_.set_uint16 \
-       ~default:%u ~byte_ofs:%u (%s.encode_unsafe e))"
-      discr_str
+    "let " ^ field_name ^ "_set_unsafe x e =";
+    "  let data = BA_.get_data_region " ^ discr_str ^ "x in";
+    sprintf
+      "  BA_.set_uint16 ~default:%u ~byte_ofs:%u (%s.encode_unsafe e) data"
       default
       (field_ofs * 2)
       unique_module_name;
@@ -310,13 +308,13 @@ let generate_list_getters ~context ~scope ~list_type ~mode
   let api_module = api_of_mode mode in
   let make_primitive_accessor element_name = [
       "let " ^ field_name ^ "_get x =";
-      sprintf "  %s.get_pointer_field x %u ~f:(%s.get_%s_list%s)"
-        api_module
-        field_ofs
+      sprintf
+        "  let ptr = %s.get_pointer_bytes x %u in" api_module field_ofs;
+      sprintf
+      "  %s.get_%s_list%s ptr"
         api_module
         element_name
-        default_str
-      ;
+        default_str;
     ]
   in
   let basic_getter =
@@ -346,8 +344,8 @@ let generate_list_getters ~context ~scope ~list_type ~mode
         begin match mode with
         | Mode.Reader -> [
             "let " ^ field_name ^ "_get x = " ^ obj_magic;
-            sprintf "  (RA_.get_pointer_field x %u ~f:(RA_.get_struct_list%s))"
-              field_ofs default_str;
+            sprintf "  (let ptr = RA_.get_pointer_bytes x %u in" field_ofs;
+            sprintf "  RA_.get_struct_list%s ptr)" default_str;
           ]
         | Mode.Builder ->
             let data_words, pointer_words =
@@ -362,9 +360,9 @@ let generate_list_getters ~context ~scope ~list_type ~mode
                     "Decoded non-struct node where struct node was expected."
             in [
               "let " ^ field_name ^ "_get x = " ^ obj_magic;
-              sprintf "  (BA_.get_pointer_field x %u \
-                       ~f:(BA_.get_struct_list%s ~data_words:%u ~pointer_words:%u))"
-                field_ofs
+              sprintf "  (let ptr = BA_.get_pointer_bytes x %u in" field_ofs;
+              sprintf "  BA_.get_struct_list%s ~data_words:%u \
+                       ~pointer_words:%u ptr)"
                 default_str
                 data_words
                 pointer_words;
@@ -385,9 +383,8 @@ let generate_list_getters ~context ~scope ~list_type ~mode
             in [
               "let " ^ field_name ^ "_get x = " ^ obj_magic ^ "(";
             ] @ decoder_declaration @ [
-              sprintf "  RA_.get_pointer_field x %u ~f:(RA_.get_list%s decoders))"
-                field_ofs
-                default_str;
+              sprintf "  let ptr = RA_.get_pointer_bytes x %u in" field_ofs;
+              sprintf "  RA_.get_list%s decoders ptr)" default_str;
             ]
         | Mode.Builder ->
             let codecs_declaration =
@@ -396,10 +393,10 @@ let generate_list_getters ~context ~scope ~list_type ~mode
             in [
               "let " ^ field_name ^ "_get x = " ^ obj_magic ^ "(";
             ] @ codecs_declaration @ [
-              sprintf "  BA_.get_pointer_field x %u ~f:(BA_.get_list%s"
-                field_ofs
+              sprintf "  let ptr = BA_.get_pointer_bytes x %u in" field_ofs;
+              sprintf "  BA_.get_list%s \
+                ~storage_type:Capnp.Runtime.ListStorageType.Pointer ~codecs ptr)"
                 default_str;
-              "    ~storage_type:Capnp.Runtime.ListStorageType.Pointer ~codecs))";
             ]
         end
     | Enum enum_def ->
@@ -415,9 +412,9 @@ let generate_list_getters ~context ~scope ~list_type ~mode
             "    " ^ unique_module_name ^
               ".decode (MessageWrapper.Slice.get_uint16 slice 0)";
             "  in";
-            sprintf "  RA_.get_pointer_field x %u ~f:(RA_.get_list%s"
-              field_ofs default_str;
-            "    (RA_.ListDecoders.Bytes2 slice_decoder))";
+            sprintf "  let ptr = RA_.get_pointer_bytes x %u in" field_ofs;
+            sprintf "  RA_.get_list%s (RA_.ListDecoders.Bytes2 slice_decoder) ptr"
+              default_str;
             ]
         | Mode.Builder -> [
             "let " ^ field_name ^ "_get x =";
@@ -429,17 +426,20 @@ let generate_list_getters ~context ~scope ~list_type ~mode
             "    MessageWrapper.Slice.set_uint16 slice 0 (" ^ unique_module_name ^
               ".encode_safe v)";
             "  in";
-            sprintf "  BA_.get_pointer_field x %u ~f:(BA_.get_list%s"
-              field_ofs default_str;
+            sprintf "  let ptr = BA_.get_pointer_bytes x %u in" field_ofs;
+            sprintf "  BA_.get_list%s" default_str;
             "    ~storage_type:Capnp.Runtime.ListStorageType.Bytes2";
-            "    ~codecs:(BA_.NC.ListCodecs.Bytes2 (slice_decoder, slice_encoder)))";
+            "    ~codecs:(BA_.NC.ListCodecs.Bytes2 (slice_decoder, slice_encoder))";
+            "    ptr";
             ]
         end
     | Interface _ -> [
-          "let " ^ field_name ^ "_get x = failwith \"not implemented (type iface)\"";
+        "let " ^ field_name ^
+          "_get x = failwith \"not implemented (type iface)\"";
         ]
     | AnyPointer -> [
-          "let " ^ field_name ^ "_get x = failwith \"not implemented (type anyptr)\"";
+        "let " ^ field_name ^
+          "_get x = failwith \"not implemented (type anyptr)\"";
         ]
     | Undefined x ->
          failwith (sprintf "Unknown Type union discriminant %d" x)
@@ -457,15 +457,11 @@ let generate_list_setters ~context ~scope ~list_type
     ~discr_str ~field_name ~field_ofs =
   let make_primitive_setters element_name = [
     "let " ^ field_name ^ "_set x v =";
-    sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.set_%s_list v)"
-      discr_str
-      field_ofs
-      element_name;
+    sprintf "  let ptr = BA_.get_pointer_bytes %sx %u in" discr_str field_ofs;
+    sprintf "  BA_.set_%s_list v ptr" element_name;
     "let " ^ field_name ^ "_init x n =";
-    sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.init_%s_list n)"
-      discr_str
-      field_ofs
-      element_name;
+    sprintf "  let ptr = BA_.get_pointer_bytes %sx %u in" discr_str field_ofs;
+    sprintf "  BA_.init_%s_list n ptr" element_name;
   ] in
   let basic_setters =
     let open PS.Type in
@@ -503,18 +499,18 @@ let generate_list_setters ~context ~scope ~list_type
                 "Decoded non-struct node where struct node was expected."
         in [
           "let " ^ field_name ^ "_set x v = " ^ obj_magic;
-          sprintf "  (BA_.get_pointer_field %sx %u \
-                   ~f:(BA_.set_struct_list ~data_words:%u ~pointer_words:%u (%sv)))"
-            discr_str
-            field_ofs
+          sprintf "  (let ptr = BA_.get_pointer_bytes %sx %u in"
+            discr_str field_ofs;
+          sprintf "  BA_.set_struct_list ~data_words:%u \
+                   ~pointer_words:%u (%sv) ptr)"
             data_words
             pointer_words
             obj_magic;
           "let " ^ field_name ^ "_init x n = " ^ obj_magic;
-          sprintf "  (BA_.get_pointer_field %sx %u \
-                   ~f:(BA_.init_struct_list ~data_words:%u ~pointer_words:%u n))"
-            discr_str
-            field_ofs
+          sprintf "  (let ptr = BA_.get_pointer_bytes %sx %u in"
+            discr_str field_ofs;
+          sprintf "  BA_.init_struct_list ~data_words:%u \
+                   ~pointer_words:%u n ptr)"
             data_words
             pointer_words;
         ]
@@ -531,14 +527,18 @@ let generate_list_setters ~context ~scope ~list_type
         in [
           "let " ^ field_name ^ "_set x v = " ^ obj_magic ^ "(";
         ] @ codecs_declaration @ [
-          sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.set_list v"
+          sprintf "  let ptr = BA_.get_pointer_bytes %sx %u in"
             discr_str field_ofs;
-          "    ~storage_type:Capnp.Runtime.ListStorageType.Pointer ~codecs))";
+          "  BA_.set_list v";
+          "    ~storage_type:Capnp.Runtime.ListStorageType.Pointer \
+           ~codecs ptr)";
           "let " ^ field_name ^ "_init x n = " ^ obj_magic ^ "(";
         ] @ codecs_declaration @ [
-          sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.init_list n"
+          sprintf "  let ptr = BA_.get_pointer_bytes %sx %u in"
             discr_str field_ofs;
-          "    ~storage_type:Capnp.Runtime.ListStorageType.Pointer ~codecs))";
+          "  BA_.init_list n";
+          "    ~storage_type:Capnp.Runtime.ListStorageType.Pointer \
+           ~codecs ptr)";
         ]
     | Enum enum_def ->
         let enum_id = Enum.type_id_get enum_def in
@@ -558,22 +558,30 @@ let generate_list_setters ~context ~scope ~list_type
         ] in [
           "let " ^ field_name ^ "_set x v =";
         ] @ codecs @ [
-          sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.set_list v"
+          sprintf "  let ptr = BA_.get_pointer_bytes %sx %u in"
             discr_str field_ofs;
+          "  BA_.set_list v";
           "    ~storage_type:Capnp.Runtime.ListStorageType.Bytes2";
-          "    ~codecs:(BA_.NC.ListCodecs.Bytes2 (slice_decoder, slice_encoder)))";
+          "    ~codecs:(BA_.NC.ListCodecs.Bytes2 \
+           (slice_decoder, slice_encoder))";
+          "    ptr";
           "let " ^ field_name ^ "_init x n =";
         ] @ codecs @ [
-          sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.init_list n"
+          sprintf "  let ptr = BA_.get_pointer_bytes %sx %u in"
             discr_str field_ofs;
+          "  BA_.init_list n";
           "    ~storage_type:Capnp.Runtime.ListStorageType.Bytes2";
-          "    ~codecs:(BA_.NC.ListCodecs.Bytes2 (slice_decoder, slice_encoder)))";
+          "    ~codecs:(BA_.NC.ListCodecs.Bytes2 \
+           (slice_decoder, slice_encoder))";
+          "    ptr";
         ]
     | Interface _ -> [
-          "let " ^ field_name ^ "_set x v = failwith \"not implemented (type iface)\"";
+        "let " ^ field_name ^
+          "_set x v = failwith \"not implemented (type iface)\"";
         ]
     | AnyPointer -> [
-          "let " ^ field_name ^ "_set x v = failwith \"not implemented (type anyptr)\"";
+        "let " ^ field_name ^
+          "_set x v = failwith \"not implemented (type anyptr)\"";
         ]
     | Undefined x ->
          failwith (sprintf "Unknown Type union discriminant %d" x)
@@ -628,8 +636,8 @@ let rec generate_clear_group_fields_rev ~acc ~context ~group_id =
               | PS.Type.Void ->
                   []
               | PS.Type.Bool -> [
-                  sprintf "let () = BA_.set_bit ~default:false ~byte_ofs:%u ~bit_ofs:%u \
-                           false data in"
+                  sprintf "let () = BA_.set_bit ~default:false ~byte_ofs:%u \
+                           ~bit_ofs:%u false data in"
                     (field_ofs / 8) (field_ofs mod 8)
                 ]
               | PS.Type.Int8
@@ -747,15 +755,15 @@ let generate_one_field_accessors ~context ~node_id ~scope
             in
             let setters = [
               "let " ^ field_name ^ "_set x =";
-              sprintf "  BA_.get_data_field %sx ~f:BA_.set_void" discr_str;
+              "  let data = BA_.get_data_region " ^ discr_str ^ "x in";
+              "  BA_.set_void data";
             ] in
             (getters, setters)
         | (PS.Type.Bool, PS.Value.Bool a) ->
             let getters = [
               "let " ^ field_name ^ "_get x =";
-              sprintf "  %s.get_data_field x ~f:(%s.get_bit ~default:%s ~byte_ofs:%u \
-                       ~bit_ofs:%u)"
-                api_module
+              "  let data = " ^ api_module ^ ".get_data_region x in";
+              sprintf "  %s.get_bit ~default:%s ~byte_ofs:%u ~bit_ofs:%u data"
                 api_module
                 (if a then "true" else "false")
                 (field_ofs / 8)
@@ -763,9 +771,8 @@ let generate_one_field_accessors ~context ~node_id ~scope
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v =";
-              sprintf "  BA_.get_data_field %sx ~f:(BA_.set_bit \
-                        ~default:%s ~byte_ofs:%u ~bit_ofs:%u v)"
-                discr_str
+              "  let data = BA_.get_data_region " ^ discr_str ^ "x in";
+              sprintf "  BA_.set_bit ~default:%s ~byte_ofs:%u ~bit_ofs:%u v data"
                 (if a then "true" else "false")
                 (field_ofs / 8)
                 (field_ofs mod 8);
@@ -774,18 +781,16 @@ let generate_one_field_accessors ~context ~node_id ~scope
         | (PS.Type.Int8, PS.Value.Int8 a) ->
             let getters = [
               "let " ^ field_name ^ "_get x =";
-              sprintf "  %s.get_data_field x ~f:(%s.get_int8 \
-                       ~default:(%d) ~byte_ofs:%u)"
-                api_module
+              "  let data = " ^ api_module ^ ".get_data_region x in";
+              sprintf "  %s.get_int8 ~default:(%d) ~byte_ofs:%u data"
                 api_module
                 a
                 field_ofs;
             ] in
             let setters = [
               "let " ^ field_name ^ "_set_exn x v =";
-              sprintf "  BA_.get_data_field %sx ~f:(BA_.set_int8 \
-                       ~default:(%d) ~byte_ofs:%u v)"
-                discr_str
+              "  let data = BA_.get_data_region " ^ discr_str ^ "x in";
+              sprintf "  BA_.set_int8 ~default:(%d) ~byte_ofs:%u v data"
                 a
                 field_ofs;
             ] in
@@ -793,18 +798,16 @@ let generate_one_field_accessors ~context ~node_id ~scope
         | (PS.Type.Int16, PS.Value.Int16 a) ->
             let getters = [
               "let " ^ field_name ^ "_get x =";
-              sprintf "  %s.get_data_field x ~f:(%s.get_int16 \
-                       ~default:(%d) ~byte_ofs:%u)"
-                api_module
+              "  let data = " ^ api_module ^ ".get_data_region x in";
+              sprintf "  %s.get_int16 ~default:(%d) ~byte_ofs:%u data"
                 api_module
                 a
                 (field_ofs * 2)
             ] in
             let setters = [
               "let " ^ field_name ^ "_set_exn x v =";
-              sprintf "  BA_.get_data_field %sx ~f:(BA_.set_int16 \
-                       ~default:(%d) ~byte_ofs:%u v)"
-                discr_str
+              "  let data = BA_.get_data_region " ^ discr_str ^ "x in";
+              sprintf "  BA_.set_int16 ~default:(%d) ~byte_ofs:%u v data"
                 a
                 (field_ofs * 2);
             ] in
@@ -812,9 +815,8 @@ let generate_one_field_accessors ~context ~node_id ~scope
         | (PS.Type.Int32, PS.Value.Int32 a) ->
             let getters = [
               "let " ^ field_name ^ "_get x =";
-              sprintf "  %s.get_data_field x ~f:(%s.get_int32 \
-                       ~default:(%sl) ~byte_ofs:%u)"
-                api_module
+              "  let data = " ^ api_module ^ ".get_data_region x in";
+              sprintf "  %s.get_int32 ~default:(%sl) ~byte_ofs:%u data"
                 api_module
                 (Int32.to_string a)
                 (field_ofs * 4);
@@ -823,9 +825,8 @@ let generate_one_field_accessors ~context ~node_id ~scope
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v =";
-              sprintf "  BA_.get_data_field %sx ~f:(BA_.set_int32 \
-                       ~default:(%sl) ~byte_ofs:%u v)"
-                discr_str
+              "  let data = BA_.get_data_region " ^ discr_str ^ "x in";
+              sprintf "  BA_.set_int32 ~default:(%sl) ~byte_ofs:%u v data"
                 (Int32.to_string a)
                 (field_ofs * 4);
               "let " ^ field_name ^ "_set_int_exn x v = " ^
@@ -835,9 +836,8 @@ let generate_one_field_accessors ~context ~node_id ~scope
         | (PS.Type.Int64, PS.Value.Int64 a) ->
             let getters = [
               "let " ^ field_name ^ "_get x =";
-              sprintf "  %s.get_data_field x ~f:(%s.get_int64 \
-                       ~default:(%sL) ~byte_ofs:%u)"
-                api_module
+              "  let data = " ^ api_module ^ ".get_data_region x in";
+              sprintf "  %s.get_int64 ~default:(%sL) ~byte_ofs:%u data"
                 api_module
                 (Int64.to_string a)
                 (field_ofs * 8);
@@ -846,9 +846,8 @@ let generate_one_field_accessors ~context ~node_id ~scope
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v =";
-              sprintf "  BA_.get_data_field %sx ~f:(BA_.set_int64 \
-                       ~default:(%sL) ~byte_ofs:%u v)"
-                discr_str
+              "  let data = BA_.get_data_region " ^ discr_str ^ "x in";
+              sprintf "  BA_.set_int64 ~default:(%sL) ~byte_ofs:%u v data"
                 (Int64.to_string a)
                 (field_ofs * 8);
               "let " ^ field_name ^ "_set_int x v = " ^
@@ -858,18 +857,16 @@ let generate_one_field_accessors ~context ~node_id ~scope
         | (PS.Type.Uint8, PS.Value.Uint8 a) ->
             let getters = [
               "let " ^ field_name ^ "_get x =";
-              sprintf "  %s.get_data_field x ~f:(%s.get_uint8 \
-                       ~default:%u ~byte_ofs:%u)"
-                api_module
+              "  let data = " ^ api_module ^ ".get_data_region x in";
+              sprintf "  %s.get_uint8 ~default:%u ~byte_ofs:%u data"
                 api_module
                 a
                 field_ofs;
             ] in
             let setters = [
               "let " ^ field_name ^ "_set_exn x v =";
-              sprintf "  BA_.get_data_field %sx ~f:(BA_.set_uint8 \
-                       ~default:%u ~byte_ofs:%u v)"
-                discr_str
+              "  let data = BA_.get_data_region " ^ discr_str ^ "x in";
+              sprintf "  BA_.set_uint8 ~default:%u ~byte_ofs:%u v data"
                 a
                 field_ofs;
             ] in
@@ -877,18 +874,16 @@ let generate_one_field_accessors ~context ~node_id ~scope
         | (PS.Type.Uint16, PS.Value.Uint16 a) ->
             let getters = [
               "let " ^ field_name ^ "_get x =";
-              sprintf "  %s.get_data_field x ~f:(%s.get_uint16 \
-                       ~default:%u ~byte_ofs:%u)"
-                api_module
+              "  let data = " ^ api_module ^ ".get_data_region x in";
+              sprintf "  %s.get_uint16 ~default:%u ~byte_ofs:%u data"
                 api_module
                 a
                 (field_ofs * 2);
             ] in
             let setters = [
               "let " ^ field_name ^ "_set_exn x v =";
-              sprintf "  BA_.get_data_field %sx ~f:(BA_.set_uint16 \
-                       ~default:%u ~byte_ofs:%u v)"
-                discr_str
+              "  let data = BA_.get_data_region " ^ discr_str ^ "x in";
+              sprintf "  BA_.set_uint16 ~default:%u ~byte_ofs:%u v data"
                 a
                 (field_ofs * 2);
             ] in
@@ -902,8 +897,8 @@ let generate_one_field_accessors ~context ~node_id ~scope
             in
             let getters = [
               "let " ^ field_name ^ "_get x =";
-              sprintf "  %s.get_data_field x ~f:(%s.get_uint32 ~default:%s ~byte_ofs:%u)"
-                api_module
+              "  let data = " ^ api_module ^ ".get_data_region x in";
+              sprintf "  %s.get_uint32 ~default:%s ~byte_ofs:%u data"
                 api_module
                 default
                 (field_ofs * 4);
@@ -912,9 +907,8 @@ let generate_one_field_accessors ~context ~node_id ~scope
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v =";
-              sprintf "  BA_.get_data_field %sx ~f:(BA_.set_uint32 \
-                       ~default:%s ~byte_ofs:%u v)"
-                discr_str
+              "  let data = BA_.get_data_region " ^ discr_str ^ "x in";
+              sprintf "  BA_.set_uint32 ~default:%s ~byte_ofs:%u v data"
                 default
                 (field_ofs * 4);
               "let " ^ field_name ^ "_set_int_exn x v = " ^
@@ -930,9 +924,8 @@ let generate_one_field_accessors ~context ~node_id ~scope
             in
             let getters = [
               "let " ^ field_name ^ "_get x =";
-              sprintf "  %s.get_data_field x ~f:(%s.get_uint64 \
-                       ~default:%s ~byte_ofs:%u)"
-                api_module
+              "  let data = " ^ api_module ^ ".get_data_region x in";
+              sprintf "  %s.get_uint64 ~default:%s ~byte_ofs:%u data"
                 api_module
                 default
                 (field_ofs * 8);
@@ -941,9 +934,8 @@ let generate_one_field_accessors ~context ~node_id ~scope
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v =";
-              sprintf "  BA_.get_data_field %sx ~f:(BA_.set_uint64 \
-                       ~default:%s ~byte_ofs:%u v)"
-                discr_str
+              "  let data = BA_.get_data_region " ^ discr_str ^ "x in";
+              sprintf "  BA_.set_uint64 ~default:%s ~byte_ofs:%u v data"
                 default
                 (field_ofs * 8);
               "let " ^ field_name ^ "_set_int_exn x v = " ^
@@ -954,18 +946,16 @@ let generate_one_field_accessors ~context ~node_id ~scope
             let default = Int32.to_string (Int32.bits_of_float a) in
             let getters = [
               "let " ^ field_name ^ "_get x =";
-              sprintf "  %s.get_data_field x ~f:(%s.get_float32 \
-                       ~default_bits:(%sl) ~byte_ofs:%u)"
-                api_module
+              "  let data = " ^ api_module ^ ".get_data_region x in";
+              sprintf "  %s.get_float32 ~default_bits:(%sl) ~byte_ofs:%u data"
                 api_module
                 default
                 (field_ofs * 4);
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v =";
-              sprintf "  BA_.get_data_field %sx ~f:(BA_.set_float32 \
-                       ~default_bits:(%sl) ~byte_ofs:%u v)"
-                discr_str
+              "  let data = BA_.get_data_region " ^ discr_str ^ "x in";
+              sprintf "  BA_.set_float32 ~default_bits:(%sl) ~byte_ofs:%u v data"
                 default
                 (field_ofs * 4);
             ] in
@@ -974,18 +964,16 @@ let generate_one_field_accessors ~context ~node_id ~scope
             let default = Int64.to_string (Int64.bits_of_float a) in
             let getters = [
               "let " ^ field_name ^ "_get x =";
-              sprintf "  %s.get_data_field x ~f:(%s.get_float64 \
-                       ~default_bits:(%sL) ~byte_ofs:%u)"
-                api_module
+              "  let data = " ^ api_module ^ ".get_data_region x in";
+              sprintf "  %s.get_float64 ~default_bits:(%sL) ~byte_ofs:%u data"
                 api_module
                 default
                 (field_ofs * 8);
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v =";
-              sprintf "BA_.get_data_field %sx ~f:(BA_.set_float64 \
-                       ~default_bits:(%sL) ~byte_ofs:%u v)"
-                discr_str
+              "  let data = BA_.get_data_region " ^ discr_str ^ "x in";
+              sprintf "  BA_.set_float64 ~default_bits:(%sL) ~byte_ofs:%u v data"
                 default
                 (field_ofs * 8);
             ] in
@@ -993,39 +981,41 @@ let generate_one_field_accessors ~context ~node_id ~scope
         | (PS.Type.Text, PS.Value.Text a) ->
             let getters = [
               "let has_" ^ field_name ^ " x =";
-              sprintf "  %s.get_pointer_field x %u ~f:%s.has_field"
-                api_module field_ofs api_module;
+              sprintf "  let ptr = %s.get_pointer_bytes x %u in"
+                api_module field_ofs;
+              "  " ^ api_module ^ ".has_field ptr";
               "let " ^ field_name ^ "_get x =";
-              sprintf "  %s.get_pointer_field x %u ~f:(%s.get_text ~default:\"%s\")"
-                api_module
-                field_ofs
+              sprintf "  let ptr = %s.get_pointer_bytes x %u in"
+                api_module field_ofs;
+              sprintf "  %s.get_text ~default:\"%s\" ptr"
                 api_module
                 (String.escaped a);
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v =";
-              sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.set_text v)"
-                discr_str
-                field_ofs
+              sprintf "  let ptr = BA_.get_pointer_bytes %sx %u in"
+                discr_str field_ofs;
+              "  BA_.set_text v ptr";
             ] in
             (getters, setters)
         | (PS.Type.Data, PS.Value.Data a) ->
             let getters = [
               "let has_" ^ field_name ^ " x =";
-              sprintf "  %s.get_pointer_field x %u ~f:%s.has_field"
-                api_module field_ofs api_module;
+              sprintf "  let ptr = %s.get_pointer_bytes x %u in"
+                api_module field_ofs;
+              "  " ^ api_module ^ ".has_field ptr";
               "let " ^ field_name ^ "_get x =";
-              sprintf "  %s.get_pointer_field x %u ~f:(%s.get_blob ~default:\"%s\")"
-                api_module
-                field_ofs
+              sprintf "  let ptr = %s.get_pointer_bytes x %u in"
+                api_module field_ofs;
+              sprintf "  %s.get_blob ~default:\"%s\" ptr"
                 api_module
                 (String.escaped a);
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v =";
-              sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.set_blob v)"
-                discr_str
-                field_ofs
+              sprintf "  let ptr = BA_.get_pointer_bytes %sx %u in"
+                discr_str field_ofs;
+              "  BA_.set_blob v ptr";
             ] in
             (getters, setters)
         | (PS.Type.List list_def, PS.Value.List pointer_slice_opt) ->
@@ -1056,8 +1046,9 @@ let generate_one_field_accessors ~context ~node_id ~scope
             in
             let getters = [
               "let has_" ^ field_name ^ " x = " ^ obj_magic;
-              sprintf "  (%s.get_pointer_field x %u ~f:%s.has_field)"
-                api_module field_ofs api_module;
+              sprintf "  (let ptr = %s.get_pointer_bytes x %u in"
+                api_module field_ofs;
+              "  " ^ api_module ^ ".has_field ptr)";
               ] @ (generate_list_getters ~context ~scope ~list_type
                 ~mode ~field_name ~field_ofs ~default_str)
             in
@@ -1114,18 +1105,19 @@ let generate_one_field_accessors ~context ~node_id ~scope
               match mode with
               | Mode.Reader -> [
                   "let has_" ^ field_name ^ " x = " ^ obj_magic;
-                  sprintf "  (RA_.get_pointer_field x %u ~f:RA_.has_field)" field_ofs;
+                  sprintf "  (let ptr = RA_.get_pointer_bytes x %u in" field_ofs;
+                  "  RA_.has_field ptr)";
                   "let " ^ field_name ^ "_get x = " ^ obj_magic;
-                  sprintf "  (RA_.get_pointer_field x %u ~f:(RA_.get_struct%s))"
-                    field_ofs reader_default_str;
+                  sprintf "  (let ptr = RA_.get_pointer_bytes x %u in" field_ofs;
+                  "  RA_.get_struct" ^ reader_default_str ^ " ptr)";
                 ]
               | Mode.Builder -> [
                   "let has_" ^ field_name ^ " x = " ^ obj_magic;
-                  sprintf "  (BA_.get_pointer_field x %u ~f:BA_.has_field)" field_ofs;
+                  sprintf "  (let ptr = BA_.get_pointer_bytes x %u in" field_ofs;
+                  "  BA_.has_field ptr)";
                   "let " ^ field_name ^ "_get x = " ^ obj_magic;
-                  sprintf "  (BA_.get_pointer_field x %u \
-                           ~f:(BA_.get_struct%s ~data_words:%u ~pointer_words:%u))"
-                    field_ofs
+                  sprintf "  (let ptr = BA_.get_pointer_bytes x %u in" field_ofs;
+                  sprintf "  BA_.get_struct%s ~data_words:%u ~pointer_words:%u ptr)"
                     builder_default_str
                     data_words
                     pointer_words;
@@ -1133,26 +1125,24 @@ let generate_one_field_accessors ~context ~node_id ~scope
             in
             let setters = [
               "let " ^ field_name ^ "_set_reader x v = " ^ obj_magic;
-              sprintf "  (BA_.get_pointer_field %sx %u \
-                       ~f:(BA_.set_struct ~data_words:%u ~pointer_words:%u (%sv)))"
-                discr_str
-                field_ofs
+              sprintf "  (let ptr = BA_.get_pointer_bytes %sx %u in"
+                discr_str field_ofs;
+              sprintf "  BA_.set_struct ~data_words:%u ~pointer_words:%u (%sv) ptr)"
                 data_words
                 pointer_words
                 obj_magic;
               "let " ^ field_name ^ "_set_builder x v = " ^ obj_magic;
-              sprintf "  (BA_.get_pointer_field %sx %u \
-                       ~f:(BA_.set_struct ~data_words:%u ~pointer_words:%u (Some (%sv))))"
-                discr_str
-                field_ofs
+              sprintf "  (let ptr = BA_.get_pointer_bytes %sx %u in"
+                discr_str field_ofs;
+              sprintf "  BA_.set_struct ~data_words:%u ~pointer_words:%u \
+                       (Some (%sv)) ptr)"
                 data_words
                 pointer_words
                 obj_magic;
               "let " ^ field_name ^ "_init x = " ^ obj_magic;
-              sprintf "  (BA_.get_pointer_field %sx %u \
-                       ~f:(BA_.init_struct ~data_words:%u ~pointer_words:%u))"
-                discr_str
-                field_ofs
+              sprintf "  (let ptr = BA_.get_pointer_bytes %sx %u in"
+                discr_str field_ofs;
+              sprintf "  BA_.init_struct ~data_words:%u ~pointer_words:%u ptr)"
                 data_words
                 pointer_words;
             ] in
@@ -1166,17 +1156,15 @@ let generate_one_field_accessors ~context ~node_id ~scope
             in
             let getters = [
               "let " ^ field_name ^ "_get x = " ^ obj_magic;
-              sprintf "  (%s.get_pointer_field x %u ~f:%s.get_interface)"
-                api_module
-                field_ofs
-                api_module;
+              sprintf "  (let ptr = %s.get_pointer_bytes x %u in"
+                api_module field_ofs;
+              "  " ^ api_module ^ ".get_interface ptr)";
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v = " ^ obj_magic;
-              sprintf "  (BA_.get_pointer_field %sx %u ~f:(BA_.set_interface (%sv)))"
-                discr_str
-                field_ofs
-                obj_magic;
+              sprintf "  (let ptr = BA_.get_pointer_bytes %sx %u in"
+                discr_str field_ofs;
+              "  BA_.set_interface (" ^ obj_magic ^ "v) ptr)";
             ] in
             (getters, setters)
         | (PS.Type.AnyPointer, PS.Value.AnyPointer pointer_slice_opt) ->
@@ -1195,17 +1183,18 @@ let generate_one_field_accessors ~context ~node_id ~scope
             in
             let getters = [
               "let " ^ field_name ^ "_get x =";
-              sprintf "  %s.get_pointer_field x %u ~f:(%s.get_pointer%s)"
+              sprintf "  let ptr = %s.get_pointer_bytes x %u in"
+                api_module field_ofs;
+              sprintf "  %s.get_pointer%s ptr"
                 api_module
-                field_ofs
-                api_module
-                (if mode = Mode.Reader then reader_default_str else builder_default_str);
+                (if mode = Mode.Reader then reader_default_str
+                 else builder_default_str);
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v =";
-              sprintf "  BA_.get_pointer_field %sx %u ~f:(BA_.set_pointer v)"
-                discr_str
-                field_ofs
+              sprintf "  let ptr = BA_.get_pointer_bytes %sx %u in"
+                discr_str field_ofs;
+              "  BA_.set_pointer v ptr";
             ] in
             (getters, setters)
         | (PS.Type.Undefined x, _) ->
@@ -1281,9 +1270,8 @@ let generate_union_getter ~context ~scope ~mode struct_def fields =
       in
       let header = [
         "let get x =";
-        sprintf "  match %s.get_data_field x \
-                 ~f:(%s.get_uint16 ~default:0 ~byte_ofs:%u) with"
-          api_module
+        "  let data = " ^ api_module ^ ".get_data_region x in";
+        sprintf "  match %s.get_uint16 ~default:0 ~byte_ofs:%u data with"
           api_module
           ((PS.Node.Struct.discriminant_offset_get_int_exn struct_def) * 2);
       ]

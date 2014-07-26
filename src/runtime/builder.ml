@@ -219,20 +219,18 @@ module Make (NM : MessageSig.S) = struct
     let () = set_opt_discriminant data discr in
     NM.Slice.set_uint16 data byte_ofs (value lxor default)
 
+
   (* Given storage for a struct, get the bytes associated with the
-     struct data section.  The provided decoding function is applied
-     to the resulting region.  If the optional discriminant parameter
-     is supplied, then the discriminant is also set as a side-effect. *)
-  (* FIXME: [apply_data_field] would be a better name *)
-  let get_data_field
+     struct data section.  If the optional discriminant parameter is
+     supplied, then the discriminant is also set as a side-effect. *)
+  let get_data_region
       ?(discr : Discr.t option)
       (struct_storage : rw NC.StructStorage.t)
-      ~(f : rw NM.Slice.t -> 'a)
-    : 'a =
+    : rw NM.Slice.t =
     let data = struct_storage.NC.StructStorage.data in
-    let result = f data in
     let () = set_opt_discriminant data discr in
-    result
+    data
+
 
   let get_void
       (data : 'cap NM.Slice.t)
@@ -449,20 +447,18 @@ module Make (NM : MessageSig.S) = struct
 
 
   (* Given storage for a struct, get the bytes associated with struct
-     pointer at offset [pointer_word].  The provided decoding function
-     is applied to the resulting region.  If the optional discriminant
+     pointer at offset [pointer_word].  If the optional discriminant
      parameter is supplied, then the discriminant is also set as a
      side-effect. *)
-  (* FIXME: [apply_pointer_field] would be a better name *)
-  let get_pointer_field
+  let get_pointer_bytes
       ?(discr : Discr.t option)
       (struct_storage : rw NC.StructStorage.t)
       (pointer_word : int)
-      ~(f : 'cap NM.Slice.t -> 'a)
-    : 'a =
-    let result = f (BOps.get_struct_pointer struct_storage pointer_word) in
+    : rw NM.Slice.t =
+    let ptr = BOps.get_struct_pointer struct_storage pointer_word in
     let () = set_opt_discriminant struct_storage.NC.StructStorage.data discr in
-    result
+    ptr
+
 
   let has_field
       (pointer_bytes : 'cap NM.Slice.t)

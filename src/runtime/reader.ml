@@ -170,20 +170,16 @@ module Make (MessageWrapper : MessageSig.S) = struct
    *******************************************************************************)
 
   (* Given storage for a struct, attempt to get the bytes associated
-     with the struct data section.  The provided decoding function
-     is applied to the resulting region. *)
-  let get_data_field
+     with the struct data section. *)
+  let get_data_region
       (struct_storage_opt : 'cap StructStorage.t option)
-      ~(f : 'cap Slice.t option -> 'a)
-    : 'a =
-    let data_opt =
-      match struct_storage_opt with
-      | Some struct_storage ->
-          Some struct_storage.StructStorage.data
-      | None ->
-          None
-    in
-    f data_opt
+    : 'cap Slice.t option =
+    match struct_storage_opt with
+    | Some struct_storage ->
+        Some struct_storage.StructStorage.data
+    | None ->
+        None
+
 
   let get_void
       (data_opt : 'cap Slice.t option)
@@ -354,21 +350,17 @@ module Make (MessageWrapper : MessageSig.S) = struct
    *******************************************************************************)
 
   (* Given storage for a struct, attempt to get the bytes associated
-     with the struct-relative pointer index. The provided decoding
-     function is applied to the resulting pointer. *)
-  let get_pointer_field
+     with the struct-relative pointer index. *)
+  let get_pointer_bytes
       (struct_storage_opt : 'cap StructStorage.t option)
       (pointer_word : int)
-      ~(f : 'cap Slice.t option -> 'a)
-    : 'a =
-    let pointer_opt =
-      match struct_storage_opt with
-      | Some struct_storage ->
-          ss_get_pointer struct_storage pointer_word
-      | None ->
-          None
-    in
-    f pointer_opt
+    : 'cap Slice.t option =
+    match struct_storage_opt with
+    | Some struct_storage ->
+        ss_get_pointer struct_storage pointer_word
+    | None ->
+        None
+
 
   let has_field
       (pointer_opt : 'cap Slice.t option)
