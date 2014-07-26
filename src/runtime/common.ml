@@ -415,8 +415,8 @@ module Make (MessageWrapper : MessageSig.S) = struct
       | ListStorageType.Composite (data_words, pointer_words) ->
           let data_size     = data_words * sizeof_uint64 in
           let pointers_size = pointer_words * sizeof_uint64 in
-          let total_size    = data_size + pointers_size in
-          let make_storage ls i =
+          let make_storage ls i ~data_size ~pointers_size =
+            let total_size = data_size + pointers_size in
             (* Skip over the composite tag word *)
             let content_offset =
               ls.ListStorage.storage.Slice.start + sizeof_uint64
@@ -439,12 +439,12 @@ module Make (MessageWrapper : MessageSig.S) = struct
                 "decoded List<composite> with empty data region where data was expected"
             else
               (fun ls i ->
-                let struct_storage = make_storage ls i in
-                let slice = {
-                  struct_storage.StructStorage.data with
-                  Slice.len = size
-                } in
-                decode slice)
+                 let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                 let slice = {
+                   struct_storage.StructStorage.data with
+                   Slice.len = size
+                 } in
+                 decode slice)
           in
           begin match decoders with
           | ListDecoders.Empty decode ->
@@ -455,7 +455,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
                   "decoded List<composite> with empty data region where data was expected"
               else
                 fun ls i ->
-                  let struct_storage = make_storage ls i in
+                  let struct_storage = make_storage ls i ~data_size ~pointers_size in
                   let first_byte = Slice.get_uint8 struct_storage.StructStorage.data 0 in
                   let is_set = (first_byte land 0x1) <> 0 in
                   decode is_set
@@ -474,15 +474,15 @@ module Make (MessageWrapper : MessageSig.S) = struct
                    pointers were expected"
               else
                 (fun ls i ->
-                  let struct_storage = make_storage ls i in
-                  let slice = {
-                    struct_storage.StructStorage.pointers with
-                    Slice.len = sizeof_uint64
-                  } in
-                  decode slice)
+                   let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                   let slice = {
+                     struct_storage.StructStorage.pointers with
+                     Slice.len = sizeof_uint64
+                   } in
+                   decode slice)
           | ListDecoders.Struct struct_decoders ->
               fun ls i ->
-                let struct_storage = make_storage ls i in
+                let struct_storage = make_storage ls i ~data_size ~pointers_size in
                 struct_decoders.ListDecoders.composite struct_storage
           end
     in {
@@ -606,8 +606,8 @@ module Make (MessageWrapper : MessageSig.S) = struct
       | ListStorageType.Composite (data_words, pointer_words) ->
           let data_size     = data_words * sizeof_uint64 in
           let pointers_size = pointer_words * sizeof_uint64 in
-          let total_size    = data_size + pointers_size in
-          let make_storage ls i =
+          let make_storage ls i ~data_size ~pointers_size =
+            let total_size    = data_size + pointers_size in
             (* Skip over the composite tag word *)
             let content_offset =
               ls.ListStorage.storage.Slice.start + sizeof_uint64
@@ -630,7 +630,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
                 "decoded List<composite> with empty data region where data was expected"
             else
               let get ls i =
-                let struct_storage = make_storage ls i in
+                let struct_storage = make_storage ls i ~data_size ~pointers_size in
                 let slice = {
                   struct_storage.StructStorage.data with
                   Slice.len = size
@@ -638,7 +638,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
                 decode slice
               in
               let set ls i v =
-                let struct_storage = make_storage ls i in
+                let struct_storage = make_storage ls i ~data_size ~pointers_size in
                 let slice = {
                   struct_storage.StructStorage.data with
                   Slice.len = size
@@ -658,13 +658,13 @@ module Make (MessageWrapper : MessageSig.S) = struct
                   "decoded List<composite> with empty data region where data was expected"
               else
                 let get ls i =
-                  let struct_storage = make_storage ls i in
+                  let struct_storage = make_storage ls i ~data_size ~pointers_size in
                   let first_byte = Slice.get_uint8 struct_storage.StructStorage.data 0 in
                   let is_set = (first_byte land 0x1) <> 0 in
                   decode is_set
                 in
                 let set ls i v =
-                  let struct_storage = make_storage ls i in
+                  let struct_storage = make_storage ls i ~data_size ~pointers_size in
                   let first_byte =
                     Slice.get_uint8 struct_storage.StructStorage.data 0
                   in
@@ -689,7 +689,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
                    pointers were expected"
               else
                 let get ls i =
-                  let struct_storage = make_storage ls i in
+                  let struct_storage = make_storage ls i ~data_size ~pointers_size in
                   let slice = {
                     struct_storage.StructStorage.pointers with
                     Slice.len = sizeof_uint64
@@ -697,7 +697,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
                   decode slice
                 in
                 let set ls i v =
-                  let struct_storage = make_storage ls i in
+                  let struct_storage = make_storage ls i ~data_size ~pointers_size in
                   let slice = {
                     struct_storage.StructStorage.pointers with
                     Slice.len = sizeof_uint64
@@ -706,8 +706,12 @@ module Make (MessageWrapper : MessageSig.S) = struct
                 in
                 (get, set)
           | ListCodecs.Struct { ListCodecs.composite = (decode, encode); _ } ->
-              let get ls i = decode (make_storage ls i) in
-              let set ls i v = encode v (make_storage ls i) in
+              let get ls i =
+                decode (make_storage ls i ~data_size ~pointers_size)
+              in
+              let set ls i v =
+                encode v (make_storage ls i ~data_size ~pointers_size)
+              in
               (get, set)
           end
     in {
