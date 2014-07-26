@@ -1,6 +1,16 @@
 OCAMLINCLUDES += ../runtime
 OCAML_LIBS += ../runtime/libcapnp
 
+GENERATED = \
+  c2b2b.mli \
+  c2b2b.ml \
+  catrank.mli \
+  catrank.ml \
+  carsales.mli \
+  carsales.ml \
+  eval.mli \
+  eval.ml
+
 MODULES = \
   c2b2b \
   catrank \
@@ -27,8 +37,7 @@ CAPNPROTO_REVISION = 25509cf4f1fe6b3f5a6faa2f42b865f7571db8c4
 	pushd $$REPO_DIR && git checkout $(CAPNPROTO_REVISION) && popd && \
 	echo "$$REPO_DIR" > .capnp-repo'
 
-c2b2b.mli c2b2b.ml catrank.mli catrank.ml carsales.mli carsales.ml \
-eval.mli eval.ml: $(COMPILER) .capnp-repo
+$(GENERATED): $(COMPILER) .capnp-repo
 	bash -c 'REPO_DIR=`cat .capnp-repo` && \
 	capnp compile -o $(COMPILER) -I $$REPO_DIR/c++/src \
 		$$REPO_DIR/c++/src/capnp/c++.capnp \
@@ -36,13 +45,26 @@ eval.mli eval.ml: $(COMPILER) .capnp-repo
 		$$REPO_DIR/c++/src/capnp/benchmark/carsales.capnp \
 		$$REPO_DIR/c++/src/capnp/benchmark/eval.capnp'
 
+
+OCAMLDEP_MODULES_ENABLED = false
+LocalOCamlGeneratedFiles($(GENERATED))
 OCamlProgram($(PROGRAM), $(MODULES))
 
-.PHONY: bench-clean bench-distclean
+
+# Some sort of a bug in omake, the OCamlProgram directive fails to build c2b2b.cmi
+# as a dependency of the code which imports it.
+
+carsales: $(PROGRAM)
+	ln -f -s $(PROGRAM) carsales
+
+.PHONY: all-bench bench-clean bench-distclean
+
+all-bench: carsales
 
 bench-clean:
 	rm -f $(PROGRAM)$(EXE) $(PROGRAM).opt $(PROGRAM).run \
-		*.cmi *.cmo *.cmx *.cma *.cmxa *.cmxs *.a *.o
+		carsales $(GENERATED) *.cmi *.cmo *.cmx *.cma *.cmxa *.cmxs \
+		*.a *.o
 
 bench-distclean: bench-clean
 	rm -f *.omc

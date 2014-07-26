@@ -5,6 +5,16 @@ OCAML_LIBS += ../runtime/libcapnp
 # best possible backtrace support.
 NATIVE_ENABLED = false
 
+GENERATED = \
+  c2b2b.mli \
+  c2b2b.ml \
+  test.mli \
+  test.ml \
+  test_import.mli \
+  test_import.ml \
+  testLists.mli \
+  testLists.ml
+
 TEST_MODULES = \
   c2b2b \
   test \
@@ -28,8 +38,7 @@ CAPNPROTO_REVISION = 25509cf4f1fe6b3f5a6faa2f42b865f7571db8c4
 	pushd $$REPO_DIR && git checkout $(CAPNPROTO_REVISION) && popd && \
 	echo "$$REPO_DIR" > .capnp-repo'
 
-c2b2b.mli c2b2b.ml test.mli test.ml test_import.mli test_import.ml \
-testLists.mli testLists.ml: $(COMPILER) .capnp-repo
+$(GENERATED): $(COMPILER) .capnp-repo
 	bash -c 'REPO_DIR=`cat .capnp-repo` && \
 	capnp compile -o $(COMPILER) -I $$REPO_DIR/c++/src \
 		$$REPO_DIR/c++/src/capnp/c++.capnp \
@@ -37,16 +46,18 @@ testLists.mli testLists.ml: $(COMPILER) .capnp-repo
 		$$REPO_DIR/c++/src/capnp/test-import.capnp \
 		testLists.capnp'
 
+OCAMLDEP_MODULES_ENABLED = false
+LocalOCamlGeneratedFiles($(GENERATED))
 OCamlProgram($(PROGRAM), $(TEST_MODULES))
 
-.PHONY: test-clean test-distclean
+.PHONY: tests-clean tests-distclean
 
-test-clean:
+tests-clean:
 	rm -f $(PROGRAM)$(EXE) $(PROGRAM).opt $(PROGRAM).run \
 		*.cmi *.cmo *.cmx *.cma *.cmxa *.cmxs *.a *.o \
 		test.mli test.ml
 
-test-distclean: test-clean
+tests-distclean: tests-clean
 	rm -f *.omc
 	bash -c 'if [ -f .capnp-repo ]; then \
 		cat .capnp-repo | xargs rm -rf --preserve-root; \

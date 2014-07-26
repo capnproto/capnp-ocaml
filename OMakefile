@@ -22,7 +22,7 @@ else
 
 .SUBDIRS: src
 
-.PHONY: clean distclean install uninstall
+.PHONY: clean distclean install uninstall all-bench
 
 clean: runtime-clean compiler-clean
 
