@@ -79,12 +79,25 @@ let decode (pointer64 : Int64.t) : t =
 
 
 let encode (storage_descr : t) : Int64.t =
-  let offset64 = Int64.of_int (Util.encode_signed 30 storage_descr.offset) in
-  let data_size64 = Int64.of_int storage_descr.data_words in
-  let ptr_size64 = Int64.of_int storage_descr.pointer_words in
-  tag_val_struct |>
-  Int64.bit_or (Int64.shift_left offset64 offset_shift) |>
-  Int64.bit_or (Int64.shift_left data_size64 data_size_shift) |>
-  Int64.bit_or (Int64.shift_left ptr_size64 pointers_size_shift)
+  (* Int64 arithmetic causes unfortunate GC pressure.  If we're on a 64-bit
+     platform, use standard 63-bit ints whenever possible. *)
+  if Sys.word_size = 64 && storage_descr.pointer_words <= 0x7fff then
+    let offset = Util.encode_signed 30 storage_descr.offset in
+    let data_size = storage_descr.data_words in
+    let ptr_size = storage_descr.pointer_words in
+    let tag_val_struct_int = 0 in
+    Int64.of_int
+      (tag_val_struct_int lor
+         (offset lsl offset_shift) lor
+         (data_size lsl data_size_shift) lor
+         (ptr_size lsl pointers_size_shift))
+  else
+    let offset64 = Int64.of_int (Util.encode_signed 30 storage_descr.offset) in
+    let data_size64 = Int64.of_int storage_descr.data_words in
+    let ptr_size64 = Int64.of_int storage_descr.pointer_words in
+    tag_val_struct |>
+    Int64.bit_or (Int64.shift_left offset64 offset_shift) |>
+    Int64.bit_or (Int64.shift_left data_size64 data_size_shift) |>
+    Int64.bit_or (Int64.shift_left ptr_size64 pointers_size_shift)
 
 

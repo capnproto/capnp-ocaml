@@ -71,9 +71,12 @@ let decode (pointer64 : Int64.t) : t =
 
 
 let encode (storage_descr : t) : Int64.t =
-  let offset64 = Int64.of_int (Util.encode_signed 30 storage_descr.offset) in
-  let type64 =
-    let type_id = match storage_descr.element_type with
+  (* Int64 arithmetic causes unfortunate GC pressure.  If we're on a 64-bit
+     platform, use standard 63-bit ints whenever possible. *)
+  if Sys.word_size = 64 && storage_descr.num_elements <= 0xfffffff then
+    let offset = Util.encode_signed 30 storage_descr.offset in
+    let tp =
+      match storage_descr.element_type with
       | Void             -> 0
       | OneBitValue      -> 1
       | OneByteValue     -> 2
@@ -83,11 +86,30 @@ let encode (storage_descr : t) : Int64.t =
       | EightBytePointer -> 6
       | Composite        -> 7
     in
-    Int64.of_int type_id
-  in
-  tag_val_list |>
-  Int64.bit_or (Int64.shift_left offset64 offset_shift) |>
-  Int64.bit_or (Int64.shift_left type64 type_shift) |>
-  Int64.bit_or (Int64.shift_left (Int64.of_int storage_descr.num_elements) count_shift)
+    let tag_val_list_int = 1 in
+    Int64.of_int
+      (tag_val_list_int lor
+         (offset lsl offset_shift) lor
+         (tp lsl type_shift) lor
+         (storage_descr.num_elements lsl count_shift))
+  else
+    let offset64 = Int64.of_int (Util.encode_signed 30 storage_descr.offset) in
+    let type64 =
+      let type_id = match storage_descr.element_type with
+        | Void             -> 0
+        | OneBitValue      -> 1
+        | OneByteValue     -> 2
+        | TwoByteValue     -> 3
+        | FourByteValue    -> 4
+        | EightByteValue   -> 5
+        | EightBytePointer -> 6
+        | Composite        -> 7
+      in
+      Int64.of_int type_id
+    in
+    tag_val_list |>
+    Int64.bit_or (Int64.shift_left offset64 offset_shift) |>
+    Int64.bit_or (Int64.shift_left type64 type_shift) |>
+    Int64.bit_or (Int64.shift_left (Int64.of_int storage_descr.num_elements) count_shift)
 
 

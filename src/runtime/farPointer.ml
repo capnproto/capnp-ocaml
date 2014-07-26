@@ -88,18 +88,33 @@ let decode (pointer64 : Int64.t) : t =
 
 
 let encode (storage_descr : t) : Int64.t =
-  let type64 =
-    match storage_descr.landing_pad with
-    | NormalPointer ->
-        Int64.zero
-    | TaggedFarPointer ->
-        Int64.one
-  in
-  let offset64 = Int64.of_int storage_descr.offset in
-  let segment64 = Int64.of_int storage_descr.segment_id in
-  tag_val_far |>
-  Int64.bit_or (Int64.shift_left type64 landing_pad_type_shift) |>
-  Int64.bit_or (Int64.shift_left offset64 offset_shift) |>
-  Int64.bit_or (Int64.shift_left segment64 segment_shift)
+  (* Int64 arithmetic causes unfortunate GC pressure.  If we're on a 64-bit
+     platform, use standard 63-bit ints whenever possible. *)
+  if Sys.word_size = 64 && storage_descr.segment_id <= 0x7fffffff then
+    let tp =
+      match storage_descr.landing_pad with
+      | NormalPointer    -> 0
+      | TaggedFarPointer -> 1
+    in
+    let tag_val_far_int = 2 in
+    Int64.of_int
+      (tag_val_far_int lor
+         (tp lsl landing_pad_type_shift) lor
+         (storage_descr.offset lsl offset_shift) lor
+         (storage_descr.segment_id lsl segment_shift))
+  else
+    let type64 =
+      match storage_descr.landing_pad with
+      | NormalPointer ->
+          Int64.zero
+      | TaggedFarPointer ->
+          Int64.one
+    in
+    let offset64 = Int64.of_int storage_descr.offset in
+    let segment64 = Int64.of_int storage_descr.segment_id in
+    tag_val_far |>
+    Int64.bit_or (Int64.shift_left type64 landing_pad_type_shift) |>
+    Int64.bit_or (Int64.shift_left offset64 offset_shift) |>
+    Int64.bit_or (Int64.shift_left segment64 segment_shift)
 
 
