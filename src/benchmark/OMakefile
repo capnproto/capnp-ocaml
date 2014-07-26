@@ -30,7 +30,7 @@ PROGRAM = bench
 # code based on the benchmark schema.
 COMPILER = ../compiler/capnpc-ocaml
 CAPNPROTO_REPO = https://github.com/kentonv/capnproto.git
-CAPNPROTO_REVISION = 25509cf4f1fe6b3f5a6faa2f42b865f7571db8c4
+CAPNPROTO_REVISION = f536c8cfbc749f98e43b679242b24afbab8e74b2
 
 .capnp-repo:
 	bash -c 'REPO_DIR=`mktemp -d`/capnproto && git clone $(CAPNPROTO_REPO) $$REPO_DIR && \
