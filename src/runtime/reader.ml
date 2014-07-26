@@ -157,6 +157,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
     else
       let pointer_bytes = {
         Slice.msg        = m;
+        Slice.segment    = first_segment;
         Slice.segment_id = 0;
         Slice.start      = 0;
         Slice.len        = sizeof_uint64

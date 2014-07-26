@@ -156,7 +156,8 @@ module type SLICE = sig
       segment of a message. *)
   type 'cap t = {
     msg        : 'cap message_t;  (** Identifies the message of interest *)
-    segment_id : int;             (** Index of the message segment of interest *)
+    segment    : 'cap segment_t;  (** Segment within message housing these bytes *)
+    segment_id : int;             (** Index of the segment *)
     start      : int;             (** Starting byte of the slice *)
     len        : int;             (** Length of the slice, in bytes *)
   }

@@ -1048,6 +1048,7 @@ module Make (NM : MessageSig.S) = struct
     else
       let pointer_bytes = {
         NM.Slice.msg        = m;
+        NM.Slice.segment    = first_segment;
         NM.Slice.segment_id = 0;
         NM.Slice.start      = 0;
         NM.Slice.len        = sizeof_uint64

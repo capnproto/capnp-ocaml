@@ -175,11 +175,16 @@ let emit_instantiate_builder_message message : string list =
 let emit_instantiate_builder_structs struct_array : string list =
   Res.Array.fold_right (fun (ident, struct_storage) acc ->
     let open DC.StructStorage in [
-      "let " ^ (builder_string_of_ident ident) ^ " = {";
+      "let " ^ (builder_string_of_ident ident) ^ " =";
+      "  let data_segment_id = " ^
+        (Int.to_string struct_storage.data.M.Slice.segment_id) ^ "in";
+      "  let pointers_segment_id = " ^
+        (Int.to_string struct_storage.pointers.M.Slice.segment_id) ^ "in {";
       "  DefaultsCommon_.StructStorage.data = {";
       "    DefaultsMessage_.Slice.msg = _builder_defaults_message;";
-      "    DefaultsMessage_.Slice.segment_id = " ^
-        (Int.to_string struct_storage.data.M.Slice.segment_id) ^ ";";
+      "    DefaultsMessage_.Slice.segment = DefaultsMessage_.Message.get_segment \
+       _builder_defaults_message data_segment_id;";
+      "    DefaultsMessage_.Slice.segment_id = data_segment_id;";
       "    DefaultsMessage_.Slice.start = " ^
         (Int.to_string struct_storage.data.M.Slice.start) ^ ";";
       "    DefaultsMessage_.Slice.len = " ^
@@ -187,8 +192,9 @@ let emit_instantiate_builder_structs struct_array : string list =
       "  };";
       "  DefaultsCommon_.StructStorage.pointers = {";
       "    DefaultsMessage_.Slice.msg = _builder_defaults_message;";
-      "    DefaultsMessage_.Slice.segment_id = " ^
-        (Int.to_string struct_storage.pointers.M.Slice.segment_id) ^ ";";
+      "    DefaultsMessage_.Slice.segment = DefaultsMessage_.Message.get_segment \
+       _builder_defaults_message pointers_segment_id;";
+      "    DefaultsMessage_.Slice.segment_id = pointers_segment_id;";
       "    DefaultsMessage_.Slice.start = " ^
         (Int.to_string struct_storage.pointers.M.Slice.start) ^ ";";
       "    DefaultsMessage_.Slice.len = " ^
@@ -206,11 +212,14 @@ let emit_instantiate_builder_structs struct_array : string list =
 let emit_instantiate_builder_lists list_array : string list =
   Res.Array.fold_right (fun (ident, list_storage) acc ->
     let open DC.ListStorage in [
-      "let " ^ (builder_string_of_ident ident) ^ " = {";
+      "let " ^ (builder_string_of_ident ident) ^ " =";
+      "  let segment_id = " ^
+        (Int.to_string list_storage.storage.M.Slice.segment_id) ^ " in {";
       "  DefaultsCommon_.ListStorage.storage = {";
       "    DefaultsMessage_.Slice.msg = _builder_defaults_message;";
-      "    DefaultsMessage_.Slice.segment_id = " ^
-        (Int.to_string list_storage.storage.M.Slice.segment_id) ^ ";";
+      "    DefaultsMessage_.Slice.segment = DefaultsMessage_.Message.get_segment \
+       _builder_defaults_message segment_id;";
+      "    DefaultsMessage_.Slice.segment_id = segment_id;" ^
       "    DefaultsMessage_.Slice.start = " ^
         (Int.to_string list_storage.storage.M.Slice.start) ^ ";";
       "    DefaultsMessage_.Slice.len = " ^
@@ -230,10 +239,13 @@ let emit_instantiate_builder_lists list_array : string list =
    stored in the message. *)
 let emit_instantiate_builder_pointers pointer_array : string list =
   Res.Array.fold_right (fun (ident, pointer_bytes) acc -> [
-      "let " ^ (builder_string_of_ident ident) ^ " = {";
+      "let " ^ (builder_string_of_ident ident) ^ " =";
+      "  let segment_id = " ^
+        (Int.to_string pointer_bytes.M.Slice.segment_id) ^ " in {";
       "  DefaultsMessage_.Slice.msg = _builder_defaults_message;";
-      "  DefaultsMessage_.Slice.segment_id = " ^
-        (Int.to_string pointer_bytes.M.Slice.segment_id) ^ ";";
+      "  DefaultsMessage_.Slice.segment = DefaultsMessage_.Message.get_segment \
+       _builder_defaults_message segment_id;";
+      "  DefaultsMessage_.Slice.segment_id = segment_id;";
       "  DefaultsMessage_.Slice.start = " ^
         (Int.to_string pointer_bytes.M.Slice.start) ^ ";";
       "  DefaultsMessage_.Slice.len = " ^

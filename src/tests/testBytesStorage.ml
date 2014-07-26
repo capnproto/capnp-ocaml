@@ -46,6 +46,7 @@ let uint8_suite =
   in
   let short_slice = {
     SM.Slice.msg        = short_msg;
+    SM.Slice.segment    = SM.Message.get_segment short_msg 0;
     SM.Slice.segment_id = 0;
     SM.Slice.start      = 0;
     SM.Slice.len        = SM.Message.total_size short_msg;
@@ -106,6 +107,7 @@ let uint16_suite =
   in
   let short_slice = {
     SM.Slice.msg        = short_msg;
+    SM.Slice.segment    = SM.Message.get_segment short_msg 0;
     SM.Slice.segment_id = 0;
     SM.Slice.start      = 0;
     SM.Slice.len        = SM.Message.total_size short_msg;
@@ -166,6 +168,7 @@ let uint32_suite =
   in
   let short_slice = {
     SM.Slice.msg        = short_msg;
+    SM.Slice.segment    = SM.Message.get_segment short_msg 0;
     SM.Slice.segment_id = 0;
     SM.Slice.start      = 0;
     SM.Slice.len        = SM.Message.total_size short_msg;
@@ -220,6 +223,7 @@ let uint64_suite =
   ] in
   let short_slice = {
     SM.Slice.msg        = short_msg;
+    SM.Slice.segment    = SM.Message.get_segment short_msg 0;
     SM.Slice.segment_id = 0;
     SM.Slice.start      = 0;
     SM.Slice.len        = SM.Message.total_size short_msg;
@@ -272,6 +276,7 @@ let int8_suite =
   in
   let short_slice = {
     SM.Slice.msg        = short_msg;
+    SM.Slice.segment    = SM.Message.get_segment short_msg 0;
     SM.Slice.segment_id = 0;
     SM.Slice.start      = 0;
     SM.Slice.len        = SM.Message.total_size short_msg;
@@ -331,6 +336,7 @@ let int16_suite =
   in
   let short_slice = {
     SM.Slice.msg        = short_msg;
+    SM.Slice.segment    = SM.Message.get_segment short_msg 0;
     SM.Slice.segment_id = 0;
     SM.Slice.start      = 0;
     SM.Slice.len        = SM.Message.total_size short_msg;
@@ -391,6 +397,7 @@ let int32_suite =
   in
   let short_slice = {
     SM.Slice.msg        = short_msg;
+    SM.Slice.segment    = SM.Message.get_segment short_msg 0;
     SM.Slice.segment_id = 0;
     SM.Slice.start      = 0;
     SM.Slice.len        = SM.Message.total_size short_msg;
@@ -441,6 +448,7 @@ let int64_suite =
   ] in
   let short_slice = {
     SM.Slice.msg        = short_msg;
+    SM.Slice.segment    = SM.Message.get_segment short_msg 0;
     SM.Slice.segment_id = 0;
     SM.Slice.start      = 0;
     SM.Slice.len        = SM.Message.total_size short_msg;

@@ -121,6 +121,7 @@ module Make (Storage : MessageStorage.S) = struct
 
     type 'cap t = {
       msg        : 'cap message_t;
+      segment    : 'cap segment_t;
       segment_id : int;
       start      : int;
       len        : int;
@@ -151,6 +152,7 @@ module Make (Storage : MessageStorage.S) = struct
       in
       let slice = {
         msg = m;
+        segment = segment_descr.Message.segment;
         segment_id;
         start = segment_descr.Message.free_start;
         len = size;
@@ -172,6 +174,7 @@ module Make (Storage : MessageStorage.S) = struct
       if size <= bytes_avail then
         let slice = {
           msg = m;
+          segment = seg_descr.Message.segment;
           segment_id;
           start = seg_descr.Message.free_start;
           len = size;
@@ -186,7 +189,7 @@ module Make (Storage : MessageStorage.S) = struct
       else
         None
 
-    let get_segment slice = Message.get_segment slice.msg slice.segment_id
+    let get_segment slice = slice.segment
 
     let get_end slice = slice.start + slice.len
 

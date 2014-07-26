@@ -109,6 +109,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
     let make_list_storage_aux ~num_words ~num_elements ~storage_type =
       let storage = {
         Slice.msg        = message;
+        Slice.segment    = Message.get_segment message segment_id;
         Slice.segment_id = segment_id;
         Slice.start      = segment_offset;
         Slice.len        = num_words * sizeof_uint64;
@@ -156,6 +157,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
     | Composite ->
         let struct_tag_bytes = {
           Slice.msg        = message;
+          Slice.segment    = Message.get_segment message segment_id;
           Slice.segment_id = segment_id;
           Slice.start      = segment_offset;
           Slice.len        = sizeof_uint64;
@@ -194,6 +196,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
     | NormalPointer ->
         let next_pointer_bytes = {
           Slice.msg        = message;
+          Slice.segment    = Message.get_segment message far_pointer.segment_id;
           Slice.segment_id = far_pointer.segment_id;
           Slice.start      = far_pointer.offset * sizeof_uint64;
           Slice.len        = sizeof_uint64;
@@ -205,6 +208,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
     | TaggedFarPointer ->
         let content_pointer_bytes = {
           Slice.msg        = message;
+          Slice.segment    = Message.get_segment message far_pointer.segment_id;
           Slice.segment_id = far_pointer.segment_id;
           Slice.start      = far_pointer.offset * sizeof_uint64;
           Slice.len        = sizeof_uint64;
@@ -221,9 +225,11 @@ module Make (MessageWrapper : MessageSig.S) = struct
               ~segment_offset:(content_pointer.FarPointer.offset * sizeof_uint64)
               ~list_pointer)
         | (Pointer.Far content_pointer, Pointer.Struct struct_pointer) ->
+            let segment_id = content_pointer.FarPointer.segment_id in
             let data = {
               Slice.msg = message;
-              Slice.segment_id = content_pointer.FarPointer.segment_id;
+              Slice.segment = Message.get_segment message segment_id;
+              Slice.segment_id;
               Slice.start = content_pointer.FarPointer.offset * sizeof_uint64;
               Slice.len = struct_pointer.StructPointer.data_words * sizeof_uint64;
             } in
