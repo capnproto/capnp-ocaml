@@ -70,11 +70,11 @@ module Make (NM : MessageSig.S) = struct
         ListStorageType.Bytes1
         (String.length src + (if null_terminated then 1 else 0))
     in
-    let (_ : int) = String.fold src ~init:0 ~f:(fun ofs c ->
-        let byte = Char.to_int c in
-        let () = NM.Slice.set_uint8 list_storage.NC.ListStorage.storage ofs byte in
-        ofs + 1)
-    in
+    let len = String.length src in
+    for i = 0 to len - 1 do
+      let byte = Char.to_int src.[i] in
+      NM.Slice.set_uint8 list_storage.NC.ListStorage.storage i byte
+    done;
     list_storage
 
 
