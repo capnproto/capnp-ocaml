@@ -184,3 +184,6 @@ let make_hex_literal s =
   Bytes.to_string result
 
 
+let is_int64_zero i64 =
+  (Caml.Int64.float_of_bits i64) = 0.0
+

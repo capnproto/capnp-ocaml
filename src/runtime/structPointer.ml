@@ -29,6 +29,7 @@
 
 
 module Int64 = Core.Core_int64
+module Caml  = Core.Caml
 
 type t = {
   (** Signed offset in words from end of the pointer to start of struct
@@ -58,18 +59,18 @@ let decode (pointer64 : Int64.t) : t =
   let offset =
     let masked     = Int64.bit_and pointer64 offset_mask in
     let offset64   = Int64.shift_right_logical masked offset_shift in
-    let offset_int = Int64.to_int_exn offset64 in
+    let offset_int = Caml.Int64.to_int offset64 in
     Util.decode_signed 30 offset_int
   in
   let data_size =
     let masked = Int64.bit_and pointer64 data_size_mask in
     let size64 = Int64.shift_right_logical masked data_size_shift in
-    Int64.to_int_exn size64
+    Caml.Int64.to_int size64
   in
   let pointers_size =
     let masked = Int64.bit_and pointer64 pointers_size_mask in
     let size64 = Int64.shift_right_logical masked pointers_size_shift in
-    Int64.to_int_exn size64
+    Caml.Int64.to_int size64
   in {
     offset;
     data_words    = data_size;

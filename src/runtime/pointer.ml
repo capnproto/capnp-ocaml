@@ -29,10 +29,10 @@
 
 
 module Bitfield = struct
-  let tag_mask       = Int64.of_int 0x3
-  let tag_val_list   = Int64.one
-  let tag_val_struct = Int64.zero
-  let tag_val_far    = Int64.of_int 0x2
+  let tag_mask       = 0x3
+  let tag_val_list   = 0x1
+  let tag_val_struct = 0x0
+  let tag_val_far    = 0x2
   let tag_val_other  = tag_mask
 end
 

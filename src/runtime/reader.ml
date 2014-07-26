@@ -31,6 +31,7 @@
    here will modify the underlying message; derefencing null pointers and
    reading from truncated structs both lead to default data being returned. *)
 
+
 open Core.Std
 
 let sizeof_uint64 = Common.sizeof_uint64
@@ -368,7 +369,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
     match pointer_opt with
     | Some pointer_bytes ->
         let ptr_val = Slice.get_int64 pointer_bytes 0 in
-        Int64.compare ptr_val Int64.zero <> 0
+        not (Util.is_int64_zero ptr_val)
     | None ->
         false
 
@@ -543,10 +544,10 @@ module Make (MessageWrapper : MessageSig.S) = struct
     match pointer_opt with
     | Some pointer_bytes ->
         let pointer_val = Slice.get_int64 pointer_bytes 0 in
-        if Int64.compare pointer_val Int64.zero <> 0 then
-          pointer_opt
-        else
+        if Util.is_int64_zero pointer_val then
           default
+        else
+          pointer_opt
     | None ->
         default
 

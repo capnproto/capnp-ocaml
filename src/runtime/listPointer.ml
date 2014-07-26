@@ -1,5 +1,6 @@
 
 module Int64 = Core.Core_int64;;
+module Caml  = Core.Caml
 
 type element_type_t =
   | Void
@@ -41,13 +42,13 @@ let decode (pointer64 : Int64.t) : t =
   let offset =
     let masked     = Int64.bit_and pointer64 offset_mask in
     let offset64   = Int64.shift_right_logical masked offset_shift in
-    let offset_int = Int64.to_int_exn offset64 in
+    let offset_int = Caml.Int64.to_int offset64 in
     Util.decode_signed 30 offset_int
   in
   let element_type =
     let masked = Int64.bit_and pointer64 type_mask in
     let tp64   = Int64.shift_right_logical masked type_shift in
-    match Int64.to_int_exn tp64 with
+    match Caml.Int64.to_int tp64 with
     | 0 -> Void
     | 1 -> OneBitValue
     | 2 -> OneByteValue
@@ -61,7 +62,7 @@ let decode (pointer64 : Int64.t) : t =
   let num_elements =
     let masked  = Int64.bit_and pointer64 count_mask in
     let count64 = Int64.shift_right_logical masked count_shift in
-    Int64.to_int_exn count64
+    Caml.Int64.to_int count64
   in {
     offset;
     element_type;

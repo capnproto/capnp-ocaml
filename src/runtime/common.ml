@@ -81,21 +81,24 @@ module Make (MessageWrapper : MessageSig.S) = struct
      decode the information stored in the pointer. *)
   let decode_pointer (pointer_bytes : 'cap Slice.t) : Pointer.t =
     let pointer64 = Slice.get_int64 pointer_bytes 0 in
-    if Int64.compare pointer64 Int64.zero = 0 then
+    if Util.is_int64_zero pointer64 then
       Pointer.Null
     else
-      let module B = Pointer.Bitfield in
-      let tag = Int64.bit_and pointer64 B.tag_mask in
-      if Int64.compare tag B.tag_val_list = 0 then
-        Pointer.List (ListPointer.decode pointer64)
-      else if Int64.compare tag B.tag_val_struct = 0 then
-        Pointer.Struct (StructPointer.decode pointer64)
-      else if Int64.compare tag B.tag_val_far = 0 then
-        Pointer.Far (FarPointer.decode pointer64)
-      else if Int64.compare tag B.tag_val_other = 0 then
-        Pointer.Other (OtherPointer.decode pointer64)
-      else
-        invalid_msg "pointer has undefined type tag"
+      let tag_bits = Caml.Int64.to_int pointer64 in
+      let tag = tag_bits land Pointer.Bitfield.tag_mask in
+      (* OCaml won't match an int against let-bound variables,
+         only against constants. *)
+      match tag with
+      | 0x0 ->  (* Pointer.Bitfield.tag_val_struct *)
+          Pointer.Struct (StructPointer.decode pointer64)
+      | 0x1 ->  (* Pointer.Bitfield.tag_val_list *)
+          Pointer.List (ListPointer.decode pointer64)
+      | 0x2 ->  (* Pointer.Bitfield.tag_val_far *)
+          Pointer.Far (FarPointer.decode pointer64)
+      | 0x3 ->  (* Pointer.Bitfield.tag_val_other *)
+          Pointer.Other (OtherPointer.decode pointer64)
+      | _ ->
+          assert false
 
 
   (* Given a list pointer descriptor, construct the corresponding list storage

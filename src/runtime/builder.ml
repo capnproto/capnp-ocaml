@@ -464,7 +464,7 @@ module Make (NM : MessageSig.S) = struct
       (pointer_bytes : 'cap NM.Slice.t)
     : bool =
     let ptr_val = NM.Slice.get_int64 pointer_bytes 0 in
-    Int64.compare ptr_val Int64.zero <> 0
+    not (Util.is_int64_zero ptr_val)
 
   let get_text
       ~(default : string)
@@ -661,15 +661,15 @@ module Make (NM : MessageSig.S) = struct
     : rw NM.Slice.t =
     let () =
       let pointer_val = NM.Slice.get_int64 pointer_bytes 0 in
-      if Int64.compare pointer_val Int64.zero <> 0 then
-        ()
-      else
+      if Util.is_int64_zero pointer_val then
         match default with
         | Some default_pointer ->
             DefaultsCopier.deep_copy_pointer ~src:default_pointer
               ~dest:pointer_bytes
         | None ->
             ()
+      else
+        ()
     in
     pointer_bytes
 
