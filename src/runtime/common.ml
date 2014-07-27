@@ -258,40 +258,53 @@ module Make (MessageWrapper : MessageSig.S) = struct
   (* Given a range of eight bytes which represent a pointer, get the object which
      the pointer points to. *)
   and deref_pointer (pointer_bytes : 'cap Slice.t) : 'cap Object.t =
-    match decode_pointer pointer_bytes with
-    | Pointer.Null ->
-        Object.None
-    | Pointer.List list_pointer ->
-        Object.List (make_list_storage
-          ~message:pointer_bytes.Slice.msg
-          ~segment_id:pointer_bytes.Slice.segment_id
-          ~segment_offset:((Slice.get_end pointer_bytes) +
-                             (list_pointer.ListPointer.offset * sizeof_uint64))
-          ~list_pointer)
-    | Pointer.Struct struct_pointer ->
-        let open StructPointer in
-        let data = {
-          pointer_bytes with
-          Slice.start =
-            (Slice.get_end pointer_bytes) + (struct_pointer.offset * sizeof_uint64);
-          Slice.len = struct_pointer.data_words * sizeof_uint64;
-        } in
-        let pointers = {
-          data with
-          Slice.start = Slice.get_end data;
-          Slice.len   = struct_pointer.pointer_words * sizeof_uint64;
-        } in
-        let () = bounds_check_slice_exn
-          ~err:"struct pointer describes invalid data region" data
-        in
-        let () = bounds_check_slice_exn
-          ~err:"struct pointer describes invalid pointers region" pointers
-        in
-        Object.Struct { StructStorage.data; StructStorage.pointers; }
-    | Pointer.Far far_pointer ->
-        deref_far_pointer far_pointer pointer_bytes.Slice.msg
-    | Pointer.Other (OtherPointer.Capability index) ->
-        Object.Capability index
+    let pointer64 = Slice.get_int64 pointer_bytes 0 in
+    if Util.is_int64_zero pointer64 then
+      Object.None
+    else
+      let tag_bits = Caml.Int64.to_int pointer64 in
+      let tag = tag_bits land Pointer.Bitfield.tag_mask in
+      (* OCaml won't match an int against let-bound variables,
+         only against constants. *)
+      match tag with
+      | 0x0 ->  (* Pointer.Bitfield.tag_val_struct *)
+          let struct_pointer = StructPointer.decode pointer64 in
+          let open StructPointer in
+          let data = {
+            pointer_bytes with
+            Slice.start =
+              (Slice.get_end pointer_bytes) + (struct_pointer.offset * sizeof_uint64);
+            Slice.len = struct_pointer.data_words * sizeof_uint64;
+          } in
+          let pointers = {
+            data with
+            Slice.start = Slice.get_end data;
+            Slice.len   = struct_pointer.pointer_words * sizeof_uint64;
+          } in
+          let () = bounds_check_slice_exn
+            ~err:"struct pointer describes invalid data region" data
+          in
+          let () = bounds_check_slice_exn
+            ~err:"struct pointer describes invalid pointers region" pointers
+          in
+          Object.Struct { StructStorage.data; StructStorage.pointers; }
+      | 0x1 ->  (* Pointer.Bitfield.tag_val_list *)
+          let list_pointer = ListPointer.decode pointer64 in
+          Object.List (make_list_storage
+            ~message:pointer_bytes.Slice.msg
+            ~segment_id:pointer_bytes.Slice.segment_id
+            ~segment_offset:((Slice.get_end pointer_bytes) +
+                               (list_pointer.ListPointer.offset * sizeof_uint64))
+            ~list_pointer)
+      | 0x2 ->  (* Pointer.Bitfield.tag_val_far *)
+          let far_pointer = FarPointer.decode pointer64 in
+          deref_far_pointer far_pointer pointer_bytes.Slice.msg
+      | 0x3 ->  (* Pointer.Bitfield.tag_val_other *)
+          let other_pointer = OtherPointer.decode pointer64 in
+          let (OtherPointer.Capability index) = other_pointer in
+          Object.Capability index
+      | _ ->
+          assert false
 
 
   module ListDecoders = struct
