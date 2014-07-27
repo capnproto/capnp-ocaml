@@ -1,6 +1,7 @@
 USE_OCAMLFIND = true
 
 OCAMLFLAGS += -thread -short-paths
+OCAMLOPTFLAGS += -inline 1000
 
 OCAMLPACKS[] =  \
   core          \
