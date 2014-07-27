@@ -46,36 +46,54 @@ type t = {
 
 let tag_val_struct = 0L
 
-let offset_shift = 2
-let offset_mask  = Int64.shift_left 0x3fffffffL offset_shift
+let offset_shift    = 2
+let offset_mask     = Int64.shift_left 0x3fffffffL offset_shift
+let offset_mask_int = 0x3fffffff lsl offset_shift
 
-let data_size_shift = 32
-let data_size_mask  = Int64.shift_left 0xffffL data_size_shift
+let data_size_shift    = 32
+let data_size_mask     = Int64.shift_left 0xffffL data_size_shift
+let data_size_mask_int = 0xffff lsl data_size_shift
 
-let pointers_size_shift = 48
-let pointers_size_mask  = Int64.shift_left 0xffffL pointers_size_shift
+let pointers_size_shift    = 48
+let pointers_size_mask_int = 0xffff
 
 let decode (pointer64 : Int64.t) : t =
-  let offset =
-    let masked     = Int64.bit_and pointer64 offset_mask in
-    let offset64   = Int64.shift_right_logical masked offset_shift in
-    let offset_int = Caml.Int64.to_int offset64 in
-    Util.decode_signed 30 offset_int
-  in
-  let data_size =
-    let masked = Int64.bit_and pointer64 data_size_mask in
-    let size64 = Int64.shift_right_logical masked data_size_shift in
-    Caml.Int64.to_int size64
-  in
   let pointers_size =
-    let masked = Int64.bit_and pointer64 pointers_size_mask in
-    let size64 = Int64.shift_right_logical masked pointers_size_shift in
-    Caml.Int64.to_int size64
-  in {
-    offset;
-    data_words    = data_size;
-    pointer_words = pointers_size;
-  }
+    let shifted = Int64.shift_right_logical pointer64 pointers_size_shift in
+    let shifted_int = Caml.Int64.to_int shifted in
+    shifted_int land pointers_size_mask_int
+  in
+  (* Int64 arithmetic causes unfortunate GC pressure.  If we're on a 64-bit
+     platform, use standard 63-bit ints whenever possible. *)
+  if Sys.word_size = 64 then
+    let pointer = Caml.Int64.to_int pointer64 in
+    let offset =
+      let v = (pointer land offset_mask_int) lsr offset_shift in
+      Util.decode_signed 30 v
+    in
+    let data_size =
+      (pointer land data_size_mask_int) lsr data_size_shift
+    in {
+      offset;
+      data_words    = data_size;
+      pointer_words = pointers_size;
+    }
+  else
+    let offset =
+      let masked     = Int64.bit_and pointer64 offset_mask in
+      let offset64   = Int64.shift_right_logical masked offset_shift in
+      let offset_int = Caml.Int64.to_int offset64 in
+      Util.decode_signed 30 offset_int
+    in
+    let data_size =
+      let masked = Int64.bit_and pointer64 data_size_mask in
+      let size64 = Int64.shift_right_logical masked data_size_shift in
+      Caml.Int64.to_int size64
+    in {
+      offset;
+      data_words    = data_size;
+      pointer_words = pointers_size;
+    }
 
 
 let encode (storage_descr : t) : Int64.t =

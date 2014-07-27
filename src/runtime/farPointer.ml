@@ -52,26 +52,16 @@ let tag_val_far = 0x2L
 
 let landing_pad_type_shift = 2
 let landing_pad_type_mask  = Int64.shift_left 1L landing_pad_type_shift
+let landing_pad_type_mask_int = 1 lsl landing_pad_type_shift
 
 let offset_shift = 3
 let offset_mask  = Int64.shift_left 0x1fffffffL offset_shift
+let offset_mask_int = 0x1fffffff lsl offset_shift
 
 let segment_shift = 32
 let segment_mask  = Int64.shift_left 0xffffffffL segment_shift
 
 let decode (pointer64 : Int64.t) : t =
-  let landing_pad =
-    let masked = Int64.bit_and pointer64 landing_pad_type_mask in
-    if Int64.compare masked Int64.zero = 0 then
-      NormalPointer
-    else
-      TaggedFarPointer
-  in
-  let offset =
-    let masked = Int64.bit_and pointer64 offset_mask in
-    let offset64 = Int64.shift_right_logical masked offset_shift in
-    Caml.Int64.to_int offset64
-  in
   let segment_id =
     let max64  = Int64.of_int max_int in
     let masked = Int64.bit_and pointer64 segment_mask in
@@ -80,11 +70,41 @@ let decode (pointer64 : Int64.t) : t =
       Message.invalid_msg "far pointer contains segment ID larger than OCaml max_int"
     else
       Caml.Int64.to_int id64
-  in {
-    landing_pad;
-    offset;
-    segment_id;
-  }
+  in
+  (* Int64 arithmetic causes unfortunate GC pressure.  If we're on a 64-bit
+     platform, use standard 63-bit ints whenever possible. *)
+  if Sys.word_size = 64 then
+    let pointer = Caml.Int64.to_int pointer64 in
+    let landing_pad =
+      if (pointer land landing_pad_type_mask_int) = 0 then
+        NormalPointer
+      else
+        TaggedFarPointer
+    in
+    let offset =
+      (pointer land offset_mask_int) lsr offset_shift
+    in {
+      landing_pad;
+      offset;
+      segment_id;
+    }
+  else
+    let landing_pad =
+      let masked = Int64.bit_and pointer64 landing_pad_type_mask in
+      if Int64.compare masked Int64.zero = 0 then
+        NormalPointer
+      else
+        TaggedFarPointer
+    in
+    let offset =
+      let masked = Int64.bit_and pointer64 offset_mask in
+      let offset64 = Int64.shift_right_logical masked offset_shift in
+      Caml.Int64.to_int offset64
+    in {
+      landing_pad;
+      offset;
+      segment_id;
+    }
 
 
 let encode (storage_descr : t) : Int64.t =
