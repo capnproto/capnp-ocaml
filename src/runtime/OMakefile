@@ -1,6 +1,5 @@
 
 RUNTIME_MODULES =   \
-  builder           \
   builderOps        \
   bytesStorage      \
   cArray            \
@@ -18,7 +17,6 @@ RUNTIME_MODULES =   \
   otherPointer      \
   packing           \
   pointer           \
-  reader            \
   structPointer     \
   util
 

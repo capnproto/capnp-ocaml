@@ -993,8 +993,8 @@ module type S = sig
   end
 end
 
-module DefaultsMessage_ = Capnp.Runtime.Builder.DefaultsMessage
-module DefaultsCommon_  = Capnp.Runtime.Builder.DC
+module DefaultsMessage_ = Capnp.BytesMessage
+module DefaultsCommon_  = Capnp.Runtime.Common.Make(DefaultsMessage_)
 
 let _builder_defaults_message =
   let message_segments = [
@@ -1010,8 +1010,15 @@ let _builder_defaults_message =
 module Make (MessageWrapper : Capnp.MessageSig.S) = struct
   let invalid_msg = Capnp.Message.invalid_msg
 
-  module RA_ = Capnp.Runtime.Reader.Make(MessageWrapper)
-  module BA_ = Capnp.Runtime.Builder.Make(MessageWrapper)
+  module RA_ = struct
+    open Capnp.Runtime
+    INCLUDE "reader-inc.ml"
+  end
+  module BA_ = struct
+    open Capnp.Runtime
+    module NM = MessageWrapper
+    INCLUDE "builder-inc.ml"
+  end
 
   type 'cap message_t = 'cap MessageWrapper.Message.t
 
@@ -1107,7 +1114,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       | Undefined x -> x
   end
   module DefaultsCopier_ =
-    Capnp.Runtime.BuilderOps.Make(Capnp.Runtime.Builder.DefaultsMessage)(MessageWrapper)
+    Capnp.Runtime.BuilderOps.Make(Capnp.BytesMessage)(MessageWrapper)
 
   let _reader_defaults_message =
     MessageWrapper.Message.create

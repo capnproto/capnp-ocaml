@@ -35,7 +35,12 @@ module Context   = GenCommon.Context
 module Mode      = GenCommon.Mode
 module C         = Capnp
 module RC        = C.Runtime.Common.Make(GenCommon.M)
-module ReaderApi = C.Runtime.Reader.Make(GenCommon.M)
+
+module ReaderApi = struct
+  open Capnp.Runtime
+  module MessageWrapper = GenCommon.M
+  INCLUDE "reader-inc.ml"
+end
 
 let sprintf = Printf.sprintf
 let apply_indent = GenCommon.apply_indent

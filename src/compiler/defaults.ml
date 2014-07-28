@@ -157,8 +157,8 @@ let emit_instantiate_builder_message message : string list =
     List.fold_left (List.rev strings) ~init:[] ~f:(fun acc seg ->
       (emit_literal_seg (Bytes.unsafe_to_string seg) wrap_chars) @ acc)
   in [
-    "module DefaultsMessage_ = Capnp.Runtime.Builder.DefaultsMessage";
-    "module DefaultsCommon_  = Capnp.Runtime.Builder.DC";
+    "module DefaultsMessage_ = Capnp.BytesMessage";
+    "module DefaultsCommon_  = Capnp.Runtime.Common.Make(DefaultsMessage_)";
     "";
     "let _builder_defaults_message =";
     "  let message_segments = ["; ] @
@@ -269,7 +269,7 @@ let gen_builder_defaults defaults =
    using the same native storage type as the functor parameter. *)
 let emit_instantiate_reader_message () = [
   "module DefaultsCopier_ =";
-  "  Capnp.Runtime.BuilderOps.Make(Capnp.Runtime.Builder.DefaultsMessage)(MessageWrapper)";
+  "  Capnp.Runtime.BuilderOps.Make(Capnp.BytesMessage)(MessageWrapper)";
   "";
   "let _reader_defaults_message =";
   "  MessageWrapper.Message.create";

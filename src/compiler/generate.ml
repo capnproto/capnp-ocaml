@@ -92,8 +92,15 @@ let mod_header ~context = [
   "module Make (MessageWrapper : Capnp.MessageSig.S) = struct";
   "  let invalid_msg = Capnp.Message.invalid_msg";
   "";
-  "  module RA_ = Capnp.Runtime.Reader.Make(MessageWrapper)";
-  "  module BA_ = Capnp.Runtime.Builder.Make(MessageWrapper)";
+  "  module RA_ = struct";
+  "    open Capnp.Runtime"; ] @
+    (GenCommon.apply_indent ~indent:"    " Includes.reader_api) @ [
+  "  end";
+  "  module BA_ = struct";
+  "    open Capnp.Runtime";
+  "    module NM = MessageWrapper"; ] @
+    (GenCommon.apply_indent ~indent:"    " Includes.builder_api) @ [
+  "  end";
   "";
   "  type 'cap message_t = 'cap MessageWrapper.Message.t";
   ""; ] @ (List.concat_map context.Context.imports ~f:(fun import -> [

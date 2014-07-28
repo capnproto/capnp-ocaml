@@ -52,7 +52,11 @@ end
 module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
   module ROC = Common.Make(ROM)
   module RWC = Common.Make(RWM)
-  module RReader = Reader.Make(RWM)
+
+  module RReader = struct
+    module MessageWrapper = RWM
+    INCLUDE "reader-inc.ml"
+  end
 
 
   (* Given storage for a struct, get the pointer bytes for the given
