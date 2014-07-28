@@ -36,11 +36,23 @@ module TestCase = struct
 
     let result = result + (seats_get car) * 200 in
     let result = result + (doors_get car) * 350 in
-    let result = Capnp.Array.fold (wheels_get car) ~init:result ~f:(fun acc wheel ->
+
+    let wheels_value =
+      (* Capnp.Array.fold would be more elegant, but creates a closure
+         for every wheel. *)
+      let wv = ref 0 in
+      let wheels = wheels_get car in
+      let num_wheels = Capnp.Array.length wheels in
+      for i = 0 to num_wheels - 1 do
+        let wheel = Capnp.Array.get wheels i in
         let diam  = CS.Reader.Wheel.diameter_get wheel in
         let diam2 = diam * diam in
         let st = if CS.Reader.Wheel.snow_tires_get wheel then 100 else 0 in
-        acc + diam2 + st) in
+        wv := !wv + diam2 + st
+      done;
+      !wv
+    in
+    let result = result + wheels_value in
 
     let result = result + ((length_get car) * (width_get car) * (height_get car) / 50) in
 
@@ -76,10 +88,14 @@ module TestCase = struct
     doors_set_exn car (2 + (FastRand.int 3));
 
     let wheels = wheels_init car 4 in
-    Capnp.Array.iter wheels ~f:(fun wheel ->
+    (* Capnp.Array.iter would be more elegant, but creates a
+       closure for every wheel. *)
+    for i = 0 to 3 do
+      let wheel = Capnp.Array.get wheels i in
       CS.Builder.Wheel.diameter_set_exn wheel (25 + (FastRand.int 15));
       CS.Builder.Wheel.air_pressure_set wheel (30.0 +. (FastRand.double 20.0));
-      CS.Builder.Wheel.snow_tires_set wheel (FastRand.int 16 = 0));
+      CS.Builder.Wheel.snow_tires_set wheel (FastRand.int 16 = 0)
+    done;
 
     length_set_exn car (170 + (FastRand.int 150));
     width_set_exn car (48 + (FastRand.int 36));
@@ -107,19 +123,27 @@ module TestCase = struct
 
   let setup_request () =
     let builder = CS.Builder.ParkingLot.init_root ~message_size:16384 () in
-    Capnp.Array.fold (CS.Builder.ParkingLot.cars_init builder (FastRand.int 200))
-      ~init:(builder, 0)
-      ~f:(fun (parking_lot, value) car ->
-        let () = random_car car in
-        (parking_lot, value + (car_value (CS.Reader.Car.of_builder car))))
+    let num_cars = FastRand.int 200 in
+    let cars = CS.Builder.ParkingLot.cars_init builder num_cars in
+    let total_value = ref 0 in
+    for i = 0 to num_cars - 1 do
+      let car = Capnp.Array.get cars i in
+      let () = random_car car in
+      total_value := !total_value + (car_value (CS.Reader.Car.of_builder car))
+    done;
+    (builder, !total_value)
 
 
   let handle_request parking_lot =
     let total_value = CS.Builder.TotalValue.init_root () in
-    let result = Capnp.Array.fold (CS.Reader.ParkingLot.cars_get parking_lot)
-        ~init:0 ~f:(fun acc car -> acc + (car_value car))
-    in
-    let () = CS.Builder.TotalValue.amount_set_int_exn total_value result in
+    let cars = CS.Reader.ParkingLot.cars_get parking_lot in
+    let num_cars = Capnp.Array.length cars in
+    let result = ref 0 in
+    for i = 0 to num_cars - 1 do
+      let car = Capnp.Array.get cars i in
+      result := !result + (car_value car)
+    done;
+    let () = CS.Builder.TotalValue.amount_set_int_exn total_value !result in
     total_value
 
 
