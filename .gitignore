@@ -27,6 +27,10 @@ src/tests/c2b2b.mli
 src/tests/c2b2b.ml
 src/tests/test_import.mli
 src/tests/test_import.ml
+src/tests/c2b2b_defun.ml
+src/tests/testLists_defun.ml
+src/tests/test_defun.ml
+src/tests/test_import_defun.ml
 src/benchmark/bench
 src/benchmark/bench.opt
 src/benchmark/bench.run
@@ -41,3 +45,7 @@ src/benchmark/eval.mli
 src/benchmark/eval.ml
 src/benchmark/carsales
 src/compiler/includes.ml
+src/benchmark/c2b2b_defun.ml
+src/benchmark/carsales_defun.ml
+src/benchmark/catrank_defun.ml
+src/benchmark/eval_defun.ml

@@ -88,8 +88,11 @@ let functor_sig ~context = [
   "";
 ]
 
-let mod_header ~context = [
+let mod_functor_header = [
   "module Make (MessageWrapper : Capnp.MessageSig.S) = struct";
+]
+
+let mod_header ~context = [
   "  let invalid_msg = Capnp.Message.invalid_msg";
   "";
   "  module RA_ = struct";
@@ -130,6 +133,9 @@ let mod_divide_reader_builder = [
 
 let mod_footer = [
   "  end";
+]
+
+let mod_functor_footer = [
   "end";
   "";
 ]
@@ -142,6 +148,10 @@ let ml_filename filename =
 let mli_filename filename =
   let module_name = GenCommon.make_legal_module_name filename in
   String.uncapitalize (module_name ^ ".mli")
+
+let ml_defun_filename filename =
+  let module_name = GenCommon.make_legal_module_name filename in
+  String.uncapitalize (module_name ^ "_defun.ml")
 
 
 let string_of_lines lines =
@@ -215,7 +225,7 @@ let compile
     let sig_file_content =
       string_of_lines (sig_s @ (functor_sig ~context))
     in
-    let mod_file_content =
+    let mod_shared_content =
       let defaults_context =
         GenModules.build_defaults_context ~context ~node_name:requested_filename
         requested_file_node
@@ -232,22 +242,36 @@ let compile
              ~scope:[] ~mode:Mode.Builder ~node_name:requested_filename
              requested_file_node)
       in
-      let builder_defaults = Defaults.gen_builder_defaults defaults_context in
+      let builder_defaults = GenCommon.apply_indent ~indent:"  "
+          (Defaults.gen_builder_defaults defaults_context)
+      in
       let reader_defaults = GenCommon.apply_indent ~indent:"  "
           (Defaults.gen_reader_defaults defaults_context)
       in
+      builder_defaults @
+      (mod_header ~context) @
+      mod_unique_types @
+      mod_unique_enums @
+      reader_defaults @
+      mod_reader_header @
+      reader_body @
+      mod_divide_reader_builder @
+      builder_body @
+      mod_footer
+    in
+    let mod_file_content =
       string_of_lines (
         sig_s @
-        builder_defaults @
-        (mod_header ~context) @
-        mod_unique_types @
-        mod_unique_enums @
-        reader_defaults @
-        mod_reader_header @
-        reader_body @
-        mod_divide_reader_builder @
-        builder_body @
-        mod_footer)
+        mod_functor_header @
+        mod_shared_content @
+        mod_functor_footer)
+    in
+    let mod_defun_content =
+      string_of_lines ( [
+        "  type ro = Capnp.Message.ro";
+        "  type rw = Capnp.Message.rw";
+      ] @
+      mod_shared_content)
     in
     let () = Out_channel.with_file (mli_filename requested_filename)
         ~f:(fun chan -> Out_channel.output_string chan sig_file_content)
@@ -255,10 +279,14 @@ let compile
     let () = Out_channel.with_file (ml_filename requested_filename)
         ~f:(fun chan -> Out_channel.output_string chan mod_file_content)
     in
-    let () = Printf.printf "%s --> %s %s\n"
+    let () = Out_channel.with_file (ml_defun_filename requested_filename)
+        ~f:(fun chan -> Out_channel.output_string chan mod_defun_content)
+    in
+    let () = Printf.printf "%s --> %s %s %s\n"
         requested_filename
         (mli_filename requested_filename)
         (ml_filename requested_filename)
+        (ml_defun_filename requested_filename)
     in
     ())
 
