@@ -155,7 +155,7 @@ let emit_instantiate_builder_message message : string list =
     (* 64 characters works out to 16 bytes per line. *)
     let wrap_chars = 64 in
     List.fold_left (List.rev strings) ~init:[] ~f:(fun acc seg ->
-      (emit_literal_seg seg wrap_chars) @ acc)
+      (emit_literal_seg (Bytes.unsafe_to_string seg) wrap_chars) @ acc)
   in [
     "module DefaultsMessage_ = Capnp.Runtime.Builder.DefaultsMessage";
     "module DefaultsCommon_  = Capnp.Runtime.Builder.DC";

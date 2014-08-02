@@ -99,7 +99,8 @@ module UncompStream = struct
     | Some partial_header ->
         begin try
           let segment_count =
-            Util.int_of_uint32_exn (BytesStorage.get_uint32 partial_header 0)
+            let bytes_header = Bytes.unsafe_of_string partial_header in
+            Util.int_of_uint32_exn (BytesStorage.get_uint32 bytes_header 0)
           in
           let () =
             if segment_count > (Int.max_value / 4) - 2 then
@@ -130,7 +131,10 @@ module UncompStream = struct
         Result.Error FramingError.Incomplete
 
   and unpack_frame stream incomplete_frame =
-    let segment_count_u32 = BytesStorage.get_uint32 incomplete_frame.frame_header 0 in
+    let frame_header_bytes =
+      Bytes.unsafe_of_string incomplete_frame.frame_header
+    in
+    let segment_count_u32 = BytesStorage.get_uint32 frame_header_bytes 0 in
     let segment_count = 1 + (Util.int_of_uint32_exn segment_count_u32) in
     let segments_decoded = Res.Array.length incomplete_frame.complete_segments in
     if segments_decoded = segment_count then
@@ -141,7 +145,7 @@ module UncompStream = struct
     else
       let () = assert (segments_decoded < segment_count) in
       let segment_size_words_u32 = BytesStorage.get_uint32
-          incomplete_frame.frame_header (4 + (4 * segments_decoded))
+          frame_header_bytes (4 + (4 * segments_decoded))
       in
       begin try
         let segment_size = 8 * (Util.int_of_uint32_exn segment_size_words_u32) in
@@ -244,7 +248,7 @@ module FramedStream = struct
 end
 
 
-let make_header segments =
+let make_header segments : string =
   let buf = Buffer.create 8 in
   let () = List.iter segments ~f:(fun segment ->
       let size_buf = Bytes.create 4 in
@@ -278,7 +282,8 @@ let rec serialize_fold message ~compression ~init ~f =
   match compression with
   | `None ->
       let header = make_header segments in
-      List.fold_left segments ~init:(f init header) ~f
+      List.fold_left segments ~init:(f init header) ~f:(fun acc segment ->
+        f acc (Bytes.unsafe_to_string segment))
   | `Packing ->
       serialize_fold message ~compression:`None ~init
         ~f:(fun acc unpacked_fragment ->
@@ -293,7 +298,8 @@ let rec serialize ~compression message=
   match compression with
   | `None ->
       let segments = Message.BytesMessage.Message.to_storage message in
-      (make_header segments) ^ (String.concat ~sep:"" segments)
+      (make_header segments) ^
+        (Bytes.unsafe_to_string (Bytes.concat (Bytes.unsafe_of_string "") segments))
   | `Packing ->
       Packing.pack_string (serialize ~compression:`None message)
 

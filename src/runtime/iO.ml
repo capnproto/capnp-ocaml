@@ -145,9 +145,7 @@ module ReadContext = struct
     in
     if bytes_read > 0 then
       let str_buf = Bytes.unsafe_to_string context.read_buf in
-      let substr = Bytes.unsafe_to_string
-          (String.sub str_buf ~pos:0 ~len:bytes_read)
-      in
+      let substr = String.sub str_buf ~pos:0 ~len:bytes_read in
       let () = Codecs.FramedStream.add_fragment context.stream substr in
       bytes_read
     else
@@ -185,15 +183,28 @@ let create_write_context_for_channel ~compression chan =
   WriteContext.create ~write:chan_write ~compression chan
 
 
+let rec loop_eintr f =
+  try
+    f ()
+  with Unix.Unix_error (Unix.EINTR, _, _) ->
+    loop_eintr f
+
+
 let create_read_context_for_fd ?(restart = true) ~compression fd =
   let unix_read fd' ~buf ~pos ~len =
-    Unix.read fd' ~restart ~buf ~pos ~len
+    if restart then
+      loop_eintr (fun () -> UnixLabels.read fd' ~buf ~pos ~len)
+    else
+      UnixLabels.read fd' ~buf ~pos ~len
   in
   ReadContext.create ~read:unix_read ~compression fd
 
 
 let create_read_context_for_channel ~compression chan =
-  ReadContext.create ~read:In_channel.input ~compression chan
+  let in_chan_read ic ~buf ~pos ~len =
+    Pervasives.input ic buf pos len
+  in
+  ReadContext.create ~read:in_chan_read ~compression chan
 
 
 let write_message_to_fd ?(restart = true) ~compression message fd =

@@ -283,10 +283,10 @@ let pass_by_pipe client_func server_func : int =
           ~output_fd:server_to_client_write
       in
 
-      let tp64_buf = Bytes.create 8 in
+      let tp64_buf = String.create 8 in
       let bytes_read = Unix.read client_to_server_read ~buf:tp64_buf in
       assert (bytes_read = 8);
-      let tp64 = EndianBytes.LittleEndian.get_int64 tp64_buf 0 in
+      let tp64 = EndianString.LittleEndian.get_int64 tp64_buf 0 in
       let throughput = throughput + (Int64.to_int_exn tp64) in
       Unix.close client_to_server_read;
       Unix.close server_to_client_write;

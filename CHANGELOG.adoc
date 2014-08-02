@@ -18,6 +18,7 @@
 * New module `IO`: functions for moving message data through various types of I/O
   channels.
 * Compiler now says something about files it created.
+* Corrected compilation errors when using 4.02 `-safe-string`.
 
 == capnp-ocaml 1.0.1
 
