@@ -62,18 +62,13 @@ let segment_shift = 32
 let segment_mask  = Int64.shift_left 0xffffffffL segment_shift
 
 let decode (pointer64 : Int64.t) : t =
-  let segment_id =
-    let max64  = Int64.of_int max_int in
-    let masked = Int64.bit_and pointer64 segment_mask in
-    let id64   = Int64.shift_right_logical masked segment_shift in
-    if Int64.compare id64 max64 > 0 then
-      Message.invalid_msg "far pointer contains segment ID larger than OCaml max_int"
-    else
-      Caml.Int64.to_int id64
-  in
   (* Int64 arithmetic causes unfortunate GC pressure.  If we're on a 64-bit
      platform, use standard 63-bit ints whenever possible. *)
   if Sys.word_size = 64 then
+    let segment_id =
+      let id64 = Int64.shift_right_logical pointer64 segment_shift in
+      Caml.Int64.to_int id64
+    in
     let pointer = Caml.Int64.to_int pointer64 in
     let landing_pad =
       if (pointer land landing_pad_type_mask_int) = 0 then
@@ -89,6 +84,15 @@ let decode (pointer64 : Int64.t) : t =
       segment_id;
     }
   else
+    let segment_id =
+      let max64 = Int64.of_int max_int in
+      (* Segment ID is left-aligned, no need to mask it *)
+      let id64 = Int64.shift_right_logical pointer64 segment_shift in
+      if Int64.compare id64 max64 > 0 then
+        Message.invalid_msg "far pointer contains segment ID larger than OCaml max_int"
+      else
+        Caml.Int64.to_int id64
+    in
     let landing_pad =
       let masked = Int64.bit_and pointer64 landing_pad_type_mask in
       if Int64.compare masked Int64.zero = 0 then

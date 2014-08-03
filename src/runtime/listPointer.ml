@@ -42,20 +42,20 @@ let count_mask  = Int64.shift_left 0x1fffffffL count_shift
 
 let decode (pointer64 : Int64.t) : t =
   let num_elements =
-    let masked  = Int64.bit_and pointer64 count_mask in
-    let count64 = Int64.shift_right_logical masked count_shift in
-    Caml.Int64.to_int count64
+    let shifted64 = Int64.shift_right_logical pointer64 count_shift in
+    (* The count is left-aligned in the field, no mask needed *)
+    Caml.Int64.to_int shifted64
   in
   (* Int64 arithmetic causes unfortunate GC pressure.  If we're on a 64-bit
      platform, use standard 63-bit ints whenever possible. *)
   if Sys.word_size = 64 then
-    let pointer = Caml.Int64.to_int pointer64 in
+    let pointer_int = Caml.Int64.to_int pointer64 in
     let offset =
-      let v = (pointer land offset_mask_int) lsr offset_shift in
+      let v = (pointer_int land offset_mask_int) lsr offset_shift in
       Util.decode_signed 30 v
     in
     let element_type =
-      let tp = (pointer land type_mask_int) lsr type_shift in
+      let tp = (pointer_int land type_mask_int) lsr type_shift in
       match tp with
       | 0 -> Void
       | 1 -> OneBitValue

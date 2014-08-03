@@ -83,8 +83,8 @@ let decode_pointer (pointer_bytes : 'cap Slice.t) : Pointer.t =
   if Util.is_int64_zero pointer64 then
     Pointer.Null
   else
-    let tag_bits = Caml.Int64.to_int pointer64 in
-    let tag = tag_bits land Pointer.Bitfield.tag_mask in
+    let pointer_int = Caml.Int64.to_int pointer64 in
+    let tag = pointer_int land Pointer.Bitfield.tag_mask in
     (* OCaml won't match an int against let-bound variables,
        only against constants. *)
     match tag with

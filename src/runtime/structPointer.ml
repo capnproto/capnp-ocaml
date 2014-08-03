@@ -54,14 +54,13 @@ let data_size_shift    = 32
 let data_size_mask     = Int64.shift_left 0xffffL data_size_shift
 let data_size_mask_int = 0xffff lsl data_size_shift
 
-let pointers_size_shift    = 48
-let pointers_size_mask_int = 0xffff
+let pointers_size_shift = 48
 
 let decode (pointer64 : Int64.t) : t =
   let pointers_size =
-    let shifted = Int64.shift_right_logical pointer64 pointers_size_shift in
-    let shifted_int = Caml.Int64.to_int shifted in
-    shifted_int land pointers_size_mask_int
+    let shifted64 = Int64.shift_right_logical pointer64 pointers_size_shift in
+    (* pointers size is left-aligned, no need to mask it *)
+    Caml.Int64.to_int shifted64
   in
   (* Int64 arithmetic causes unfortunate GC pressure.  If we're on a 64-bit
      platform, use standard 63-bit ints whenever possible. *)
