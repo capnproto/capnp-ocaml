@@ -29,6 +29,7 @@
 
 open Core.Std
 open OUnit2
+module Quickcheck = Core_extended.Quickcheck
 
 
 let expect_packs_to unpacked packed =
