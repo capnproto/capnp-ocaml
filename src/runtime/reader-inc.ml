@@ -426,10 +426,10 @@ let get_list
     (struct_storage_opt : 'cap StructStorage.t option)
     (pointer_word : int)
   : (ro, 'a, 'cap ListStorage.t) InnerArray.t =
-  let make_default () =
-    begin match default with
+  let make_default default' decoders' =
+    begin match default' with
     | Some default_storage ->
-        make_array_readonly default_storage decoders
+        make_array_readonly default_storage decoders'
     | None ->
         (* Empty array *)
         { InnerArray.length     = 0;
@@ -454,11 +454,11 @@ let get_list
         | Some list_storage ->
             make_array_readonly list_storage decoders
         | None ->
-            make_default ()
+            make_default default decoders
       else
-        make_default ()
+        make_default default decoders
   | None ->
-      make_default ()
+      make_default default decoders
 
 let get_void_list
     ?(default : ro ListStorage.t option)
