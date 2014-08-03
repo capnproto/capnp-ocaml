@@ -355,156 +355,230 @@ module Make (MessageWrapper : MessageSig.S) = struct
       Slice.len = byte_count;
     } in
     let length = list_storage.ListStorage.num_elements in
-    let get_unsafe =
-      match list_storage.ListStorage.storage_type with
-      | ListStorageType.Empty ->
-          begin match decoders with
-          | ListDecoders.Empty decode ->
-              fun ls i -> decode ()
-          | _ ->
-              invalid_msg
-                "decoded List<Void> where a different list type was expected"
-          end
-      | ListStorageType.Bit ->
-          begin match decoders with
-          | ListDecoders.Bit decode ->
-              fun ls i ->
-                let byte_ofs = i / 8 in
-                let bit_ofs  = i mod 8 in
-                let byte_val =
-                  Slice.get_uint8 ls.ListStorage.storage byte_ofs
-                in
-                decode ((byte_val land (1 lsl bit_ofs)) <> 0)
-          | _ ->
-              invalid_msg
-                "decoded List<Bool> where a different list type was expected"
-          end
-      | ListStorageType.Bytes1 ->
-          begin match decoders with
-          | ListDecoders.Bytes1 decode
-          | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
-              fun ls i -> decode (make_element_slice ls i 1)
-          | _ ->
-              invalid_msg
-                "decoded List<1 byte> where a different list type was expected"
-          end
-      | ListStorageType.Bytes2 ->
-          begin match decoders with
-          | ListDecoders.Bytes2 decode
-          | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
-              fun ls i -> decode (make_element_slice ls i 2)
-          | _ ->
-              invalid_msg
-                "decoded List<2 byte> where a different list type was expected"
-          end
-      | ListStorageType.Bytes4 ->
-          begin match decoders with
-          | ListDecoders.Bytes4 decode
-          | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
-              fun ls i -> decode (make_element_slice ls i 4)
-          | _ ->
-              invalid_msg
-                "decoded List<4 byte> where a different list type was expected"
-          end
-      | ListStorageType.Bytes8 ->
-          begin match decoders with
-          | ListDecoders.Bytes8 decode
-          | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
-              fun ls i -> decode (make_element_slice ls i 8)
-          | _ ->
-              invalid_msg
-                "decoded List<8 byte> where a different list type was expected"
-          end
-      | ListStorageType.Pointer ->
-          begin match decoders with
-          | ListDecoders.Pointer decode
-          | ListDecoders.Struct { ListDecoders.pointer = decode; _ } ->
-              fun ls i ->
-                decode (make_element_slice ls i sizeof_uint64)
-          | _ ->
-              invalid_msg
-                "decoded List<pointer> a different list type was expected"
-          end
-      | ListStorageType.Composite (data_words, pointer_words) ->
-          let data_size     = data_words * sizeof_uint64 in
-          let pointers_size = pointer_words * sizeof_uint64 in
-          let make_storage ls i ~data_size ~pointers_size =
-            let total_size = data_size + pointers_size in
-            (* Skip over the composite tag word *)
-            let content_offset =
-              ls.ListStorage.storage.Slice.start + sizeof_uint64
-            in
-            let data = {
-              ls.ListStorage.storage with
-              Slice.start = content_offset + (i * total_size);
-              Slice.len = data_size;
-            } in
-            let pointers = {
-              data with
-              Slice.start = Slice.get_end data;
-              Slice.len   = pointers_size;
-            } in
-            { StructStorage.data; StructStorage.pointers; }
+    (* Note: the following is attempting to strike a balance between
+     * (1) building InnerArray.get_unsafe closures that do as little work as
+     *     possible and
+     * (2) making the closure calling convention as efficient as possible.
+     *
+     * A naive implementation of this getter can result in quite slow code. *)
+    match list_storage.ListStorage.storage_type with
+    | ListStorageType.Empty ->
+        begin match decoders with
+        | ListDecoders.Empty decode ->
+            let ro_get_unsafe_void ls i = decode () in {
+              InnerArray.length;
+              InnerArray.init = InnerArray.invalid_init;
+              InnerArray.get_unsafe = ro_get_unsafe_void;
+              InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+              InnerArray.storage = Some list_storage;
+            }
+        | _ ->
+            invalid_msg
+              "decoded List<Void> where a different list type was expected"
+        end
+    | ListStorageType.Bit ->
+        begin match decoders with
+        | ListDecoders.Bit decode ->
+            let ro_get_unsafe_bool ls i =
+              let byte_ofs = i / 8 in
+              let bit_ofs  = i mod 8 in
+              let byte_val =
+                Slice.get_uint8 ls.ListStorage.storage byte_ofs
+              in
+              decode ((byte_val land (1 lsl bit_ofs)) <> 0)
+            in {
+              InnerArray.length;
+              InnerArray.init = InnerArray.invalid_init;
+              InnerArray.get_unsafe = ro_get_unsafe_bool;
+              InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+              InnerArray.storage = Some list_storage;
+            }
+        | _ ->
+            invalid_msg
+              "decoded List<Bool> where a different list type was expected"
+        end
+    | ListStorageType.Bytes1 ->
+        begin match decoders with
+        | ListDecoders.Bytes1 decode
+        | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
+            let ro_get_unsafe_bytes1 ls i = decode (make_element_slice ls i 1) in {
+              InnerArray.length;
+              InnerArray.init = InnerArray.invalid_init;
+              InnerArray.get_unsafe = ro_get_unsafe_bytes1;
+              InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+              InnerArray.storage = Some list_storage;
+            }
+        | _ ->
+            invalid_msg
+              "decoded List<1 byte> where a different list type was expected"
+        end
+    | ListStorageType.Bytes2 ->
+        begin match decoders with
+        | ListDecoders.Bytes2 decode
+        | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
+            let ro_get_unsafe_bytes2 ls i = decode (make_element_slice ls i 2) in {
+              InnerArray.length;
+              InnerArray.init = InnerArray.invalid_init;
+              InnerArray.get_unsafe = ro_get_unsafe_bytes2;
+              InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+              InnerArray.storage = Some list_storage;
+            }
+        | _ ->
+            invalid_msg
+              "decoded List<2 byte> where a different list type was expected"
+        end
+    | ListStorageType.Bytes4 ->
+        begin match decoders with
+        | ListDecoders.Bytes4 decode
+        | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
+            let ro_get_unsafe_bytes4 ls i = decode (make_element_slice ls i 4) in {
+              InnerArray.length;
+              InnerArray.init = InnerArray.invalid_init;
+              InnerArray.get_unsafe = ro_get_unsafe_bytes4;
+              InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+              InnerArray.storage = Some list_storage;
+            }
+        | _ ->
+            invalid_msg
+              "decoded List<4 byte> where a different list type was expected"
+        end
+    | ListStorageType.Bytes8 ->
+        begin match decoders with
+        | ListDecoders.Bytes8 decode
+        | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
+            let ro_get_unsafe_bytes8 ls i = decode (make_element_slice ls i 8) in {
+              InnerArray.length;
+              InnerArray.init = InnerArray.invalid_init;
+              InnerArray.get_unsafe = ro_get_unsafe_bytes8;
+              InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+              InnerArray.storage = Some list_storage;
+            }
+        | _ ->
+            invalid_msg
+              "decoded List<8 byte> where a different list type was expected"
+        end
+    | ListStorageType.Pointer ->
+        begin match decoders with
+        | ListDecoders.Pointer decode
+        | ListDecoders.Struct { ListDecoders.pointer = decode; _ } ->
+            let ro_get_unsafe_pointer ls i = decode (make_element_slice ls i sizeof_uint64) in {
+              InnerArray.length;
+              InnerArray.init = InnerArray.invalid_init;
+              InnerArray.get_unsafe = ro_get_unsafe_pointer;
+              InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+              InnerArray.storage = Some list_storage;
+            }
+        | _ ->
+            invalid_msg
+              "decoded List<pointer> a different list type was expected"
+        end
+    | ListStorageType.Composite (data_words, pointer_words) ->
+        let data_size     = data_words * sizeof_uint64 in
+        let pointers_size = pointer_words * sizeof_uint64 in
+        let make_storage ls i ~data_size ~pointers_size =
+          let total_size = data_size + pointers_size in
+          (* Skip over the composite tag word *)
+          let content_offset =
+            ls.ListStorage.storage.Slice.start + sizeof_uint64
           in
-          let make_bytes_handler ~size ~decode =
+          let data = {
+            ls.ListStorage.storage with
+            Slice.start = content_offset + (i * total_size);
+            Slice.len = data_size;
+          } in
+          let pointers = {
+            data with
+            Slice.start = Slice.get_end data;
+            Slice.len   = pointers_size;
+          } in
+          { StructStorage.data; StructStorage.pointers; }
+        in
+        let make_bytes_handler ~size ~decode =
+          if data_words = 0 then
+            invalid_msg
+              "decoded List<composite> with empty data region where data was expected"
+          else
+            let ro_get_unsafe_composite_bytes ls i =
+              let struct_storage = make_storage ls i ~data_size ~pointers_size in
+              let slice = {
+                struct_storage.StructStorage.data with
+                Slice.len = size
+              } in
+              decode slice
+            in {
+              InnerArray.length;
+              InnerArray.init = InnerArray.invalid_init;
+              InnerArray.get_unsafe = ro_get_unsafe_composite_bytes;
+              InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+              InnerArray.storage = Some list_storage;
+            }
+        in
+        begin match decoders with
+        | ListDecoders.Empty decode ->
+            let ro_get_unsafe_composite_void ls i = decode () in {
+              InnerArray.length;
+              InnerArray.init = InnerArray.invalid_init;
+              InnerArray.get_unsafe = ro_get_unsafe_composite_void;
+              InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+              InnerArray.storage = Some list_storage;
+            }
+        | ListDecoders.Bit decode ->
             if data_words = 0 then
               invalid_msg
                 "decoded List<composite> with empty data region where data was expected"
             else
-              (fun ls i ->
-                 let struct_storage = make_storage ls i ~data_size ~pointers_size in
-                 let slice = {
-                   struct_storage.StructStorage.data with
-                   Slice.len = size
-                 } in
-                 decode slice)
-          in
-          begin match decoders with
-          | ListDecoders.Empty decode ->
-              fun ls i -> decode ()
-          | ListDecoders.Bit decode ->
-              if data_words = 0 then
-                invalid_msg
-                  "decoded List<composite> with empty data region where data was expected"
-              else
-                fun ls i ->
-                  let struct_storage = make_storage ls i ~data_size ~pointers_size in
-                  let first_byte = Slice.get_uint8 struct_storage.StructStorage.data 0 in
-                  let is_set = (first_byte land 0x1) <> 0 in
-                  decode is_set
-          | ListDecoders.Bytes1 decode ->
-              make_bytes_handler ~size:1 ~decode
-          | ListDecoders.Bytes2 decode ->
-              make_bytes_handler ~size:2 ~decode
-          | ListDecoders.Bytes4 decode ->
-              make_bytes_handler ~size:4 ~decode
-          | ListDecoders.Bytes8 decode ->
-              make_bytes_handler ~size:8 ~decode
-          | ListDecoders.Pointer decode ->
-              if pointer_words = 0 then
-                invalid_msg
-                  "decoded List<composite> with empty pointers region where \
-                   pointers were expected"
-              else
-                (fun ls i ->
-                   let struct_storage = make_storage ls i ~data_size ~pointers_size in
-                   let slice = {
-                     struct_storage.StructStorage.pointers with
-                     Slice.len = sizeof_uint64
-                   } in
-                   decode slice)
-          | ListDecoders.Struct struct_decoders ->
-              fun ls i ->
+              let ro_get_unsafe_composite_bool ls i =
                 let struct_storage = make_storage ls i ~data_size ~pointers_size in
-                struct_decoders.ListDecoders.composite struct_storage
-          end
-    in {
-      InnerArray.length;
-      InnerArray.init = InnerArray.invalid_init;
-      InnerArray.get_unsafe;
-      InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
-      InnerArray.storage = Some list_storage;
-    }
+                let first_byte = Slice.get_uint8 struct_storage.StructStorage.data 0 in
+                let is_set = (first_byte land 0x1) <> 0 in
+                decode is_set
+              in {
+                InnerArray.length;
+                InnerArray.init = InnerArray.invalid_init;
+                InnerArray.get_unsafe = ro_get_unsafe_composite_bool;
+                InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                InnerArray.storage = Some list_storage;
+              }
+        | ListDecoders.Bytes1 decode ->
+            make_bytes_handler ~size:1 ~decode
+        | ListDecoders.Bytes2 decode ->
+            make_bytes_handler ~size:2 ~decode
+        | ListDecoders.Bytes4 decode ->
+            make_bytes_handler ~size:4 ~decode
+        | ListDecoders.Bytes8 decode ->
+            make_bytes_handler ~size:8 ~decode
+        | ListDecoders.Pointer decode ->
+            if pointer_words = 0 then
+              invalid_msg
+                "decoded List<composite> with empty pointers region where \
+                 pointers were expected"
+            else
+              let ro_get_unsafe_composite_pointer ls i =
+                let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                let slice = {
+                  struct_storage.StructStorage.pointers with
+                  Slice.len = sizeof_uint64
+                } in
+                decode slice
+              in {
+                InnerArray.length;
+                InnerArray.init = InnerArray.invalid_init;
+                InnerArray.get_unsafe = ro_get_unsafe_composite_pointer;
+                InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                InnerArray.storage = Some list_storage;
+              }
+        | ListDecoders.Struct struct_decoders ->
+            let ro_get_unsafe_composite_struct ls i =
+              let struct_storage = make_storage ls i ~data_size ~pointers_size in
+              struct_decoders.ListDecoders.composite struct_storage
+            in {
+              InnerArray.length;
+              InnerArray.init = InnerArray.invalid_init;
+              InnerArray.get_unsafe = ro_get_unsafe_composite_struct;
+              InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+              InnerArray.storage = Some list_storage;
+            }
+        end
 
 
   let make_array_readwrite
@@ -518,222 +592,284 @@ module Make (MessageWrapper : MessageSig.S) = struct
       Slice.len = byte_count;
     } in
     let length = list_storage.ListStorage.num_elements in
-    let get_unsafe, set_unsafe =
-      match list_storage.ListStorage.storage_type with
-      | ListStorageType.Empty ->
-          begin match codecs with
-          | ListCodecs.Empty (decode, encode) ->
-              let get ls i = decode () in
-              let set ls i v = encode v in
-              (get, set)
-          | _ ->
-              invalid_msg
-                "decoded List<Void> where a different list type was expected"
-          end
-      | ListStorageType.Bit ->
-          begin match codecs with
-          | ListCodecs.Bit (decode, encode) ->
-              let get ls i =
-                let byte_ofs = i / 8 in
-                let bit_ofs  = i mod 8 in
-                let byte_val =
-                  Slice.get_uint8 ls.ListStorage.storage byte_ofs
-                in
-                decode ((byte_val land (1 lsl bit_ofs)) <> 0)
+    (* Note: the following is attempting to strike a balance between
+     * (1) building InnerArray.get_unsafe/set_unsafe closures that do as little
+     *     work as possible and
+     * (2) making the closure calling convention as efficient as possible.
+     *
+     * A naive implementation of these accessors can result in quite slow code. *)
+    match list_storage.ListStorage.storage_type with
+    | ListStorageType.Empty ->
+        begin match codecs with
+        | ListCodecs.Empty (decode, encode) ->
+            let rw_get_unsafe_void ls i = decode () in
+            let rw_set_unsafe_void ls i v = encode v in {
+              InnerArray.length;
+              InnerArray.init;
+              InnerArray.get_unsafe = rw_get_unsafe_void;
+              InnerArray.set_unsafe = rw_set_unsafe_void;
+              InnerArray.storage = Some list_storage;
+            }
+        | _ ->
+            invalid_msg
+              "decoded List<Void> where a different list type was expected"
+        end
+    | ListStorageType.Bit ->
+        begin match codecs with
+        | ListCodecs.Bit (decode, encode) ->
+            let rw_get_unsafe_bool ls i =
+              let byte_ofs = i / 8 in
+              let bit_ofs  = i mod 8 in
+              let byte_val =
+                Slice.get_uint8 ls.ListStorage.storage byte_ofs
               in
-              let set ls i v =
-                let byte_ofs = i / 8 in
-                let bit_ofs  = i mod 8 in
-                let bitmask  = 1 lsl bit_ofs in
-                let old_byte_val =
-                  Slice.get_uint8 ls.ListStorage.storage byte_ofs
-                in
-                let new_byte_val =
-                  if encode v then
-                    old_byte_val lor bitmask
-                  else
-                    old_byte_val land (lnot bitmask)
-                in
-                Slice.set_uint8 ls.ListStorage.storage byte_ofs new_byte_val
-              in
-              (get, set)
-          | _ ->
-              invalid_msg
-                "decoded List<Bool> where a different list type was expected"
-          end
-      | ListStorageType.Bytes1 ->
-          begin match codecs with
-          | ListCodecs.Bytes1 (decode, encode)
-          | ListCodecs.Struct { ListCodecs.bytes = (decode, encode); _ } ->
-              let get ls i = decode (make_element_slice ls i 1) in
-              let set ls i v = encode v (make_element_slice ls i 1) in
-              (get, set)
-          | _ ->
-              invalid_msg
-                "decoded List<1 byte> where a different list type was expected"
-          end
-      | ListStorageType.Bytes2 ->
-          begin match codecs with
-          | ListCodecs.Bytes2 (decode, encode)
-          | ListCodecs.Struct { ListCodecs.bytes = (decode, encode); _ } ->
-              let get ls i = decode (make_element_slice ls i 2) in
-              let set ls i v = encode v (make_element_slice ls i 2) in
-              (get, set)
-          | _ ->
-              invalid_msg
-                "decoded List<2 byte> where a different list type was expected"
-          end
-      | ListStorageType.Bytes4 ->
-          begin match codecs with
-          | ListCodecs.Bytes4 (decode, encode)
-          | ListCodecs.Struct { ListCodecs.bytes = (decode, encode); _ } ->
-              let get ls i = decode (make_element_slice ls i 4) in
-              let set ls i v = encode v (make_element_slice ls i 4) in
-              (get, set)
-          | _ ->
-              invalid_msg
-                "decoded List<4 byte> where a different list type was expected"
-          end
-      | ListStorageType.Bytes8 ->
-          begin match codecs with
-          | ListCodecs.Bytes8 (decode, encode)
-          | ListCodecs.Struct { ListCodecs.bytes = (decode, encode); _ } ->
-              let get ls i = decode (make_element_slice ls i 8) in
-              let set ls i v = encode v (make_element_slice ls i 8) in
-              (get, set)
-          | _ ->
-              invalid_msg
-                "decoded List<8 byte> where a different list type was expected"
-          end
-      | ListStorageType.Pointer ->
-          begin match codecs with
-          | ListCodecs.Pointer (decode, encode)
-          | ListCodecs.Struct { ListCodecs.pointer = (decode, encode); _ } ->
-              let get ls i = decode (make_element_slice ls i sizeof_uint64) in
-              let set ls i v = encode v (make_element_slice ls i sizeof_uint64) in
-              (get, set)
-          | _ ->
-              invalid_msg
-                "decoded List<pointer> where a different list type was expected"
-          end
-      | ListStorageType.Composite (data_words, pointer_words) ->
-          let data_size     = data_words * sizeof_uint64 in
-          let pointers_size = pointer_words * sizeof_uint64 in
-          let make_storage ls i ~data_size ~pointers_size =
-            let total_size    = data_size + pointers_size in
-            (* Skip over the composite tag word *)
-            let content_offset =
-              ls.ListStorage.storage.Slice.start + sizeof_uint64
+              decode ((byte_val land (1 lsl bit_ofs)) <> 0)
             in
-            let data = {
-              ls.ListStorage.storage with
-              Slice.start = content_offset + (i * total_size);
-              Slice.len = data_size;
-            } in
-            let pointers = {
-              data with
-              Slice.start = Slice.get_end data;
-              Slice.len   = pointers_size;
-            } in
-            { StructStorage.data; StructStorage.pointers; }
+            let rw_set_unsafe_bool ls i v =
+              let byte_ofs = i / 8 in
+              let bit_ofs  = i mod 8 in
+              let bitmask  = 1 lsl bit_ofs in
+              let old_byte_val =
+                Slice.get_uint8 ls.ListStorage.storage byte_ofs
+              in
+              let new_byte_val =
+                if encode v then
+                  old_byte_val lor bitmask
+                else
+                  old_byte_val land (lnot bitmask)
+              in
+              Slice.set_uint8 ls.ListStorage.storage byte_ofs new_byte_val
+            in {
+              InnerArray.length;
+              InnerArray.init;
+              InnerArray.get_unsafe = rw_get_unsafe_bool;
+              InnerArray.set_unsafe = rw_set_unsafe_bool;
+              InnerArray.storage = Some list_storage;
+            }
+        | _ ->
+            invalid_msg
+              "decoded List<Bool> where a different list type was expected"
+        end
+    | ListStorageType.Bytes1 ->
+        begin match codecs with
+        | ListCodecs.Bytes1 (decode, encode)
+        | ListCodecs.Struct { ListCodecs.bytes = (decode, encode); _ } ->
+            let rw_get_unsafe_bytes1 ls i = decode (make_element_slice ls i 1) in
+            let rw_set_unsafe_bytes1 ls i v = encode v (make_element_slice ls i 1) in {
+              InnerArray.length;
+              InnerArray.init;
+              InnerArray.get_unsafe = rw_get_unsafe_bytes1;
+              InnerArray.set_unsafe = rw_set_unsafe_bytes1;
+              InnerArray.storage = Some list_storage;
+            }
+        | _ ->
+            invalid_msg
+              "decoded List<1 byte> where a different list type was expected"
+        end
+    | ListStorageType.Bytes2 ->
+        begin match codecs with
+        | ListCodecs.Bytes2 (decode, encode)
+        | ListCodecs.Struct { ListCodecs.bytes = (decode, encode); _ } ->
+            let rw_get_unsafe_bytes2 ls i = decode (make_element_slice ls i 2) in
+            let rw_set_unsafe_bytes2 ls i v = encode v (make_element_slice ls i 2) in {
+              InnerArray.length;
+              InnerArray.init;
+              InnerArray.get_unsafe = rw_get_unsafe_bytes2;
+              InnerArray.set_unsafe = rw_set_unsafe_bytes2;
+              InnerArray.storage = Some list_storage;
+            }
+        | _ ->
+            invalid_msg
+              "decoded List<2 byte> where a different list type was expected"
+        end
+    | ListStorageType.Bytes4 ->
+        begin match codecs with
+        | ListCodecs.Bytes4 (decode, encode)
+        | ListCodecs.Struct { ListCodecs.bytes = (decode, encode); _ } ->
+            let rw_get_unsafe_bytes4 ls i = decode (make_element_slice ls i 4) in
+            let rw_set_unsafe_bytes4 ls i v = encode v (make_element_slice ls i 4) in {
+              InnerArray.length;
+              InnerArray.init;
+              InnerArray.get_unsafe = rw_get_unsafe_bytes4;
+              InnerArray.set_unsafe = rw_set_unsafe_bytes4;
+              InnerArray.storage = Some list_storage;
+            }
+        | _ ->
+            invalid_msg
+              "decoded List<4 byte> where a different list type was expected"
+        end
+    | ListStorageType.Bytes8 ->
+        begin match codecs with
+        | ListCodecs.Bytes8 (decode, encode)
+        | ListCodecs.Struct { ListCodecs.bytes = (decode, encode); _ } ->
+            let rw_get_unsafe_bytes8 ls i = decode (make_element_slice ls i 8) in
+            let rw_set_unsafe_bytes8 ls i v = encode v (make_element_slice ls i 8) in {
+              InnerArray.length;
+              InnerArray.init;
+              InnerArray.get_unsafe = rw_get_unsafe_bytes8;
+              InnerArray.set_unsafe = rw_set_unsafe_bytes8;
+              InnerArray.storage = Some list_storage;
+            }
+        | _ ->
+            invalid_msg
+              "decoded List<8 byte> where a different list type was expected"
+        end
+    | ListStorageType.Pointer ->
+        begin match codecs with
+        | ListCodecs.Pointer (decode, encode)
+        | ListCodecs.Struct { ListCodecs.pointer = (decode, encode); _ } ->
+            let rw_get_unsafe_ptr ls i =
+              decode (make_element_slice ls i sizeof_uint64)
+            in
+            let rw_set_unsafe_ptr ls i v =
+              encode v (make_element_slice ls i sizeof_uint64)
+            in {
+              InnerArray.length;
+              InnerArray.init;
+              InnerArray.get_unsafe = rw_get_unsafe_ptr;
+              InnerArray.set_unsafe = rw_set_unsafe_ptr;
+              InnerArray.storage = Some list_storage;
+            }
+        | _ ->
+            invalid_msg
+              "decoded List<pointer> where a different list type was expected"
+        end
+    | ListStorageType.Composite (data_words, pointer_words) ->
+        let data_size     = data_words * sizeof_uint64 in
+        let pointers_size = pointer_words * sizeof_uint64 in
+        let make_storage ls i ~data_size ~pointers_size =
+          let total_size    = data_size + pointers_size in
+          (* Skip over the composite tag word *)
+          let content_offset =
+            ls.ListStorage.storage.Slice.start + sizeof_uint64
           in
-          let make_bytes_handlers ~size ~decode ~encode =
+          let data = {
+            ls.ListStorage.storage with
+            Slice.start = content_offset + (i * total_size);
+            Slice.len = data_size;
+          } in
+          let pointers = {
+            data with
+            Slice.start = Slice.get_end data;
+            Slice.len   = pointers_size;
+          } in
+          { StructStorage.data; StructStorage.pointers; }
+        in
+        let make_bytes_handlers ~size ~decode ~encode =
+          if data_words = 0 then
+            invalid_msg
+              "decoded List<composite> with empty data region where data was expected"
+          else
+            let rw_get_unsafe_composite_bytes ls i =
+              let struct_storage = make_storage ls i ~data_size ~pointers_size in
+              let slice = {
+                struct_storage.StructStorage.data with
+                Slice.len = size
+              } in
+              decode slice
+            in
+            let rw_set_unsafe_composite_bytes ls i v =
+              let struct_storage = make_storage ls i ~data_size ~pointers_size in
+              let slice = {
+                struct_storage.StructStorage.data with
+                Slice.len = size
+              } in
+              encode v slice
+            in {
+              InnerArray.length;
+              InnerArray.init;
+              InnerArray.get_unsafe = rw_get_unsafe_composite_bytes;
+              InnerArray.set_unsafe = rw_set_unsafe_composite_bytes;
+              InnerArray.storage = Some list_storage;
+            }
+        in
+        begin match codecs with
+        | ListCodecs.Empty (decode, encode) ->
+            let rw_get_unsafe_composite_void ls i = decode () in
+            let rw_set_unsafe_composite_void ls i v = encode v in {
+              InnerArray.length;
+              InnerArray.init;
+              InnerArray.get_unsafe = rw_get_unsafe_composite_void;
+              InnerArray.set_unsafe = rw_set_unsafe_composite_void;
+              InnerArray.storage = Some list_storage;
+            }
+        | ListCodecs.Bit (decode, encode) ->
             if data_words = 0 then
               invalid_msg
                 "decoded List<composite> with empty data region where data was expected"
             else
-              let get ls i =
+              let rw_get_unsafe_composite_bool ls i =
+                let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                let first_byte = Slice.get_uint8 struct_storage.StructStorage.data 0 in
+                let is_set = (first_byte land 0x1) <> 0 in
+                decode is_set
+              in
+              let rw_set_unsafe_composite_bool ls i v =
+                let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                let first_byte =
+                  Slice.get_uint8 struct_storage.StructStorage.data 0
+                in
+                let first_byte =
+                  if encode v then first_byte lor 0x1 else first_byte land 0xfe
+                in
+                Slice.set_uint8 struct_storage.StructStorage.data 0 first_byte
+              in {
+                InnerArray.length;
+                InnerArray.init;
+                InnerArray.get_unsafe = rw_get_unsafe_composite_bool;
+                InnerArray.set_unsafe = rw_set_unsafe_composite_bool;
+                InnerArray.storage = Some list_storage;
+              }
+        | ListCodecs.Bytes1 (decode, encode) ->
+            make_bytes_handlers ~size:1 ~decode ~encode
+        | ListCodecs.Bytes2 (decode, encode) ->
+            make_bytes_handlers ~size:2 ~decode ~encode
+        | ListCodecs.Bytes4 (decode, encode) ->
+            make_bytes_handlers ~size:4 ~decode ~encode
+        | ListCodecs.Bytes8 (decode, encode) ->
+            make_bytes_handlers ~size:8 ~decode ~encode
+        | ListCodecs.Pointer (decode, encode) ->
+            if pointer_words = 0 then
+              invalid_msg
+                "decoded List<composite> with empty pointers region where \
+                 pointers were expected"
+            else
+              let rw_get_unsafe_composite_ptr ls i =
                 let struct_storage = make_storage ls i ~data_size ~pointers_size in
                 let slice = {
-                  struct_storage.StructStorage.data with
-                  Slice.len = size
+                  struct_storage.StructStorage.pointers with
+                  Slice.len = sizeof_uint64
                 } in
                 decode slice
               in
-              let set ls i v =
+              let rw_set_unsafe_composite_ptr ls i v =
                 let struct_storage = make_storage ls i ~data_size ~pointers_size in
                 let slice = {
-                  struct_storage.StructStorage.data with
-                  Slice.len = size
+                  struct_storage.StructStorage.pointers with
+                  Slice.len = sizeof_uint64
                 } in
                 encode v slice
-              in
-              (get, set)
-          in
-          begin match codecs with
-          | ListCodecs.Empty (decode, encode) ->
-              let get ls i   = decode () in
-              let set ls i v = encode v in
-              (get, set)
-          | ListCodecs.Bit (decode, encode) ->
-              if data_words = 0 then
-                invalid_msg
-                  "decoded List<composite> with empty data region where data was expected"
-              else
-                let get ls i =
-                  let struct_storage = make_storage ls i ~data_size ~pointers_size in
-                  let first_byte = Slice.get_uint8 struct_storage.StructStorage.data 0 in
-                  let is_set = (first_byte land 0x1) <> 0 in
-                  decode is_set
-                in
-                let set ls i v =
-                  let struct_storage = make_storage ls i ~data_size ~pointers_size in
-                  let first_byte =
-                    Slice.get_uint8 struct_storage.StructStorage.data 0
-                  in
-                  let first_byte =
-                    if encode v then first_byte lor 0x1 else first_byte land 0xfe
-                  in
-                  Slice.set_uint8 struct_storage.StructStorage.data 0 first_byte
-                in
-                (get, set)
-          | ListCodecs.Bytes1 (decode, encode) ->
-              make_bytes_handlers ~size:1 ~decode ~encode
-          | ListCodecs.Bytes2 (decode, encode) ->
-              make_bytes_handlers ~size:2 ~decode ~encode
-          | ListCodecs.Bytes4 (decode, encode) ->
-              make_bytes_handlers ~size:4 ~decode ~encode
-          | ListCodecs.Bytes8 (decode, encode) ->
-              make_bytes_handlers ~size:8 ~decode ~encode
-          | ListCodecs.Pointer (decode, encode) ->
-              if pointer_words = 0 then
-                invalid_msg
-                  "decoded List<composite> with empty pointers region where \
-                   pointers were expected"
-              else
-                let get ls i =
-                  let struct_storage = make_storage ls i ~data_size ~pointers_size in
-                  let slice = {
-                    struct_storage.StructStorage.pointers with
-                    Slice.len = sizeof_uint64
-                  } in
-                  decode slice
-                in
-                let set ls i v =
-                  let struct_storage = make_storage ls i ~data_size ~pointers_size in
-                  let slice = {
-                    struct_storage.StructStorage.pointers with
-                    Slice.len = sizeof_uint64
-                  } in
-                  encode v slice
-                in
-                (get, set)
-          | ListCodecs.Struct { ListCodecs.composite = (decode, encode); _ } ->
-              let get ls i =
-                decode (make_storage ls i ~data_size ~pointers_size)
-              in
-              let set ls i v =
-                encode v (make_storage ls i ~data_size ~pointers_size)
-              in
-              (get, set)
-          end
-    in {
-      InnerArray.length;
-      InnerArray.init;
-      InnerArray.get_unsafe;
-      InnerArray.set_unsafe;
-      InnerArray.storage = Some list_storage;
-    }
+              in {
+                InnerArray.length;
+                InnerArray.init;
+                InnerArray.get_unsafe = rw_get_unsafe_composite_ptr;
+                InnerArray.set_unsafe = rw_set_unsafe_composite_ptr;
+                InnerArray.storage = Some list_storage;
+              }
+        | ListCodecs.Struct { ListCodecs.composite = (decode, encode); _ } ->
+            let rw_get_unsafe_composite_struct ls i =
+              decode (make_storage ls i ~data_size ~pointers_size)
+            in
+            let rw_set_unsafe_composite_struct ls i v =
+              encode v (make_storage ls i ~data_size ~pointers_size)
+            in {
+              InnerArray.length;
+              InnerArray.init;
+              InnerArray.get_unsafe = rw_get_unsafe_composite_struct;
+              InnerArray.set_unsafe = rw_set_unsafe_composite_struct;
+              InnerArray.storage = Some list_storage;
+            }
+        end
 
 
   (* Given list storage which is expected to contain UInt8 data, decode the data as
