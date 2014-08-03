@@ -351,63 +351,80 @@ let get_float64
  * METHODS FOR GETTING OBJECTS STORED BY POINTER
  *******************************************************************************)
 
-(* Given storage for a struct, attempt to get the bytes associated
-   with the struct-relative pointer index. *)
-let get_pointer_bytes
+let has_field
     (struct_storage_opt : 'cap StructStorage.t option)
     (pointer_word : int)
-  : 'cap Slice.t option =
+  : bool =
   match struct_storage_opt with
   | Some struct_storage ->
-      ss_get_pointer struct_storage pointer_word
-  | None ->
-      None
-
-
-let has_field
-    (pointer_opt : 'cap Slice.t option)
-  : bool =
-  match pointer_opt with
-  | Some pointer_bytes ->
-      let ptr_val = Slice.get_int64 pointer_bytes 0 in
-      not (Util.is_int64_zero ptr_val)
+      let pointers = struct_storage.StructStorage.pointers in
+      let start = pointer_word * sizeof_uint64 in
+      let len   = sizeof_uint64 in
+      if start + len <= pointers.Slice.len then
+        let pointer64 = Slice.get_int64 pointers start in
+        not (Util.is_int64_zero pointer64)
+      else
+        false
   | None ->
       false
 
 let get_text
     ~(default : string)
-    (pointer_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (pointer_word : int)
   : string =
-  match pointer_opt with
-  | Some pointer_bytes ->
-      begin match deref_list_pointer pointer_bytes with
-      | Some list_storage ->
-          string_of_uint8_list ~null_terminated:true list_storage
-      | None ->
-          default
-      end
+  match struct_storage_opt with
+  | Some struct_storage ->
+      let pointers = struct_storage.StructStorage.pointers in
+      let start = pointer_word * sizeof_uint64 in
+      let len   = sizeof_uint64 in
+      if start + len <= pointers.Slice.len then
+        let pointer_bytes = {
+          pointers with
+          Slice.start = pointers.Slice.start + start;
+          Slice.len   = len;
+        } in
+        match deref_list_pointer pointer_bytes with
+        | Some list_storage ->
+            string_of_uint8_list ~null_terminated:true list_storage
+        | None ->
+            default
+      else
+        default
   | None ->
       default
 
 let get_blob
     ~(default : string)
-    (pointer_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (pointer_word : int)
   : string =
-  match pointer_opt with
-  | Some pointer_bytes ->
-      begin match deref_list_pointer pointer_bytes with
-      | Some list_storage ->
-          string_of_uint8_list ~null_terminated:false list_storage
-      | None ->
-          default
-      end
+  match struct_storage_opt with
+  | Some struct_storage ->
+      let pointers = struct_storage.StructStorage.pointers in
+      let start = pointer_word * sizeof_uint64 in
+      let len   = sizeof_uint64 in
+      if start + len <= pointers.Slice.len then
+        let pointer_bytes = {
+          pointers with
+          Slice.start = pointers.Slice.start + start;
+          Slice.len   = len;
+        } in
+        match deref_list_pointer pointer_bytes with
+        | Some list_storage ->
+            string_of_uint8_list ~null_terminated:false list_storage
+        | None ->
+            default
+      else
+        default
   | None ->
       default
 
 let get_list
     ?(default : ro ListStorage.t option)
     (decoders : ('cap, 'a) ListDecoders.t)
-    (pointer_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (pointer_word : int)
   : (ro, 'a, 'cap ListStorage.t) InnerArray.t =
   let make_default () =
     begin match default with
@@ -422,149 +439,208 @@ let get_list
           InnerArray.set_unsafe = InnerArray.invalid_set_unsafe; }
     end
   in
-  match pointer_opt with
-  | Some pointer_bytes ->
-      begin match deref_list_pointer pointer_bytes with
-      | Some list_storage ->
-          make_array_readonly list_storage decoders
-      | None ->
-          make_default ()
-      end
+  match struct_storage_opt with
+  | Some struct_storage ->
+      let pointers = struct_storage.StructStorage.pointers in
+      let start = pointer_word * sizeof_uint64 in
+      let len   = sizeof_uint64 in
+      if start + len <= pointers.Slice.len then
+        let pointer_bytes = {
+          pointers with
+          Slice.start = pointers.Slice.start + start;
+          Slice.len   = len;
+        } in
+        match deref_list_pointer pointer_bytes with
+        | Some list_storage ->
+            make_array_readonly list_storage decoders
+        | None ->
+            make_default ()
+      else
+        make_default ()
   | None ->
       make_default ()
 
 let get_void_list
     ?(default : ro ListStorage.t option)
-    (pointer_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (pointer_word : int)
   : (ro, unit, 'cap ListStorage.t) InnerArray.t =
-  get_list ?default void_list_decoders pointer_opt
+  get_list ?default void_list_decoders struct_storage_opt pointer_word
 
 let get_bit_list
     ?(default : ro ListStorage.t option)
-    (pointer_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (pointer_word : int)
   : (ro, bool, 'cap ListStorage.t) InnerArray.t =
-  get_list ?default bit_list_decoders pointer_opt
+  get_list ?default bit_list_decoders struct_storage_opt pointer_word
 
 let get_int8_list
     ?(default : ro ListStorage.t option)
-    (pointer_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (pointer_word : int)
   : (ro, int, 'cap ListStorage.t) InnerArray.t =
-  get_list ?default int8_list_decoders pointer_opt
+  get_list ?default int8_list_decoders struct_storage_opt pointer_word
 
 let get_int16_list
     ?(default : ro ListStorage.t option)
-    (pointer_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (pointer_word : int)
   : (ro, int, 'cap ListStorage.t) InnerArray.t =
-  get_list ?default int16_list_decoders pointer_opt
+  get_list ?default int16_list_decoders struct_storage_opt pointer_word
 
 let get_int32_list
     ?(default : ro ListStorage.t option)
-    (pointer_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (pointer_word : int)
   : (ro, int32, 'cap ListStorage.t) InnerArray.t =
-  get_list ?default int32_list_decoders pointer_opt
+  get_list ?default int32_list_decoders struct_storage_opt pointer_word
 
 let get_int64_list
     ?(default : ro ListStorage.t option)
-    (pointer_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (pointer_word : int)
   : (ro, int64, 'cap ListStorage.t) InnerArray.t =
-  get_list ?default int64_list_decoders pointer_opt
+  get_list ?default int64_list_decoders struct_storage_opt pointer_word
 
 let get_uint8_list
     ?(default : ro ListStorage.t option)
-    (pointer_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (pointer_word : int)
   : (ro, int, 'cap ListStorage.t) InnerArray.t =
-  get_list ?default uint8_list_decoders pointer_opt
+  get_list ?default uint8_list_decoders struct_storage_opt pointer_word
 
 let get_uint16_list
     ?(default : ro ListStorage.t option)
-    (pointer_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (pointer_word : int)
   : (ro, int, 'cap ListStorage.t) InnerArray.t =
-  get_list ?default uint16_list_decoders pointer_opt
+  get_list ?default uint16_list_decoders struct_storage_opt pointer_word
 
 let get_uint32_list
     ?(default : ro ListStorage.t option)
-    (pointer_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (pointer_word : int)
   : (ro, Uint32.t, 'cap ListStorage.t) InnerArray.t =
-  get_list ?default uint32_list_decoders pointer_opt
+  get_list ?default uint32_list_decoders struct_storage_opt pointer_word
 
 let get_uint64_list
     ?(default : ro ListStorage.t option)
-    (pointer_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (pointer_word : int)
   : (ro, Uint64.t, 'cap ListStorage.t) InnerArray.t =
-  get_list ?default uint64_list_decoders pointer_opt
+  get_list ?default uint64_list_decoders struct_storage_opt pointer_word
 
 let get_float32_list
     ?(default : ro ListStorage.t option)
-    (pointer_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (pointer_word : int)
   : (ro, float, 'cap ListStorage.t) InnerArray.t =
-  get_list ?default float32_list_decoders pointer_opt
+  get_list ?default float32_list_decoders struct_storage_opt pointer_word
 
 let get_float64_list
     ?(default : ro ListStorage.t option)
-    (pointer_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (pointer_word : int)
   : (ro, float, 'cap ListStorage.t) InnerArray.t =
-  get_list ?default float64_list_decoders pointer_opt
+  get_list ?default float64_list_decoders struct_storage_opt pointer_word
 
 let get_text_list
     ?(default : ro ListStorage.t option)
-    (pointer_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (pointer_word : int)
   : (ro, string, 'cap ListStorage.t) InnerArray.t =
-  get_list ?default text_list_decoders pointer_opt
+  get_list ?default text_list_decoders struct_storage_opt pointer_word
 
 let get_blob_list
     ?(default : ro ListStorage.t option)
-    (pointer_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (pointer_word : int)
   : (ro, string, 'cap ListStorage.t) InnerArray.t =
-  get_list ?default blob_list_decoders pointer_opt
+  get_list ?default blob_list_decoders struct_storage_opt pointer_word
 
 let get_struct_list
     ?(default : ro ListStorage.t option)
-    (pointer_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (pointer_word : int)
   : (ro, 'cap StructStorage.t option, 'cap ListStorage.t) InnerArray.t =
-  get_list ?default struct_list_decoders pointer_opt
+  get_list ?default struct_list_decoders struct_storage_opt pointer_word
 
 let get_struct
     ?(default : ro StructStorage.t option)
-    (pointer_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (pointer_word : int)
   : 'cap StructStorage.t option =
-  match pointer_opt with
-  | Some pointer_bytes ->
-      begin match deref_struct_pointer pointer_bytes with
-      | Some storage ->
-          Some storage
-      | None ->
-          default
-      end
+  match struct_storage_opt with
+  | Some struct_storage ->
+      let pointers = struct_storage.StructStorage.pointers in
+      let start = pointer_word * sizeof_uint64 in
+      let len   = sizeof_uint64 in
+      if start + len <= pointers.Slice.len then
+        let pointer_bytes = {
+          pointers with
+          Slice.start = pointers.Slice.start + start;
+          Slice.len   = len;
+        } in
+        match deref_struct_pointer pointer_bytes with
+        | Some storage ->
+            Some storage
+        | None ->
+            default
+      else
+        default
   | None ->
       default
 
 let get_pointer
     ?(default: ro Slice.t option)
-    (pointer_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (pointer_word : int)
   : 'cap Slice.t option =
-  match pointer_opt with
-  | Some pointer_bytes ->
-      let pointer_val = Slice.get_int64 pointer_bytes 0 in
-      if Util.is_int64_zero pointer_val then
-        default
+  match struct_storage_opt with
+  | Some struct_storage ->
+      let pointers = struct_storage.StructStorage.pointers in
+      let start = pointer_word * sizeof_uint64 in
+      let len   = sizeof_uint64 in
+      if start + len <= pointers.Slice.len then
+        let pointer64 = Slice.get_int64 pointers start in
+        if Util.is_int64_zero pointer64 then
+          default
+        else
+          let pointer_bytes = {
+            pointers with
+            Slice.start = pointers.Slice.start + start;
+            Slice.len   = len;
+          } in
+          Some pointer_bytes
       else
-        pointer_opt
+        default
   | None ->
       default
 
 let get_interface
-    (pointer_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (pointer_word : int)
   : Uint32.t option =
-  match pointer_opt with
-  | Some pointer_bytes ->
-      begin match decode_pointer pointer_bytes with
-      | Pointer.Null ->
-          None
-      | Pointer.Other (OtherPointer.Capability index) ->
-          Some index
-      | _ ->
-          invalid_msg "decoded non-capability pointer where capability was expected"
-      end
+  match struct_storage_opt with
+  | Some struct_storage ->
+      let pointers = struct_storage.StructStorage.pointers in
+      let start = pointer_word * sizeof_uint64 in
+      let len   = sizeof_uint64 in
+      if start + len <= pointers.Slice.len then
+        let pointer_bytes = {
+          pointers with
+          Slice.start = pointers.Slice.start + start;
+          Slice.len   = len;
+        } in
+        match decode_pointer pointer_bytes with
+        | Pointer.Null ->
+            None
+        | Pointer.Other (OtherPointer.Capability index) ->
+            Some index
+        | _ ->
+            invalid_msg "decoded non-capability pointer where capability was expected"
+      else
+        None
   | None ->
       None
 

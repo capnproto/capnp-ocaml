@@ -226,9 +226,9 @@ and set_uint16
    supplied, then the discriminant is also set as a side-effect. *)
 let get_data_region
     ?(discr : Discr.t option)
-    (struct_storage : rw NC.StructStorage.t)
+    (struct_storage : rw NM.StructStorage.t)
   : rw NM.Slice.t =
-  let data = struct_storage.NC.StructStorage.data in
+  let data = struct_storage.NM.StructStorage.data in
   let () = set_opt_discriminant data discr in
   data
 
@@ -453,24 +453,41 @@ let set_float64
    side-effect. *)
 let get_pointer_bytes
     ?(discr : Discr.t option)
-    (struct_storage : rw NC.StructStorage.t)
+    (struct_storage : rw NM.StructStorage.t)
     (pointer_word : int)
   : rw NM.Slice.t =
   let ptr = BOps.get_struct_pointer struct_storage pointer_word in
-  let () = set_opt_discriminant struct_storage.NC.StructStorage.data discr in
+  let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
   ptr
 
 
 let has_field
-    (pointer_bytes : 'cap NM.Slice.t)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
   : bool =
-  let ptr_val = NM.Slice.get_int64 pointer_bytes 0 in
-  not (Util.is_int64_zero ptr_val)
+  let pointers = struct_storage.NM.StructStorage.pointers in
+  let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+  (* Struct should have already been upgraded to at least the
+     expected data region and pointer region sizes *)
+  assert (pointer_word < num_pointers);
+  let pointer64 = NM.Slice.get_int64 pointers (pointer_word * sizeof_uint64) in
+  not (Util.is_int64_zero pointer64)
 
 let get_text
     ~(default : string)
-    (pointer_bytes : 'cap NM.Slice.t)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
   : string =
+  let pointers = struct_storage.NM.StructStorage.pointers in
+  let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+  (* Struct should have already been upgraded to at least the
+     expected data region and pointer region sizes *)
+  assert (pointer_word < num_pointers);
+  let pointer_bytes = {
+    pointers with
+    NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+    NM.Slice.len   = sizeof_uint64;
+  } in
   (* Text fields are always accessed by value, not by reference, since
      we always do an immediate decode to [string].  Therefore we can
      use the Reader logic to handle this case. *)
@@ -482,8 +499,19 @@ let get_text
 
 let get_blob
     ~(default : string)
-    (pointer_bytes : 'cap NM.Slice.t)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
   : string =
+  let pointers = struct_storage.NM.StructStorage.pointers in
+  let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+  (* Struct should have already been upgraded to at least the
+     expected data region and pointer region sizes *)
+  assert (pointer_word < num_pointers);
+  let pointer_bytes = {
+    pointers with
+    NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+    NM.Slice.len   = sizeof_uint64;
+  } in
   (* Data fields are always accessed by value, not by reference, since
      we always do an immediate decode to [string].  Therefore we can
      use the Reader logic to handle this case. *)
@@ -500,7 +528,7 @@ let init_list_storage
     ~(storage_type : ListStorageType.t)
     ~(num_elements : int)
     (pointer_bytes : rw NM.Slice.t)
-  : rw NC.ListStorage.t =
+  : rw NM.ListStorage.t =
   let () = BOps.deep_zero_pointer pointer_bytes in
   let message = pointer_bytes.NM.Slice.msg in
   let list_storage = BOps.alloc_list_storage message storage_type num_elements in
@@ -513,8 +541,9 @@ let get_list
     ?(default : ro DM.ListStorage.t option)
     ~(storage_type : ListStorageType.t)
     ~(codecs : 'a NC.ListCodecs.t)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, 'a, rw NC.ListStorage.t) InnerArray.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+  : (rw, 'a, rw NM.ListStorage.t) InnerArray.t =
   let create_default message =
     match default with
     | Some default_storage ->
@@ -523,6 +552,16 @@ let get_list
     | None ->
         BOps.alloc_list_storage message storage_type 0
   in
+  let pointers = struct_storage.NM.StructStorage.pointers in
+  let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+  (* Struct should have already been upgraded to at least the
+     expected data region and pointer region sizes *)
+  assert (pointer_word < num_pointers);
+  let pointer_bytes = {
+    pointers with
+    NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+    NM.Slice.len   = sizeof_uint64;
+  } in
   let list_storage = BOps.deref_list_pointer ?struct_sizes ~create_default
       pointer_bytes
   in
@@ -531,121 +570,137 @@ let get_list
 
 let get_void_list
     ?(default : ro DM.ListStorage.t option)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, unit, rw NC.ListStorage.t) InnerArray.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+  : (rw, unit, rw NM.ListStorage.t) InnerArray.t =
   get_list ?default ~storage_type:ListStorageType.Empty
-    ~codecs:void_list_codecs pointer_bytes
+    ~codecs:void_list_codecs struct_storage pointer_word
 
 let get_bit_list
     ?(default : ro DM.ListStorage.t option)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, bool, rw NC.ListStorage.t) InnerArray.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+  : (rw, bool, rw NM.ListStorage.t) InnerArray.t =
   get_list ?default ~storage_type:ListStorageType.Bit
-    ~codecs:bit_list_codecs pointer_bytes
+    ~codecs:bit_list_codecs struct_storage pointer_word
 
 let get_int8_list
     ?(default : ro DM.ListStorage.t option)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, int, rw NC.ListStorage.t) InnerArray.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+  : (rw, int, rw NM.ListStorage.t) InnerArray.t =
   get_list ?default ~storage_type:ListStorageType.Bytes1
-    ~codecs:int8_list_codecs pointer_bytes
+    ~codecs:int8_list_codecs struct_storage pointer_word
 
 let get_int16_list
     ?(default : ro DM.ListStorage.t option)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, int, rw NC.ListStorage.t) InnerArray.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+  : (rw, int, rw NM.ListStorage.t) InnerArray.t =
   get_list ?default ~storage_type:ListStorageType.Bytes2
-    ~codecs:int16_list_codecs pointer_bytes
+    ~codecs:int16_list_codecs struct_storage pointer_word
 
 let get_int32_list
     ?(default : ro DM.ListStorage.t option)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, int32, rw NC.ListStorage.t) InnerArray.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+  : (rw, int32, rw NM.ListStorage.t) InnerArray.t =
   get_list ?default ~storage_type:ListStorageType.Bytes4
-    ~codecs:int32_list_codecs pointer_bytes
+    ~codecs:int32_list_codecs struct_storage pointer_word
 
 let get_int64_list
     ?(default : ro DM.ListStorage.t option)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, int64, rw NC.ListStorage.t) InnerArray.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+  : (rw, int64, rw NM.ListStorage.t) InnerArray.t =
   get_list ?default ~storage_type:ListStorageType.Bytes8
-    ~codecs:int64_list_codecs pointer_bytes
+    ~codecs:int64_list_codecs struct_storage pointer_word
 
 let get_uint8_list
     ?(default : ro DM.ListStorage.t option)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, int, rw NC.ListStorage.t) InnerArray.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+  : (rw, int, rw NM.ListStorage.t) InnerArray.t =
   get_list ?default ~storage_type:ListStorageType.Bytes1
-    ~codecs:uint8_list_codecs pointer_bytes
+    ~codecs:uint8_list_codecs struct_storage pointer_word
 
 let get_uint16_list
     ?(default : ro DM.ListStorage.t option)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, int, rw NC.ListStorage.t) InnerArray.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+  : (rw, int, rw NM.ListStorage.t) InnerArray.t =
   get_list ?default ~storage_type:ListStorageType.Bytes2
-    ~codecs:uint16_list_codecs pointer_bytes
+    ~codecs:uint16_list_codecs struct_storage pointer_word
 
 let get_uint32_list
     ?(default : ro DM.ListStorage.t option)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, Uint32.t, rw NC.ListStorage.t) InnerArray.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+  : (rw, Uint32.t, rw NM.ListStorage.t) InnerArray.t =
   get_list ?default ~storage_type:ListStorageType.Bytes4
-    ~codecs:uint32_list_codecs pointer_bytes
+    ~codecs:uint32_list_codecs struct_storage pointer_word
 
 let get_uint64_list
     ?(default : ro DM.ListStorage.t option)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, Uint64.t, rw NC.ListStorage.t) InnerArray.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+  : (rw, Uint64.t, rw NM.ListStorage.t) InnerArray.t =
   get_list ?default ~storage_type:ListStorageType.Bytes8
-    ~codecs:uint64_list_codecs pointer_bytes
+    ~codecs:uint64_list_codecs struct_storage pointer_word
 
 let get_float32_list
     ?(default : ro DM.ListStorage.t option)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, float, rw NC.ListStorage.t) InnerArray.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+  : (rw, float, rw NM.ListStorage.t) InnerArray.t =
   get_list ?default ~storage_type:ListStorageType.Bytes4
-    ~codecs:float32_list_codecs pointer_bytes
+    ~codecs:float32_list_codecs struct_storage pointer_word
 
 let get_float64_list
     ?(default : ro DM.ListStorage.t option)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, float, rw NC.ListStorage.t) InnerArray.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+  : (rw, float, rw NM.ListStorage.t) InnerArray.t =
   get_list ?default ~storage_type:ListStorageType.Bytes8
-    ~codecs:float64_list_codecs pointer_bytes
+    ~codecs:float64_list_codecs struct_storage pointer_word
 
 let get_text_list
     ?(default : ro DM.ListStorage.t option)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, string, rw NC.ListStorage.t) InnerArray.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+  : (rw, string, rw NM.ListStorage.t) InnerArray.t =
   get_list ?default ~storage_type:ListStorageType.Pointer
-    ~codecs:text_list_codecs pointer_bytes
+    ~codecs:text_list_codecs struct_storage pointer_word
 
 let get_blob_list
     ?(default : ro DM.ListStorage.t option)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, string, rw NC.ListStorage.t) InnerArray.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+  : (rw, string, rw NM.ListStorage.t) InnerArray.t =
   get_list ?default ~storage_type:ListStorageType.Pointer
-    ~codecs:blob_list_codecs pointer_bytes
+    ~codecs:blob_list_codecs struct_storage pointer_word
 
 let get_struct_list
     ?(default : ro DM.ListStorage.t option)
     ~(data_words : int)
     ~(pointer_words : int)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, rw NC.StructStorage.t, rw NC.ListStorage.t) InnerArray.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+  : (rw, rw NM.StructStorage.t, rw NM.ListStorage.t) InnerArray.t =
   get_list ~struct_sizes:{
     BuilderOps.StructSizes.data_words;
     BuilderOps.StructSizes.pointer_words }
     ?default ~storage_type:(
       ListStorageType.Composite (data_words, pointer_words))
-    ~codecs:struct_list_codecs pointer_bytes
+    ~codecs:struct_list_codecs struct_storage pointer_word
 
 let get_struct
     ?(default : ro DM.StructStorage.t option)
     ~(data_words : int)
     ~(pointer_words : int)
-    (pointer_bytes : rw NM.Slice.t)
-  : rw NC.StructStorage.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+  : rw NM.StructStorage.t =
   let create_default message =
     match default with
     | Some default_storage ->
@@ -654,12 +709,33 @@ let get_struct
     | None ->
         BOps.alloc_struct_storage message ~data_words ~pointer_words
   in
+  let pointers = struct_storage.NM.StructStorage.pointers in
+  let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+  (* Struct should have already been upgraded to at least the
+     expected data region and pointer region sizes *)
+  assert (pointer_word < num_pointers);
+  let pointer_bytes = {
+    pointers with
+    NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+    NM.Slice.len   = sizeof_uint64;
+  } in
   BOps.deref_struct_pointer ~create_default ~data_words ~pointer_words pointer_bytes
 
 let get_pointer
-  ?(default : ro DM.Slice.t option)
-  (pointer_bytes : rw NM.Slice.t)
+    ?(default : ro DM.Slice.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
   : rw NM.Slice.t =
+  let pointers = struct_storage.NM.StructStorage.pointers in
+  let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+  (* Struct should have already been upgraded to at least the
+     expected data region and pointer region sizes *)
+  assert (pointer_word < num_pointers);
+  let pointer_bytes = {
+    pointers with
+    NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+    NM.Slice.len   = sizeof_uint64;
+  } in
   let () =
     let pointer_val = NM.Slice.get_int64 pointer_bytes 0 in
     if Util.is_int64_zero pointer_val then
@@ -675,8 +751,19 @@ let get_pointer
   pointer_bytes
 
 let get_interface
-    (pointer_bytes : rw NM.Slice.t)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
   : Uint32.t option =
+  let pointers = struct_storage.NM.StructStorage.pointers in
+  let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+  (* Struct should have already been upgraded to at least the
+     expected data region and pointer region sizes *)
+  assert (pointer_word < num_pointers);
+  let pointer_bytes = {
+    pointers with
+    NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+    NM.Slice.len   = sizeof_uint64;
+  } in
   match NC.decode_pointer pointer_bytes with
   | Pointer.Null ->
       None
@@ -691,9 +778,22 @@ let get_interface
  *******************************************************************************)
 
 let set_text
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
     (value : string)
-    (pointer_bytes : rw NM.Slice.t)
   : unit =
+  let pointers = struct_storage.NM.StructStorage.pointers in
+  let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+  (* Struct should have already been upgraded to at least the
+     expected data region and pointer region sizes *)
+  assert (pointer_word < num_pointers);
+  let pointer_bytes = {
+    pointers with
+    NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+    NM.Slice.len   = sizeof_uint64;
+  } in
+  let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
   let new_string_storage = uint8_list_of_string
     ~null_terminated:true ~dest_message:pointer_bytes.NM.Slice.msg
     value
@@ -702,9 +802,22 @@ let set_text
   BOps.init_list_pointer pointer_bytes new_string_storage
 
 let set_blob
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
     (value : string)
-    (pointer_bytes : rw NM.Slice.t)
   : unit =
+  let pointers = struct_storage.NM.StructStorage.pointers in
+  let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+  (* Struct should have already been upgraded to at least the
+     expected data region and pointer region sizes *)
+  assert (pointer_word < num_pointers);
+  let pointer_bytes = {
+    pointers with
+    NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+    NM.Slice.len   = sizeof_uint64;
+  } in
+  let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
   let new_string_storage = uint8_list_of_string
     ~null_terminated:false ~dest_message:pointer_bytes.NM.Slice.msg
     value
@@ -716,9 +829,20 @@ let set_list_from_storage
     ?(struct_sizes : BuilderOps.StructSizes.t option)
     ~(storage_type : ListStorageType.t)
     ~(codecs : 'a NC.ListCodecs.t)
-    (value : 'cap NC.ListStorage.t option)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, 'a, rw NC.ListStorage.t) InnerArray.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+    (value : 'cap NM.ListStorage.t option)
+  : (rw, 'a, rw NM.ListStorage.t) InnerArray.t =
+  let pointers = struct_storage.NM.StructStorage.pointers in
+  let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+  (* Struct should have already been upgraded to at least the
+     expected data region and pointer region sizes *)
+  assert (pointer_word < num_pointers);
+  let pointer_bytes = {
+    pointers with
+    NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+    NM.Slice.len   = sizeof_uint64;
+  } in
   let list_storage =
     match value with
     | Some src_storage ->
@@ -733,133 +857,178 @@ let set_list_from_storage
     ~init:(fun n -> init_list_storage ~storage_type ~num_elements:n pointer_bytes)
 
 let set_list
+    ?(discr : Discr.t option)
     ?(struct_sizes : BuilderOps.StructSizes.t option)
     ~(storage_type : ListStorageType.t)
     ~(codecs : 'a NC.ListCodecs.t)
-    (value : ('cap1, 'a, 'cap2 NC.ListStorage.t) InnerArray.t)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, 'a, rw NC.ListStorage.t) InnerArray.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+    (value : ('cap1, 'a, 'cap2 NM.ListStorage.t) InnerArray.t)
+  : (rw, 'a, rw NM.ListStorage.t) InnerArray.t =
+  let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
   set_list_from_storage ?struct_sizes ~storage_type ~codecs
-    (InnerArray.to_storage value)
-    pointer_bytes
+    struct_storage pointer_word (InnerArray.to_storage value)
 
 let set_void_list
-    (value : ('cap1, unit, 'cap2 NC.ListStorage.t) InnerArray.t)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, unit, rw NC.ListStorage.t) InnerArray.t =
-  set_list ~storage_type:ListStorageType.Empty ~codecs:void_list_codecs
-    value pointer_bytes
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+    (value : ('cap1, unit, 'cap2 NM.ListStorage.t) InnerArray.t)
+  : (rw, unit, rw NM.ListStorage.t) InnerArray.t =
+  set_list ?discr ~storage_type:ListStorageType.Empty ~codecs:void_list_codecs
+    struct_storage pointer_word value
 
 let set_bit_list
-    (value : ('cap1, bool, 'cap2 NC.ListStorage.t) InnerArray.t)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, bool, rw NC.ListStorage.t) InnerArray.t =
-  set_list ~storage_type:ListStorageType.Bit ~codecs:bit_list_codecs
-    value pointer_bytes
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+    (value : ('cap1, bool, 'cap2 NM.ListStorage.t) InnerArray.t)
+  : (rw, bool, rw NM.ListStorage.t) InnerArray.t =
+  set_list ?discr ~storage_type:ListStorageType.Bit ~codecs:bit_list_codecs
+    struct_storage pointer_word value
 
 let set_int8_list
-    (value : ('cap1, int, 'cap2 NC.ListStorage.t) InnerArray.t)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, int, 'cap NC.ListStorage.t) InnerArray.t =
-  set_list ~storage_type:ListStorageType.Bytes1 ~codecs:int8_list_codecs
-    value pointer_bytes
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+    (value : ('cap1, int, 'cap2 NM.ListStorage.t) InnerArray.t)
+  : (rw, int, 'cap NM.ListStorage.t) InnerArray.t =
+  set_list ?discr ~storage_type:ListStorageType.Bytes1 ~codecs:int8_list_codecs
+    struct_storage pointer_word value
 
 let set_int16_list
-    (value : ('cap1, int, 'cap2 NC.ListStorage.t) InnerArray.t)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, int, 'cap NC.ListStorage.t) InnerArray.t =
-  set_list ~storage_type:ListStorageType.Bytes2 ~codecs:int16_list_codecs
-    value pointer_bytes
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+    (value : ('cap1, int, 'cap2 NM.ListStorage.t) InnerArray.t)
+  : (rw, int, 'cap NM.ListStorage.t) InnerArray.t =
+  set_list ?discr ~storage_type:ListStorageType.Bytes2 ~codecs:int16_list_codecs
+    struct_storage pointer_word value
 
 let set_int32_list
-    (value : ('cap1, int32, 'cap NC.ListStorage.t) InnerArray.t)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, int32, rw NC.ListStorage.t) InnerArray.t =
-  set_list ~storage_type:ListStorageType.Bytes4 ~codecs:int32_list_codecs
-    value pointer_bytes
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+    (value : ('cap1, int32, 'cap NM.ListStorage.t) InnerArray.t)
+  : (rw, int32, rw NM.ListStorage.t) InnerArray.t =
+  set_list ?discr ~storage_type:ListStorageType.Bytes4 ~codecs:int32_list_codecs
+    struct_storage pointer_word value
 
 let set_int64_list
-    (value : ('cap1, int64, 'cap2 NC.ListStorage.t) InnerArray.t)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, int64, rw NC.ListStorage.t) InnerArray.t =
-  set_list ~storage_type:ListStorageType.Bytes8 ~codecs:int64_list_codecs
-    value pointer_bytes
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+    (value : ('cap1, int64, 'cap2 NM.ListStorage.t) InnerArray.t)
+  : (rw, int64, rw NM.ListStorage.t) InnerArray.t =
+  set_list ?discr ~storage_type:ListStorageType.Bytes8 ~codecs:int64_list_codecs
+    struct_storage pointer_word value
 
 let set_uint8_list
-    (value : ('cap1, int, 'cap2 NC.ListStorage.t) InnerArray.t)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, int, rw NC.ListStorage.t) InnerArray.t =
-  set_list ~storage_type:ListStorageType.Bytes1 ~codecs:uint8_list_codecs
-    value pointer_bytes
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+    (value : ('cap1, int, 'cap2 NM.ListStorage.t) InnerArray.t)
+  : (rw, int, rw NM.ListStorage.t) InnerArray.t =
+  set_list ?discr ~storage_type:ListStorageType.Bytes1 ~codecs:uint8_list_codecs
+    struct_storage pointer_word value
 
 let set_uint16_list
-    (value : ('cap1, int, 'cap2 NC.ListStorage.t) InnerArray.t)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, int, rw NC.ListStorage.t) InnerArray.t =
-  set_list ~storage_type:ListStorageType.Bytes2 ~codecs:uint16_list_codecs
-    value pointer_bytes
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+    (value : ('cap1, int, 'cap2 NM.ListStorage.t) InnerArray.t)
+  : (rw, int, rw NM.ListStorage.t) InnerArray.t =
+  set_list ?discr ~storage_type:ListStorageType.Bytes2 ~codecs:uint16_list_codecs
+    struct_storage pointer_word value
 
 let set_uint32_list
-    (value : ('cap1, Uint32.t, 'cap2 NC.ListStorage.t) InnerArray.t)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, Uint32.t, rw NC.ListStorage.t) InnerArray.t =
-  set_list ~storage_type:ListStorageType.Bytes4 ~codecs:uint32_list_codecs
-    value pointer_bytes
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+    (value : ('cap1, Uint32.t, 'cap2 NM.ListStorage.t) InnerArray.t)
+  : (rw, Uint32.t, rw NM.ListStorage.t) InnerArray.t =
+  set_list ?discr ~storage_type:ListStorageType.Bytes4 ~codecs:uint32_list_codecs
+    struct_storage pointer_word value
 
 let set_uint64_list
-    (value : ('cap1, Uint64.t, 'cap2 NC.ListStorage.t) InnerArray.t)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, Uint64.t, rw NC.ListStorage.t) InnerArray.t =
-  set_list ~storage_type:ListStorageType.Bytes8 ~codecs:uint64_list_codecs
-    value pointer_bytes
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+    (value : ('cap1, Uint64.t, 'cap2 NM.ListStorage.t) InnerArray.t)
+  : (rw, Uint64.t, rw NM.ListStorage.t) InnerArray.t =
+  set_list ?discr ~storage_type:ListStorageType.Bytes8 ~codecs:uint64_list_codecs
+    struct_storage pointer_word value
 
 let set_float32_list
-    (value : ('cap1, float, 'cap2 NC.ListStorage.t) InnerArray.t)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, float, rw NC.ListStorage.t) InnerArray.t =
-  set_list ~storage_type:ListStorageType.Bytes4 ~codecs:float32_list_codecs
-    value pointer_bytes
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+    (value : ('cap1, float, 'cap2 NM.ListStorage.t) InnerArray.t)
+  : (rw, float, rw NM.ListStorage.t) InnerArray.t =
+  set_list ?discr ~storage_type:ListStorageType.Bytes4 ~codecs:float32_list_codecs
+    struct_storage pointer_word value
 
 let set_float64_list
-    (value : ('cap1, float, 'cap2 NC.ListStorage.t) InnerArray.t)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, float, rw NC.ListStorage.t) InnerArray.t =
-  set_list ~storage_type:ListStorageType.Bytes8 ~codecs:float64_list_codecs
-    value pointer_bytes
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+    (value : ('cap1, float, 'cap2 NM.ListStorage.t) InnerArray.t)
+  : (rw, float, rw NM.ListStorage.t) InnerArray.t =
+  set_list ?discr ~storage_type:ListStorageType.Bytes8 ~codecs:float64_list_codecs
+    struct_storage pointer_word value
 
 let set_text_list
-    (value : ('cap1, string, 'cap2 NC.ListStorage.t) InnerArray.t)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, string, rw NC.ListStorage.t) InnerArray.t =
-  set_list ~storage_type:ListStorageType.Pointer ~codecs:text_list_codecs
-    value pointer_bytes
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+    (value : ('cap1, string, 'cap2 NM.ListStorage.t) InnerArray.t)
+  : (rw, string, rw NM.ListStorage.t) InnerArray.t =
+  set_list ?discr ~storage_type:ListStorageType.Pointer ~codecs:text_list_codecs
+    struct_storage pointer_word value
 
 let set_blob_list
-    (value : ('cap1, string, 'cap2 NC.ListStorage.t) InnerArray.t)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, string, rw NC.ListStorage.t) InnerArray.t =
-  set_list ~storage_type:ListStorageType.Pointer ~codecs:blob_list_codecs
-    value pointer_bytes
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+    (value : ('cap1, string, 'cap2 NM.ListStorage.t) InnerArray.t)
+  : (rw, string, rw NM.ListStorage.t) InnerArray.t =
+  set_list ?discr ~storage_type:ListStorageType.Pointer ~codecs:blob_list_codecs
+    struct_storage pointer_word value
 
 let set_struct_list
+    ?(discr : Discr.t option)
     ~(data_words : int)
     ~(pointer_words : int)
     (* FIXME: this won't allow assignment from Reader struct lists *)
-    (value : ('cap1, 'cap2 NC.StructStorage.t, 'cap2 NC.ListStorage.t) InnerArray.t)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, rw NC.StructStorage.t, rw NC.ListStorage.t) InnerArray.t =
-  set_list ~struct_sizes:{
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+    (value : ('cap1, 'cap2 NM.StructStorage.t, 'cap2 NM.ListStorage.t) InnerArray.t)
+  : (rw, rw NM.StructStorage.t, rw NM.ListStorage.t) InnerArray.t =
+  set_list ?discr ~struct_sizes:{
     BuilderOps.StructSizes.data_words;
     BuilderOps.StructSizes.pointer_words }
     ~storage_type:(ListStorageType.Composite (data_words, pointer_words))
-    ~codecs:struct_list_codecs value pointer_bytes
+    ~codecs:struct_list_codecs struct_storage pointer_word value
 
 let set_struct
+    ?(discr : Discr.t option)
     ~(data_words : int)
     ~(pointer_words : int)
-    (value : 'cap NC.StructStorage.t option)
-    (pointer_bytes : rw NM.Slice.t)
-  : rw NC.StructStorage.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+    (value : 'cap NM.StructStorage.t option)
+  : rw NM.StructStorage.t =
+  let pointers = struct_storage.NM.StructStorage.pointers in
+  let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+  (* Struct should have already been upgraded to at least the
+     expected data region and pointer region sizes *)
+  assert (pointer_word < num_pointers);
+  let pointer_bytes = {
+    pointers with
+    NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+    NM.Slice.len   = sizeof_uint64;
+  } in
+  let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
   let dest_storage =
     match value with
     | Some src_storage ->
@@ -873,16 +1042,42 @@ let set_struct
   dest_storage
 
 let set_pointer
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
     (value : 'cap NM.Slice.t)
-    (pointer_bytes : rw NM.Slice.t)
   : rw NM.Slice.t =
+  let pointers = struct_storage.NM.StructStorage.pointers in
+  let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+  (* Struct should have already been upgraded to at least the
+     expected data region and pointer region sizes *)
+  assert (pointer_word < num_pointers);
+  let pointer_bytes = {
+    pointers with
+    NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+    NM.Slice.len   = sizeof_uint64;
+  } in
+  let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
   let () = BOps.deep_copy_pointer ~src:value ~dest:pointer_bytes in
   pointer_bytes
 
 let set_interface
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
     (value : Uint32.t option)
-    (pointer_bytes : rw NM.Slice.t)
   : unit =
+  let pointers = struct_storage.NM.StructStorage.pointers in
+  let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+  (* Struct should have already been upgraded to at least the
+     expected data region and pointer region sizes *)
+  assert (pointer_word < num_pointers);
+  let pointer_bytes = {
+    pointers with
+    NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+    NM.Slice.len   = sizeof_uint64;
+  } in
+  let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
   match value with
   | Some index ->
       NM.Slice.set_int64 pointer_bytes 0
@@ -896,135 +1091,193 @@ let set_interface
  *******************************************************************************)
 
 let init_blob
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
     (num_elements : int)
-    (pointer_bytes : rw NM.Slice.t)
   : unit =
   let s = String.make num_elements '\x00' in
-  set_blob s pointer_bytes
+  set_blob ?discr struct_storage pointer_word s
 
 let init_list
+    ?(discr : Discr.t option)
     ~(storage_type : ListStorageType.t)
     ~(codecs : 'a NC.ListCodecs.t)
+    (struct_storage : 'cap NM.StructStorage.t)
+    (pointer_word : int)
     (num_elements : int)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, 'a, rw NC.ListStorage.t) InnerArray.t =
+  : (rw, 'a, rw NM.ListStorage.t) InnerArray.t =
+  let pointers = struct_storage.NM.StructStorage.pointers in
+  let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+  (* Struct should have already been upgraded to at least the
+     expected data region and pointer region sizes *)
+  assert (pointer_word < num_pointers);
+  let pointer_bytes = {
+    pointers with
+    NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+    NM.Slice.len   = sizeof_uint64;
+  } in
+  let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
   let list_storage = init_list_storage ~storage_type ~num_elements pointer_bytes in
   NC.make_array_readwrite ~list_storage ~codecs
     ~init:(fun n -> init_list_storage ~storage_type ~num_elements:n pointer_bytes)
 
 let init_void_list
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
     (num_elements : int)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, unit, rw NC.ListStorage.t) InnerArray.t =
-  init_list ~storage_type:ListStorageType.Empty ~codecs:void_list_codecs
-    num_elements pointer_bytes
+  : (rw, unit, rw NM.ListStorage.t) InnerArray.t =
+  init_list ?discr ~storage_type:ListStorageType.Empty ~codecs:void_list_codecs
+    struct_storage pointer_word num_elements
 
 let init_bit_list
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
     (num_elements : int)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, bool, rw NC.ListStorage.t) InnerArray.t =
-  init_list ~storage_type:ListStorageType.Bit ~codecs:bit_list_codecs
-    num_elements pointer_bytes
+  : (rw, bool, rw NM.ListStorage.t) InnerArray.t =
+  init_list ?discr ~storage_type:ListStorageType.Bit ~codecs:bit_list_codecs
+    struct_storage pointer_word num_elements
 
 let init_int8_list
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
     (num_elements : int)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, int, rw NC.ListStorage.t) InnerArray.t =
-  init_list ~storage_type:ListStorageType.Bytes1 ~codecs:int8_list_codecs
-    num_elements pointer_bytes
+  : (rw, int, rw NM.ListStorage.t) InnerArray.t =
+  init_list ?discr ~storage_type:ListStorageType.Bytes1 ~codecs:int8_list_codecs
+    struct_storage pointer_word num_elements
 
 let init_int16_list
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
     (num_elements : int)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, int, rw NC.ListStorage.t) InnerArray.t =
-  init_list ~storage_type:ListStorageType.Bytes2 ~codecs:int16_list_codecs
-    num_elements pointer_bytes
+  : (rw, int, rw NM.ListStorage.t) InnerArray.t =
+  init_list ?discr ~storage_type:ListStorageType.Bytes2 ~codecs:int16_list_codecs
+    struct_storage pointer_word num_elements
 
 let init_int32_list
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
     (num_elements : int)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, int32, rw NC.ListStorage.t) InnerArray.t =
-  init_list ~storage_type:ListStorageType.Bytes4 ~codecs:int32_list_codecs
-    num_elements pointer_bytes
+  : (rw, int32, rw NM.ListStorage.t) InnerArray.t =
+  init_list ?discr ~storage_type:ListStorageType.Bytes4 ~codecs:int32_list_codecs
+    struct_storage pointer_word num_elements
 
 let init_int64_list
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
     (num_elements : int)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, int64, rw NC.ListStorage.t) InnerArray.t =
-  init_list ~storage_type:ListStorageType.Bytes8 ~codecs:int64_list_codecs
-    num_elements pointer_bytes
+  : (rw, int64, rw NM.ListStorage.t) InnerArray.t =
+  init_list ?discr ~storage_type:ListStorageType.Bytes8 ~codecs:int64_list_codecs
+    struct_storage pointer_word num_elements
 
 let init_uint8_list
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
     (num_elements : int)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, int, rw NC.ListStorage.t) InnerArray.t =
-  init_list ~storage_type:ListStorageType.Bytes1 ~codecs:uint8_list_codecs
-    num_elements pointer_bytes
+  : (rw, int, rw NM.ListStorage.t) InnerArray.t =
+  init_list ?discr ~storage_type:ListStorageType.Bytes1 ~codecs:uint8_list_codecs
+    struct_storage pointer_word num_elements
 
 let init_uint16_list
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
     (num_elements : int)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, int, rw NC.ListStorage.t) InnerArray.t =
-  init_list ~storage_type:ListStorageType.Bytes2 ~codecs:uint16_list_codecs
-    num_elements pointer_bytes
+  : (rw, int, rw NM.ListStorage.t) InnerArray.t =
+  init_list ?discr ~storage_type:ListStorageType.Bytes2 ~codecs:uint16_list_codecs
+    struct_storage pointer_word num_elements
 
 let init_uint32_list
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
     (num_elements : int)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, Uint32.t, rw NC.ListStorage.t) InnerArray.t =
-  init_list ~storage_type:ListStorageType.Bytes4 ~codecs:uint32_list_codecs
-    num_elements pointer_bytes
+  : (rw, Uint32.t, rw NM.ListStorage.t) InnerArray.t =
+  init_list ?discr ~storage_type:ListStorageType.Bytes4 ~codecs:uint32_list_codecs
+    struct_storage pointer_word num_elements
 
 let init_uint64_list
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
     (num_elements : int)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, Uint64.t, rw NC.ListStorage.t) InnerArray.t =
-  init_list ~storage_type:ListStorageType.Bytes8 ~codecs:uint64_list_codecs
-    num_elements pointer_bytes
+  : (rw, Uint64.t, rw NM.ListStorage.t) InnerArray.t =
+  init_list ?discr ~storage_type:ListStorageType.Bytes8 ~codecs:uint64_list_codecs
+    struct_storage pointer_word num_elements
 
 let init_float32_list
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
     (num_elements : int)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, float, rw NC.ListStorage.t) InnerArray.t =
-  init_list ~storage_type:ListStorageType.Bytes4 ~codecs:float32_list_codecs
-    num_elements pointer_bytes
+  : (rw, float, rw NM.ListStorage.t) InnerArray.t =
+  init_list ?discr ~storage_type:ListStorageType.Bytes4 ~codecs:float32_list_codecs
+    struct_storage pointer_word num_elements
 
 let init_float64_list
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
     (num_elements : int)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, float, rw NC.ListStorage.t) InnerArray.t =
-  init_list ~storage_type:ListStorageType.Bytes8 ~codecs:float64_list_codecs
-    num_elements pointer_bytes
+  : (rw, float, rw NM.ListStorage.t) InnerArray.t =
+  init_list ?discr ~storage_type:ListStorageType.Bytes8 ~codecs:float64_list_codecs
+    struct_storage pointer_word num_elements
 
 let init_text_list
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
     (num_elements : int)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, string, rw NC.ListStorage.t) InnerArray.t =
-  init_list ~storage_type:ListStorageType.Pointer ~codecs:text_list_codecs
-    num_elements pointer_bytes
+  : (rw, string, rw NM.ListStorage.t) InnerArray.t =
+  init_list ?discr ~storage_type:ListStorageType.Pointer ~codecs:text_list_codecs
+    struct_storage pointer_word num_elements
 
 let init_blob_list
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
     (num_elements : int)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, string, rw NC.ListStorage.t) InnerArray.t =
-  init_list ~storage_type:ListStorageType.Pointer ~codecs:blob_list_codecs
-    num_elements pointer_bytes
+  : (rw, string, rw NM.ListStorage.t) InnerArray.t =
+  init_list ?discr ~storage_type:ListStorageType.Pointer ~codecs:blob_list_codecs
+    struct_storage pointer_word num_elements
 
 let init_struct_list
+    ?(discr : Discr.t option)
     ~(data_words : int)
     ~(pointer_words : int)
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
     (num_elements : int)
-    (pointer_bytes : rw NM.Slice.t)
-  : (rw, rw NC.StructStorage.t, rw NC.ListStorage.t) InnerArray.t =
-  init_list ~storage_type:(
+  : (rw, rw NM.StructStorage.t, rw NM.ListStorage.t) InnerArray.t =
+  init_list ?discr ~storage_type:(
     ListStorageType.Composite (data_words, pointer_words))
-    ~codecs:struct_list_codecs num_elements pointer_bytes
+    struct_storage pointer_word ~codecs:struct_list_codecs num_elements
 
 let init_struct
+    ?(discr : Discr.t option)
     ~(data_words : int)
     ~(pointer_words : int)
-    (pointer_bytes : rw NM.Slice.t)
-  : rw NC.StructStorage.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (pointer_word : int)
+  : rw NM.StructStorage.t =
+  let pointers = struct_storage.NM.StructStorage.pointers in
+  let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+  (* Struct should have already been upgraded to at least the
+     expected data region and pointer region sizes *)
+  assert (pointer_word < num_pointers);
+  let pointer_bytes = {
+    pointers with
+    NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+    NM.Slice.len   = sizeof_uint64;
+  } in
+  let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
   let () = BOps.deep_zero_pointer pointer_bytes in
   let storage =
     BOps.alloc_struct_storage pointer_bytes.NM.Slice.msg ~data_words ~pointer_words
@@ -1038,7 +1291,7 @@ let get_root_struct
     (m : rw NM.Message.t)
     ~(data_words : int)
     ~(pointer_words : int)
-  : rw NC.StructStorage.t =
+  : rw NM.StructStorage.t =
   let first_segment = NM.Message.get_segment m 0 in
   if NM.Segment.length first_segment < sizeof_uint64 then
     invalid_msg "message is too small to contain root struct pointer"
@@ -1065,7 +1318,7 @@ let alloc_root_struct
     ~(data_words : int)
     ~(pointer_words : int)
     ()
-  : rw NC.StructStorage.t =
+  : rw NM.StructStorage.t =
   let act_message_size =
     let requested_size =
       match message_size with

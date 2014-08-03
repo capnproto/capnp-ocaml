@@ -993,30 +993,4007 @@ module type S = sig
   end
 end
 
-module DefaultsMessage_ = Capnp.BytesMessage
-
-let _builder_defaults_message =
-  let message_segments = [
-    Bytes.unsafe_of_string "\
-    \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
-    \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
-    \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
-    \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
-  ] in
-  DefaultsMessage_.Message.readonly
-    (DefaultsMessage_.Message.of_storage message_segments)
-
 module Make (MessageWrapper : Capnp.MessageSig.S) = struct
+  module DefaultsMessage_ = Capnp.BytesMessage
+
+  let _builder_defaults_message =
+    let message_segments = [
+      Bytes.unsafe_of_string "\
+      \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
+      \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
+      \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
+      \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+    ] in
+    DefaultsMessage_.Message.readonly
+      (DefaultsMessage_.Message.of_storage message_segments)
+
   let invalid_msg = Capnp.Message.invalid_msg
 
   module RA_ = struct
     open Capnp.Runtime
-    INCLUDE "reader-inc.ml"
+    (******************************************************************************
+     * capnp-ocaml
+     *
+     * Copyright (c) 2013-2014, Paul Pelzl
+     * All rights reserved.
+     *
+     * Redistribution and use in source and binary forms, with or without
+     * modification, are permitted provided that the following conditions are met:
+     *
+     *  1. Redistributions of source code must retain the above copyright notice,
+     *     this list of conditions and the following disclaimer.
+     *
+     *  2. Redistributions in binary form must reproduce the above copyright
+     *     notice, this list of conditions and the following disclaimer in the
+     *     documentation and/or other materials provided with the distribution.
+     *
+     * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+     * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+     * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+     * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+     * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+     * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+     * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+     * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+     * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+     * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+     * POSSIBILITY OF SUCH DAMAGE.
+     ******************************************************************************)
+
+    (* Runtime support for Reader interfaces.  None of the functions provided
+       here will modify the underlying message; derefencing null pointers and
+       reading from truncated structs both lead to default data being returned. *)
+
+
+    open Core.Std
+
+    let sizeof_uint64 = 8
+
+    module RC = struct
+      (******************************************************************************
+       * capnp-ocaml
+       *
+       * Copyright (c) 2013-2014, Paul Pelzl
+       * All rights reserved.
+       *
+       * Redistribution and use in source and binary forms, with or without
+       * modification, are permitted provided that the following conditions are met:
+       *
+       *  1. Redistributions of source code must retain the above copyright notice,
+       *     this list of conditions and the following disclaimer.
+       *
+       *  2. Redistributions in binary form must reproduce the above copyright
+       *     notice, this list of conditions and the following disclaimer in the
+       *     documentation and/or other materials provided with the distribution.
+       *
+       * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+       * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+       * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+       * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+       * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+       * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+       * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+       * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+       * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+       * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+       * POSSIBILITY OF SUCH DAMAGE.
+       ******************************************************************************)
+      
+      (* Runtime support which is common to both Reader and Builder interfaces. *)
+      
+      open Core.Std
+      
+      
+      let sizeof_uint32 = 4
+      let sizeof_uint64 = 8
+      
+      let invalid_msg      = Message.invalid_msg
+      let out_of_int_range = Message.out_of_int_range
+      type ro = Message.ro
+      type rw = Message.rw
+      
+      include MessageWrapper
+      
+      let bounds_check_slice_exn ?err (slice : 'cap Slice.t) : unit =
+        let open Slice in
+        if slice.segment_id < 0 ||
+          slice.segment_id >= Message.num_segments slice.msg ||
+          slice.start < 0 ||
+          slice.start + slice.len > Segment.length (Slice.get_segment slice)
+        then
+          let error_msg =
+            match err with
+            | None -> "pointer referenced a memory region outside the message"
+            | Some msg -> msg
+          in
+          invalid_msg error_msg
+        else
+          ()
+      
+      
+      (** Get the range of bytes associated with a pointer stored in a struct. *)
+      let ss_get_pointer
+          (struct_storage : 'cap StructStorage.t)
+          (word : int)           (* Struct-relative pointer index *)
+        : 'cap Slice.t option =  (* Returns None if storage is too small for this word *)
+        let pointers = struct_storage.StructStorage.pointers in
+        let start = word * sizeof_uint64 in
+        let len   = sizeof_uint64 in
+        if start + len <= pointers.Slice.len then
+          Some {
+            pointers with
+            Slice.start = pointers.Slice.start + start;
+            Slice.len   = len
+          }
+        else
+          None
+      
+      (* Given a range of eight bytes corresponding to a cap'n proto pointer,
+         decode the information stored in the pointer. *)
+      let decode_pointer (pointer_bytes : 'cap Slice.t) : Pointer.t =
+        let pointer64 = Slice.get_int64 pointer_bytes 0 in
+        if Util.is_int64_zero pointer64 then
+          Pointer.Null
+        else
+          let tag_bits = Caml.Int64.to_int pointer64 in
+          let tag = tag_bits land Pointer.Bitfield.tag_mask in
+          (* OCaml won't match an int against let-bound variables,
+             only against constants. *)
+          match tag with
+          | 0x0 ->  (* Pointer.Bitfield.tag_val_struct *)
+              Pointer.Struct (StructPointer.decode pointer64)
+          | 0x1 ->  (* Pointer.Bitfield.tag_val_list *)
+              Pointer.List (ListPointer.decode pointer64)
+          | 0x2 ->  (* Pointer.Bitfield.tag_val_far *)
+              Pointer.Far (FarPointer.decode pointer64)
+          | 0x3 ->  (* Pointer.Bitfield.tag_val_other *)
+              Pointer.Other (OtherPointer.decode pointer64)
+          | _ ->
+              assert false
+      
+      
+      (* Given a list pointer descriptor, construct the corresponding list storage
+         descriptor. *)
+      let make_list_storage
+          ~(message : 'cap Message.t)     (* Message of interest *)
+          ~(segment_id : int)             (* Segment ID where list storage is found *)
+          ~(segment_offset : int)         (* Segment offset where list storage is found *)
+          ~(list_pointer : ListPointer.t)
+        : 'cap ListStorage.t =
+        let make_list_storage_aux ~num_words ~num_elements ~storage_type =
+          let storage = {
+            Slice.msg        = message;
+            Slice.segment    = Message.get_segment message segment_id;
+            Slice.segment_id = segment_id;
+            Slice.start      = segment_offset;
+            Slice.len        = num_words * sizeof_uint64;
+          } in
+          let () = bounds_check_slice_exn
+            ~err:"list pointer describes invalid storage region" storage
+          in {
+            ListStorage.storage      = storage;
+            ListStorage.storage_type = storage_type;
+            ListStorage.num_elements = num_elements;
+          }
+        in
+        let open ListPointer in
+        match list_pointer.element_type with
+        | Void ->
+            make_list_storage_aux ~num_words:0
+              ~num_elements:list_pointer.num_elements ~storage_type:ListStorageType.Empty
+        | OneBitValue ->
+            make_list_storage_aux
+              ~num_words:(Util.ceil_ratio list_pointer.num_elements 64)
+              ~num_elements:list_pointer.num_elements ~storage_type:ListStorageType.Bit
+        | OneByteValue ->
+            make_list_storage_aux
+              ~num_words:(Util.ceil_ratio list_pointer.num_elements 8)
+              ~num_elements:list_pointer.num_elements
+              ~storage_type:ListStorageType.Bytes1
+        | TwoByteValue ->
+            make_list_storage_aux
+              ~num_words:(Util.ceil_ratio list_pointer.num_elements 4)
+              ~num_elements:list_pointer.num_elements
+              ~storage_type:ListStorageType.Bytes2
+        | FourByteValue ->
+            make_list_storage_aux
+              ~num_words:(Util.ceil_ratio list_pointer.num_elements 2)
+              ~num_elements:list_pointer.num_elements
+              ~storage_type:ListStorageType.Bytes4
+        | EightByteValue ->
+            make_list_storage_aux ~num_words:list_pointer.num_elements
+              ~num_elements:list_pointer.num_elements
+              ~storage_type:ListStorageType.Bytes8
+        | EightBytePointer ->
+            make_list_storage_aux ~num_words:list_pointer.num_elements
+              ~num_elements:list_pointer.num_elements
+              ~storage_type:ListStorageType.Pointer
+        | Composite ->
+            let struct_tag_bytes = {
+              Slice.msg        = message;
+              Slice.segment    = Message.get_segment message segment_id;
+              Slice.segment_id = segment_id;
+              Slice.start      = segment_offset;
+              Slice.len        = sizeof_uint64;
+            } in
+            let () = bounds_check_slice_exn
+                ~err:"composite list pointer describes invalid storage region"
+                struct_tag_bytes
+            in
+            begin match decode_pointer struct_tag_bytes with
+            | Pointer.Struct struct_pointer ->
+                let module SP = StructPointer in
+                let num_words = list_pointer.num_elements in
+                let num_elements = struct_pointer.SP.offset in
+                let words_per_element =
+                  struct_pointer.SP.data_words + struct_pointer.SP.pointer_words
+                in
+                if num_elements * words_per_element > num_words then
+                  invalid_msg "composite list pointer describes invalid word count"
+                else
+                  make_list_storage_aux ~num_words ~num_elements
+                    ~storage_type:(ListStorageType.Composite
+                       (struct_pointer.SP.data_words, struct_pointer.SP.pointer_words))
+            | _ ->
+                invalid_msg "composite list pointer has malformed element type tag"
+            end
+      
+      
+      (* Given a description of a cap'n proto far pointer, get the object which
+         the pointer points to. *)
+      let rec deref_far_pointer
+          (far_pointer : FarPointer.t)
+          (message : 'cap Message.t)
+        : 'cap Object.t =
+        let open FarPointer in
+        match far_pointer.landing_pad with
+        | NormalPointer ->
+            let next_pointer_bytes = {
+              Slice.msg        = message;
+              Slice.segment    = Message.get_segment message far_pointer.segment_id;
+              Slice.segment_id = far_pointer.segment_id;
+              Slice.start      = far_pointer.offset * sizeof_uint64;
+              Slice.len        = sizeof_uint64;
+            } in
+            let () = bounds_check_slice_exn
+              ~err:"far pointer describes invalid landing pad" next_pointer_bytes
+            in
+            deref_pointer next_pointer_bytes
+        | TaggedFarPointer ->
+            let content_pointer_bytes = {
+              Slice.msg        = message;
+              Slice.segment    = Message.get_segment message far_pointer.segment_id;
+              Slice.segment_id = far_pointer.segment_id;
+              Slice.start      = far_pointer.offset * sizeof_uint64;
+              Slice.len        = sizeof_uint64;
+            } in
+            let tag_bytes = {
+              content_pointer_bytes with
+              Slice.start = Slice.get_end content_pointer_bytes;
+            } in
+            match (decode_pointer content_pointer_bytes, decode_pointer tag_bytes) with
+            | (Pointer.Far content_pointer, Pointer.List list_pointer) ->
+                Object.List (make_list_storage
+                  ~message
+                  ~segment_id:content_pointer.FarPointer.segment_id
+                  ~segment_offset:(content_pointer.FarPointer.offset * sizeof_uint64)
+                  ~list_pointer)
+            | (Pointer.Far content_pointer, Pointer.Struct struct_pointer) ->
+                let segment_id = content_pointer.FarPointer.segment_id in
+                let data = {
+                  Slice.msg = message;
+                  Slice.segment = Message.get_segment message segment_id;
+                  Slice.segment_id;
+                  Slice.start = content_pointer.FarPointer.offset * sizeof_uint64;
+                  Slice.len = struct_pointer.StructPointer.data_words * sizeof_uint64;
+                } in
+                let pointers = {
+                  data with
+                  Slice.start = Slice.get_end data;
+                  Slice.len =
+                    struct_pointer.StructPointer.pointer_words * sizeof_uint64;
+                } in
+                let () = bounds_check_slice_exn
+                    ~err:"struct-tagged far pointer describes invalid data region"
+                    data
+                in
+                let () = bounds_check_slice_exn
+                    ~err:"struct-tagged far pointer describes invalid pointers region"
+                    pointers
+                in
+                Object.Struct { StructStorage.data; StructStorage.pointers; }
+            | _ ->
+                invalid_msg "tagged far pointer points to invalid landing pad"
+      
+      
+      (* Given a range of eight bytes which represent a pointer, get the object which
+         the pointer points to. *)
+      and deref_pointer (pointer_bytes : 'cap Slice.t) : 'cap Object.t =
+        let pointer64 = Slice.get_int64 pointer_bytes 0 in
+        if Util.is_int64_zero pointer64 then
+          Object.None
+        else
+          let pointer64 = Slice.get_int64 pointer_bytes 0 in
+          let tag_bits = Caml.Int64.to_int pointer64 in
+          let tag = tag_bits land Pointer.Bitfield.tag_mask in
+          (* OCaml won't match an int against let-bound variables,
+             only against constants. *)
+          match tag with
+          | 0x0 ->  (* Pointer.Bitfield.tag_val_struct *)
+              let struct_pointer = StructPointer.decode pointer64 in
+              let open StructPointer in
+              let data = {
+                pointer_bytes with
+                Slice.start =
+                  (Slice.get_end pointer_bytes) + (struct_pointer.offset * sizeof_uint64);
+                Slice.len = struct_pointer.data_words * sizeof_uint64;
+              } in
+              let pointers = {
+                data with
+                Slice.start = Slice.get_end data;
+                Slice.len   = struct_pointer.pointer_words * sizeof_uint64;
+              } in
+              let () = bounds_check_slice_exn
+                ~err:"struct pointer describes invalid data region" data
+              in
+              let () = bounds_check_slice_exn
+                ~err:"struct pointer describes invalid pointers region" pointers
+              in
+              Object.Struct { StructStorage.data; StructStorage.pointers; }
+          | 0x1 ->  (* Pointer.Bitfield.tag_val_list *)
+              let list_pointer = ListPointer.decode pointer64 in
+              Object.List (make_list_storage
+                ~message:pointer_bytes.Slice.msg
+                ~segment_id:pointer_bytes.Slice.segment_id
+                ~segment_offset:((Slice.get_end pointer_bytes) +
+                                   (list_pointer.ListPointer.offset * sizeof_uint64))
+                ~list_pointer)
+          | 0x2 ->  (* Pointer.Bitfield.tag_val_far *)
+              let far_pointer = FarPointer.decode pointer64 in
+              deref_far_pointer far_pointer pointer_bytes.Slice.msg
+          | 0x3 ->  (* Pointer.Bitfield.tag_val_other *)
+              let other_pointer = OtherPointer.decode pointer64 in
+              let (OtherPointer.Capability index) = other_pointer in
+              Object.Capability index
+          | _ ->
+              assert false
+      
+      
+      module ListDecoders = struct
+        type ('cap, 'a) struct_decoders_t = {
+          bytes     : 'cap Slice.t -> 'a;
+          pointer   : 'cap Slice.t -> 'a;
+          composite : 'cap StructStorage.t -> 'a;
+        }
+      
+        type ('cap, 'a) t =
+          | Empty of (unit -> 'a)
+          | Bit of (bool -> 'a)
+          | Bytes1 of ('cap Slice.t -> 'a)
+          | Bytes2 of ('cap Slice.t -> 'a)
+          | Bytes4 of ('cap Slice.t -> 'a)
+          | Bytes8 of ('cap Slice.t -> 'a)
+          | Pointer of ('cap Slice.t -> 'a)
+          | Struct of ('cap, 'a) struct_decoders_t
+      end
+      
+      
+      module ListCodecs = struct
+        type 'a struct_codecs_t = {
+          bytes     : (rw Slice.t -> 'a) * ('a -> rw Slice.t -> unit);
+          pointer   : (rw Slice.t -> 'a) * ('a -> rw Slice.t -> unit);
+          composite : (rw StructStorage.t -> 'a) * ('a -> rw StructStorage.t -> unit);
+        }
+      
+        type 'a t =
+          | Empty of (unit -> 'a) * ('a -> unit)
+          | Bit of (bool -> 'a) * ('a -> bool)
+          | Bytes1 of (rw Slice.t -> 'a) * ('a -> rw Slice.t -> unit)
+          | Bytes2 of (rw Slice.t -> 'a) * ('a -> rw Slice.t -> unit)
+          | Bytes4 of (rw Slice.t -> 'a) * ('a -> rw Slice.t -> unit)
+          | Bytes8 of (rw Slice.t -> 'a) * ('a -> rw Slice.t -> unit)
+          | Pointer of (rw Slice.t -> 'a) * ('a -> rw Slice.t -> unit)
+          | Struct of 'a struct_codecs_t
+      end
+      
+      let _dummy = ref true
+      
+      let make_array_readonly
+          (list_storage : 'cap ListStorage.t)
+          (decoders : ('cap, 'a) ListDecoders.t)
+        : (ro, 'a, 'cap ListStorage.t) InnerArray.t =
+        let make_element_slice ls i byte_count = {
+          ls.ListStorage.storage with
+          Slice.start = ls.ListStorage.storage.Slice.start + (i * byte_count);
+          Slice.len = byte_count;
+        } in
+        let length = list_storage.ListStorage.num_elements in
+        (* Note: the following is attempting to strike a balance between
+         * (1) building InnerArray.get_unsafe closures that do as little work as
+         *     possible and
+         * (2) making the closure calling convention as efficient as possible.
+         *
+         * A naive implementation of this getter can result in quite slow code. *)
+        match list_storage.ListStorage.storage_type with
+        | ListStorageType.Empty ->
+            begin match decoders with
+            | ListDecoders.Empty decode ->
+                let ro_get_unsafe_void ls i = decode () in {
+                  InnerArray.length;
+                  InnerArray.init = InnerArray.invalid_init;
+                  InnerArray.get_unsafe = ro_get_unsafe_void;
+                  InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<Void> where a different list type was expected"
+            end
+        | ListStorageType.Bit ->
+            begin match decoders with
+            | ListDecoders.Bit decode ->
+                let ro_get_unsafe_bool ls i =
+                  let byte_ofs = i / 8 in
+                  let bit_ofs  = i mod 8 in
+                  let byte_val =
+                    Slice.get_uint8 ls.ListStorage.storage byte_ofs
+                  in
+                  decode ((byte_val land (1 lsl bit_ofs)) <> 0)
+                in {
+                  InnerArray.length;
+                  InnerArray.init = InnerArray.invalid_init;
+                  InnerArray.get_unsafe = ro_get_unsafe_bool;
+                  InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<Bool> where a different list type was expected"
+            end
+        | ListStorageType.Bytes1 ->
+            begin match decoders with
+            | ListDecoders.Bytes1 decode
+            | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
+                let ro_get_unsafe_bytes1 ls i = decode (make_element_slice ls i 1) in {
+                  InnerArray.length;
+                  InnerArray.init = InnerArray.invalid_init;
+                  InnerArray.get_unsafe = ro_get_unsafe_bytes1;
+                  InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<1 byte> where a different list type was expected"
+            end
+        | ListStorageType.Bytes2 ->
+            begin match decoders with
+            | ListDecoders.Bytes2 decode
+            | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
+                let ro_get_unsafe_bytes2 ls i = decode (make_element_slice ls i 2) in {
+                  InnerArray.length;
+                  InnerArray.init = InnerArray.invalid_init;
+                  InnerArray.get_unsafe = ro_get_unsafe_bytes2;
+                  InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<2 byte> where a different list type was expected"
+            end
+        | ListStorageType.Bytes4 ->
+            begin match decoders with
+            | ListDecoders.Bytes4 decode
+            | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
+                let ro_get_unsafe_bytes4 ls i = decode (make_element_slice ls i 4) in {
+                  InnerArray.length;
+                  InnerArray.init = InnerArray.invalid_init;
+                  InnerArray.get_unsafe = ro_get_unsafe_bytes4;
+                  InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<4 byte> where a different list type was expected"
+            end
+        | ListStorageType.Bytes8 ->
+            begin match decoders with
+            | ListDecoders.Bytes8 decode
+            | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
+                let ro_get_unsafe_bytes8 ls i = decode (make_element_slice ls i 8) in {
+                  InnerArray.length;
+                  InnerArray.init = InnerArray.invalid_init;
+                  InnerArray.get_unsafe = ro_get_unsafe_bytes8;
+                  InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<8 byte> where a different list type was expected"
+            end
+        | ListStorageType.Pointer ->
+            begin match decoders with
+            | ListDecoders.Pointer decode
+            | ListDecoders.Struct { ListDecoders.pointer = decode; _ } ->
+                let ro_get_unsafe_pointer ls i = decode (make_element_slice ls i sizeof_uint64) in {
+                  InnerArray.length;
+                  InnerArray.init = InnerArray.invalid_init;
+                  InnerArray.get_unsafe = ro_get_unsafe_pointer;
+                  InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<pointer> a different list type was expected"
+            end
+        | ListStorageType.Composite (data_words, pointer_words) ->
+            let data_size     = data_words * sizeof_uint64 in
+            let pointers_size = pointer_words * sizeof_uint64 in
+            let make_storage ls i ~data_size ~pointers_size =
+              let total_size = data_size + pointers_size in
+              (* Skip over the composite tag word *)
+              let content_offset =
+                ls.ListStorage.storage.Slice.start + sizeof_uint64
+              in
+              let data = {
+                ls.ListStorage.storage with
+                Slice.start = content_offset + (i * total_size);
+                Slice.len = data_size;
+              } in
+              let pointers = {
+                data with
+                Slice.start = Slice.get_end data;
+                Slice.len   = pointers_size;
+              } in
+              { StructStorage.data; StructStorage.pointers; }
+            in
+            let make_bytes_handler ~size ~decode =
+              if data_words = 0 then
+                invalid_msg
+                  "decoded List<composite> with empty data region where data was expected"
+              else
+                let ro_get_unsafe_composite_bytes ls i =
+                  let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                  let slice = {
+                    struct_storage.StructStorage.data with
+                    Slice.len = size
+                  } in
+                  decode slice
+                in {
+                  InnerArray.length;
+                  InnerArray.init = InnerArray.invalid_init;
+                  InnerArray.get_unsafe = ro_get_unsafe_composite_bytes;
+                  InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                  InnerArray.storage = Some list_storage;
+                }
+            in
+            begin match decoders with
+            | ListDecoders.Empty decode ->
+                let ro_get_unsafe_composite_void ls i = decode () in {
+                  InnerArray.length;
+                  InnerArray.init = InnerArray.invalid_init;
+                  InnerArray.get_unsafe = ro_get_unsafe_composite_void;
+                  InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                  InnerArray.storage = Some list_storage;
+                }
+            | ListDecoders.Bit decode ->
+                if data_words = 0 then
+                  invalid_msg
+                    "decoded List<composite> with empty data region where data was expected"
+                else
+                  let ro_get_unsafe_composite_bool ls i =
+                    let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                    let first_byte = Slice.get_uint8 struct_storage.StructStorage.data 0 in
+                    let is_set = (first_byte land 0x1) <> 0 in
+                    decode is_set
+                  in {
+                    InnerArray.length;
+                    InnerArray.init = InnerArray.invalid_init;
+                    InnerArray.get_unsafe = ro_get_unsafe_composite_bool;
+                    InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                    InnerArray.storage = Some list_storage;
+                  }
+            | ListDecoders.Bytes1 decode ->
+                make_bytes_handler ~size:1 ~decode
+            | ListDecoders.Bytes2 decode ->
+                make_bytes_handler ~size:2 ~decode
+            | ListDecoders.Bytes4 decode ->
+                make_bytes_handler ~size:4 ~decode
+            | ListDecoders.Bytes8 decode ->
+                make_bytes_handler ~size:8 ~decode
+            | ListDecoders.Pointer decode ->
+                if pointer_words = 0 then
+                  invalid_msg
+                    "decoded List<composite> with empty pointers region where \
+                     pointers were expected"
+                else
+                  let ro_get_unsafe_composite_pointer ls i =
+                    let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                    let slice = {
+                      struct_storage.StructStorage.pointers with
+                      Slice.len = sizeof_uint64
+                    } in
+                    decode slice
+                  in {
+                    InnerArray.length;
+                    InnerArray.init = InnerArray.invalid_init;
+                    InnerArray.get_unsafe = ro_get_unsafe_composite_pointer;
+                    InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                    InnerArray.storage = Some list_storage;
+                  }
+            | ListDecoders.Struct struct_decoders ->
+                let ro_get_unsafe_composite_struct ls i =
+                  let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                  struct_decoders.ListDecoders.composite struct_storage
+                in {
+                  InnerArray.length;
+                  InnerArray.init = InnerArray.invalid_init;
+                  InnerArray.get_unsafe = ro_get_unsafe_composite_struct;
+                  InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                  InnerArray.storage = Some list_storage;
+                }
+            end
+      
+      
+      let make_array_readwrite
+          ~(list_storage : rw ListStorage.t)
+          ~(init : int -> rw ListStorage.t)
+          ~(codecs : 'a ListCodecs.t)
+        : (rw, 'a, rw ListStorage.t) InnerArray.t =
+        let make_element_slice ls i byte_count = {
+          ls.ListStorage.storage with
+          Slice.start = ls.ListStorage.storage.Slice.start + (i * byte_count);
+          Slice.len = byte_count;
+        } in
+        let length = list_storage.ListStorage.num_elements in
+        (* Note: the following is attempting to strike a balance between
+         * (1) building InnerArray.get_unsafe/set_unsafe closures that do as little
+         *     work as possible and
+         * (2) making the closure calling convention as efficient as possible.
+         *
+         * A naive implementation of these accessors can result in quite slow code. *)
+        match list_storage.ListStorage.storage_type with
+        | ListStorageType.Empty ->
+            begin match codecs with
+            | ListCodecs.Empty (decode, encode) ->
+                let rw_get_unsafe_void ls i = decode () in
+                let rw_set_unsafe_void ls i v = encode v in {
+                  InnerArray.length;
+                  InnerArray.init;
+                  InnerArray.get_unsafe = rw_get_unsafe_void;
+                  InnerArray.set_unsafe = rw_set_unsafe_void;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<Void> where a different list type was expected"
+            end
+        | ListStorageType.Bit ->
+            begin match codecs with
+            | ListCodecs.Bit (decode, encode) ->
+                let rw_get_unsafe_bool ls i =
+                  let byte_ofs = i / 8 in
+                  let bit_ofs  = i mod 8 in
+                  let byte_val =
+                    Slice.get_uint8 ls.ListStorage.storage byte_ofs
+                  in
+                  decode ((byte_val land (1 lsl bit_ofs)) <> 0)
+                in
+                let rw_set_unsafe_bool ls i v =
+                  let byte_ofs = i / 8 in
+                  let bit_ofs  = i mod 8 in
+                  let bitmask  = 1 lsl bit_ofs in
+                  let old_byte_val =
+                    Slice.get_uint8 ls.ListStorage.storage byte_ofs
+                  in
+                  let new_byte_val =
+                    if encode v then
+                      old_byte_val lor bitmask
+                    else
+                      old_byte_val land (lnot bitmask)
+                  in
+                  Slice.set_uint8 ls.ListStorage.storage byte_ofs new_byte_val
+                in {
+                  InnerArray.length;
+                  InnerArray.init;
+                  InnerArray.get_unsafe = rw_get_unsafe_bool;
+                  InnerArray.set_unsafe = rw_set_unsafe_bool;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<Bool> where a different list type was expected"
+            end
+        | ListStorageType.Bytes1 ->
+            begin match codecs with
+            | ListCodecs.Bytes1 (decode, encode)
+            | ListCodecs.Struct { ListCodecs.bytes = (decode, encode); _ } ->
+                let rw_get_unsafe_bytes1 ls i = decode (make_element_slice ls i 1) in
+                let rw_set_unsafe_bytes1 ls i v = encode v (make_element_slice ls i 1) in {
+                  InnerArray.length;
+                  InnerArray.init;
+                  InnerArray.get_unsafe = rw_get_unsafe_bytes1;
+                  InnerArray.set_unsafe = rw_set_unsafe_bytes1;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<1 byte> where a different list type was expected"
+            end
+        | ListStorageType.Bytes2 ->
+            begin match codecs with
+            | ListCodecs.Bytes2 (decode, encode)
+            | ListCodecs.Struct { ListCodecs.bytes = (decode, encode); _ } ->
+                let rw_get_unsafe_bytes2 ls i = decode (make_element_slice ls i 2) in
+                let rw_set_unsafe_bytes2 ls i v = encode v (make_element_slice ls i 2) in {
+                  InnerArray.length;
+                  InnerArray.init;
+                  InnerArray.get_unsafe = rw_get_unsafe_bytes2;
+                  InnerArray.set_unsafe = rw_set_unsafe_bytes2;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<2 byte> where a different list type was expected"
+            end
+        | ListStorageType.Bytes4 ->
+            begin match codecs with
+            | ListCodecs.Bytes4 (decode, encode)
+            | ListCodecs.Struct { ListCodecs.bytes = (decode, encode); _ } ->
+                let rw_get_unsafe_bytes4 ls i = decode (make_element_slice ls i 4) in
+                let rw_set_unsafe_bytes4 ls i v = encode v (make_element_slice ls i 4) in {
+                  InnerArray.length;
+                  InnerArray.init;
+                  InnerArray.get_unsafe = rw_get_unsafe_bytes4;
+                  InnerArray.set_unsafe = rw_set_unsafe_bytes4;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<4 byte> where a different list type was expected"
+            end
+        | ListStorageType.Bytes8 ->
+            begin match codecs with
+            | ListCodecs.Bytes8 (decode, encode)
+            | ListCodecs.Struct { ListCodecs.bytes = (decode, encode); _ } ->
+                let rw_get_unsafe_bytes8 ls i = decode (make_element_slice ls i 8) in
+                let rw_set_unsafe_bytes8 ls i v = encode v (make_element_slice ls i 8) in {
+                  InnerArray.length;
+                  InnerArray.init;
+                  InnerArray.get_unsafe = rw_get_unsafe_bytes8;
+                  InnerArray.set_unsafe = rw_set_unsafe_bytes8;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<8 byte> where a different list type was expected"
+            end
+        | ListStorageType.Pointer ->
+            begin match codecs with
+            | ListCodecs.Pointer (decode, encode)
+            | ListCodecs.Struct { ListCodecs.pointer = (decode, encode); _ } ->
+                let rw_get_unsafe_ptr ls i =
+                  decode (make_element_slice ls i sizeof_uint64)
+                in
+                let rw_set_unsafe_ptr ls i v =
+                  encode v (make_element_slice ls i sizeof_uint64)
+                in {
+                  InnerArray.length;
+                  InnerArray.init;
+                  InnerArray.get_unsafe = rw_get_unsafe_ptr;
+                  InnerArray.set_unsafe = rw_set_unsafe_ptr;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<pointer> where a different list type was expected"
+            end
+        | ListStorageType.Composite (data_words, pointer_words) ->
+            let data_size     = data_words * sizeof_uint64 in
+            let pointers_size = pointer_words * sizeof_uint64 in
+            let make_storage ls i ~data_size ~pointers_size =
+              let total_size    = data_size + pointers_size in
+              (* Skip over the composite tag word *)
+              let content_offset =
+                ls.ListStorage.storage.Slice.start + sizeof_uint64
+              in
+              let data = {
+                ls.ListStorage.storage with
+                Slice.start = content_offset + (i * total_size);
+                Slice.len = data_size;
+              } in
+              let pointers = {
+                data with
+                Slice.start = Slice.get_end data;
+                Slice.len   = pointers_size;
+              } in
+              { StructStorage.data; StructStorage.pointers; }
+            in
+            let make_bytes_handlers ~size ~decode ~encode =
+              if data_words = 0 then
+                invalid_msg
+                  "decoded List<composite> with empty data region where data was expected"
+              else
+                let rw_get_unsafe_composite_bytes ls i =
+                  let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                  let slice = {
+                    struct_storage.StructStorage.data with
+                    Slice.len = size
+                  } in
+                  decode slice
+                in
+                let rw_set_unsafe_composite_bytes ls i v =
+                  let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                  let slice = {
+                    struct_storage.StructStorage.data with
+                    Slice.len = size
+                  } in
+                  encode v slice
+                in {
+                  InnerArray.length;
+                  InnerArray.init;
+                  InnerArray.get_unsafe = rw_get_unsafe_composite_bytes;
+                  InnerArray.set_unsafe = rw_set_unsafe_composite_bytes;
+                  InnerArray.storage = Some list_storage;
+                }
+            in
+            begin match codecs with
+            | ListCodecs.Empty (decode, encode) ->
+                let rw_get_unsafe_composite_void ls i = decode () in
+                let rw_set_unsafe_composite_void ls i v = encode v in {
+                  InnerArray.length;
+                  InnerArray.init;
+                  InnerArray.get_unsafe = rw_get_unsafe_composite_void;
+                  InnerArray.set_unsafe = rw_set_unsafe_composite_void;
+                  InnerArray.storage = Some list_storage;
+                }
+            | ListCodecs.Bit (decode, encode) ->
+                if data_words = 0 then
+                  invalid_msg
+                    "decoded List<composite> with empty data region where data was expected"
+                else
+                  let rw_get_unsafe_composite_bool ls i =
+                    let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                    let first_byte = Slice.get_uint8 struct_storage.StructStorage.data 0 in
+                    let is_set = (first_byte land 0x1) <> 0 in
+                    decode is_set
+                  in
+                  let rw_set_unsafe_composite_bool ls i v =
+                    let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                    let first_byte =
+                      Slice.get_uint8 struct_storage.StructStorage.data 0
+                    in
+                    let first_byte =
+                      if encode v then first_byte lor 0x1 else first_byte land 0xfe
+                    in
+                    Slice.set_uint8 struct_storage.StructStorage.data 0 first_byte
+                  in {
+                    InnerArray.length;
+                    InnerArray.init;
+                    InnerArray.get_unsafe = rw_get_unsafe_composite_bool;
+                    InnerArray.set_unsafe = rw_set_unsafe_composite_bool;
+                    InnerArray.storage = Some list_storage;
+                  }
+            | ListCodecs.Bytes1 (decode, encode) ->
+                make_bytes_handlers ~size:1 ~decode ~encode
+            | ListCodecs.Bytes2 (decode, encode) ->
+                make_bytes_handlers ~size:2 ~decode ~encode
+            | ListCodecs.Bytes4 (decode, encode) ->
+                make_bytes_handlers ~size:4 ~decode ~encode
+            | ListCodecs.Bytes8 (decode, encode) ->
+                make_bytes_handlers ~size:8 ~decode ~encode
+            | ListCodecs.Pointer (decode, encode) ->
+                if pointer_words = 0 then
+                  invalid_msg
+                    "decoded List<composite> with empty pointers region where \
+                     pointers were expected"
+                else
+                  let rw_get_unsafe_composite_ptr ls i =
+                    let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                    let slice = {
+                      struct_storage.StructStorage.pointers with
+                      Slice.len = sizeof_uint64
+                    } in
+                    decode slice
+                  in
+                  let rw_set_unsafe_composite_ptr ls i v =
+                    let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                    let slice = {
+                      struct_storage.StructStorage.pointers with
+                      Slice.len = sizeof_uint64
+                    } in
+                    encode v slice
+                  in {
+                    InnerArray.length;
+                    InnerArray.init;
+                    InnerArray.get_unsafe = rw_get_unsafe_composite_ptr;
+                    InnerArray.set_unsafe = rw_set_unsafe_composite_ptr;
+                    InnerArray.storage = Some list_storage;
+                  }
+            | ListCodecs.Struct { ListCodecs.composite = (decode, encode); _ } ->
+                let rw_get_unsafe_composite_struct ls i =
+                  decode (make_storage ls i ~data_size ~pointers_size)
+                in
+                let rw_set_unsafe_composite_struct ls i v =
+                  encode v (make_storage ls i ~data_size ~pointers_size)
+                in {
+                  InnerArray.length;
+                  InnerArray.init;
+                  InnerArray.get_unsafe = rw_get_unsafe_composite_struct;
+                  InnerArray.set_unsafe = rw_set_unsafe_composite_struct;
+                  InnerArray.storage = Some list_storage;
+                }
+            end
+      
+      
+      (* Given list storage which is expected to contain UInt8 data, decode the data as
+         an OCaml string. *)
+      let string_of_uint8_list
+          ~(null_terminated : bool)   (* true if the data is expected to end in 0 *)
+          (list_storage : 'cap ListStorage.t)
+        : string =
+        let open ListStorage in
+        match list_storage.storage_type with
+        | ListStorageType.Bytes1 ->
+            let result_byte_count =
+              if null_terminated then
+                let () =
+                  if list_storage.num_elements < 1 then
+                    invalid_msg "empty string list has no space for null terminator"
+                in
+                let terminator =
+                  Slice.get_uint8 list_storage.storage (list_storage.num_elements - 1)
+                in
+                let () = if terminator <> 0 then
+                  invalid_msg "string list is not null terminated"
+                in
+                list_storage.num_elements - 1
+              else
+                list_storage.num_elements
+            in
+            let buf = Bytes.create result_byte_count in
+            let () =
+              for i = 0 to result_byte_count - 1 do
+                Bytes.set buf i (Char.of_int_exn (Slice.get_uint8 list_storage.storage i))
+              done
+            in
+            Bytes.to_string buf
+        | _ ->
+            invalid_msg "decoded non-UInt8 list where string data was expected"
+      
+      
+      let struct_of_bytes_slice slice =
+        let data = slice in
+        let pointers = {
+          slice with
+          Slice.start = Slice.get_end data;
+          Slice.len   = 0;
+        } in
+        { StructStorage.data; StructStorage.pointers }
+      
+      let struct_of_pointer_slice slice =
+        let () = assert (slice.Slice.len = sizeof_uint64) in
+        let data = {
+          slice with
+          Slice.len = 0
+        } in
+        let pointers = {
+          slice with
+          Slice.len = sizeof_uint64;
+        } in
+        { StructStorage.data; StructStorage.pointers }
+      
+      
+      (* Given some list storage corresponding to a struct list, construct
+         a function for mapping an element index to the associated
+         struct storage. *)
+      let make_struct_of_list_index list_storage =
+        let storage      = list_storage.ListStorage.storage in
+        let storage_type = list_storage.ListStorage.storage_type in
+        match list_storage.ListStorage.storage_type with
+        | ListStorageType.Empty ->
+            let make_struct_of_list_index_void i =
+              let slice = {
+                storage with
+                Slice.start = storage.Slice.start;
+                Slice.len   = 0;
+              } in
+              struct_of_bytes_slice slice
+            in
+            make_struct_of_list_index_void
+        | ListStorageType.Bytes1
+        | ListStorageType.Bytes2
+        | ListStorageType.Bytes4
+        | ListStorageType.Bytes8 ->
+            (* Short data-only struct *)
+            let byte_count = ListStorageType.get_byte_count storage_type in
+            let make_struct_of_list_index_bytes i =
+              let slice = {
+                storage with
+                Slice.start = storage.Slice.start + (i * byte_count);
+                Slice.len   = byte_count;
+              } in
+              struct_of_bytes_slice slice
+            in
+            make_struct_of_list_index_bytes
+        | ListStorageType.Pointer ->
+            (* Single-pointer struct *)
+            let make_struct_of_list_index_pointer i =
+              let slice = {
+                storage with
+                Slice.start = (storage.Slice.start) + (i * sizeof_uint64);
+                Slice.len   = sizeof_uint64;
+              } in
+              struct_of_pointer_slice slice
+            in
+            make_struct_of_list_index_pointer
+        | ListStorageType.Composite (data_words, pointer_words) ->
+            let data_size     = data_words * sizeof_uint64 in
+            let pointers_size = pointer_words * sizeof_uint64 in
+            let element_size  = data_size + pointers_size in
+            (* Skip over the composite tag word *)
+            let content_offset = storage.Slice.start + sizeof_uint64 in
+            let make_struct_of_list_index_composite i =
+              let data = {
+                storage with
+                Slice.start = content_offset + (i * element_size);
+                Slice.len   = data_size;
+              } in
+              let pointers = {
+                storage with
+                Slice.start = Slice.get_end data;
+                Slice.len   = pointers_size;
+              } in
+              { StructStorage.data; StructStorage.pointers }
+            in
+            make_struct_of_list_index_composite
+        | ListStorageType.Bit ->
+            invalid_msg "decoded List<Bool> where List<composite> was expected"
+      
+      
+    end
+    include RC
+
+    (* Given a pointer which is expected to be a list pointer, compute the
+       corresponding list storage descriptor.  Returns None if the pointer is
+       null. *)
+    let deref_list_pointer (pointer_bytes : 'cap Slice.t)
+      : 'cap ListStorage.t option =
+      match deref_pointer pointer_bytes with
+      | Object.None ->
+          None
+      | Object.List list_descr ->
+          Some list_descr
+      | Object.Struct _ ->
+          invalid_msg "decoded struct pointer where list pointer was expected"
+      | Object.Capability _ ->
+          invalid_msg "decoded capability pointer where list pointer was expected"
+
+
+    (* Given a pointer which is expected to be a struct pointer, compute the
+       corresponding struct storage descriptor.  Returns None if the pointer is
+       null. *)
+    let deref_struct_pointer (pointer_bytes : 'cap Slice.t)
+      : 'cap StructStorage.t option =
+      match deref_pointer pointer_bytes with
+      | Object.None ->
+          None
+      | Object.Struct struct_descr ->
+          Some struct_descr
+      | Object.List _ ->
+          invalid_msg "decoded list pointer where struct pointer was expected"
+      | Object.Capability _ ->
+          invalid_msg "decoded capability pointer where struct pointer was expected"
+
+
+    let void_list_decoders =
+      ListDecoders.Empty (fun (x : unit) -> x)
+
+    let bit_list_decoders =
+      ListDecoders.Bit (fun (x : bool) -> x)
+
+    let int8_list_decoders =
+      ListDecoders.Bytes1 (fun slice -> Slice.get_int8 slice 0)
+
+    let int16_list_decoders =
+      ListDecoders.Bytes2 (fun slice -> Slice.get_int16 slice 0)
+
+    let int32_list_decoders =
+      ListDecoders.Bytes4 (fun slice -> Slice.get_int32 slice 0)
+
+    let int64_list_decoders =
+      ListDecoders.Bytes8 (fun slice -> Slice.get_int64 slice 0)
+
+    let uint8_list_decoders =
+      ListDecoders.Bytes1 (fun slice -> Slice.get_uint8 slice 0)
+
+    let uint16_list_decoders =
+      ListDecoders.Bytes2 (fun slice -> Slice.get_uint16 slice 0)
+
+    let uint32_list_decoders =
+      ListDecoders.Bytes4 (fun slice -> Slice.get_uint32 slice 0)
+
+    let uint64_list_decoders =
+      ListDecoders.Bytes8 (fun slice -> Slice.get_uint64 slice 0)
+
+    let float32_list_decoders = ListDecoders.Bytes4
+        (fun slice -> Int32.float_of_bits (Slice.get_int32 slice 0))
+
+    let float64_list_decoders = ListDecoders.Bytes8
+        (fun slice -> Int64.float_of_bits (Slice.get_int64 slice 0))
+
+    let text_list_decoders = ListDecoders.Pointer (fun slice ->
+        match deref_list_pointer slice with
+        | Some list_storage ->
+            string_of_uint8_list ~null_terminated:true list_storage
+        | None ->
+            "")
+
+    let blob_list_decoders = ListDecoders.Pointer (fun slice ->
+        match deref_list_pointer slice with
+        | Some list_storage ->
+            string_of_uint8_list ~null_terminated:false list_storage
+        | None ->
+            "")
+
+    let struct_list_decoders =
+      let struct_decoders =
+        let bytes slice = Some {
+            StructStorage.data = slice;
+            StructStorage.pointers = {
+              slice with
+              Slice.start = Slice.get_end slice;
+              Slice.len   = 0;
+            };
+          }
+        in
+        let pointer slice = Some {
+            StructStorage.data = {
+              slice with
+              Slice.len = 0;
+            };
+            StructStorage.pointers = slice;
+          }
+        in
+        let composite x = Some x in {
+          ListDecoders.bytes;
+          ListDecoders.pointer;
+          ListDecoders.composite;
+        }
+      in
+      ListDecoders.Struct struct_decoders
+
+
+    (* Locate the storage region corresponding to the root struct of a message. *)
+    let get_root_struct (m : 'cap Message.t) : 'cap StructStorage.t option =
+      let first_segment = Message.get_segment m 0 in
+      if Segment.length first_segment < sizeof_uint64 then
+        None
+      else
+        let pointer_bytes = {
+          Slice.msg        = m;
+          Slice.segment    = first_segment;
+          Slice.segment_id = 0;
+          Slice.start      = 0;
+          Slice.len        = sizeof_uint64
+        } in
+        deref_struct_pointer pointer_bytes
+
+
+    (*******************************************************************************
+     * METHODS FOR GETTING OBJECTS STORED BY VALUE
+     *******************************************************************************)
+
+    (* Given storage for a struct, attempt to get the bytes associated
+       with the struct data section. *)
+    let get_data_region
+        (struct_storage_opt : 'cap StructStorage.t option)
+      : 'cap Slice.t option =
+      match struct_storage_opt with
+      | Some struct_storage ->
+          Some struct_storage.StructStorage.data
+      | None ->
+          None
+
+
+    let get_void
+        (data_opt : 'cap Slice.t option)
+      : unit =
+      ()
+
+    let get_bit
+        ~(default : bool)
+        ~(byte_ofs : int)
+        ~(bit_ofs : int)
+        (data_opt : 'cap Slice.t option)
+      : bool =
+      let byte_val =
+        match data_opt with
+        | Some data when byte_ofs < data.Slice.len ->
+            Slice.get_uint8 data byte_ofs
+        | _ ->
+            0
+      in
+      let bit_val = (byte_val land (1 lsl bit_ofs)) <> 0 in
+      if default then not bit_val else bit_val
+
+    let get_int8
+        ~(default : int)
+        ~(byte_ofs : int)
+        (data_opt : 'cap Slice.t option)
+      : int =
+      let numeric =
+        match data_opt with
+        | Some data when byte_ofs < data.Slice.len ->
+            Slice.get_int8 data byte_ofs
+        | _ ->
+            0
+      in
+      numeric lxor default
+
+    let get_int16
+        ~(default : int)
+        ~(byte_ofs : int)
+        (data_opt : 'cap Slice.t option)
+      : int =
+      let numeric =
+        match data_opt with
+        | Some data when byte_ofs + 1 < data.Slice.len ->
+            Slice.get_int16 data byte_ofs
+        | _ ->
+            0
+      in
+      numeric lxor default
+
+    let get_int32
+        ~(default : int32)
+        ~(byte_ofs : int)
+        (data_opt : 'cap Slice.t option)
+        : int32 =
+      let numeric =
+        match data_opt with
+        | Some data when byte_ofs + 3 < data.Slice.len ->
+            Slice.get_int32 data byte_ofs
+        | _ ->
+            Int32.zero
+      in
+      Int32.bit_xor numeric default
+
+    let get_int64
+        ~(default : int64)
+        ~(byte_ofs : int)
+        (data_opt : 'cap Slice.t option)
+      : int64 =
+      let numeric =
+        match data_opt with
+        | Some data when byte_ofs + 7 < data.Slice.len ->
+            Slice.get_int64 data byte_ofs
+        | _ ->
+            Int64.zero
+      in
+      Int64.bit_xor numeric default
+
+    let get_uint8
+        ~(default : int)
+        ~(byte_ofs : int)
+        (data_opt : 'cap Slice.t option)
+      : int =
+      let numeric =
+        match data_opt with
+        | Some data when byte_ofs < data.Slice.len ->
+            Slice.get_uint8 data byte_ofs
+        | _ ->
+            0
+      in
+      numeric lxor default
+
+    let get_uint16
+        ~(default : int)
+        ~(byte_ofs : int)
+        (data_opt : 'cap Slice.t option)
+      : int =
+      let numeric =
+        match data_opt with
+        | Some data when byte_ofs + 1 < data.Slice.len ->
+            Slice.get_uint16 data byte_ofs
+        | _ ->
+            0
+      in
+      numeric lxor default
+
+    let get_uint32
+        ~(default : Uint32.t)
+        ~(byte_ofs : int)
+        (data_opt : 'cap Slice.t option)
+        : Uint32.t =
+      let numeric =
+        match data_opt with
+        | Some data when byte_ofs + 3 < data.Slice.len ->
+            Slice.get_uint32 data byte_ofs
+        | _ ->
+            Uint32.zero
+      in
+      Uint32.logxor numeric default
+
+    let get_uint64
+        ~(default : Uint64.t)
+        ~(byte_ofs : int)
+        (data_opt : 'cap Slice.t option)
+      : Uint64.t =
+      let numeric =
+        match data_opt with
+        | Some data when byte_ofs + 7 < data.Slice.len ->
+            Slice.get_uint64 data byte_ofs
+        | _ ->
+            Uint64.zero
+      in
+      Uint64.logxor numeric default
+
+    let get_float32
+        ~(default_bits : int32)
+        ~(byte_ofs : int)
+        (data_opt : 'cap Slice.t option)
+      : float =
+      let numeric =
+        match data_opt with
+        | Some data when byte_ofs + 3 < data.Slice.len ->
+            Slice.get_int32 data byte_ofs
+        | _ ->
+            Int32.zero
+      in
+      let bits = Int32.bit_xor numeric default_bits in
+      Int32.float_of_bits bits
+
+    let get_float64
+        ~(default_bits : int64)
+        ~(byte_ofs : int)
+        (data_opt : 'cap Slice.t option)
+      : float =
+      let numeric =
+        match data_opt with
+        | Some data when byte_ofs + 7 < data.Slice.len ->
+            Slice.get_int64 data byte_ofs
+        | _ ->
+            Int64.zero
+      in
+      let bits = Int64.bit_xor numeric default_bits in
+      Int64.float_of_bits bits
+
+
+    (*******************************************************************************
+     * METHODS FOR GETTING OBJECTS STORED BY POINTER
+     *******************************************************************************)
+
+    let has_field
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : bool =
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let pointers = struct_storage.StructStorage.pointers in
+          let start = pointer_word * sizeof_uint64 in
+          let len   = sizeof_uint64 in
+          if start + len <= pointers.Slice.len then
+            let pointer64 = Slice.get_int64 pointers start in
+            not (Util.is_int64_zero pointer64)
+          else
+            false
+      | None ->
+          false
+
+    let get_text
+        ~(default : string)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : string =
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let pointers = struct_storage.StructStorage.pointers in
+          let start = pointer_word * sizeof_uint64 in
+          let len   = sizeof_uint64 in
+          if start + len <= pointers.Slice.len then
+            let pointer_bytes = {
+              pointers with
+              Slice.start = pointers.Slice.start + start;
+              Slice.len   = len;
+            } in
+            match deref_list_pointer pointer_bytes with
+            | Some list_storage ->
+                string_of_uint8_list ~null_terminated:true list_storage
+            | None ->
+                default
+          else
+            default
+      | None ->
+          default
+
+    let get_blob
+        ~(default : string)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : string =
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let pointers = struct_storage.StructStorage.pointers in
+          let start = pointer_word * sizeof_uint64 in
+          let len   = sizeof_uint64 in
+          if start + len <= pointers.Slice.len then
+            let pointer_bytes = {
+              pointers with
+              Slice.start = pointers.Slice.start + start;
+              Slice.len   = len;
+            } in
+            match deref_list_pointer pointer_bytes with
+            | Some list_storage ->
+                string_of_uint8_list ~null_terminated:false list_storage
+            | None ->
+                default
+          else
+            default
+      | None ->
+          default
+
+    let get_list
+        ?(default : ro ListStorage.t option)
+        (decoders : ('cap, 'a) ListDecoders.t)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : (ro, 'a, 'cap ListStorage.t) InnerArray.t =
+      let make_default () =
+        begin match default with
+        | Some default_storage ->
+            make_array_readonly default_storage decoders
+        | None ->
+            (* Empty array *)
+            { InnerArray.length     = 0;
+              InnerArray.storage    = None;
+              InnerArray.init       = InnerArray.invalid_init;
+              InnerArray.get_unsafe = InnerArray.invalid_get_unsafe;
+              InnerArray.set_unsafe = InnerArray.invalid_set_unsafe; }
+        end
+      in
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let pointers = struct_storage.StructStorage.pointers in
+          let start = pointer_word * sizeof_uint64 in
+          let len   = sizeof_uint64 in
+          if start + len <= pointers.Slice.len then
+            let pointer_bytes = {
+              pointers with
+              Slice.start = pointers.Slice.start + start;
+              Slice.len   = len;
+            } in
+            match deref_list_pointer pointer_bytes with
+            | Some list_storage ->
+                make_array_readonly list_storage decoders
+            | None ->
+                make_default ()
+          else
+            make_default ()
+      | None ->
+          make_default ()
+
+    let get_void_list
+        ?(default : ro ListStorage.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : (ro, unit, 'cap ListStorage.t) InnerArray.t =
+      get_list ?default void_list_decoders struct_storage_opt pointer_word
+
+    let get_bit_list
+        ?(default : ro ListStorage.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : (ro, bool, 'cap ListStorage.t) InnerArray.t =
+      get_list ?default bit_list_decoders struct_storage_opt pointer_word
+
+    let get_int8_list
+        ?(default : ro ListStorage.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : (ro, int, 'cap ListStorage.t) InnerArray.t =
+      get_list ?default int8_list_decoders struct_storage_opt pointer_word
+
+    let get_int16_list
+        ?(default : ro ListStorage.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : (ro, int, 'cap ListStorage.t) InnerArray.t =
+      get_list ?default int16_list_decoders struct_storage_opt pointer_word
+
+    let get_int32_list
+        ?(default : ro ListStorage.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : (ro, int32, 'cap ListStorage.t) InnerArray.t =
+      get_list ?default int32_list_decoders struct_storage_opt pointer_word
+
+    let get_int64_list
+        ?(default : ro ListStorage.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : (ro, int64, 'cap ListStorage.t) InnerArray.t =
+      get_list ?default int64_list_decoders struct_storage_opt pointer_word
+
+    let get_uint8_list
+        ?(default : ro ListStorage.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : (ro, int, 'cap ListStorage.t) InnerArray.t =
+      get_list ?default uint8_list_decoders struct_storage_opt pointer_word
+
+    let get_uint16_list
+        ?(default : ro ListStorage.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : (ro, int, 'cap ListStorage.t) InnerArray.t =
+      get_list ?default uint16_list_decoders struct_storage_opt pointer_word
+
+    let get_uint32_list
+        ?(default : ro ListStorage.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : (ro, Uint32.t, 'cap ListStorage.t) InnerArray.t =
+      get_list ?default uint32_list_decoders struct_storage_opt pointer_word
+
+    let get_uint64_list
+        ?(default : ro ListStorage.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : (ro, Uint64.t, 'cap ListStorage.t) InnerArray.t =
+      get_list ?default uint64_list_decoders struct_storage_opt pointer_word
+
+    let get_float32_list
+        ?(default : ro ListStorage.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : (ro, float, 'cap ListStorage.t) InnerArray.t =
+      get_list ?default float32_list_decoders struct_storage_opt pointer_word
+
+    let get_float64_list
+        ?(default : ro ListStorage.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : (ro, float, 'cap ListStorage.t) InnerArray.t =
+      get_list ?default float64_list_decoders struct_storage_opt pointer_word
+
+    let get_text_list
+        ?(default : ro ListStorage.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : (ro, string, 'cap ListStorage.t) InnerArray.t =
+      get_list ?default text_list_decoders struct_storage_opt pointer_word
+
+    let get_blob_list
+        ?(default : ro ListStorage.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : (ro, string, 'cap ListStorage.t) InnerArray.t =
+      get_list ?default blob_list_decoders struct_storage_opt pointer_word
+
+    let get_struct_list
+        ?(default : ro ListStorage.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : (ro, 'cap StructStorage.t option, 'cap ListStorage.t) InnerArray.t =
+      get_list ?default struct_list_decoders struct_storage_opt pointer_word
+
+    let get_struct
+        ?(default : ro StructStorage.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : 'cap StructStorage.t option =
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let pointers = struct_storage.StructStorage.pointers in
+          let start = pointer_word * sizeof_uint64 in
+          let len   = sizeof_uint64 in
+          if start + len <= pointers.Slice.len then
+            let pointer_bytes = {
+              pointers with
+              Slice.start = pointers.Slice.start + start;
+              Slice.len   = len;
+            } in
+            match deref_struct_pointer pointer_bytes with
+            | Some storage ->
+                Some storage
+            | None ->
+                default
+          else
+            default
+      | None ->
+          default
+
+    let get_pointer
+        ?(default: ro Slice.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : 'cap Slice.t option =
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let pointers = struct_storage.StructStorage.pointers in
+          let start = pointer_word * sizeof_uint64 in
+          let len   = sizeof_uint64 in
+          if start + len <= pointers.Slice.len then
+            let pointer64 = Slice.get_int64 pointers start in
+            if Util.is_int64_zero pointer64 then
+              default
+            else
+              let pointer_bytes = {
+                pointers with
+                Slice.start = pointers.Slice.start + start;
+                Slice.len   = len;
+              } in
+              Some pointer_bytes
+          else
+            default
+      | None ->
+          default
+
+    let get_interface
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (pointer_word : int)
+      : Uint32.t option =
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let pointers = struct_storage.StructStorage.pointers in
+          let start = pointer_word * sizeof_uint64 in
+          let len   = sizeof_uint64 in
+          if start + len <= pointers.Slice.len then
+            let pointer_bytes = {
+              pointers with
+              Slice.start = pointers.Slice.start + start;
+              Slice.len   = len;
+            } in
+            match decode_pointer pointer_bytes with
+            | Pointer.Null ->
+                None
+            | Pointer.Other (OtherPointer.Capability index) ->
+                Some index
+            | _ ->
+                invalid_msg "decoded non-capability pointer where capability was expected"
+          else
+            None
+      | None ->
+          None
+
   end
   module BA_ = struct
     open Capnp.Runtime
     module NM = MessageWrapper
-    INCLUDE "builder-inc.ml"
+    (******************************************************************************
+     * capnp-ocaml
+     *
+     * Copyright (c) 2013-2014, Paul Pelzl
+     * All rights reserved.
+     *
+     * Redistribution and use in source and binary forms, with or without
+     * modification, are permitted provided that the following conditions are met:
+     *
+     *  1. Redistributions of source code must retain the above copyright notice,
+     *     this list of conditions and the following disclaimer.
+     *
+     *  2. Redistributions in binary form must reproduce the above copyright
+     *     notice, this list of conditions and the following disclaimer in the
+     *     documentation and/or other materials provided with the distribution.
+     *
+     * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+     * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+     * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+     * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+     * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+     * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+     * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+     * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+     * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+     * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+     * POSSIBILITY OF SUCH DAMAGE.
+     ******************************************************************************)
+
+    (* Runtime support for Builder interfaces.  In many ways this parallels the
+       Reader support, to the point of using the same function names; however,
+       the underlying message must be tagged as read/write, and many functions in
+       this module may allocate message space (for example, dereferencing a struct
+       pointer will cause struct storage to be immediately allocated if that pointer
+       was null). *)
+
+    open Core.Std
+
+    type ro = Message.ro
+    type rw = Message.rw
+    let invalid_msg = Message.invalid_msg
+
+    let sizeof_uint64 = 8
+
+    (* Functor parameter: NM == "native message" *)
+
+    (* DM == "defaults message", meaning "the type of messages that store default values" *)
+    module DM = Message.BytesMessage
+
+    module NC = struct
+      module MessageWrapper = NM
+      (******************************************************************************
+       * capnp-ocaml
+       *
+       * Copyright (c) 2013-2014, Paul Pelzl
+       * All rights reserved.
+       *
+       * Redistribution and use in source and binary forms, with or without
+       * modification, are permitted provided that the following conditions are met:
+       *
+       *  1. Redistributions of source code must retain the above copyright notice,
+       *     this list of conditions and the following disclaimer.
+       *
+       *  2. Redistributions in binary form must reproduce the above copyright
+       *     notice, this list of conditions and the following disclaimer in the
+       *     documentation and/or other materials provided with the distribution.
+       *
+       * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+       * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+       * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+       * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+       * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+       * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+       * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+       * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+       * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+       * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+       * POSSIBILITY OF SUCH DAMAGE.
+       ******************************************************************************)
+      
+      (* Runtime support which is common to both Reader and Builder interfaces. *)
+      
+      open Core.Std
+      
+      
+      let sizeof_uint32 = 4
+      let sizeof_uint64 = 8
+      
+      let invalid_msg      = Message.invalid_msg
+      let out_of_int_range = Message.out_of_int_range
+      type ro = Message.ro
+      type rw = Message.rw
+      
+      include MessageWrapper
+      
+      let bounds_check_slice_exn ?err (slice : 'cap Slice.t) : unit =
+        let open Slice in
+        if slice.segment_id < 0 ||
+          slice.segment_id >= Message.num_segments slice.msg ||
+          slice.start < 0 ||
+          slice.start + slice.len > Segment.length (Slice.get_segment slice)
+        then
+          let error_msg =
+            match err with
+            | None -> "pointer referenced a memory region outside the message"
+            | Some msg -> msg
+          in
+          invalid_msg error_msg
+        else
+          ()
+      
+      
+      (** Get the range of bytes associated with a pointer stored in a struct. *)
+      let ss_get_pointer
+          (struct_storage : 'cap StructStorage.t)
+          (word : int)           (* Struct-relative pointer index *)
+        : 'cap Slice.t option =  (* Returns None if storage is too small for this word *)
+        let pointers = struct_storage.StructStorage.pointers in
+        let start = word * sizeof_uint64 in
+        let len   = sizeof_uint64 in
+        if start + len <= pointers.Slice.len then
+          Some {
+            pointers with
+            Slice.start = pointers.Slice.start + start;
+            Slice.len   = len
+          }
+        else
+          None
+      
+      (* Given a range of eight bytes corresponding to a cap'n proto pointer,
+         decode the information stored in the pointer. *)
+      let decode_pointer (pointer_bytes : 'cap Slice.t) : Pointer.t =
+        let pointer64 = Slice.get_int64 pointer_bytes 0 in
+        if Util.is_int64_zero pointer64 then
+          Pointer.Null
+        else
+          let tag_bits = Caml.Int64.to_int pointer64 in
+          let tag = tag_bits land Pointer.Bitfield.tag_mask in
+          (* OCaml won't match an int against let-bound variables,
+             only against constants. *)
+          match tag with
+          | 0x0 ->  (* Pointer.Bitfield.tag_val_struct *)
+              Pointer.Struct (StructPointer.decode pointer64)
+          | 0x1 ->  (* Pointer.Bitfield.tag_val_list *)
+              Pointer.List (ListPointer.decode pointer64)
+          | 0x2 ->  (* Pointer.Bitfield.tag_val_far *)
+              Pointer.Far (FarPointer.decode pointer64)
+          | 0x3 ->  (* Pointer.Bitfield.tag_val_other *)
+              Pointer.Other (OtherPointer.decode pointer64)
+          | _ ->
+              assert false
+      
+      
+      (* Given a list pointer descriptor, construct the corresponding list storage
+         descriptor. *)
+      let make_list_storage
+          ~(message : 'cap Message.t)     (* Message of interest *)
+          ~(segment_id : int)             (* Segment ID where list storage is found *)
+          ~(segment_offset : int)         (* Segment offset where list storage is found *)
+          ~(list_pointer : ListPointer.t)
+        : 'cap ListStorage.t =
+        let make_list_storage_aux ~num_words ~num_elements ~storage_type =
+          let storage = {
+            Slice.msg        = message;
+            Slice.segment    = Message.get_segment message segment_id;
+            Slice.segment_id = segment_id;
+            Slice.start      = segment_offset;
+            Slice.len        = num_words * sizeof_uint64;
+          } in
+          let () = bounds_check_slice_exn
+            ~err:"list pointer describes invalid storage region" storage
+          in {
+            ListStorage.storage      = storage;
+            ListStorage.storage_type = storage_type;
+            ListStorage.num_elements = num_elements;
+          }
+        in
+        let open ListPointer in
+        match list_pointer.element_type with
+        | Void ->
+            make_list_storage_aux ~num_words:0
+              ~num_elements:list_pointer.num_elements ~storage_type:ListStorageType.Empty
+        | OneBitValue ->
+            make_list_storage_aux
+              ~num_words:(Util.ceil_ratio list_pointer.num_elements 64)
+              ~num_elements:list_pointer.num_elements ~storage_type:ListStorageType.Bit
+        | OneByteValue ->
+            make_list_storage_aux
+              ~num_words:(Util.ceil_ratio list_pointer.num_elements 8)
+              ~num_elements:list_pointer.num_elements
+              ~storage_type:ListStorageType.Bytes1
+        | TwoByteValue ->
+            make_list_storage_aux
+              ~num_words:(Util.ceil_ratio list_pointer.num_elements 4)
+              ~num_elements:list_pointer.num_elements
+              ~storage_type:ListStorageType.Bytes2
+        | FourByteValue ->
+            make_list_storage_aux
+              ~num_words:(Util.ceil_ratio list_pointer.num_elements 2)
+              ~num_elements:list_pointer.num_elements
+              ~storage_type:ListStorageType.Bytes4
+        | EightByteValue ->
+            make_list_storage_aux ~num_words:list_pointer.num_elements
+              ~num_elements:list_pointer.num_elements
+              ~storage_type:ListStorageType.Bytes8
+        | EightBytePointer ->
+            make_list_storage_aux ~num_words:list_pointer.num_elements
+              ~num_elements:list_pointer.num_elements
+              ~storage_type:ListStorageType.Pointer
+        | Composite ->
+            let struct_tag_bytes = {
+              Slice.msg        = message;
+              Slice.segment    = Message.get_segment message segment_id;
+              Slice.segment_id = segment_id;
+              Slice.start      = segment_offset;
+              Slice.len        = sizeof_uint64;
+            } in
+            let () = bounds_check_slice_exn
+                ~err:"composite list pointer describes invalid storage region"
+                struct_tag_bytes
+            in
+            begin match decode_pointer struct_tag_bytes with
+            | Pointer.Struct struct_pointer ->
+                let module SP = StructPointer in
+                let num_words = list_pointer.num_elements in
+                let num_elements = struct_pointer.SP.offset in
+                let words_per_element =
+                  struct_pointer.SP.data_words + struct_pointer.SP.pointer_words
+                in
+                if num_elements * words_per_element > num_words then
+                  invalid_msg "composite list pointer describes invalid word count"
+                else
+                  make_list_storage_aux ~num_words ~num_elements
+                    ~storage_type:(ListStorageType.Composite
+                       (struct_pointer.SP.data_words, struct_pointer.SP.pointer_words))
+            | _ ->
+                invalid_msg "composite list pointer has malformed element type tag"
+            end
+      
+      
+      (* Given a description of a cap'n proto far pointer, get the object which
+         the pointer points to. *)
+      let rec deref_far_pointer
+          (far_pointer : FarPointer.t)
+          (message : 'cap Message.t)
+        : 'cap Object.t =
+        let open FarPointer in
+        match far_pointer.landing_pad with
+        | NormalPointer ->
+            let next_pointer_bytes = {
+              Slice.msg        = message;
+              Slice.segment    = Message.get_segment message far_pointer.segment_id;
+              Slice.segment_id = far_pointer.segment_id;
+              Slice.start      = far_pointer.offset * sizeof_uint64;
+              Slice.len        = sizeof_uint64;
+            } in
+            let () = bounds_check_slice_exn
+              ~err:"far pointer describes invalid landing pad" next_pointer_bytes
+            in
+            deref_pointer next_pointer_bytes
+        | TaggedFarPointer ->
+            let content_pointer_bytes = {
+              Slice.msg        = message;
+              Slice.segment    = Message.get_segment message far_pointer.segment_id;
+              Slice.segment_id = far_pointer.segment_id;
+              Slice.start      = far_pointer.offset * sizeof_uint64;
+              Slice.len        = sizeof_uint64;
+            } in
+            let tag_bytes = {
+              content_pointer_bytes with
+              Slice.start = Slice.get_end content_pointer_bytes;
+            } in
+            match (decode_pointer content_pointer_bytes, decode_pointer tag_bytes) with
+            | (Pointer.Far content_pointer, Pointer.List list_pointer) ->
+                Object.List (make_list_storage
+                  ~message
+                  ~segment_id:content_pointer.FarPointer.segment_id
+                  ~segment_offset:(content_pointer.FarPointer.offset * sizeof_uint64)
+                  ~list_pointer)
+            | (Pointer.Far content_pointer, Pointer.Struct struct_pointer) ->
+                let segment_id = content_pointer.FarPointer.segment_id in
+                let data = {
+                  Slice.msg = message;
+                  Slice.segment = Message.get_segment message segment_id;
+                  Slice.segment_id;
+                  Slice.start = content_pointer.FarPointer.offset * sizeof_uint64;
+                  Slice.len = struct_pointer.StructPointer.data_words * sizeof_uint64;
+                } in
+                let pointers = {
+                  data with
+                  Slice.start = Slice.get_end data;
+                  Slice.len =
+                    struct_pointer.StructPointer.pointer_words * sizeof_uint64;
+                } in
+                let () = bounds_check_slice_exn
+                    ~err:"struct-tagged far pointer describes invalid data region"
+                    data
+                in
+                let () = bounds_check_slice_exn
+                    ~err:"struct-tagged far pointer describes invalid pointers region"
+                    pointers
+                in
+                Object.Struct { StructStorage.data; StructStorage.pointers; }
+            | _ ->
+                invalid_msg "tagged far pointer points to invalid landing pad"
+      
+      
+      (* Given a range of eight bytes which represent a pointer, get the object which
+         the pointer points to. *)
+      and deref_pointer (pointer_bytes : 'cap Slice.t) : 'cap Object.t =
+        let pointer64 = Slice.get_int64 pointer_bytes 0 in
+        if Util.is_int64_zero pointer64 then
+          Object.None
+        else
+          let pointer64 = Slice.get_int64 pointer_bytes 0 in
+          let tag_bits = Caml.Int64.to_int pointer64 in
+          let tag = tag_bits land Pointer.Bitfield.tag_mask in
+          (* OCaml won't match an int against let-bound variables,
+             only against constants. *)
+          match tag with
+          | 0x0 ->  (* Pointer.Bitfield.tag_val_struct *)
+              let struct_pointer = StructPointer.decode pointer64 in
+              let open StructPointer in
+              let data = {
+                pointer_bytes with
+                Slice.start =
+                  (Slice.get_end pointer_bytes) + (struct_pointer.offset * sizeof_uint64);
+                Slice.len = struct_pointer.data_words * sizeof_uint64;
+              } in
+              let pointers = {
+                data with
+                Slice.start = Slice.get_end data;
+                Slice.len   = struct_pointer.pointer_words * sizeof_uint64;
+              } in
+              let () = bounds_check_slice_exn
+                ~err:"struct pointer describes invalid data region" data
+              in
+              let () = bounds_check_slice_exn
+                ~err:"struct pointer describes invalid pointers region" pointers
+              in
+              Object.Struct { StructStorage.data; StructStorage.pointers; }
+          | 0x1 ->  (* Pointer.Bitfield.tag_val_list *)
+              let list_pointer = ListPointer.decode pointer64 in
+              Object.List (make_list_storage
+                ~message:pointer_bytes.Slice.msg
+                ~segment_id:pointer_bytes.Slice.segment_id
+                ~segment_offset:((Slice.get_end pointer_bytes) +
+                                   (list_pointer.ListPointer.offset * sizeof_uint64))
+                ~list_pointer)
+          | 0x2 ->  (* Pointer.Bitfield.tag_val_far *)
+              let far_pointer = FarPointer.decode pointer64 in
+              deref_far_pointer far_pointer pointer_bytes.Slice.msg
+          | 0x3 ->  (* Pointer.Bitfield.tag_val_other *)
+              let other_pointer = OtherPointer.decode pointer64 in
+              let (OtherPointer.Capability index) = other_pointer in
+              Object.Capability index
+          | _ ->
+              assert false
+      
+      
+      module ListDecoders = struct
+        type ('cap, 'a) struct_decoders_t = {
+          bytes     : 'cap Slice.t -> 'a;
+          pointer   : 'cap Slice.t -> 'a;
+          composite : 'cap StructStorage.t -> 'a;
+        }
+      
+        type ('cap, 'a) t =
+          | Empty of (unit -> 'a)
+          | Bit of (bool -> 'a)
+          | Bytes1 of ('cap Slice.t -> 'a)
+          | Bytes2 of ('cap Slice.t -> 'a)
+          | Bytes4 of ('cap Slice.t -> 'a)
+          | Bytes8 of ('cap Slice.t -> 'a)
+          | Pointer of ('cap Slice.t -> 'a)
+          | Struct of ('cap, 'a) struct_decoders_t
+      end
+      
+      
+      module ListCodecs = struct
+        type 'a struct_codecs_t = {
+          bytes     : (rw Slice.t -> 'a) * ('a -> rw Slice.t -> unit);
+          pointer   : (rw Slice.t -> 'a) * ('a -> rw Slice.t -> unit);
+          composite : (rw StructStorage.t -> 'a) * ('a -> rw StructStorage.t -> unit);
+        }
+      
+        type 'a t =
+          | Empty of (unit -> 'a) * ('a -> unit)
+          | Bit of (bool -> 'a) * ('a -> bool)
+          | Bytes1 of (rw Slice.t -> 'a) * ('a -> rw Slice.t -> unit)
+          | Bytes2 of (rw Slice.t -> 'a) * ('a -> rw Slice.t -> unit)
+          | Bytes4 of (rw Slice.t -> 'a) * ('a -> rw Slice.t -> unit)
+          | Bytes8 of (rw Slice.t -> 'a) * ('a -> rw Slice.t -> unit)
+          | Pointer of (rw Slice.t -> 'a) * ('a -> rw Slice.t -> unit)
+          | Struct of 'a struct_codecs_t
+      end
+      
+      let _dummy = ref true
+      
+      let make_array_readonly
+          (list_storage : 'cap ListStorage.t)
+          (decoders : ('cap, 'a) ListDecoders.t)
+        : (ro, 'a, 'cap ListStorage.t) InnerArray.t =
+        let make_element_slice ls i byte_count = {
+          ls.ListStorage.storage with
+          Slice.start = ls.ListStorage.storage.Slice.start + (i * byte_count);
+          Slice.len = byte_count;
+        } in
+        let length = list_storage.ListStorage.num_elements in
+        (* Note: the following is attempting to strike a balance between
+         * (1) building InnerArray.get_unsafe closures that do as little work as
+         *     possible and
+         * (2) making the closure calling convention as efficient as possible.
+         *
+         * A naive implementation of this getter can result in quite slow code. *)
+        match list_storage.ListStorage.storage_type with
+        | ListStorageType.Empty ->
+            begin match decoders with
+            | ListDecoders.Empty decode ->
+                let ro_get_unsafe_void ls i = decode () in {
+                  InnerArray.length;
+                  InnerArray.init = InnerArray.invalid_init;
+                  InnerArray.get_unsafe = ro_get_unsafe_void;
+                  InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<Void> where a different list type was expected"
+            end
+        | ListStorageType.Bit ->
+            begin match decoders with
+            | ListDecoders.Bit decode ->
+                let ro_get_unsafe_bool ls i =
+                  let byte_ofs = i / 8 in
+                  let bit_ofs  = i mod 8 in
+                  let byte_val =
+                    Slice.get_uint8 ls.ListStorage.storage byte_ofs
+                  in
+                  decode ((byte_val land (1 lsl bit_ofs)) <> 0)
+                in {
+                  InnerArray.length;
+                  InnerArray.init = InnerArray.invalid_init;
+                  InnerArray.get_unsafe = ro_get_unsafe_bool;
+                  InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<Bool> where a different list type was expected"
+            end
+        | ListStorageType.Bytes1 ->
+            begin match decoders with
+            | ListDecoders.Bytes1 decode
+            | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
+                let ro_get_unsafe_bytes1 ls i = decode (make_element_slice ls i 1) in {
+                  InnerArray.length;
+                  InnerArray.init = InnerArray.invalid_init;
+                  InnerArray.get_unsafe = ro_get_unsafe_bytes1;
+                  InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<1 byte> where a different list type was expected"
+            end
+        | ListStorageType.Bytes2 ->
+            begin match decoders with
+            | ListDecoders.Bytes2 decode
+            | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
+                let ro_get_unsafe_bytes2 ls i = decode (make_element_slice ls i 2) in {
+                  InnerArray.length;
+                  InnerArray.init = InnerArray.invalid_init;
+                  InnerArray.get_unsafe = ro_get_unsafe_bytes2;
+                  InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<2 byte> where a different list type was expected"
+            end
+        | ListStorageType.Bytes4 ->
+            begin match decoders with
+            | ListDecoders.Bytes4 decode
+            | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
+                let ro_get_unsafe_bytes4 ls i = decode (make_element_slice ls i 4) in {
+                  InnerArray.length;
+                  InnerArray.init = InnerArray.invalid_init;
+                  InnerArray.get_unsafe = ro_get_unsafe_bytes4;
+                  InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<4 byte> where a different list type was expected"
+            end
+        | ListStorageType.Bytes8 ->
+            begin match decoders with
+            | ListDecoders.Bytes8 decode
+            | ListDecoders.Struct { ListDecoders.bytes = decode; _ } ->
+                let ro_get_unsafe_bytes8 ls i = decode (make_element_slice ls i 8) in {
+                  InnerArray.length;
+                  InnerArray.init = InnerArray.invalid_init;
+                  InnerArray.get_unsafe = ro_get_unsafe_bytes8;
+                  InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<8 byte> where a different list type was expected"
+            end
+        | ListStorageType.Pointer ->
+            begin match decoders with
+            | ListDecoders.Pointer decode
+            | ListDecoders.Struct { ListDecoders.pointer = decode; _ } ->
+                let ro_get_unsafe_pointer ls i = decode (make_element_slice ls i sizeof_uint64) in {
+                  InnerArray.length;
+                  InnerArray.init = InnerArray.invalid_init;
+                  InnerArray.get_unsafe = ro_get_unsafe_pointer;
+                  InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<pointer> a different list type was expected"
+            end
+        | ListStorageType.Composite (data_words, pointer_words) ->
+            let data_size     = data_words * sizeof_uint64 in
+            let pointers_size = pointer_words * sizeof_uint64 in
+            let make_storage ls i ~data_size ~pointers_size =
+              let total_size = data_size + pointers_size in
+              (* Skip over the composite tag word *)
+              let content_offset =
+                ls.ListStorage.storage.Slice.start + sizeof_uint64
+              in
+              let data = {
+                ls.ListStorage.storage with
+                Slice.start = content_offset + (i * total_size);
+                Slice.len = data_size;
+              } in
+              let pointers = {
+                data with
+                Slice.start = Slice.get_end data;
+                Slice.len   = pointers_size;
+              } in
+              { StructStorage.data; StructStorage.pointers; }
+            in
+            let make_bytes_handler ~size ~decode =
+              if data_words = 0 then
+                invalid_msg
+                  "decoded List<composite> with empty data region where data was expected"
+              else
+                let ro_get_unsafe_composite_bytes ls i =
+                  let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                  let slice = {
+                    struct_storage.StructStorage.data with
+                    Slice.len = size
+                  } in
+                  decode slice
+                in {
+                  InnerArray.length;
+                  InnerArray.init = InnerArray.invalid_init;
+                  InnerArray.get_unsafe = ro_get_unsafe_composite_bytes;
+                  InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                  InnerArray.storage = Some list_storage;
+                }
+            in
+            begin match decoders with
+            | ListDecoders.Empty decode ->
+                let ro_get_unsafe_composite_void ls i = decode () in {
+                  InnerArray.length;
+                  InnerArray.init = InnerArray.invalid_init;
+                  InnerArray.get_unsafe = ro_get_unsafe_composite_void;
+                  InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                  InnerArray.storage = Some list_storage;
+                }
+            | ListDecoders.Bit decode ->
+                if data_words = 0 then
+                  invalid_msg
+                    "decoded List<composite> with empty data region where data was expected"
+                else
+                  let ro_get_unsafe_composite_bool ls i =
+                    let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                    let first_byte = Slice.get_uint8 struct_storage.StructStorage.data 0 in
+                    let is_set = (first_byte land 0x1) <> 0 in
+                    decode is_set
+                  in {
+                    InnerArray.length;
+                    InnerArray.init = InnerArray.invalid_init;
+                    InnerArray.get_unsafe = ro_get_unsafe_composite_bool;
+                    InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                    InnerArray.storage = Some list_storage;
+                  }
+            | ListDecoders.Bytes1 decode ->
+                make_bytes_handler ~size:1 ~decode
+            | ListDecoders.Bytes2 decode ->
+                make_bytes_handler ~size:2 ~decode
+            | ListDecoders.Bytes4 decode ->
+                make_bytes_handler ~size:4 ~decode
+            | ListDecoders.Bytes8 decode ->
+                make_bytes_handler ~size:8 ~decode
+            | ListDecoders.Pointer decode ->
+                if pointer_words = 0 then
+                  invalid_msg
+                    "decoded List<composite> with empty pointers region where \
+                     pointers were expected"
+                else
+                  let ro_get_unsafe_composite_pointer ls i =
+                    let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                    let slice = {
+                      struct_storage.StructStorage.pointers with
+                      Slice.len = sizeof_uint64
+                    } in
+                    decode slice
+                  in {
+                    InnerArray.length;
+                    InnerArray.init = InnerArray.invalid_init;
+                    InnerArray.get_unsafe = ro_get_unsafe_composite_pointer;
+                    InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                    InnerArray.storage = Some list_storage;
+                  }
+            | ListDecoders.Struct struct_decoders ->
+                let ro_get_unsafe_composite_struct ls i =
+                  let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                  struct_decoders.ListDecoders.composite struct_storage
+                in {
+                  InnerArray.length;
+                  InnerArray.init = InnerArray.invalid_init;
+                  InnerArray.get_unsafe = ro_get_unsafe_composite_struct;
+                  InnerArray.set_unsafe = InnerArray.invalid_set_unsafe;
+                  InnerArray.storage = Some list_storage;
+                }
+            end
+      
+      
+      let make_array_readwrite
+          ~(list_storage : rw ListStorage.t)
+          ~(init : int -> rw ListStorage.t)
+          ~(codecs : 'a ListCodecs.t)
+        : (rw, 'a, rw ListStorage.t) InnerArray.t =
+        let make_element_slice ls i byte_count = {
+          ls.ListStorage.storage with
+          Slice.start = ls.ListStorage.storage.Slice.start + (i * byte_count);
+          Slice.len = byte_count;
+        } in
+        let length = list_storage.ListStorage.num_elements in
+        (* Note: the following is attempting to strike a balance between
+         * (1) building InnerArray.get_unsafe/set_unsafe closures that do as little
+         *     work as possible and
+         * (2) making the closure calling convention as efficient as possible.
+         *
+         * A naive implementation of these accessors can result in quite slow code. *)
+        match list_storage.ListStorage.storage_type with
+        | ListStorageType.Empty ->
+            begin match codecs with
+            | ListCodecs.Empty (decode, encode) ->
+                let rw_get_unsafe_void ls i = decode () in
+                let rw_set_unsafe_void ls i v = encode v in {
+                  InnerArray.length;
+                  InnerArray.init;
+                  InnerArray.get_unsafe = rw_get_unsafe_void;
+                  InnerArray.set_unsafe = rw_set_unsafe_void;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<Void> where a different list type was expected"
+            end
+        | ListStorageType.Bit ->
+            begin match codecs with
+            | ListCodecs.Bit (decode, encode) ->
+                let rw_get_unsafe_bool ls i =
+                  let byte_ofs = i / 8 in
+                  let bit_ofs  = i mod 8 in
+                  let byte_val =
+                    Slice.get_uint8 ls.ListStorage.storage byte_ofs
+                  in
+                  decode ((byte_val land (1 lsl bit_ofs)) <> 0)
+                in
+                let rw_set_unsafe_bool ls i v =
+                  let byte_ofs = i / 8 in
+                  let bit_ofs  = i mod 8 in
+                  let bitmask  = 1 lsl bit_ofs in
+                  let old_byte_val =
+                    Slice.get_uint8 ls.ListStorage.storage byte_ofs
+                  in
+                  let new_byte_val =
+                    if encode v then
+                      old_byte_val lor bitmask
+                    else
+                      old_byte_val land (lnot bitmask)
+                  in
+                  Slice.set_uint8 ls.ListStorage.storage byte_ofs new_byte_val
+                in {
+                  InnerArray.length;
+                  InnerArray.init;
+                  InnerArray.get_unsafe = rw_get_unsafe_bool;
+                  InnerArray.set_unsafe = rw_set_unsafe_bool;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<Bool> where a different list type was expected"
+            end
+        | ListStorageType.Bytes1 ->
+            begin match codecs with
+            | ListCodecs.Bytes1 (decode, encode)
+            | ListCodecs.Struct { ListCodecs.bytes = (decode, encode); _ } ->
+                let rw_get_unsafe_bytes1 ls i = decode (make_element_slice ls i 1) in
+                let rw_set_unsafe_bytes1 ls i v = encode v (make_element_slice ls i 1) in {
+                  InnerArray.length;
+                  InnerArray.init;
+                  InnerArray.get_unsafe = rw_get_unsafe_bytes1;
+                  InnerArray.set_unsafe = rw_set_unsafe_bytes1;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<1 byte> where a different list type was expected"
+            end
+        | ListStorageType.Bytes2 ->
+            begin match codecs with
+            | ListCodecs.Bytes2 (decode, encode)
+            | ListCodecs.Struct { ListCodecs.bytes = (decode, encode); _ } ->
+                let rw_get_unsafe_bytes2 ls i = decode (make_element_slice ls i 2) in
+                let rw_set_unsafe_bytes2 ls i v = encode v (make_element_slice ls i 2) in {
+                  InnerArray.length;
+                  InnerArray.init;
+                  InnerArray.get_unsafe = rw_get_unsafe_bytes2;
+                  InnerArray.set_unsafe = rw_set_unsafe_bytes2;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<2 byte> where a different list type was expected"
+            end
+        | ListStorageType.Bytes4 ->
+            begin match codecs with
+            | ListCodecs.Bytes4 (decode, encode)
+            | ListCodecs.Struct { ListCodecs.bytes = (decode, encode); _ } ->
+                let rw_get_unsafe_bytes4 ls i = decode (make_element_slice ls i 4) in
+                let rw_set_unsafe_bytes4 ls i v = encode v (make_element_slice ls i 4) in {
+                  InnerArray.length;
+                  InnerArray.init;
+                  InnerArray.get_unsafe = rw_get_unsafe_bytes4;
+                  InnerArray.set_unsafe = rw_set_unsafe_bytes4;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<4 byte> where a different list type was expected"
+            end
+        | ListStorageType.Bytes8 ->
+            begin match codecs with
+            | ListCodecs.Bytes8 (decode, encode)
+            | ListCodecs.Struct { ListCodecs.bytes = (decode, encode); _ } ->
+                let rw_get_unsafe_bytes8 ls i = decode (make_element_slice ls i 8) in
+                let rw_set_unsafe_bytes8 ls i v = encode v (make_element_slice ls i 8) in {
+                  InnerArray.length;
+                  InnerArray.init;
+                  InnerArray.get_unsafe = rw_get_unsafe_bytes8;
+                  InnerArray.set_unsafe = rw_set_unsafe_bytes8;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<8 byte> where a different list type was expected"
+            end
+        | ListStorageType.Pointer ->
+            begin match codecs with
+            | ListCodecs.Pointer (decode, encode)
+            | ListCodecs.Struct { ListCodecs.pointer = (decode, encode); _ } ->
+                let rw_get_unsafe_ptr ls i =
+                  decode (make_element_slice ls i sizeof_uint64)
+                in
+                let rw_set_unsafe_ptr ls i v =
+                  encode v (make_element_slice ls i sizeof_uint64)
+                in {
+                  InnerArray.length;
+                  InnerArray.init;
+                  InnerArray.get_unsafe = rw_get_unsafe_ptr;
+                  InnerArray.set_unsafe = rw_set_unsafe_ptr;
+                  InnerArray.storage = Some list_storage;
+                }
+            | _ ->
+                invalid_msg
+                  "decoded List<pointer> where a different list type was expected"
+            end
+        | ListStorageType.Composite (data_words, pointer_words) ->
+            let data_size     = data_words * sizeof_uint64 in
+            let pointers_size = pointer_words * sizeof_uint64 in
+            let make_storage ls i ~data_size ~pointers_size =
+              let total_size    = data_size + pointers_size in
+              (* Skip over the composite tag word *)
+              let content_offset =
+                ls.ListStorage.storage.Slice.start + sizeof_uint64
+              in
+              let data = {
+                ls.ListStorage.storage with
+                Slice.start = content_offset + (i * total_size);
+                Slice.len = data_size;
+              } in
+              let pointers = {
+                data with
+                Slice.start = Slice.get_end data;
+                Slice.len   = pointers_size;
+              } in
+              { StructStorage.data; StructStorage.pointers; }
+            in
+            let make_bytes_handlers ~size ~decode ~encode =
+              if data_words = 0 then
+                invalid_msg
+                  "decoded List<composite> with empty data region where data was expected"
+              else
+                let rw_get_unsafe_composite_bytes ls i =
+                  let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                  let slice = {
+                    struct_storage.StructStorage.data with
+                    Slice.len = size
+                  } in
+                  decode slice
+                in
+                let rw_set_unsafe_composite_bytes ls i v =
+                  let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                  let slice = {
+                    struct_storage.StructStorage.data with
+                    Slice.len = size
+                  } in
+                  encode v slice
+                in {
+                  InnerArray.length;
+                  InnerArray.init;
+                  InnerArray.get_unsafe = rw_get_unsafe_composite_bytes;
+                  InnerArray.set_unsafe = rw_set_unsafe_composite_bytes;
+                  InnerArray.storage = Some list_storage;
+                }
+            in
+            begin match codecs with
+            | ListCodecs.Empty (decode, encode) ->
+                let rw_get_unsafe_composite_void ls i = decode () in
+                let rw_set_unsafe_composite_void ls i v = encode v in {
+                  InnerArray.length;
+                  InnerArray.init;
+                  InnerArray.get_unsafe = rw_get_unsafe_composite_void;
+                  InnerArray.set_unsafe = rw_set_unsafe_composite_void;
+                  InnerArray.storage = Some list_storage;
+                }
+            | ListCodecs.Bit (decode, encode) ->
+                if data_words = 0 then
+                  invalid_msg
+                    "decoded List<composite> with empty data region where data was expected"
+                else
+                  let rw_get_unsafe_composite_bool ls i =
+                    let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                    let first_byte = Slice.get_uint8 struct_storage.StructStorage.data 0 in
+                    let is_set = (first_byte land 0x1) <> 0 in
+                    decode is_set
+                  in
+                  let rw_set_unsafe_composite_bool ls i v =
+                    let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                    let first_byte =
+                      Slice.get_uint8 struct_storage.StructStorage.data 0
+                    in
+                    let first_byte =
+                      if encode v then first_byte lor 0x1 else first_byte land 0xfe
+                    in
+                    Slice.set_uint8 struct_storage.StructStorage.data 0 first_byte
+                  in {
+                    InnerArray.length;
+                    InnerArray.init;
+                    InnerArray.get_unsafe = rw_get_unsafe_composite_bool;
+                    InnerArray.set_unsafe = rw_set_unsafe_composite_bool;
+                    InnerArray.storage = Some list_storage;
+                  }
+            | ListCodecs.Bytes1 (decode, encode) ->
+                make_bytes_handlers ~size:1 ~decode ~encode
+            | ListCodecs.Bytes2 (decode, encode) ->
+                make_bytes_handlers ~size:2 ~decode ~encode
+            | ListCodecs.Bytes4 (decode, encode) ->
+                make_bytes_handlers ~size:4 ~decode ~encode
+            | ListCodecs.Bytes8 (decode, encode) ->
+                make_bytes_handlers ~size:8 ~decode ~encode
+            | ListCodecs.Pointer (decode, encode) ->
+                if pointer_words = 0 then
+                  invalid_msg
+                    "decoded List<composite> with empty pointers region where \
+                     pointers were expected"
+                else
+                  let rw_get_unsafe_composite_ptr ls i =
+                    let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                    let slice = {
+                      struct_storage.StructStorage.pointers with
+                      Slice.len = sizeof_uint64
+                    } in
+                    decode slice
+                  in
+                  let rw_set_unsafe_composite_ptr ls i v =
+                    let struct_storage = make_storage ls i ~data_size ~pointers_size in
+                    let slice = {
+                      struct_storage.StructStorage.pointers with
+                      Slice.len = sizeof_uint64
+                    } in
+                    encode v slice
+                  in {
+                    InnerArray.length;
+                    InnerArray.init;
+                    InnerArray.get_unsafe = rw_get_unsafe_composite_ptr;
+                    InnerArray.set_unsafe = rw_set_unsafe_composite_ptr;
+                    InnerArray.storage = Some list_storage;
+                  }
+            | ListCodecs.Struct { ListCodecs.composite = (decode, encode); _ } ->
+                let rw_get_unsafe_composite_struct ls i =
+                  decode (make_storage ls i ~data_size ~pointers_size)
+                in
+                let rw_set_unsafe_composite_struct ls i v =
+                  encode v (make_storage ls i ~data_size ~pointers_size)
+                in {
+                  InnerArray.length;
+                  InnerArray.init;
+                  InnerArray.get_unsafe = rw_get_unsafe_composite_struct;
+                  InnerArray.set_unsafe = rw_set_unsafe_composite_struct;
+                  InnerArray.storage = Some list_storage;
+                }
+            end
+      
+      
+      (* Given list storage which is expected to contain UInt8 data, decode the data as
+         an OCaml string. *)
+      let string_of_uint8_list
+          ~(null_terminated : bool)   (* true if the data is expected to end in 0 *)
+          (list_storage : 'cap ListStorage.t)
+        : string =
+        let open ListStorage in
+        match list_storage.storage_type with
+        | ListStorageType.Bytes1 ->
+            let result_byte_count =
+              if null_terminated then
+                let () =
+                  if list_storage.num_elements < 1 then
+                    invalid_msg "empty string list has no space for null terminator"
+                in
+                let terminator =
+                  Slice.get_uint8 list_storage.storage (list_storage.num_elements - 1)
+                in
+                let () = if terminator <> 0 then
+                  invalid_msg "string list is not null terminated"
+                in
+                list_storage.num_elements - 1
+              else
+                list_storage.num_elements
+            in
+            let buf = Bytes.create result_byte_count in
+            let () =
+              for i = 0 to result_byte_count - 1 do
+                Bytes.set buf i (Char.of_int_exn (Slice.get_uint8 list_storage.storage i))
+              done
+            in
+            Bytes.to_string buf
+        | _ ->
+            invalid_msg "decoded non-UInt8 list where string data was expected"
+      
+      
+      let struct_of_bytes_slice slice =
+        let data = slice in
+        let pointers = {
+          slice with
+          Slice.start = Slice.get_end data;
+          Slice.len   = 0;
+        } in
+        { StructStorage.data; StructStorage.pointers }
+      
+      let struct_of_pointer_slice slice =
+        let () = assert (slice.Slice.len = sizeof_uint64) in
+        let data = {
+          slice with
+          Slice.len = 0
+        } in
+        let pointers = {
+          slice with
+          Slice.len = sizeof_uint64;
+        } in
+        { StructStorage.data; StructStorage.pointers }
+      
+      
+      (* Given some list storage corresponding to a struct list, construct
+         a function for mapping an element index to the associated
+         struct storage. *)
+      let make_struct_of_list_index list_storage =
+        let storage      = list_storage.ListStorage.storage in
+        let storage_type = list_storage.ListStorage.storage_type in
+        match list_storage.ListStorage.storage_type with
+        | ListStorageType.Empty ->
+            let make_struct_of_list_index_void i =
+              let slice = {
+                storage with
+                Slice.start = storage.Slice.start;
+                Slice.len   = 0;
+              } in
+              struct_of_bytes_slice slice
+            in
+            make_struct_of_list_index_void
+        | ListStorageType.Bytes1
+        | ListStorageType.Bytes2
+        | ListStorageType.Bytes4
+        | ListStorageType.Bytes8 ->
+            (* Short data-only struct *)
+            let byte_count = ListStorageType.get_byte_count storage_type in
+            let make_struct_of_list_index_bytes i =
+              let slice = {
+                storage with
+                Slice.start = storage.Slice.start + (i * byte_count);
+                Slice.len   = byte_count;
+              } in
+              struct_of_bytes_slice slice
+            in
+            make_struct_of_list_index_bytes
+        | ListStorageType.Pointer ->
+            (* Single-pointer struct *)
+            let make_struct_of_list_index_pointer i =
+              let slice = {
+                storage with
+                Slice.start = (storage.Slice.start) + (i * sizeof_uint64);
+                Slice.len   = sizeof_uint64;
+              } in
+              struct_of_pointer_slice slice
+            in
+            make_struct_of_list_index_pointer
+        | ListStorageType.Composite (data_words, pointer_words) ->
+            let data_size     = data_words * sizeof_uint64 in
+            let pointers_size = pointer_words * sizeof_uint64 in
+            let element_size  = data_size + pointers_size in
+            (* Skip over the composite tag word *)
+            let content_offset = storage.Slice.start + sizeof_uint64 in
+            let make_struct_of_list_index_composite i =
+              let data = {
+                storage with
+                Slice.start = content_offset + (i * element_size);
+                Slice.len   = data_size;
+              } in
+              let pointers = {
+                storage with
+                Slice.start = Slice.get_end data;
+                Slice.len   = pointers_size;
+              } in
+              { StructStorage.data; StructStorage.pointers }
+            in
+            make_struct_of_list_index_composite
+        | ListStorageType.Bit ->
+            invalid_msg "decoded List<Bool> where List<composite> was expected"
+      
+      
+    end
+
+    (* DefaultsCopier will provide algorithms for making deep copies of default
+       data from DM storage into native storage *)
+    module DefaultsCopier = BuilderOps.Make(DM)(NM)
+
+    (* Most of the Builder operations need to copy from native storage back into
+       native storage *)
+    module BOps = BuilderOps.Make(NM)(NM)
+
+    (* Given a string, generate an orphaned cap'n proto List<Uint8> which contains
+       the string content. *)
+    let uint8_list_of_string
+        ~(null_terminated : bool)   (* true if the data is expected to end in 0 *)
+        ~(dest_message : rw NM.Message.t)
+        (src : string)
+      : rw NM.ListStorage.t =
+      let list_storage = BOps.alloc_list_storage dest_message
+          ListStorageType.Bytes1
+          (String.length src + (if null_terminated then 1 else 0))
+      in
+      let len = String.length src in
+      for i = 0 to len - 1 do
+        let byte = Char.to_int src.[i] in
+        NM.Slice.set_uint8 list_storage.NM.ListStorage.storage i byte
+      done;
+      list_storage
+
+
+    let void_list_codecs = NC.ListCodecs.Empty (
+        (fun (x : unit) -> x), (fun (x : unit) -> x))
+
+    let bit_list_codecs = NC.ListCodecs.Bit (
+        (fun (x : bool) -> x), (fun (x : bool) -> x))
+
+    let int8_list_codecs = NC.ListCodecs.Bytes1 (
+        (fun slice -> NM.Slice.get_int8 slice 0),
+          (fun v slice -> NM.Slice.set_int8 slice 0 v))
+
+    let int16_list_codecs = NC.ListCodecs.Bytes2 (
+        (fun slice -> NM.Slice.get_int16 slice 0),
+          (fun v slice -> NM.Slice.set_int16 slice 0 v))
+
+    let int32_list_codecs = NC.ListCodecs.Bytes4 (
+        (fun slice -> NM.Slice.get_int32 slice 0),
+          (fun v slice -> NM.Slice.set_int32 slice 0 v))
+
+    let int64_list_codecs = NC.ListCodecs.Bytes8 (
+        (fun slice -> NM.Slice.get_int64 slice 0),
+          (fun v slice -> NM.Slice.set_int64 slice 0 v))
+
+    let uint8_list_codecs = NC.ListCodecs.Bytes1 (
+        (fun slice -> NM.Slice.get_uint8 slice 0),
+          (fun v slice -> NM.Slice.set_uint8 slice 0 v))
+
+    let uint16_list_codecs = NC.ListCodecs.Bytes2 (
+        (fun slice -> NM.Slice.get_uint16 slice 0),
+          (fun v slice -> NM.Slice.set_uint16 slice 0 v))
+
+    let uint32_list_codecs = NC.ListCodecs.Bytes4 (
+        (fun slice -> NM.Slice.get_uint32 slice 0),
+          (fun v slice -> NM.Slice.set_uint32 slice 0 v))
+
+    let uint64_list_codecs = NC.ListCodecs.Bytes8 (
+        (fun slice -> NM.Slice.get_uint64 slice 0),
+          (fun v slice -> NM.Slice.set_uint64 slice 0 v))
+
+    let float32_list_codecs = NC.ListCodecs.Bytes4 (
+        (fun slice -> Int32.float_of_bits (NM.Slice.get_int32 slice 0)),
+          (fun v slice -> NM.Slice.set_int32 slice 0
+            (Int32.bits_of_float v)))
+
+    let float64_list_codecs = NC.ListCodecs.Bytes8 (
+        (fun slice -> Int64.float_of_bits (NM.Slice.get_int64 slice 0)),
+          (fun v slice -> NM.Slice.set_int64 slice 0
+            (Int64.bits_of_float v)))
+
+    let text_list_codecs =
+      let decode slice =
+        (* Text fields are always accessed by value, not by reference, since
+           we always do an immediate decode to [string].  Therefore we can
+           use the Reader logic to handle this case. *)
+        match RA_.deref_list_pointer slice with
+        | Some list_storage ->
+            NC.string_of_uint8_list ~null_terminated:true list_storage
+        | None ->
+            ""
+      in
+      let encode s slice =
+        let new_list_storage = uint8_list_of_string ~null_terminated:true
+            ~dest_message:slice.NM.Slice.msg s
+        in
+        BOps.init_list_pointer slice new_list_storage
+      in
+      NC.ListCodecs.Pointer (decode, encode)
+
+    let blob_list_codecs =
+      let decode slice =
+        (* Data fields are always accessed by value, not by reference, since
+           we always do an immediate decode to [string].  Therefore we can
+           use the Reader logic to handle this case. *)
+        match RA_.deref_list_pointer slice with
+        | Some list_storage ->
+            NC.string_of_uint8_list ~null_terminated:false list_storage
+        | None ->
+            ""
+      in
+      let encode s slice =
+        let new_list_storage = uint8_list_of_string ~null_terminated:false
+            ~dest_message:slice.NM.Slice.msg s
+        in
+        BOps.init_list_pointer slice new_list_storage
+      in
+      NC.ListCodecs.Pointer (decode, encode)
+
+    let struct_list_codecs =
+      let bytes_decoder slice =
+        NC.struct_of_bytes_slice slice
+      in
+      let bytes_encoder v slice =
+        let dest = NC.struct_of_bytes_slice slice in
+        BOps.deep_copy_struct_to_dest ~src:v ~dest
+      in
+      let pointer_decoder slice =
+        NC.struct_of_pointer_slice slice
+      in
+      let pointer_encoder v slice =
+        let dest = NC.struct_of_pointer_slice slice in
+        BOps.deep_copy_struct_to_dest ~src:v ~dest
+      in
+      let composite_decoder x = x in
+      let composite_encoder v dest = BOps.deep_copy_struct_to_dest ~src:v ~dest in
+      NC.ListCodecs.Struct {
+        NC.ListCodecs.bytes     = (bytes_decoder, bytes_encoder);
+        NC.ListCodecs.pointer   = (pointer_decoder, pointer_encoder);
+        NC.ListCodecs.composite = (composite_decoder, composite_encoder);
+      }
+
+
+    (*******************************************************************************
+     * METHODS FOR GETTING OBJECTS STORED BY VALUE
+     *******************************************************************************)
+
+    module Discr = struct
+      type t = {
+        value    : int;
+        byte_ofs : int;
+      }
+    end
+
+    let rec set_opt_discriminant
+        (data : rw NM.Slice.t)
+        (discr : Discr.t option)
+      : unit =
+      match discr with
+      | None ->
+          ()
+      | Some x ->
+          set_uint16 data ~default:0 ~byte_ofs:x.Discr.byte_ofs x.Discr.value
+
+    and set_uint16
+        ?(discr : Discr.t option)
+        (data : rw NM.Slice.t)
+        ~(default : int)
+        ~(byte_ofs : int)
+        (value : int)
+      : unit =
+      let () = set_opt_discriminant data discr in
+      NM.Slice.set_uint16 data byte_ofs (value lxor default)
+
+
+    (* Given storage for a struct, get the bytes associated with the
+       struct data section.  If the optional discriminant parameter is
+       supplied, then the discriminant is also set as a side-effect. *)
+    let get_data_region
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+      : rw NM.Slice.t =
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
+      data
+
+
+    let get_void
+        (data : 'cap NM.Slice.t)
+      : unit =
+      ()
+
+     let get_bit
+        ~(default : bool)
+        ~(byte_ofs : int)
+        ~(bit_ofs : int)
+        (data : 'cap NM.Slice.t)
+       : bool =
+       let byte_val = NM.Slice.get_uint8 data byte_ofs in
+       let bit_val = (byte_val land (1 lsl bit_ofs)) <> 0 in
+       if default then not bit_val else bit_val
+
+    let get_int8
+        ~(default : int)
+        ~(byte_ofs : int)
+        (data : 'cap NM.Slice.t)
+      : int =
+      let numeric = NM.Slice.get_int8 data byte_ofs in
+      numeric lxor default
+
+    let get_int16
+        ~(default : int)
+        ~(byte_ofs : int)
+        (data : 'cap NM.Slice.t)
+      : int =
+      let numeric = NM.Slice.get_int16 data byte_ofs in
+      numeric lxor default
+
+    let get_int32
+        ~(default : int32)
+        ~(byte_ofs : int)
+        (data : 'cap NM.Slice.t)
+        : int32 =
+      let numeric = NM.Slice.get_int32 data byte_ofs in
+      Int32.bit_xor numeric default
+
+    let get_int64
+        ~(default : int64)
+        ~(byte_ofs : int)
+        (data : 'cap NM.Slice.t)
+      : int64 =
+      let numeric = NM.Slice.get_int64 data byte_ofs in
+      Int64.bit_xor numeric default
+
+    let get_uint8
+        ~(default : int)
+        ~(byte_ofs : int)
+        (data : 'cap NM.Slice.t)
+      : int =
+      let numeric = NM.Slice.get_uint8 data byte_ofs in
+      numeric lxor default
+
+    let get_uint16
+        ~(default : int)
+        ~(byte_ofs : int)
+        (data : 'cap NM.Slice.t)
+      : int =
+      let numeric = NM.Slice.get_uint16 data byte_ofs in
+      numeric lxor default
+
+    let get_uint32
+        ~(default : Uint32.t)
+        ~(byte_ofs : int)
+        (data : 'cap NM.Slice.t)
+        : Uint32.t =
+      let numeric = NM.Slice.get_uint32 data byte_ofs in
+      Uint32.logxor numeric default
+
+    let get_uint64
+        ~(default : Uint64.t)
+        ~(byte_ofs : int)
+        (data : 'cap NM.Slice.t)
+      : Uint64.t =
+      let numeric = NM.Slice.get_uint64 data byte_ofs in
+      Uint64.logxor numeric default
+
+    let get_float32
+        ~(default_bits : int32)
+        ~(byte_ofs : int)
+        (data : 'cap NM.Slice.t)
+      : float =
+      let numeric = NM.Slice.get_int32 data byte_ofs in
+      let bits = Int32.bit_xor numeric default_bits in
+      Int32.float_of_bits bits
+
+    let get_float64
+        ~(default_bits : int64)
+        ~(byte_ofs : int)
+        (data : 'cap NM.Slice.t)
+      : float =
+      let numeric = NM.Slice.get_int64 data byte_ofs in
+      let bits = Int64.bit_xor numeric default_bits in
+      Int64.float_of_bits bits
+
+
+    (*******************************************************************************
+     * METHODS FOR SETTING OBJECTS STORED BY VALUE
+     *******************************************************************************)
+
+    let set_void
+        (data : 'cap NM.Slice.t)
+      : unit =
+      ()
+
+    let set_bit
+        ~(default : bool)
+        ~(byte_ofs : int)
+        ~(bit_ofs : int)
+        (value : bool)
+        (data : rw NM.Slice.t)
+      : unit =
+      let default_bit = if default then 1 else 0 in
+      let value_bit = if value then 1 else 0 in
+      let stored_bit = default_bit lxor value_bit in
+      let byte_val = NM.Slice.get_uint8 data byte_ofs in
+      let byte_val = byte_val land (lnot (1 lsl bit_ofs)) in
+      let byte_val = byte_val lor (stored_bit lsl bit_ofs) in
+      NM.Slice.set_uint8 data byte_ofs byte_val
+
+    let set_int8
+        ~(default : int)
+        ~(byte_ofs : int)
+        (value : int)
+        (data : rw NM.Slice.t)
+      : unit =
+      NM.Slice.set_int8 data byte_ofs (value lxor default)
+
+    let set_int16
+        ~(default : int)
+        ~(byte_ofs : int)
+        (value : int)
+        (data : rw NM.Slice.t)
+      : unit =
+      NM.Slice.set_int16 data byte_ofs (value lxor default)
+
+    let set_int32
+        ~(default : int32)
+        ~(byte_ofs : int)
+        (value : int32)
+        (data : rw NM.Slice.t)
+      : unit =
+      NM.Slice.set_int32 data byte_ofs
+        (Int32.bit_xor value default)
+
+    let set_int64
+        ~(default : int64)
+        ~(byte_ofs : int)
+        (value : int64)
+        (data : rw NM.Slice.t)
+      : unit =
+      NM.Slice.set_int64 data byte_ofs
+        (Int64.bit_xor value default)
+
+    let set_uint8
+        ~(default : int)
+        ~(byte_ofs : int)
+        (value : int)
+        (data : rw NM.Slice.t)
+      : unit =
+      NM.Slice.set_uint8 data byte_ofs (value lxor default)
+
+    let set_uint16
+        ~(default : int)
+        ~(byte_ofs : int)
+        (value : int)
+        (data : rw NM.Slice.t)
+      : unit =
+      NM.Slice.set_uint16 data byte_ofs (value lxor default)
+
+    let set_uint32
+        ~(default : Uint32.t)
+        ~(byte_ofs : int)
+        (value : Uint32.t)
+        (data : rw NM.Slice.t)
+      : unit =
+      NM.Slice.set_uint32 data byte_ofs
+        (Uint32.logxor value default)
+
+    let set_uint64
+        ~(default : Uint64.t)
+        ~(byte_ofs : int)
+        (value : Uint64.t)
+        (data : rw NM.Slice.t)
+      : unit =
+      NM.Slice.set_uint64 data byte_ofs
+        (Uint64.logxor value default)
+
+    let set_float32
+        ~(default_bits : int32)
+        ~(byte_ofs : int)
+        (value : float)
+        (data : rw NM.Slice.t)
+      : unit =
+      NM.Slice.set_int32 data byte_ofs
+        (Int32.bit_xor (Int32.bits_of_float value) default_bits)
+
+    let set_float64
+        ~(default_bits : int64)
+        ~(byte_ofs : int)
+        (value : float)
+        (data : rw NM.Slice.t)
+      : unit =
+      NM.Slice.set_int64 data byte_ofs
+        (Int64.bit_xor (Int64.bits_of_float value) default_bits)
+
+
+    (*******************************************************************************
+     * METHODS FOR GETTING OBJECTS STORED BY POINTER
+     *******************************************************************************)
+
+
+    (* Given storage for a struct, get the bytes associated with struct
+       pointer at offset [pointer_word].  If the optional discriminant
+       parameter is supplied, then the discriminant is also set as a
+       side-effect. *)
+    let get_pointer_bytes
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : rw NM.Slice.t =
+      let ptr = BOps.get_struct_pointer struct_storage pointer_word in
+      let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
+      ptr
+
+
+    let has_field
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : bool =
+      let pointers = struct_storage.NM.StructStorage.pointers in
+      let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+      (* Struct should have already been upgraded to at least the
+         expected data region and pointer region sizes *)
+      assert (pointer_word < num_pointers);
+      let pointer64 = NM.Slice.get_int64 pointers (pointer_word * sizeof_uint64) in
+      not (Util.is_int64_zero pointer64)
+
+    let get_text
+        ~(default : string)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : string =
+      let pointers = struct_storage.NM.StructStorage.pointers in
+      let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+      (* Struct should have already been upgraded to at least the
+         expected data region and pointer region sizes *)
+      assert (pointer_word < num_pointers);
+      let pointer_bytes = {
+        pointers with
+        NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+        NM.Slice.len   = sizeof_uint64;
+      } in
+      (* Text fields are always accessed by value, not by reference, since
+         we always do an immediate decode to [string].  Therefore we can
+         use the Reader logic to handle this case. *)
+      match RA_.deref_list_pointer pointer_bytes with
+      | Some list_storage ->
+          NC.string_of_uint8_list ~null_terminated:true list_storage
+      | None ->
+          default
+
+    let get_blob
+        ~(default : string)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : string =
+      let pointers = struct_storage.NM.StructStorage.pointers in
+      let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+      (* Struct should have already been upgraded to at least the
+         expected data region and pointer region sizes *)
+      assert (pointer_word < num_pointers);
+      let pointer_bytes = {
+        pointers with
+        NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+        NM.Slice.len   = sizeof_uint64;
+      } in
+      (* Data fields are always accessed by value, not by reference, since
+         we always do an immediate decode to [string].  Therefore we can
+         use the Reader logic to handle this case. *)
+      match RA_.deref_list_pointer pointer_bytes with
+      | Some list_storage ->
+          NC.string_of_uint8_list ~null_terminated:false list_storage
+      | None ->
+          default
+
+
+    (* Zero-initialize list storage of the given length and storage type, 
+       associating it with the specified list pointer. *)
+    let init_list_storage
+        ~(storage_type : ListStorageType.t)
+        ~(num_elements : int)
+        (pointer_bytes : rw NM.Slice.t)
+      : rw NM.ListStorage.t =
+      let () = BOps.deep_zero_pointer pointer_bytes in
+      let message = pointer_bytes.NM.Slice.msg in
+      let list_storage = BOps.alloc_list_storage message storage_type num_elements in
+      let () = BOps.init_list_pointer pointer_bytes list_storage in
+      list_storage
+
+
+    let get_list
+        ?(struct_sizes : BuilderOps.StructSizes.t option)
+        ?(default : ro DM.ListStorage.t option)
+        ~(storage_type : ListStorageType.t)
+        ~(codecs : 'a NC.ListCodecs.t)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : (rw, 'a, rw NM.ListStorage.t) InnerArray.t =
+      let create_default message =
+        match default with
+        | Some default_storage ->
+            DefaultsCopier.deep_copy_list ?struct_sizes
+              ~src:default_storage ~dest_message:message ()
+        | None ->
+            BOps.alloc_list_storage message storage_type 0
+      in
+      let pointers = struct_storage.NM.StructStorage.pointers in
+      let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+      (* Struct should have already been upgraded to at least the
+         expected data region and pointer region sizes *)
+      assert (pointer_word < num_pointers);
+      let pointer_bytes = {
+        pointers with
+        NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+        NM.Slice.len   = sizeof_uint64;
+      } in
+      let list_storage = BOps.deref_list_pointer ?struct_sizes ~create_default
+          pointer_bytes
+      in
+      NC.make_array_readwrite ~list_storage ~codecs
+        ~init:(fun n -> init_list_storage ~storage_type ~num_elements:n pointer_bytes)
+
+    let get_void_list
+        ?(default : ro DM.ListStorage.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : (rw, unit, rw NM.ListStorage.t) InnerArray.t =
+      get_list ?default ~storage_type:ListStorageType.Empty
+        ~codecs:void_list_codecs struct_storage pointer_word
+
+    let get_bit_list
+        ?(default : ro DM.ListStorage.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : (rw, bool, rw NM.ListStorage.t) InnerArray.t =
+      get_list ?default ~storage_type:ListStorageType.Bit
+        ~codecs:bit_list_codecs struct_storage pointer_word
+
+    let get_int8_list
+        ?(default : ro DM.ListStorage.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : (rw, int, rw NM.ListStorage.t) InnerArray.t =
+      get_list ?default ~storage_type:ListStorageType.Bytes1
+        ~codecs:int8_list_codecs struct_storage pointer_word
+
+    let get_int16_list
+        ?(default : ro DM.ListStorage.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : (rw, int, rw NM.ListStorage.t) InnerArray.t =
+      get_list ?default ~storage_type:ListStorageType.Bytes2
+        ~codecs:int16_list_codecs struct_storage pointer_word
+
+    let get_int32_list
+        ?(default : ro DM.ListStorage.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : (rw, int32, rw NM.ListStorage.t) InnerArray.t =
+      get_list ?default ~storage_type:ListStorageType.Bytes4
+        ~codecs:int32_list_codecs struct_storage pointer_word
+
+    let get_int64_list
+        ?(default : ro DM.ListStorage.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : (rw, int64, rw NM.ListStorage.t) InnerArray.t =
+      get_list ?default ~storage_type:ListStorageType.Bytes8
+        ~codecs:int64_list_codecs struct_storage pointer_word
+
+    let get_uint8_list
+        ?(default : ro DM.ListStorage.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : (rw, int, rw NM.ListStorage.t) InnerArray.t =
+      get_list ?default ~storage_type:ListStorageType.Bytes1
+        ~codecs:uint8_list_codecs struct_storage pointer_word
+
+    let get_uint16_list
+        ?(default : ro DM.ListStorage.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : (rw, int, rw NM.ListStorage.t) InnerArray.t =
+      get_list ?default ~storage_type:ListStorageType.Bytes2
+        ~codecs:uint16_list_codecs struct_storage pointer_word
+
+    let get_uint32_list
+        ?(default : ro DM.ListStorage.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : (rw, Uint32.t, rw NM.ListStorage.t) InnerArray.t =
+      get_list ?default ~storage_type:ListStorageType.Bytes4
+        ~codecs:uint32_list_codecs struct_storage pointer_word
+
+    let get_uint64_list
+        ?(default : ro DM.ListStorage.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : (rw, Uint64.t, rw NM.ListStorage.t) InnerArray.t =
+      get_list ?default ~storage_type:ListStorageType.Bytes8
+        ~codecs:uint64_list_codecs struct_storage pointer_word
+
+    let get_float32_list
+        ?(default : ro DM.ListStorage.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : (rw, float, rw NM.ListStorage.t) InnerArray.t =
+      get_list ?default ~storage_type:ListStorageType.Bytes4
+        ~codecs:float32_list_codecs struct_storage pointer_word
+
+    let get_float64_list
+        ?(default : ro DM.ListStorage.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : (rw, float, rw NM.ListStorage.t) InnerArray.t =
+      get_list ?default ~storage_type:ListStorageType.Bytes8
+        ~codecs:float64_list_codecs struct_storage pointer_word
+
+    let get_text_list
+        ?(default : ro DM.ListStorage.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : (rw, string, rw NM.ListStorage.t) InnerArray.t =
+      get_list ?default ~storage_type:ListStorageType.Pointer
+        ~codecs:text_list_codecs struct_storage pointer_word
+
+    let get_blob_list
+        ?(default : ro DM.ListStorage.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : (rw, string, rw NM.ListStorage.t) InnerArray.t =
+      get_list ?default ~storage_type:ListStorageType.Pointer
+        ~codecs:blob_list_codecs struct_storage pointer_word
+
+    let get_struct_list
+        ?(default : ro DM.ListStorage.t option)
+        ~(data_words : int)
+        ~(pointer_words : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : (rw, rw NM.StructStorage.t, rw NM.ListStorage.t) InnerArray.t =
+      get_list ~struct_sizes:{
+        BuilderOps.StructSizes.data_words;
+        BuilderOps.StructSizes.pointer_words }
+        ?default ~storage_type:(
+          ListStorageType.Composite (data_words, pointer_words))
+        ~codecs:struct_list_codecs struct_storage pointer_word
+
+    let get_struct
+        ?(default : ro DM.StructStorage.t option)
+        ~(data_words : int)
+        ~(pointer_words : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : rw NM.StructStorage.t =
+      let create_default message =
+        match default with
+        | Some default_storage ->
+            DefaultsCopier.deep_copy_struct ~src:default_storage ~dest_message:message
+              ~data_words ~pointer_words
+        | None ->
+            BOps.alloc_struct_storage message ~data_words ~pointer_words
+      in
+      let pointers = struct_storage.NM.StructStorage.pointers in
+      let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+      (* Struct should have already been upgraded to at least the
+         expected data region and pointer region sizes *)
+      assert (pointer_word < num_pointers);
+      let pointer_bytes = {
+        pointers with
+        NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+        NM.Slice.len   = sizeof_uint64;
+      } in
+      BOps.deref_struct_pointer ~create_default ~data_words ~pointer_words pointer_bytes
+
+    let get_pointer
+        ?(default : ro DM.Slice.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : rw NM.Slice.t =
+      let pointers = struct_storage.NM.StructStorage.pointers in
+      let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+      (* Struct should have already been upgraded to at least the
+         expected data region and pointer region sizes *)
+      assert (pointer_word < num_pointers);
+      let pointer_bytes = {
+        pointers with
+        NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+        NM.Slice.len   = sizeof_uint64;
+      } in
+      let () =
+        let pointer_val = NM.Slice.get_int64 pointer_bytes 0 in
+        if Util.is_int64_zero pointer_val then
+          match default with
+          | Some default_pointer ->
+              DefaultsCopier.deep_copy_pointer ~src:default_pointer
+                ~dest:pointer_bytes
+          | None ->
+              ()
+        else
+          ()
+      in
+      pointer_bytes
+
+    let get_interface
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : Uint32.t option =
+      let pointers = struct_storage.NM.StructStorage.pointers in
+      let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+      (* Struct should have already been upgraded to at least the
+         expected data region and pointer region sizes *)
+      assert (pointer_word < num_pointers);
+      let pointer_bytes = {
+        pointers with
+        NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+        NM.Slice.len   = sizeof_uint64;
+      } in
+      match NC.decode_pointer pointer_bytes with
+      | Pointer.Null ->
+          None
+      | Pointer.Other (OtherPointer.Capability index) ->
+          Some index
+      | _ ->
+          invalid_msg "decoded non-capability pointer where capability was expected"
+
+
+    (*******************************************************************************
+     * METHODS FOR SETTING OBJECTS STORED BY POINTER
+     *******************************************************************************)
+
+    let set_text
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : string)
+      : unit =
+      let pointers = struct_storage.NM.StructStorage.pointers in
+      let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+      (* Struct should have already been upgraded to at least the
+         expected data region and pointer region sizes *)
+      assert (pointer_word < num_pointers);
+      let pointer_bytes = {
+        pointers with
+        NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+        NM.Slice.len   = sizeof_uint64;
+      } in
+      let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
+      let new_string_storage = uint8_list_of_string
+        ~null_terminated:true ~dest_message:pointer_bytes.NM.Slice.msg
+        value
+      in
+      let () = BOps.deep_zero_pointer pointer_bytes in
+      BOps.init_list_pointer pointer_bytes new_string_storage
+
+    let set_blob
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : string)
+      : unit =
+      let pointers = struct_storage.NM.StructStorage.pointers in
+      let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+      (* Struct should have already been upgraded to at least the
+         expected data region and pointer region sizes *)
+      assert (pointer_word < num_pointers);
+      let pointer_bytes = {
+        pointers with
+        NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+        NM.Slice.len   = sizeof_uint64;
+      } in
+      let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
+      let new_string_storage = uint8_list_of_string
+        ~null_terminated:false ~dest_message:pointer_bytes.NM.Slice.msg
+        value
+      in
+      let () = BOps.deep_zero_pointer pointer_bytes in
+      BOps.init_list_pointer pointer_bytes new_string_storage
+
+    let set_list_from_storage
+        ?(struct_sizes : BuilderOps.StructSizes.t option)
+        ~(storage_type : ListStorageType.t)
+        ~(codecs : 'a NC.ListCodecs.t)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : 'cap NM.ListStorage.t option)
+      : (rw, 'a, rw NM.ListStorage.t) InnerArray.t =
+      let pointers = struct_storage.NM.StructStorage.pointers in
+      let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+      (* Struct should have already been upgraded to at least the
+         expected data region and pointer region sizes *)
+      assert (pointer_word < num_pointers);
+      let pointer_bytes = {
+        pointers with
+        NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+        NM.Slice.len   = sizeof_uint64;
+      } in
+      let list_storage =
+        match value with
+        | Some src_storage ->
+            BOps.deep_copy_list ?struct_sizes
+              ~src:src_storage ~dest_message:pointer_bytes.NM.Slice.msg ()
+        | None ->
+            BOps.alloc_list_storage pointer_bytes.NM.Slice.msg storage_type 0
+      in
+      let () = BOps.deep_zero_pointer pointer_bytes in
+      let () = BOps.init_list_pointer pointer_bytes list_storage in
+      NC.make_array_readwrite ~list_storage ~codecs
+        ~init:(fun n -> init_list_storage ~storage_type ~num_elements:n pointer_bytes)
+
+    let set_list
+        ?(discr : Discr.t option)
+        ?(struct_sizes : BuilderOps.StructSizes.t option)
+        ~(storage_type : ListStorageType.t)
+        ~(codecs : 'a NC.ListCodecs.t)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : ('cap1, 'a, 'cap2 NM.ListStorage.t) InnerArray.t)
+      : (rw, 'a, rw NM.ListStorage.t) InnerArray.t =
+      let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
+      set_list_from_storage ?struct_sizes ~storage_type ~codecs
+        struct_storage pointer_word (InnerArray.to_storage value)
+
+    let set_void_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : ('cap1, unit, 'cap2 NM.ListStorage.t) InnerArray.t)
+      : (rw, unit, rw NM.ListStorage.t) InnerArray.t =
+      set_list ?discr ~storage_type:ListStorageType.Empty ~codecs:void_list_codecs
+        struct_storage pointer_word value
+
+    let set_bit_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : ('cap1, bool, 'cap2 NM.ListStorage.t) InnerArray.t)
+      : (rw, bool, rw NM.ListStorage.t) InnerArray.t =
+      set_list ?discr ~storage_type:ListStorageType.Bit ~codecs:bit_list_codecs
+        struct_storage pointer_word value
+
+    let set_int8_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : ('cap1, int, 'cap2 NM.ListStorage.t) InnerArray.t)
+      : (rw, int, 'cap NM.ListStorage.t) InnerArray.t =
+      set_list ?discr ~storage_type:ListStorageType.Bytes1 ~codecs:int8_list_codecs
+        struct_storage pointer_word value
+
+    let set_int16_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : ('cap1, int, 'cap2 NM.ListStorage.t) InnerArray.t)
+      : (rw, int, 'cap NM.ListStorage.t) InnerArray.t =
+      set_list ?discr ~storage_type:ListStorageType.Bytes2 ~codecs:int16_list_codecs
+        struct_storage pointer_word value
+
+    let set_int32_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : ('cap1, int32, 'cap NM.ListStorage.t) InnerArray.t)
+      : (rw, int32, rw NM.ListStorage.t) InnerArray.t =
+      set_list ?discr ~storage_type:ListStorageType.Bytes4 ~codecs:int32_list_codecs
+        struct_storage pointer_word value
+
+    let set_int64_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : ('cap1, int64, 'cap2 NM.ListStorage.t) InnerArray.t)
+      : (rw, int64, rw NM.ListStorage.t) InnerArray.t =
+      set_list ?discr ~storage_type:ListStorageType.Bytes8 ~codecs:int64_list_codecs
+        struct_storage pointer_word value
+
+    let set_uint8_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : ('cap1, int, 'cap2 NM.ListStorage.t) InnerArray.t)
+      : (rw, int, rw NM.ListStorage.t) InnerArray.t =
+      set_list ?discr ~storage_type:ListStorageType.Bytes1 ~codecs:uint8_list_codecs
+        struct_storage pointer_word value
+
+    let set_uint16_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : ('cap1, int, 'cap2 NM.ListStorage.t) InnerArray.t)
+      : (rw, int, rw NM.ListStorage.t) InnerArray.t =
+      set_list ?discr ~storage_type:ListStorageType.Bytes2 ~codecs:uint16_list_codecs
+        struct_storage pointer_word value
+
+    let set_uint32_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : ('cap1, Uint32.t, 'cap2 NM.ListStorage.t) InnerArray.t)
+      : (rw, Uint32.t, rw NM.ListStorage.t) InnerArray.t =
+      set_list ?discr ~storage_type:ListStorageType.Bytes4 ~codecs:uint32_list_codecs
+        struct_storage pointer_word value
+
+    let set_uint64_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : ('cap1, Uint64.t, 'cap2 NM.ListStorage.t) InnerArray.t)
+      : (rw, Uint64.t, rw NM.ListStorage.t) InnerArray.t =
+      set_list ?discr ~storage_type:ListStorageType.Bytes8 ~codecs:uint64_list_codecs
+        struct_storage pointer_word value
+
+    let set_float32_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : ('cap1, float, 'cap2 NM.ListStorage.t) InnerArray.t)
+      : (rw, float, rw NM.ListStorage.t) InnerArray.t =
+      set_list ?discr ~storage_type:ListStorageType.Bytes4 ~codecs:float32_list_codecs
+        struct_storage pointer_word value
+
+    let set_float64_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : ('cap1, float, 'cap2 NM.ListStorage.t) InnerArray.t)
+      : (rw, float, rw NM.ListStorage.t) InnerArray.t =
+      set_list ?discr ~storage_type:ListStorageType.Bytes8 ~codecs:float64_list_codecs
+        struct_storage pointer_word value
+
+    let set_text_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : ('cap1, string, 'cap2 NM.ListStorage.t) InnerArray.t)
+      : (rw, string, rw NM.ListStorage.t) InnerArray.t =
+      set_list ?discr ~storage_type:ListStorageType.Pointer ~codecs:text_list_codecs
+        struct_storage pointer_word value
+
+    let set_blob_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : ('cap1, string, 'cap2 NM.ListStorage.t) InnerArray.t)
+      : (rw, string, rw NM.ListStorage.t) InnerArray.t =
+      set_list ?discr ~storage_type:ListStorageType.Pointer ~codecs:blob_list_codecs
+        struct_storage pointer_word value
+
+    let set_struct_list
+        ?(discr : Discr.t option)
+        ~(data_words : int)
+        ~(pointer_words : int)
+        (* FIXME: this won't allow assignment from Reader struct lists *)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : ('cap1, 'cap2 NM.StructStorage.t, 'cap2 NM.ListStorage.t) InnerArray.t)
+      : (rw, rw NM.StructStorage.t, rw NM.ListStorage.t) InnerArray.t =
+      set_list ?discr ~struct_sizes:{
+        BuilderOps.StructSizes.data_words;
+        BuilderOps.StructSizes.pointer_words }
+        ~storage_type:(ListStorageType.Composite (data_words, pointer_words))
+        ~codecs:struct_list_codecs struct_storage pointer_word value
+
+    let set_struct
+        ?(discr : Discr.t option)
+        ~(data_words : int)
+        ~(pointer_words : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : 'cap NM.StructStorage.t option)
+      : rw NM.StructStorage.t =
+      let pointers = struct_storage.NM.StructStorage.pointers in
+      let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+      (* Struct should have already been upgraded to at least the
+         expected data region and pointer region sizes *)
+      assert (pointer_word < num_pointers);
+      let pointer_bytes = {
+        pointers with
+        NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+        NM.Slice.len   = sizeof_uint64;
+      } in
+      let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
+      let dest_storage =
+        match value with
+        | Some src_storage ->
+            BOps.deep_copy_struct ~src:src_storage
+              ~dest_message:pointer_bytes.NM.Slice.msg ~data_words ~pointer_words
+        | None ->
+            BOps.alloc_struct_storage pointer_bytes.NM.Slice.msg ~data_words ~pointer_words
+      in
+      let () = BOps.deep_zero_pointer pointer_bytes in
+      let () = BOps.init_struct_pointer pointer_bytes dest_storage in
+      dest_storage
+
+    let set_pointer
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : 'cap NM.Slice.t)
+      : rw NM.Slice.t =
+      let pointers = struct_storage.NM.StructStorage.pointers in
+      let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+      (* Struct should have already been upgraded to at least the
+         expected data region and pointer region sizes *)
+      assert (pointer_word < num_pointers);
+      let pointer_bytes = {
+        pointers with
+        NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+        NM.Slice.len   = sizeof_uint64;
+      } in
+      let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
+      let () = BOps.deep_copy_pointer ~src:value ~dest:pointer_bytes in
+      pointer_bytes
+
+    let set_interface
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (value : Uint32.t option)
+      : unit =
+      let pointers = struct_storage.NM.StructStorage.pointers in
+      let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+      (* Struct should have already been upgraded to at least the
+         expected data region and pointer region sizes *)
+      assert (pointer_word < num_pointers);
+      let pointer_bytes = {
+        pointers with
+        NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+        NM.Slice.len   = sizeof_uint64;
+      } in
+      let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
+      match value with
+      | Some index ->
+          NM.Slice.set_int64 pointer_bytes 0
+            (OtherPointer.encode (OtherPointer.Capability index))
+      | None ->
+          NM.Slice.set_int64 pointer_bytes 0 Int64.zero
+
+
+    (*******************************************************************************
+     * METHODS FOR INITIALIZING OBJECTS STORED BY POINTER
+     *******************************************************************************)
+
+    let init_blob
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (num_elements : int)
+      : unit =
+      let s = String.make num_elements '\x00' in
+      set_blob ?discr struct_storage pointer_word s
+
+    let init_list
+        ?(discr : Discr.t option)
+        ~(storage_type : ListStorageType.t)
+        ~(codecs : 'a NC.ListCodecs.t)
+        (struct_storage : 'cap NM.StructStorage.t)
+        (pointer_word : int)
+        (num_elements : int)
+      : (rw, 'a, rw NM.ListStorage.t) InnerArray.t =
+      let pointers = struct_storage.NM.StructStorage.pointers in
+      let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+      (* Struct should have already been upgraded to at least the
+         expected data region and pointer region sizes *)
+      assert (pointer_word < num_pointers);
+      let pointer_bytes = {
+        pointers with
+        NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+        NM.Slice.len   = sizeof_uint64;
+      } in
+      let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
+      let list_storage = init_list_storage ~storage_type ~num_elements pointer_bytes in
+      NC.make_array_readwrite ~list_storage ~codecs
+        ~init:(fun n -> init_list_storage ~storage_type ~num_elements:n pointer_bytes)
+
+    let init_void_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (num_elements : int)
+      : (rw, unit, rw NM.ListStorage.t) InnerArray.t =
+      init_list ?discr ~storage_type:ListStorageType.Empty ~codecs:void_list_codecs
+        struct_storage pointer_word num_elements
+
+    let init_bit_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (num_elements : int)
+      : (rw, bool, rw NM.ListStorage.t) InnerArray.t =
+      init_list ?discr ~storage_type:ListStorageType.Bit ~codecs:bit_list_codecs
+        struct_storage pointer_word num_elements
+
+    let init_int8_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (num_elements : int)
+      : (rw, int, rw NM.ListStorage.t) InnerArray.t =
+      init_list ?discr ~storage_type:ListStorageType.Bytes1 ~codecs:int8_list_codecs
+        struct_storage pointer_word num_elements
+
+    let init_int16_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (num_elements : int)
+      : (rw, int, rw NM.ListStorage.t) InnerArray.t =
+      init_list ?discr ~storage_type:ListStorageType.Bytes2 ~codecs:int16_list_codecs
+        struct_storage pointer_word num_elements
+
+    let init_int32_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (num_elements : int)
+      : (rw, int32, rw NM.ListStorage.t) InnerArray.t =
+      init_list ?discr ~storage_type:ListStorageType.Bytes4 ~codecs:int32_list_codecs
+        struct_storage pointer_word num_elements
+
+    let init_int64_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (num_elements : int)
+      : (rw, int64, rw NM.ListStorage.t) InnerArray.t =
+      init_list ?discr ~storage_type:ListStorageType.Bytes8 ~codecs:int64_list_codecs
+        struct_storage pointer_word num_elements
+
+    let init_uint8_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (num_elements : int)
+      : (rw, int, rw NM.ListStorage.t) InnerArray.t =
+      init_list ?discr ~storage_type:ListStorageType.Bytes1 ~codecs:uint8_list_codecs
+        struct_storage pointer_word num_elements
+
+    let init_uint16_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (num_elements : int)
+      : (rw, int, rw NM.ListStorage.t) InnerArray.t =
+      init_list ?discr ~storage_type:ListStorageType.Bytes2 ~codecs:uint16_list_codecs
+        struct_storage pointer_word num_elements
+
+    let init_uint32_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (num_elements : int)
+      : (rw, Uint32.t, rw NM.ListStorage.t) InnerArray.t =
+      init_list ?discr ~storage_type:ListStorageType.Bytes4 ~codecs:uint32_list_codecs
+        struct_storage pointer_word num_elements
+
+    let init_uint64_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (num_elements : int)
+      : (rw, Uint64.t, rw NM.ListStorage.t) InnerArray.t =
+      init_list ?discr ~storage_type:ListStorageType.Bytes8 ~codecs:uint64_list_codecs
+        struct_storage pointer_word num_elements
+
+    let init_float32_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (num_elements : int)
+      : (rw, float, rw NM.ListStorage.t) InnerArray.t =
+      init_list ?discr ~storage_type:ListStorageType.Bytes4 ~codecs:float32_list_codecs
+        struct_storage pointer_word num_elements
+
+    let init_float64_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (num_elements : int)
+      : (rw, float, rw NM.ListStorage.t) InnerArray.t =
+      init_list ?discr ~storage_type:ListStorageType.Bytes8 ~codecs:float64_list_codecs
+        struct_storage pointer_word num_elements
+
+    let init_text_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (num_elements : int)
+      : (rw, string, rw NM.ListStorage.t) InnerArray.t =
+      init_list ?discr ~storage_type:ListStorageType.Pointer ~codecs:text_list_codecs
+        struct_storage pointer_word num_elements
+
+    let init_blob_list
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (num_elements : int)
+      : (rw, string, rw NM.ListStorage.t) InnerArray.t =
+      init_list ?discr ~storage_type:ListStorageType.Pointer ~codecs:blob_list_codecs
+        struct_storage pointer_word num_elements
+
+    let init_struct_list
+        ?(discr : Discr.t option)
+        ~(data_words : int)
+        ~(pointer_words : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+        (num_elements : int)
+      : (rw, rw NM.StructStorage.t, rw NM.ListStorage.t) InnerArray.t =
+      init_list ?discr ~storage_type:(
+        ListStorageType.Composite (data_words, pointer_words))
+        struct_storage pointer_word ~codecs:struct_list_codecs num_elements
+
+    let init_struct
+        ?(discr : Discr.t option)
+        ~(data_words : int)
+        ~(pointer_words : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (pointer_word : int)
+      : rw NM.StructStorage.t =
+      let pointers = struct_storage.NM.StructStorage.pointers in
+      let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+      (* Struct should have already been upgraded to at least the
+         expected data region and pointer region sizes *)
+      assert (pointer_word < num_pointers);
+      let pointer_bytes = {
+        pointers with
+        NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
+        NM.Slice.len   = sizeof_uint64;
+      } in
+      let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
+      let () = BOps.deep_zero_pointer pointer_bytes in
+      let storage =
+        BOps.alloc_struct_storage pointer_bytes.NM.Slice.msg ~data_words ~pointer_words
+      in
+      let () = BOps.init_struct_pointer pointer_bytes storage in
+      storage
+
+    (* Locate the storage region corresponding to the root struct of a message.
+       The [data_words] and [pointer_words] specify the expected struct layout. *)
+    let get_root_struct
+        (m : rw NM.Message.t)
+        ~(data_words : int)
+        ~(pointer_words : int)
+      : rw NM.StructStorage.t =
+      let first_segment = NM.Message.get_segment m 0 in
+      if NM.Segment.length first_segment < sizeof_uint64 then
+        invalid_msg "message is too small to contain root struct pointer"
+      else
+        let pointer_bytes = {
+          NM.Slice.msg        = m;
+          NM.Slice.segment    = first_segment;
+          NM.Slice.segment_id = 0;
+          NM.Slice.start      = 0;
+          NM.Slice.len        = sizeof_uint64
+        } in
+        let create_default message =
+          BOps.alloc_struct_storage message ~data_words ~pointer_words
+        in
+        BOps.deref_struct_pointer ~create_default ~data_words ~pointer_words
+          pointer_bytes
+
+
+    (* Allocate a new message of at least the given [message_size], creating a
+       root struct with the specified struct layout.
+       Returns: newly-allocated root struct storage *)
+    let alloc_root_struct
+        ?(message_size : int option)
+        ~(data_words : int)
+        ~(pointer_words : int)
+        ()
+      : rw NM.StructStorage.t =
+      let act_message_size =
+        let requested_size =
+          match message_size with
+          | Some x -> x
+          | None   -> 8192
+        in
+        max requested_size ((data_words + pointer_words + 1) * sizeof_uint64)
+      in
+      let message = NM.Message.create act_message_size in
+      (* Has the important side effect of reserving space in the message for
+         the root struct pointer... *)
+      let _ = NM.Slice.alloc message sizeof_uint64 in
+      get_root_struct message ~data_words ~pointer_words
+
   end
 
   type 'cap message_t = 'cap MessageWrapper.Message.t
@@ -1166,11 +5143,9 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = reader_t_List_9792858745991129751
         type builder_t = builder_t_List_9792858745991129751
         let has_element_type x = 
-          (let ptr = RA_.get_pointer_bytes x 0 in
-          RA_.has_field ptr)
+          (RA_.has_field x 0)
         let element_type_get x = 
-          (let ptr = RA_.get_pointer_bytes x 0 in
-          RA_.get_struct ptr)
+          (RA_.get_struct x 0)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
       end
@@ -1297,30 +5272,23 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let data = RA_.get_data_region x in
         RA_.get_float64 ~default_bits:(0L) ~byte_ofs:8 data
       let has_text x =
-        let ptr = RA_.get_pointer_bytes x 0 in
-        RA_.has_field ptr
+        RA_.has_field x 0
       let text_get x =
-        let ptr = RA_.get_pointer_bytes x 0 in
-        RA_.get_text ~default:"" ptr
+        RA_.get_text ~default:"" x 0
       let has_data x =
-        let ptr = RA_.get_pointer_bytes x 0 in
-        RA_.has_field ptr
+        RA_.has_field x 0
       let data_get x =
-        let ptr = RA_.get_pointer_bytes x 0 in
-        RA_.get_blob ~default:"" ptr
+        RA_.get_blob ~default:"" x 0
       let list_get x =
-        let ptr = RA_.get_pointer_bytes x 0 in
-        RA_.get_pointer ptr
+        RA_.get_pointer x 0
       let enum_get x =
         let data = RA_.get_data_region x in
         RA_.get_uint16 ~default:0 ~byte_ofs:2 data
       let struct_get x =
-        let ptr = RA_.get_pointer_bytes x 0 in
-        RA_.get_pointer ptr
+        RA_.get_pointer x 0
       let interface_get x = ()
       let any_pointer_get x =
-        let ptr = RA_.get_pointer_bytes x 0 in
-        RA_.get_pointer ptr
+        RA_.get_pointer x 0
       type unnamed_union_t =
         | Void
         | Bool of bool
@@ -1377,11 +5345,9 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       let id_get_int_exn x =
         Capnp.Runtime.Util.int_of_uint64_exn (id_get x)
       let has_value x = 
-        (let ptr = RA_.get_pointer_bytes x 0 in
-        RA_.has_field ptr)
+        (RA_.has_field x 0)
       let value_get x = 
-        (let ptr = RA_.get_pointer_bytes x 0 in
-        RA_.get_struct ptr)
+        (RA_.get_struct x 0)
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       let of_builder x = Some (RA_.StructStorage.readonly x)
     end
@@ -1389,11 +5355,9 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       type t = reader_t_Method_10736806783679155584
       type builder_t = builder_t_Method_10736806783679155584
       let has_name x =
-        let ptr = RA_.get_pointer_bytes x 0 in
-        RA_.has_field ptr
+        RA_.has_field x 0
       let name_get x =
-        let ptr = RA_.get_pointer_bytes x 0 in
-        RA_.get_text ~default:"" ptr
+        RA_.get_text ~default:"" x 0
       let code_order_get x =
         let data = RA_.get_data_region x in
         RA_.get_uint16 ~default:0 ~byte_ofs:0 data
@@ -1408,11 +5372,9 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       let result_struct_type_get_int_exn x =
         Capnp.Runtime.Util.int_of_uint64_exn (result_struct_type_get x)
       let has_annotations x = 
-        (let ptr = RA_.get_pointer_bytes x 1 in
-        RA_.has_field ptr)
+        (RA_.has_field x 1)
       let annotations_get x = 
-        (let ptr = RA_.get_pointer_bytes x 1 in
-        RA_.get_struct_list ptr)
+        (RA_.get_struct_list x 1)
       let annotations_get_list x =
         Capnp.Array.to_list (annotations_get x)
       let annotations_get_array x =
@@ -1424,20 +5386,16 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       type t = reader_t_Enumerant_10919677598968879693
       type builder_t = builder_t_Enumerant_10919677598968879693
       let has_name x =
-        let ptr = RA_.get_pointer_bytes x 0 in
-        RA_.has_field ptr
+        RA_.has_field x 0
       let name_get x =
-        let ptr = RA_.get_pointer_bytes x 0 in
-        RA_.get_text ~default:"" ptr
+        RA_.get_text ~default:"" x 0
       let code_order_get x =
         let data = RA_.get_data_region x in
         RA_.get_uint16 ~default:0 ~byte_ofs:0 data
       let has_annotations x = 
-        (let ptr = RA_.get_pointer_bytes x 1 in
-        RA_.has_field ptr)
+        (RA_.has_field x 1)
       let annotations_get x = 
-        (let ptr = RA_.get_pointer_bytes x 1 in
-        RA_.get_struct_list ptr)
+        (RA_.get_struct_list x 1)
       let annotations_get_list x =
         Capnp.Array.to_list (annotations_get x)
       let annotations_get_array x =
@@ -1490,17 +5448,13 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let offset_get_int_exn x =
           Capnp.Runtime.Util.int_of_uint32_exn (offset_get x)
         let has_type x = 
-          (let ptr = RA_.get_pointer_bytes x 2 in
-          RA_.has_field ptr)
+          (RA_.has_field x 2)
         let type_get x = 
-          (let ptr = RA_.get_pointer_bytes x 2 in
-          RA_.get_struct ptr)
+          (RA_.get_struct x 2)
         let has_default_value x = 
-          (let ptr = RA_.get_pointer_bytes x 3 in
-          RA_.has_field ptr)
+          (RA_.has_field x 3)
         let default_value_get x = 
-          (let ptr = RA_.get_pointer_bytes x 3 in
-          RA_.get_struct ptr)
+          (RA_.get_struct x 3)
         let had_explicit_default_get x =
           let data = RA_.get_data_region x in
           RA_.get_bit ~default:false ~byte_ofs:16 ~bit_ofs:0 data
@@ -1520,20 +5474,16 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         | 1 -> Group (group_get x)
         | v -> Undefined v
       let has_name x =
-        let ptr = RA_.get_pointer_bytes x 0 in
-        RA_.has_field ptr
+        RA_.has_field x 0
       let name_get x =
-        let ptr = RA_.get_pointer_bytes x 0 in
-        RA_.get_text ~default:"" ptr
+        RA_.get_text ~default:"" x 0
       let code_order_get x =
         let data = RA_.get_data_region x in
         RA_.get_uint16 ~default:0 ~byte_ofs:0 data
       let has_annotations x = 
-        (let ptr = RA_.get_pointer_bytes x 1 in
-        RA_.has_field ptr)
+        (RA_.has_field x 1)
       let annotations_get x = 
-        (let ptr = RA_.get_pointer_bytes x 1 in
-        RA_.get_struct_list ptr)
+        (RA_.get_struct_list x 1)
       let annotations_get_list x =
         Capnp.Array.to_list (annotations_get x)
       let annotations_get_array x =
@@ -1573,11 +5523,9 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let discriminant_offset_get_int_exn x =
           Capnp.Runtime.Util.int_of_uint32_exn (discriminant_offset_get x)
         let has_fields x = 
-          (let ptr = RA_.get_pointer_bytes x 3 in
-          RA_.has_field ptr)
+          (RA_.has_field x 3)
         let fields_get x = 
-          (let ptr = RA_.get_pointer_bytes x 3 in
-          RA_.get_struct_list ptr)
+          (RA_.get_struct_list x 3)
         let fields_get_list x =
           Capnp.Array.to_list (fields_get x)
         let fields_get_array x =
@@ -1589,11 +5537,9 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = reader_t_Enum_13063450714778629528
         type builder_t = builder_t_Enum_13063450714778629528
         let has_enumerants x = 
-          (let ptr = RA_.get_pointer_bytes x 3 in
-          RA_.has_field ptr)
+          (RA_.has_field x 3)
         let enumerants_get x = 
-          (let ptr = RA_.get_pointer_bytes x 3 in
-          RA_.get_struct_list ptr)
+          (RA_.get_struct_list x 3)
         let enumerants_get_list x =
           Capnp.Array.to_list (enumerants_get x)
         let enumerants_get_array x =
@@ -1605,11 +5551,9 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = reader_t_Annotation_17011813041836786320
         type builder_t = builder_t_Annotation_17011813041836786320
         let has_type x = 
-          (let ptr = RA_.get_pointer_bytes x 3 in
-          RA_.has_field ptr)
+          (RA_.has_field x 3)
         let type_get x = 
-          (let ptr = RA_.get_pointer_bytes x 3 in
-          RA_.get_struct ptr)
+          (RA_.get_struct x 3)
         let targets_file_get x =
           let data = RA_.get_data_region x in
           RA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:0 data
@@ -1653,17 +5597,13 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = reader_t_Const_12793219851699983392
         type builder_t = builder_t_Const_12793219851699983392
         let has_type x = 
-          (let ptr = RA_.get_pointer_bytes x 3 in
-          RA_.has_field ptr)
+          (RA_.has_field x 3)
         let type_get x = 
-          (let ptr = RA_.get_pointer_bytes x 3 in
-          RA_.get_struct ptr)
+          (RA_.get_struct x 3)
         let has_value x = 
-          (let ptr = RA_.get_pointer_bytes x 4 in
-          RA_.has_field ptr)
+          (RA_.has_field x 4)
         let value_get x = 
-          (let ptr = RA_.get_pointer_bytes x 4 in
-          RA_.get_struct ptr)
+          (RA_.get_struct x 4)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
       end
@@ -1671,21 +5611,17 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = reader_t_Interface_16728431493453586831
         type builder_t = builder_t_Interface_16728431493453586831
         let has_methods x = 
-          (let ptr = RA_.get_pointer_bytes x 3 in
-          RA_.has_field ptr)
+          (RA_.has_field x 3)
         let methods_get x = 
-          (let ptr = RA_.get_pointer_bytes x 3 in
-          RA_.get_struct_list ptr)
+          (RA_.get_struct_list x 3)
         let methods_get_list x =
           Capnp.Array.to_list (methods_get x)
         let methods_get_array x =
           Capnp.Array.to_array (methods_get x)
         let has_extends x = 
-          (let ptr = RA_.get_pointer_bytes x 4 in
-          RA_.has_field ptr)
+          (RA_.has_field x 4)
         let extends_get x =
-          let ptr = RA_.get_pointer_bytes x 4 in
-          RA_.get_uint64_list ptr
+          RA_.get_uint64_list x 4
         let extends_get_list x =
           Capnp.Array.to_list (extends_get x)
         let extends_get_array x =
@@ -1697,11 +5633,9 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = reader_t_NestedNode_16050641862814319170
         type builder_t = builder_t_NestedNode_16050641862814319170
         let has_name x =
-          let ptr = RA_.get_pointer_bytes x 0 in
-          RA_.has_field ptr
+          RA_.has_field x 0
         let name_get x =
-          let ptr = RA_.get_pointer_bytes x 0 in
-          RA_.get_text ~default:"" ptr
+          RA_.get_text ~default:"" x 0
         let id_get x =
           let data = RA_.get_data_region x in
           RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:0 data
@@ -1740,11 +5674,9 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       let id_get_int_exn x =
         Capnp.Runtime.Util.int_of_uint64_exn (id_get x)
       let has_display_name x =
-        let ptr = RA_.get_pointer_bytes x 0 in
-        RA_.has_field ptr
+        RA_.has_field x 0
       let display_name_get x =
-        let ptr = RA_.get_pointer_bytes x 0 in
-        RA_.get_text ~default:"" ptr
+        RA_.get_text ~default:"" x 0
       let display_name_prefix_length_get x =
         let data = RA_.get_data_region x in
         RA_.get_uint32 ~default:Uint32.zero ~byte_ofs:8 data
@@ -1756,21 +5688,17 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       let scope_id_get_int_exn x =
         Capnp.Runtime.Util.int_of_uint64_exn (scope_id_get x)
       let has_nested_nodes x = 
-        (let ptr = RA_.get_pointer_bytes x 1 in
-        RA_.has_field ptr)
+        (RA_.has_field x 1)
       let nested_nodes_get x = 
-        (let ptr = RA_.get_pointer_bytes x 1 in
-        RA_.get_struct_list ptr)
+        (RA_.get_struct_list x 1)
       let nested_nodes_get_list x =
         Capnp.Array.to_list (nested_nodes_get x)
       let nested_nodes_get_array x =
         Capnp.Array.to_array (nested_nodes_get x)
       let has_annotations x = 
-        (let ptr = RA_.get_pointer_bytes x 2 in
-        RA_.has_field ptr)
+        (RA_.has_field x 2)
       let annotations_get x = 
-        (let ptr = RA_.get_pointer_bytes x 2 in
-        RA_.get_struct_list ptr)
+        (RA_.get_struct_list x 2)
       let annotations_get_list x =
         Capnp.Array.to_list (annotations_get x)
       let annotations_get_array x =
@@ -1793,11 +5721,9 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let id_get_int_exn x =
             Capnp.Runtime.Util.int_of_uint64_exn (id_get x)
           let has_name x =
-            let ptr = RA_.get_pointer_bytes x 0 in
-            RA_.has_field ptr
+            RA_.has_field x 0
           let name_get x =
-            let ptr = RA_.get_pointer_bytes x 0 in
-            RA_.get_text ~default:"" ptr
+            RA_.get_text ~default:"" x 0
           let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
           let of_builder x = Some (RA_.StructStorage.readonly x)
         end
@@ -1807,17 +5733,13 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let id_get_int_exn x =
           Capnp.Runtime.Util.int_of_uint64_exn (id_get x)
         let has_filename x =
-          let ptr = RA_.get_pointer_bytes x 0 in
-          RA_.has_field ptr
+          RA_.has_field x 0
         let filename_get x =
-          let ptr = RA_.get_pointer_bytes x 0 in
-          RA_.get_text ~default:"" ptr
+          RA_.get_text ~default:"" x 0
         let has_imports x = 
-          (let ptr = RA_.get_pointer_bytes x 1 in
-          RA_.has_field ptr)
+          (RA_.has_field x 1)
         let imports_get x = 
-          (let ptr = RA_.get_pointer_bytes x 1 in
-          RA_.get_struct_list ptr)
+          (RA_.get_struct_list x 1)
         let imports_get_list x =
           Capnp.Array.to_list (imports_get x)
         let imports_get_array x =
@@ -1826,21 +5748,17 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let of_builder x = Some (RA_.StructStorage.readonly x)
       end
       let has_nodes x = 
-        (let ptr = RA_.get_pointer_bytes x 0 in
-        RA_.has_field ptr)
+        (RA_.has_field x 0)
       let nodes_get x = 
-        (let ptr = RA_.get_pointer_bytes x 0 in
-        RA_.get_struct_list ptr)
+        (RA_.get_struct_list x 0)
       let nodes_get_list x =
         Capnp.Array.to_list (nodes_get x)
       let nodes_get_array x =
         Capnp.Array.to_array (nodes_get x)
       let has_requested_files x = 
-        (let ptr = RA_.get_pointer_bytes x 1 in
-        RA_.has_field ptr)
+        (RA_.has_field x 1)
       let requested_files_get x = 
-        (let ptr = RA_.get_pointer_bytes x 1 in
-        RA_.get_struct_list ptr)
+        (RA_.get_struct_list x 1)
       let requested_files_get_list x =
         Capnp.Array.to_list (requested_files_get x)
       let requested_files_get_array x =
@@ -1883,7 +5801,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:8 v data
         let type_id_set_int_exn x v = type_id_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
         let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
-        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
         let to_reader x = Some (RA_.StructStorage.readonly x)
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:2 ~pointer_words:1 ()
@@ -1901,7 +5819,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:8 v data
         let type_id_set_int_exn x v = type_id_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
         let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
-        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
         let to_reader x = Some (RA_.StructStorage.readonly x)
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:2 ~pointer_words:1 ()
@@ -1910,22 +5828,17 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = builder_t_List_9792858745991129751
         type reader_t = reader_t_List_9792858745991129751
         let has_element_type x = 
-          (let ptr = BA_.get_pointer_bytes x 0 in
-          BA_.has_field ptr)
+          (BA_.has_field x 0)
         let element_type_get x = 
-          (let ptr = BA_.get_pointer_bytes x 0 in
-          BA_.get_struct ~data_words:2 ~pointer_words:1 ptr)
+          (BA_.get_struct ~data_words:2 ~pointer_words:1 x 0)
         let element_type_set_reader x v = 
-          (let ptr = BA_.get_pointer_bytes x 0 in
-          BA_.set_struct ~data_words:2 ~pointer_words:1 (v) ptr)
+          (BA_.set_struct ~data_words:2 ~pointer_words:1 x 0 (v))
         let element_type_set_builder x v = 
-          (let ptr = BA_.get_pointer_bytes x 0 in
-          BA_.set_struct ~data_words:2 ~pointer_words:1 (Some (v)) ptr)
+          (BA_.set_struct ~data_words:2 ~pointer_words:1 x 0 (Some (v)))
         let element_type_init x = 
-          (let ptr = BA_.get_pointer_bytes x 0 in
-          BA_.init_struct ~data_words:2 ~pointer_words:1 ptr)
+          (BA_.init_struct ~data_words:2 ~pointer_words:1 x 0)
         let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
-        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
         let to_reader x = Some (RA_.StructStorage.readonly x)
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:2 ~pointer_words:1 ()
@@ -1943,7 +5856,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:8 v data
         let type_id_set_int_exn x v = type_id_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
         let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
-        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
         let to_reader x = Some (RA_.StructStorage.readonly x)
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:2 ~pointer_words:1 ()
@@ -2006,8 +5919,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         BA_.set_void data
       let list_get x = x
       let list_init x =
-        let data = x.BA_.NC.StructStorage.data in
-        let pointers = x.BA_.NC.StructStorage.pointers in
+        let data = x.BA_.NM.StructStorage.data in
+        let pointers = x.BA_.NM.StructStorage.pointers in
         let () = ignore data in
         let () = ignore pointers in
         let () = BA_.set_opt_discriminant data
@@ -2025,8 +5938,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         x
       let enum_get x = x
       let enum_init x =
-        let data = x.BA_.NC.StructStorage.data in
-        let pointers = x.BA_.NC.StructStorage.pointers in
+        let data = x.BA_.NM.StructStorage.data in
+        let pointers = x.BA_.NM.StructStorage.pointers in
         let () = ignore data in
         let () = ignore pointers in
         let () = BA_.set_opt_discriminant data
@@ -2036,8 +5949,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         x
       let struct_get x = x
       let struct_init x =
-        let data = x.BA_.NC.StructStorage.data in
-        let pointers = x.BA_.NC.StructStorage.pointers in
+        let data = x.BA_.NM.StructStorage.data in
+        let pointers = x.BA_.NM.StructStorage.pointers in
         let () = ignore data in
         let () = ignore pointers in
         let () = BA_.set_opt_discriminant data
@@ -2047,8 +5960,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         x
       let interface_get x = x
       let interface_init x =
-        let data = x.BA_.NC.StructStorage.data in
-        let pointers = x.BA_.NC.StructStorage.pointers in
+        let data = x.BA_.NM.StructStorage.data in
+        let pointers = x.BA_.NM.StructStorage.pointers in
         let () = ignore data in
         let () = ignore pointers in
         let () = BA_.set_opt_discriminant data
@@ -2105,7 +6018,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         | 18 -> AnyPointer
         | v -> Undefined v
       let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
-      let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+      let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
       let to_reader x = Some (RA_.StructStorage.readonly x)
       let init_root ?message_size () =
         BA_.alloc_root_struct ?message_size ~data_words:2 ~pointer_words:1 ()
@@ -2196,29 +6109,21 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let data = BA_.get_data_region ~discr:{BA_.Discr.value=11; BA_.Discr.byte_ofs=0} x in
         BA_.set_float64 ~default_bits:(0L) ~byte_ofs:8 v data
       let has_text x =
-        let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.has_field ptr
+        BA_.has_field x 0
       let text_get x =
-        let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.get_text ~default:"" ptr
+        BA_.get_text ~default:"" x 0
       let text_set x v =
-        let ptr = BA_.get_pointer_bytes ~discr:{BA_.Discr.value=12; BA_.Discr.byte_ofs=0} x 0 in
-        BA_.set_text v ptr
+        BA_.set_text ~discr:{BA_.Discr.value=12; BA_.Discr.byte_ofs=0} x 0 v
       let has_data x =
-        let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.has_field ptr
+        BA_.has_field x 0
       let data_get x =
-        let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.get_blob ~default:"" ptr
+        BA_.get_blob ~default:"" x 0
       let data_set x v =
-        let ptr = BA_.get_pointer_bytes ~discr:{BA_.Discr.value=13; BA_.Discr.byte_ofs=0} x 0 in
-        BA_.set_blob v ptr
+        BA_.set_blob ~discr:{BA_.Discr.value=13; BA_.Discr.byte_ofs=0} x 0 v
       let list_get x =
-        let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.get_pointer ptr
+        BA_.get_pointer x 0
       let list_set x v =
-        let ptr = BA_.get_pointer_bytes ~discr:{BA_.Discr.value=14; BA_.Discr.byte_ofs=0} x 0 in
-        BA_.set_pointer v ptr
+        BA_.set_pointer ~discr:{BA_.Discr.value=14; BA_.Discr.byte_ofs=0} x 0 v
       let enum_get x =
         let data = BA_.get_data_region x in
         BA_.get_uint16 ~default:0 ~byte_ofs:2 data
@@ -2226,21 +6131,17 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let data = BA_.get_data_region ~discr:{BA_.Discr.value=15; BA_.Discr.byte_ofs=0} x in
         BA_.set_uint16 ~default:0 ~byte_ofs:2 v data
       let struct_get x =
-        let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.get_pointer ptr
+        BA_.get_pointer x 0
       let struct_set x v =
-        let ptr = BA_.get_pointer_bytes ~discr:{BA_.Discr.value=16; BA_.Discr.byte_ofs=0} x 0 in
-        BA_.set_pointer v ptr
+        BA_.set_pointer ~discr:{BA_.Discr.value=16; BA_.Discr.byte_ofs=0} x 0 v
       let interface_get x = ()
       let interface_set x =
         let data = BA_.get_data_region ~discr:{BA_.Discr.value=17; BA_.Discr.byte_ofs=0} x in
         BA_.set_void data
       let any_pointer_get x =
-        let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.get_pointer ptr
+        BA_.get_pointer x 0
       let any_pointer_set x v =
-        let ptr = BA_.get_pointer_bytes ~discr:{BA_.Discr.value=18; BA_.Discr.byte_ofs=0} x 0 in
-        BA_.set_pointer v ptr
+        BA_.set_pointer ~discr:{BA_.Discr.value=18; BA_.Discr.byte_ofs=0} x 0 v
       type unnamed_union_t =
         | Void
         | Bool of bool
@@ -2286,7 +6187,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         | 18 -> AnyPointer (any_pointer_get x)
         | v -> Undefined v
       let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
-      let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+      let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
       let to_reader x = Some (RA_.StructStorage.readonly x)
       let init_root ?message_size () =
         BA_.alloc_root_struct ?message_size ~data_words:2 ~pointer_words:1 ()
@@ -2304,22 +6205,17 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:0 v data
       let id_set_int_exn x v = id_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
       let has_value x = 
-        (let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.has_field ptr)
+        (BA_.has_field x 0)
       let value_get x = 
-        (let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.get_struct ~data_words:2 ~pointer_words:1 ptr)
+        (BA_.get_struct ~data_words:2 ~pointer_words:1 x 0)
       let value_set_reader x v = 
-        (let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.set_struct ~data_words:2 ~pointer_words:1 (v) ptr)
+        (BA_.set_struct ~data_words:2 ~pointer_words:1 x 0 (v))
       let value_set_builder x v = 
-        (let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.set_struct ~data_words:2 ~pointer_words:1 (Some (v)) ptr)
+        (BA_.set_struct ~data_words:2 ~pointer_words:1 x 0 (Some (v)))
       let value_init x = 
-        (let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.init_struct ~data_words:2 ~pointer_words:1 ptr)
+        (BA_.init_struct ~data_words:2 ~pointer_words:1 x 0)
       let of_message x = BA_.get_root_struct ~data_words:1 ~pointer_words:1 x
-      let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+      let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
       let to_reader x = Some (RA_.StructStorage.readonly x)
       let init_root ?message_size () =
         BA_.alloc_root_struct ?message_size ~data_words:1 ~pointer_words:1 ()
@@ -2328,14 +6224,11 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       type t = builder_t_Method_10736806783679155584
       type reader_t = reader_t_Method_10736806783679155584
       let has_name x =
-        let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.has_field ptr
+        BA_.has_field x 0
       let name_get x =
-        let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.get_text ~default:"" ptr
+        BA_.get_text ~default:"" x 0
       let name_set x v =
-        let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.set_text v ptr
+        BA_.set_text x 0 v
       let code_order_get x =
         let data = BA_.get_data_region x in
         BA_.get_uint16 ~default:0 ~byte_ofs:0 data
@@ -2361,21 +6254,17 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:16 v data
       let result_struct_type_set_int_exn x v = result_struct_type_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
       let has_annotations x = 
-        (let ptr = BA_.get_pointer_bytes x 1 in
-        BA_.has_field ptr)
+        (BA_.has_field x 1)
       let annotations_get x = 
-        (let ptr = BA_.get_pointer_bytes x 1 in
-        BA_.get_struct_list ~data_words:1 ~pointer_words:1 ptr)
+        (BA_.get_struct_list ~data_words:1 ~pointer_words:1 x 1)
       let annotations_get_list x =
         Capnp.Array.to_list (annotations_get x)
       let annotations_get_array x =
         Capnp.Array.to_array (annotations_get x)
       let annotations_set x v = 
-        (let ptr = BA_.get_pointer_bytes x 1 in
-        BA_.set_struct_list ~data_words:1 ~pointer_words:1 (v) ptr)
+        (BA_.set_struct_list ~data_words:1 ~pointer_words:1 x 1 (v))
       let annotations_init x n = 
-        (let ptr = BA_.get_pointer_bytes x 1 in
-        BA_.init_struct_list ~data_words:1 ~pointer_words:1 n ptr)
+        (BA_.init_struct_list ~data_words:1 ~pointer_words:1 x 1 n)
       let annotations_set_list x v =
         let builder = annotations_init x (List.length v) in
         let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -2385,7 +6274,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let () = Array.iteri (fun i a -> Capnp.Array.set builder i a) v in
         builder
       let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:2 x
-      let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+      let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
       let to_reader x = Some (RA_.StructStorage.readonly x)
       let init_root ?message_size () =
         BA_.alloc_root_struct ?message_size ~data_words:3 ~pointer_words:2 ()
@@ -2394,14 +6283,11 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       type t = builder_t_Enumerant_10919677598968879693
       type reader_t = reader_t_Enumerant_10919677598968879693
       let has_name x =
-        let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.has_field ptr
+        BA_.has_field x 0
       let name_get x =
-        let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.get_text ~default:"" ptr
+        BA_.get_text ~default:"" x 0
       let name_set x v =
-        let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.set_text v ptr
+        BA_.set_text x 0 v
       let code_order_get x =
         let data = BA_.get_data_region x in
         BA_.get_uint16 ~default:0 ~byte_ofs:0 data
@@ -2409,21 +6295,17 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let data = BA_.get_data_region x in
         BA_.set_uint16 ~default:0 ~byte_ofs:0 v data
       let has_annotations x = 
-        (let ptr = BA_.get_pointer_bytes x 1 in
-        BA_.has_field ptr)
+        (BA_.has_field x 1)
       let annotations_get x = 
-        (let ptr = BA_.get_pointer_bytes x 1 in
-        BA_.get_struct_list ~data_words:1 ~pointer_words:1 ptr)
+        (BA_.get_struct_list ~data_words:1 ~pointer_words:1 x 1)
       let annotations_get_list x =
         Capnp.Array.to_list (annotations_get x)
       let annotations_get_array x =
         Capnp.Array.to_array (annotations_get x)
       let annotations_set x v = 
-        (let ptr = BA_.get_pointer_bytes x 1 in
-        BA_.set_struct_list ~data_words:1 ~pointer_words:1 (v) ptr)
+        (BA_.set_struct_list ~data_words:1 ~pointer_words:1 x 1 (v))
       let annotations_init x n = 
-        (let ptr = BA_.get_pointer_bytes x 1 in
-        BA_.init_struct_list ~data_words:1 ~pointer_words:1 n ptr)
+        (BA_.init_struct_list ~data_words:1 ~pointer_words:1 x 1 n)
       let annotations_set_list x v =
         let builder = annotations_init x (List.length v) in
         let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -2433,7 +6315,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let () = Array.iteri (fun i a -> Capnp.Array.set builder i a) v in
         builder
       let of_message x = BA_.get_root_struct ~data_words:1 ~pointer_words:2 x
-      let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+      let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
       let to_reader x = Some (RA_.StructStorage.readonly x)
       let init_root ?message_size () =
         BA_.alloc_root_struct ?message_size ~data_words:1 ~pointer_words:2 ()
@@ -2467,7 +6349,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           | 1 -> Explicit (explicit_get x)
           | v -> Undefined v
         let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:4 x
-        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
         let to_reader x = Some (RA_.StructStorage.readonly x)
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:3 ~pointer_words:4 ()
@@ -2485,7 +6367,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:16 v data
         let type_id_set_int_exn x v = type_id_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
         let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:4 x
-        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
         let to_reader x = Some (RA_.StructStorage.readonly x)
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:3 ~pointer_words:4 ()
@@ -2503,35 +6385,25 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           BA_.set_uint32 ~default:Uint32.zero ~byte_ofs:4 v data
         let offset_set_int_exn x v = offset_set x (Capnp.Runtime.Util.uint32_of_int_exn v)
         let has_type x = 
-          (let ptr = BA_.get_pointer_bytes x 2 in
-          BA_.has_field ptr)
+          (BA_.has_field x 2)
         let type_get x = 
-          (let ptr = BA_.get_pointer_bytes x 2 in
-          BA_.get_struct ~data_words:2 ~pointer_words:1 ptr)
+          (BA_.get_struct ~data_words:2 ~pointer_words:1 x 2)
         let type_set_reader x v = 
-          (let ptr = BA_.get_pointer_bytes x 2 in
-          BA_.set_struct ~data_words:2 ~pointer_words:1 (v) ptr)
+          (BA_.set_struct ~data_words:2 ~pointer_words:1 x 2 (v))
         let type_set_builder x v = 
-          (let ptr = BA_.get_pointer_bytes x 2 in
-          BA_.set_struct ~data_words:2 ~pointer_words:1 (Some (v)) ptr)
+          (BA_.set_struct ~data_words:2 ~pointer_words:1 x 2 (Some (v)))
         let type_init x = 
-          (let ptr = BA_.get_pointer_bytes x 2 in
-          BA_.init_struct ~data_words:2 ~pointer_words:1 ptr)
+          (BA_.init_struct ~data_words:2 ~pointer_words:1 x 2)
         let has_default_value x = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.has_field ptr)
+          (BA_.has_field x 3)
         let default_value_get x = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.get_struct ~data_words:2 ~pointer_words:1 ptr)
+          (BA_.get_struct ~data_words:2 ~pointer_words:1 x 3)
         let default_value_set_reader x v = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.set_struct ~data_words:2 ~pointer_words:1 (v) ptr)
+          (BA_.set_struct ~data_words:2 ~pointer_words:1 x 3 (v))
         let default_value_set_builder x v = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.set_struct ~data_words:2 ~pointer_words:1 (Some (v)) ptr)
+          (BA_.set_struct ~data_words:2 ~pointer_words:1 x 3 (Some (v)))
         let default_value_init x = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.init_struct ~data_words:2 ~pointer_words:1 ptr)
+          (BA_.init_struct ~data_words:2 ~pointer_words:1 x 3)
         let had_explicit_default_get x =
           let data = BA_.get_data_region x in
           BA_.get_bit ~default:false ~byte_ofs:16 ~bit_ofs:0 data
@@ -2539,15 +6411,15 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let data = BA_.get_data_region x in
           BA_.set_bit ~default:false ~byte_ofs:16 ~bit_ofs:0 v data
         let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:4 x
-        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
         let to_reader x = Some (RA_.StructStorage.readonly x)
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:3 ~pointer_words:4 ()
       end
       let slot_get x = x
       let slot_init x =
-        let data = x.BA_.NC.StructStorage.data in
-        let pointers = x.BA_.NC.StructStorage.pointers in
+        let data = x.BA_.NM.StructStorage.data in
+        let pointers = x.BA_.NM.StructStorage.pointers in
         let () = ignore data in
         let () = ignore pointers in
         let () = BA_.set_opt_discriminant data
@@ -2576,8 +6448,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         x
       let group_get x = x
       let group_init x =
-        let data = x.BA_.NC.StructStorage.data in
-        let pointers = x.BA_.NC.StructStorage.pointers in
+        let data = x.BA_.NM.StructStorage.data in
+        let pointers = x.BA_.NM.StructStorage.pointers in
         let () = ignore data in
         let () = ignore pointers in
         let () = BA_.set_opt_discriminant data
@@ -2596,14 +6468,11 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         | 1 -> Group (group_get x)
         | v -> Undefined v
       let has_name x =
-        let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.has_field ptr
+        BA_.has_field x 0
       let name_get x =
-        let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.get_text ~default:"" ptr
+        BA_.get_text ~default:"" x 0
       let name_set x v =
-        let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.set_text v ptr
+        BA_.set_text x 0 v
       let code_order_get x =
         let data = BA_.get_data_region x in
         BA_.get_uint16 ~default:0 ~byte_ofs:0 data
@@ -2611,21 +6480,17 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let data = BA_.get_data_region x in
         BA_.set_uint16 ~default:0 ~byte_ofs:0 v data
       let has_annotations x = 
-        (let ptr = BA_.get_pointer_bytes x 1 in
-        BA_.has_field ptr)
+        (BA_.has_field x 1)
       let annotations_get x = 
-        (let ptr = BA_.get_pointer_bytes x 1 in
-        BA_.get_struct_list ~data_words:1 ~pointer_words:1 ptr)
+        (BA_.get_struct_list ~data_words:1 ~pointer_words:1 x 1)
       let annotations_get_list x =
         Capnp.Array.to_list (annotations_get x)
       let annotations_get_array x =
         Capnp.Array.to_array (annotations_get x)
       let annotations_set x v = 
-        (let ptr = BA_.get_pointer_bytes x 1 in
-        BA_.set_struct_list ~data_words:1 ~pointer_words:1 (v) ptr)
+        (BA_.set_struct_list ~data_words:1 ~pointer_words:1 x 1 (v))
       let annotations_init x n = 
-        (let ptr = BA_.get_pointer_bytes x 1 in
-        BA_.init_struct_list ~data_words:1 ~pointer_words:1 n ptr)
+        (BA_.init_struct_list ~data_words:1 ~pointer_words:1 x 1 n)
       let annotations_set_list x v =
         let builder = annotations_init x (List.length v) in
         let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -2642,15 +6507,15 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         BA_.set_uint16 ~default:65535 ~byte_ofs:2 v data
       let ordinal_get x = x
       let ordinal_init x =
-        let data = x.BA_.NC.StructStorage.data in
-        let pointers = x.BA_.NC.StructStorage.pointers in
+        let data = x.BA_.NM.StructStorage.data in
+        let pointers = x.BA_.NM.StructStorage.pointers in
         let () = ignore data in
         let () = ignore pointers in
         let () = BA_.set_int16 ~default:0 ~byte_ofs:10 0 data in
         let () = BA_.set_int16 ~default:0 ~byte_ofs:12 0 data in
         x
       let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:4 x
-      let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+      let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
       let to_reader x = Some (RA_.StructStorage.readonly x)
       let init_root ?message_size () =
         BA_.alloc_root_struct ?message_size ~data_words:3 ~pointer_words:4 ()
@@ -2705,21 +6570,17 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           BA_.set_uint32 ~default:Uint32.zero ~byte_ofs:32 v data
         let discriminant_offset_set_int_exn x v = discriminant_offset_set x (Capnp.Runtime.Util.uint32_of_int_exn v)
         let has_fields x = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.has_field ptr)
+          (BA_.has_field x 3)
         let fields_get x = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.get_struct_list ~data_words:3 ~pointer_words:4 ptr)
+          (BA_.get_struct_list ~data_words:3 ~pointer_words:4 x 3)
         let fields_get_list x =
           Capnp.Array.to_list (fields_get x)
         let fields_get_array x =
           Capnp.Array.to_array (fields_get x)
         let fields_set x v = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.set_struct_list ~data_words:3 ~pointer_words:4 (v) ptr)
+          (BA_.set_struct_list ~data_words:3 ~pointer_words:4 x 3 (v))
         let fields_init x n = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.init_struct_list ~data_words:3 ~pointer_words:4 n ptr)
+          (BA_.init_struct_list ~data_words:3 ~pointer_words:4 x 3 n)
         let fields_set_list x v =
           let builder = fields_init x (List.length v) in
           let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -2729,7 +6590,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let () = Array.iteri (fun i a -> Capnp.Array.set builder i a) v in
           builder
         let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
-        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
         let to_reader x = Some (RA_.StructStorage.readonly x)
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:5 ~pointer_words:5 ()
@@ -2738,21 +6599,17 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = builder_t_Enum_13063450714778629528
         type reader_t = reader_t_Enum_13063450714778629528
         let has_enumerants x = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.has_field ptr)
+          (BA_.has_field x 3)
         let enumerants_get x = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.get_struct_list ~data_words:1 ~pointer_words:2 ptr)
+          (BA_.get_struct_list ~data_words:1 ~pointer_words:2 x 3)
         let enumerants_get_list x =
           Capnp.Array.to_list (enumerants_get x)
         let enumerants_get_array x =
           Capnp.Array.to_array (enumerants_get x)
         let enumerants_set x v = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.set_struct_list ~data_words:1 ~pointer_words:2 (v) ptr)
+          (BA_.set_struct_list ~data_words:1 ~pointer_words:2 x 3 (v))
         let enumerants_init x n = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.init_struct_list ~data_words:1 ~pointer_words:2 n ptr)
+          (BA_.init_struct_list ~data_words:1 ~pointer_words:2 x 3 n)
         let enumerants_set_list x v =
           let builder = enumerants_init x (List.length v) in
           let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -2762,7 +6619,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let () = Array.iteri (fun i a -> Capnp.Array.set builder i a) v in
           builder
         let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
-        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
         let to_reader x = Some (RA_.StructStorage.readonly x)
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:5 ~pointer_words:5 ()
@@ -2771,20 +6628,15 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = builder_t_Annotation_17011813041836786320
         type reader_t = reader_t_Annotation_17011813041836786320
         let has_type x = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.has_field ptr)
+          (BA_.has_field x 3)
         let type_get x = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.get_struct ~data_words:2 ~pointer_words:1 ptr)
+          (BA_.get_struct ~data_words:2 ~pointer_words:1 x 3)
         let type_set_reader x v = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.set_struct ~data_words:2 ~pointer_words:1 (v) ptr)
+          (BA_.set_struct ~data_words:2 ~pointer_words:1 x 3 (v))
         let type_set_builder x v = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.set_struct ~data_words:2 ~pointer_words:1 (Some (v)) ptr)
+          (BA_.set_struct ~data_words:2 ~pointer_words:1 x 3 (Some (v)))
         let type_init x = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.init_struct ~data_words:2 ~pointer_words:1 ptr)
+          (BA_.init_struct ~data_words:2 ~pointer_words:1 x 3)
         let targets_file_get x =
           let data = BA_.get_data_region x in
           BA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:0 data
@@ -2858,7 +6710,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let data = BA_.get_data_region x in
           BA_.set_bit ~default:false ~byte_ofs:15 ~bit_ofs:3 v data
         let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
-        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
         let to_reader x = Some (RA_.StructStorage.readonly x)
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:5 ~pointer_words:5 ()
@@ -2867,37 +6719,27 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = builder_t_Const_12793219851699983392
         type reader_t = reader_t_Const_12793219851699983392
         let has_type x = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.has_field ptr)
+          (BA_.has_field x 3)
         let type_get x = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.get_struct ~data_words:2 ~pointer_words:1 ptr)
+          (BA_.get_struct ~data_words:2 ~pointer_words:1 x 3)
         let type_set_reader x v = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.set_struct ~data_words:2 ~pointer_words:1 (v) ptr)
+          (BA_.set_struct ~data_words:2 ~pointer_words:1 x 3 (v))
         let type_set_builder x v = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.set_struct ~data_words:2 ~pointer_words:1 (Some (v)) ptr)
+          (BA_.set_struct ~data_words:2 ~pointer_words:1 x 3 (Some (v)))
         let type_init x = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.init_struct ~data_words:2 ~pointer_words:1 ptr)
+          (BA_.init_struct ~data_words:2 ~pointer_words:1 x 3)
         let has_value x = 
-          (let ptr = BA_.get_pointer_bytes x 4 in
-          BA_.has_field ptr)
+          (BA_.has_field x 4)
         let value_get x = 
-          (let ptr = BA_.get_pointer_bytes x 4 in
-          BA_.get_struct ~data_words:2 ~pointer_words:1 ptr)
+          (BA_.get_struct ~data_words:2 ~pointer_words:1 x 4)
         let value_set_reader x v = 
-          (let ptr = BA_.get_pointer_bytes x 4 in
-          BA_.set_struct ~data_words:2 ~pointer_words:1 (v) ptr)
+          (BA_.set_struct ~data_words:2 ~pointer_words:1 x 4 (v))
         let value_set_builder x v = 
-          (let ptr = BA_.get_pointer_bytes x 4 in
-          BA_.set_struct ~data_words:2 ~pointer_words:1 (Some (v)) ptr)
+          (BA_.set_struct ~data_words:2 ~pointer_words:1 x 4 (Some (v)))
         let value_init x = 
-          (let ptr = BA_.get_pointer_bytes x 4 in
-          BA_.init_struct ~data_words:2 ~pointer_words:1 ptr)
+          (BA_.init_struct ~data_words:2 ~pointer_words:1 x 4)
         let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
-        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
         let to_reader x = Some (RA_.StructStorage.readonly x)
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:5 ~pointer_words:5 ()
@@ -2906,21 +6748,17 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = builder_t_Interface_16728431493453586831
         type reader_t = reader_t_Interface_16728431493453586831
         let has_methods x = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.has_field ptr)
+          (BA_.has_field x 3)
         let methods_get x = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.get_struct_list ~data_words:3 ~pointer_words:2 ptr)
+          (BA_.get_struct_list ~data_words:3 ~pointer_words:2 x 3)
         let methods_get_list x =
           Capnp.Array.to_list (methods_get x)
         let methods_get_array x =
           Capnp.Array.to_array (methods_get x)
         let methods_set x v = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.set_struct_list ~data_words:3 ~pointer_words:2 (v) ptr)
+          (BA_.set_struct_list ~data_words:3 ~pointer_words:2 x 3 (v))
         let methods_init x n = 
-          (let ptr = BA_.get_pointer_bytes x 3 in
-          BA_.init_struct_list ~data_words:3 ~pointer_words:2 n ptr)
+          (BA_.init_struct_list ~data_words:3 ~pointer_words:2 x 3 n)
         let methods_set_list x v =
           let builder = methods_init x (List.length v) in
           let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -2930,21 +6768,17 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let () = Array.iteri (fun i a -> Capnp.Array.set builder i a) v in
           builder
         let has_extends x = 
-          (let ptr = BA_.get_pointer_bytes x 4 in
-          BA_.has_field ptr)
+          (BA_.has_field x 4)
         let extends_get x =
-          let ptr = BA_.get_pointer_bytes x 4 in
-          BA_.get_uint64_list ptr
+          BA_.get_uint64_list x 4
         let extends_get_list x =
           Capnp.Array.to_list (extends_get x)
         let extends_get_array x =
           Capnp.Array.to_array (extends_get x)
         let extends_set x v =
-          let ptr = BA_.get_pointer_bytes x 4 in
-          BA_.set_uint64_list v ptr
+          BA_.set_uint64_list x 4 v
         let extends_init x n =
-          let ptr = BA_.get_pointer_bytes x 4 in
-          BA_.init_uint64_list n ptr
+          BA_.init_uint64_list x 4 n
         let extends_set_list x v =
           let builder = extends_init x (List.length v) in
           let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -2954,7 +6788,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let () = Array.iteri (fun i a -> Capnp.Array.set builder i a) v in
           builder
         let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
-        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
         let to_reader x = Some (RA_.StructStorage.readonly x)
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:5 ~pointer_words:5 ()
@@ -2963,14 +6797,11 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = builder_t_NestedNode_16050641862814319170
         type reader_t = reader_t_NestedNode_16050641862814319170
         let has_name x =
-          let ptr = BA_.get_pointer_bytes x 0 in
-          BA_.has_field ptr
+          BA_.has_field x 0
         let name_get x =
-          let ptr = BA_.get_pointer_bytes x 0 in
-          BA_.get_text ~default:"" ptr
+          BA_.get_text ~default:"" x 0
         let name_set x v =
-          let ptr = BA_.get_pointer_bytes x 0 in
-          BA_.set_text v ptr
+          BA_.set_text x 0 v
         let id_get x =
           let data = BA_.get_data_region x in
           BA_.get_uint64 ~default:Uint64.zero ~byte_ofs:0 data
@@ -2981,7 +6812,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:0 v data
         let id_set_int_exn x v = id_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
         let of_message x = BA_.get_root_struct ~data_words:1 ~pointer_words:1 x
-        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
         let to_reader x = Some (RA_.StructStorage.readonly x)
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:1 ~pointer_words:1 ()
@@ -2992,8 +6823,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         BA_.set_void data
       let struct_get x = x
       let struct_init x =
-        let data = x.BA_.NC.StructStorage.data in
-        let pointers = x.BA_.NC.StructStorage.pointers in
+        let data = x.BA_.NM.StructStorage.data in
+        let pointers = x.BA_.NM.StructStorage.pointers in
         let () = ignore data in
         let () = ignore pointers in
         let () = BA_.set_opt_discriminant data
@@ -3017,8 +6848,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         x
       let enum_get x = x
       let enum_init x =
-        let data = x.BA_.NC.StructStorage.data in
-        let pointers = x.BA_.NC.StructStorage.pointers in
+        let data = x.BA_.NM.StructStorage.data in
+        let pointers = x.BA_.NM.StructStorage.pointers in
         let () = ignore data in
         let () = ignore pointers in
         let () = BA_.set_opt_discriminant data
@@ -3036,8 +6867,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         x
       let interface_get x = x
       let interface_init x =
-        let data = x.BA_.NC.StructStorage.data in
-        let pointers = x.BA_.NC.StructStorage.pointers in
+        let data = x.BA_.NM.StructStorage.data in
+        let pointers = x.BA_.NM.StructStorage.pointers in
         let () = ignore data in
         let () = ignore pointers in
         let () = BA_.set_opt_discriminant data
@@ -3064,8 +6895,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         x
       let const_get x = x
       let const_init x =
-        let data = x.BA_.NC.StructStorage.data in
-        let pointers = x.BA_.NC.StructStorage.pointers in
+        let data = x.BA_.NM.StructStorage.data in
+        let pointers = x.BA_.NM.StructStorage.pointers in
         let () = ignore data in
         let () = ignore pointers in
         let () = BA_.set_opt_discriminant data
@@ -3092,8 +6923,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         x
       let annotation_get x = x
       let annotation_init x =
-        let data = x.BA_.NC.StructStorage.data in
-        let pointers = x.BA_.NC.StructStorage.pointers in
+        let data = x.BA_.NM.StructStorage.data in
+        let pointers = x.BA_.NM.StructStorage.pointers in
         let () = ignore data in
         let () = ignore pointers in
         let () = BA_.set_opt_discriminant data
@@ -3149,14 +6980,11 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:0 v data
       let id_set_int_exn x v = id_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
       let has_display_name x =
-        let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.has_field ptr
+        BA_.has_field x 0
       let display_name_get x =
-        let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.get_text ~default:"" ptr
+        BA_.get_text ~default:"" x 0
       let display_name_set x v =
-        let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.set_text v ptr
+        BA_.set_text x 0 v
       let display_name_prefix_length_get x =
         let data = BA_.get_data_region x in
         BA_.get_uint32 ~default:Uint32.zero ~byte_ofs:8 data
@@ -3176,21 +7004,17 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:16 v data
       let scope_id_set_int_exn x v = scope_id_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
       let has_nested_nodes x = 
-        (let ptr = BA_.get_pointer_bytes x 1 in
-        BA_.has_field ptr)
+        (BA_.has_field x 1)
       let nested_nodes_get x = 
-        (let ptr = BA_.get_pointer_bytes x 1 in
-        BA_.get_struct_list ~data_words:1 ~pointer_words:1 ptr)
+        (BA_.get_struct_list ~data_words:1 ~pointer_words:1 x 1)
       let nested_nodes_get_list x =
         Capnp.Array.to_list (nested_nodes_get x)
       let nested_nodes_get_array x =
         Capnp.Array.to_array (nested_nodes_get x)
       let nested_nodes_set x v = 
-        (let ptr = BA_.get_pointer_bytes x 1 in
-        BA_.set_struct_list ~data_words:1 ~pointer_words:1 (v) ptr)
+        (BA_.set_struct_list ~data_words:1 ~pointer_words:1 x 1 (v))
       let nested_nodes_init x n = 
-        (let ptr = BA_.get_pointer_bytes x 1 in
-        BA_.init_struct_list ~data_words:1 ~pointer_words:1 n ptr)
+        (BA_.init_struct_list ~data_words:1 ~pointer_words:1 x 1 n)
       let nested_nodes_set_list x v =
         let builder = nested_nodes_init x (List.length v) in
         let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -3200,21 +7024,17 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let () = Array.iteri (fun i a -> Capnp.Array.set builder i a) v in
         builder
       let has_annotations x = 
-        (let ptr = BA_.get_pointer_bytes x 2 in
-        BA_.has_field ptr)
+        (BA_.has_field x 2)
       let annotations_get x = 
-        (let ptr = BA_.get_pointer_bytes x 2 in
-        BA_.get_struct_list ~data_words:1 ~pointer_words:1 ptr)
+        (BA_.get_struct_list ~data_words:1 ~pointer_words:1 x 2)
       let annotations_get_list x =
         Capnp.Array.to_list (annotations_get x)
       let annotations_get_array x =
         Capnp.Array.to_array (annotations_get x)
       let annotations_set x v = 
-        (let ptr = BA_.get_pointer_bytes x 2 in
-        BA_.set_struct_list ~data_words:1 ~pointer_words:1 (v) ptr)
+        (BA_.set_struct_list ~data_words:1 ~pointer_words:1 x 2 (v))
       let annotations_init x n = 
-        (let ptr = BA_.get_pointer_bytes x 2 in
-        BA_.init_struct_list ~data_words:1 ~pointer_words:1 n ptr)
+        (BA_.init_struct_list ~data_words:1 ~pointer_words:1 x 2 n)
       let annotations_set_list x v =
         let builder = annotations_init x (List.length v) in
         let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -3224,7 +7044,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let () = Array.iteri (fun i a -> Capnp.Array.set builder i a) v in
         builder
       let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
-      let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+      let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
       let to_reader x = Some (RA_.StructStorage.readonly x)
       let init_root ?message_size () =
         BA_.alloc_root_struct ?message_size ~data_words:5 ~pointer_words:5 ()
@@ -3248,16 +7068,13 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
             BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:0 v data
           let id_set_int_exn x v = id_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
           let has_name x =
-            let ptr = BA_.get_pointer_bytes x 0 in
-            BA_.has_field ptr
+            BA_.has_field x 0
           let name_get x =
-            let ptr = BA_.get_pointer_bytes x 0 in
-            BA_.get_text ~default:"" ptr
+            BA_.get_text ~default:"" x 0
           let name_set x v =
-            let ptr = BA_.get_pointer_bytes x 0 in
-            BA_.set_text v ptr
+            BA_.set_text x 0 v
           let of_message x = BA_.get_root_struct ~data_words:1 ~pointer_words:1 x
-          let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+          let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
           let to_reader x = Some (RA_.StructStorage.readonly x)
           let init_root ?message_size () =
             BA_.alloc_root_struct ?message_size ~data_words:1 ~pointer_words:1 ()
@@ -3272,30 +7089,23 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:0 v data
         let id_set_int_exn x v = id_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
         let has_filename x =
-          let ptr = BA_.get_pointer_bytes x 0 in
-          BA_.has_field ptr
+          BA_.has_field x 0
         let filename_get x =
-          let ptr = BA_.get_pointer_bytes x 0 in
-          BA_.get_text ~default:"" ptr
+          BA_.get_text ~default:"" x 0
         let filename_set x v =
-          let ptr = BA_.get_pointer_bytes x 0 in
-          BA_.set_text v ptr
+          BA_.set_text x 0 v
         let has_imports x = 
-          (let ptr = BA_.get_pointer_bytes x 1 in
-          BA_.has_field ptr)
+          (BA_.has_field x 1)
         let imports_get x = 
-          (let ptr = BA_.get_pointer_bytes x 1 in
-          BA_.get_struct_list ~data_words:1 ~pointer_words:1 ptr)
+          (BA_.get_struct_list ~data_words:1 ~pointer_words:1 x 1)
         let imports_get_list x =
           Capnp.Array.to_list (imports_get x)
         let imports_get_array x =
           Capnp.Array.to_array (imports_get x)
         let imports_set x v = 
-          (let ptr = BA_.get_pointer_bytes x 1 in
-          BA_.set_struct_list ~data_words:1 ~pointer_words:1 (v) ptr)
+          (BA_.set_struct_list ~data_words:1 ~pointer_words:1 x 1 (v))
         let imports_init x n = 
-          (let ptr = BA_.get_pointer_bytes x 1 in
-          BA_.init_struct_list ~data_words:1 ~pointer_words:1 n ptr)
+          (BA_.init_struct_list ~data_words:1 ~pointer_words:1 x 1 n)
         let imports_set_list x v =
           let builder = imports_init x (List.length v) in
           let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -3305,27 +7115,23 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let () = Array.iteri (fun i a -> Capnp.Array.set builder i a) v in
           builder
         let of_message x = BA_.get_root_struct ~data_words:1 ~pointer_words:2 x
-        let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+        let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
         let to_reader x = Some (RA_.StructStorage.readonly x)
         let init_root ?message_size () =
           BA_.alloc_root_struct ?message_size ~data_words:1 ~pointer_words:2 ()
       end
       let has_nodes x = 
-        (let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.has_field ptr)
+        (BA_.has_field x 0)
       let nodes_get x = 
-        (let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.get_struct_list ~data_words:5 ~pointer_words:5 ptr)
+        (BA_.get_struct_list ~data_words:5 ~pointer_words:5 x 0)
       let nodes_get_list x =
         Capnp.Array.to_list (nodes_get x)
       let nodes_get_array x =
         Capnp.Array.to_array (nodes_get x)
       let nodes_set x v = 
-        (let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.set_struct_list ~data_words:5 ~pointer_words:5 (v) ptr)
+        (BA_.set_struct_list ~data_words:5 ~pointer_words:5 x 0 (v))
       let nodes_init x n = 
-        (let ptr = BA_.get_pointer_bytes x 0 in
-        BA_.init_struct_list ~data_words:5 ~pointer_words:5 n ptr)
+        (BA_.init_struct_list ~data_words:5 ~pointer_words:5 x 0 n)
       let nodes_set_list x v =
         let builder = nodes_init x (List.length v) in
         let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -3335,21 +7141,17 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let () = Array.iteri (fun i a -> Capnp.Array.set builder i a) v in
         builder
       let has_requested_files x = 
-        (let ptr = BA_.get_pointer_bytes x 1 in
-        BA_.has_field ptr)
+        (BA_.has_field x 1)
       let requested_files_get x = 
-        (let ptr = BA_.get_pointer_bytes x 1 in
-        BA_.get_struct_list ~data_words:1 ~pointer_words:2 ptr)
+        (BA_.get_struct_list ~data_words:1 ~pointer_words:2 x 1)
       let requested_files_get_list x =
         Capnp.Array.to_list (requested_files_get x)
       let requested_files_get_array x =
         Capnp.Array.to_array (requested_files_get x)
       let requested_files_set x v = 
-        (let ptr = BA_.get_pointer_bytes x 1 in
-        BA_.set_struct_list ~data_words:1 ~pointer_words:2 (v) ptr)
+        (BA_.set_struct_list ~data_words:1 ~pointer_words:2 x 1 (v))
       let requested_files_init x n = 
-        (let ptr = BA_.get_pointer_bytes x 1 in
-        BA_.init_struct_list ~data_words:1 ~pointer_words:2 n ptr)
+        (BA_.init_struct_list ~data_words:1 ~pointer_words:2 x 1 n)
       let requested_files_set_list x v =
         let builder = requested_files_init x (List.length v) in
         let () = List.iteri (fun i a -> Capnp.Array.set builder i a) v in
@@ -3359,7 +7161,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let () = Array.iteri (fun i a -> Capnp.Array.set builder i a) v in
         builder
       let of_message x = BA_.get_root_struct ~data_words:0 ~pointer_words:2 x
-      let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg
+      let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
       let to_reader x = Some (RA_.StructStorage.readonly x)
       let init_root ?message_size () =
         BA_.alloc_root_struct ?message_size ~data_words:0 ~pointer_words:2 ()

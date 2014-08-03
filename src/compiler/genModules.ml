@@ -112,21 +112,22 @@ let generate_enum_runtime_getters ~context ~mode enum_node =
   let get_enum_list =
     match mode with
     | Mode.Reader -> [
-        "let get_enum_list ?default pointer_opt =";
+        "let get_enum_list ?default struct_opt pointer_word =";
         "  RA_.get_list ?default (RA_.ListDecoders.Bytes2 (fun slice ->";
         "    " ^ unique_module_name ^ ".decode (Slice.get_uint16 slice 0)))";
-        "    pointer_opt";
+        "    struct_opt pointer_word";
         "in";
       ]
     | Mode.Builder -> [
-        "let get_enum_list ?default pointer =";
+        "let get_enum_list ?default struct_storage pointer_word =";
         "  let codecs = BA_.ListCodecs.Bytes2 (";
         "    (fun slice -> " ^ unique_module_name ^
           ".decode (Slice.get_uint16 slice 0)),";
         "    (fun v slice -> Slice.set_uint16 slice 0 (" ^ unique_module_name ^
           ".encode_safe v)))";
         "  in";
-        "  BA_.get_list ~storage_type:BA_.ListStorage.Bytes2 ~codecs pointer_bytes";
+        "  BA_.get_list ~storage_type:BA_.ListStorage.Bytes2 ~codecs";
+        "    struct_storage pointer_word";
         "in";
       ]
   in [
@@ -148,14 +149,15 @@ let generate_enum_runtime_setters ~context enum_node =
     "  BA_.set_uint16 ~default:0 ~byte_ofs (" ^ unique_module_name ^
       ".encode_safe value) data";
     "in";
-    "let set_enum_list ~default value pointer_bytes =";
+    "let set_enum_list ~default value struct_storage pointer_word =";
     "  let codecs = BA_.ListCodecs.Bytes2 (";
     "    (fun slice -> " ^ unique_module_name ^
       ".decode (Slice.get_uint16 slice 0)),";
     "    (fun v slice -> Slice.set_uint16 slice 0 (" ^ unique_module_name ^
       ".encode_safe v)))";
     "  in";
-    "  BA_.set_list ~storage_type:BA_.ListStorage.Bytes2 ~codecs value pointer_bytes";
+    "  BA_.set_list ~storage_type:BA_.ListStorage.Bytes2 ~codecs value";
+    "    struct_storage pointer_word";
     "in";
   ]
 
@@ -166,7 +168,15 @@ let generate_enum_runtime_setters ~context enum_node =
 let rec generate_list_element_decoder ~context ~scope list_def =
   let make_terminal_decoder element_name = [
       "let decoders = RA_.ListDecoders.Pointer (fun slice ->";
-      "  RA_.get_" ^ element_name ^ "_list (Some slice))";
+      (* Not super efficient, but this shouldn't be a hot path very often... *)
+      "  let struct_storage = {";
+      "    RA_.StructStorage.data = {";
+      "      slice with";
+      "      RA_.Slice.len = 0;";
+      "    };";
+      "    RA_.StructStorage.pointers = slice;";
+      "  } in";
+      "  RA_.get_" ^ element_name ^ "_list (Some struct_storage) 0)";
       "in";
     ]
   in
@@ -195,7 +205,15 @@ let rec generate_list_element_decoder ~context ~scope list_def =
       in [
         "let decoders = RA_.ListDecoders.Pointer (fun slice ->";
       ] @ inner_decoder_decl @ [
-        "  RA_.get_list decoders (Some slice))";
+        (* Not super efficient, but this shouldn't be a hot path very often... *)
+        "  let struct_storage = {";
+        "    RA_.StructStorage.data = {";
+        "      slice with";
+        "      RA_.Slice.len = 0;";
+        "    };";
+        "    RA_.StructStorage.pointers = slice;";
+        "  } in";
+        "  RA_.get_list decoders (Some struct_storage) 0)";
         "in";
       ]
   | Enum enum_def ->
@@ -208,7 +226,15 @@ let rec generate_list_element_decoder ~context ~scope list_def =
         "let decoders =";
       ] @ enum_getters @ [
         "  RA_.ListDecoders.Pointer (fun slice ->";
-        "    get_enum_list (Some slice))";
+        (* Not super efficient, but this shouldn't be a hot path very often... *)
+        "    let struct_storage = {";
+        "      RA_.StructStorage.data = {";
+        "        slice with";
+        "        RA_.Slice.len = 0;";
+        "      };";
+        "      RA_.StructStorage.pointers = slice;";
+        "    } in";
+        "    get_enum_list (Some struct_storage) 0)";
         "in";
       ]
   | Interface iface_def ->
@@ -226,9 +252,26 @@ let rec generate_list_element_decoder ~context ~scope list_def =
 let rec generate_list_element_codecs ~context ~scope list_def =
   let make_terminal_codecs element_name = [
       "let codecs =";
-      "  let decode slice = BA_.get_" ^ element_name ^ "_list slice in";
-      "  let encode v slice = let _ = BA_.set_" ^ element_name ^
-        "_list v slice in () in";
+      "  let decode slice =";
+      "    let struct_storage = {";
+      "      BA_.NM.StructStorage.data = {";
+      "        slice with";
+      "        BA_.NM.Slice.len = 0;";
+      "      };";
+      "      BA_.NM.StructStorage.pointers = slice;";
+      "    } in";
+      "    BA_.get_" ^ element_name ^ "_list struct_storage 0";
+      "  in";
+      "  let encode v slice =";
+      "    let struct_storage = {";
+      "      BA_.NM.StructStorage.data = {";
+      "        slice with";
+      "        BA_.NM.Slice.len = 0;";
+      "      };";
+      "      BA_.NM.StructStorage.pointers = slice;";
+      "    } in";
+      "    let _ = BA_.set_" ^ element_name ^ "_list struct_storage 0 v in ()";
+      "  in";
       "  BA_.NC.ListCodecs.Pointer (decode, encode)";
       "in";
     ]
@@ -263,12 +306,30 @@ let rec generate_list_element_codecs ~context ~scope list_def =
               "Decoded non-struct node where struct node was expected."
       in [
         "let codecs =";
-        sprintf "  let decode slice = BA_.get_struct_list \
-                 ~data_words:%u ~pointer_words:%u slice in"
+        "  let decode slice =";
+        "    let struct_storage = {";
+        "      BA_.NM.StructStorage.data = {";
+        "        slice with";
+        "        BA_.NM.Slice.len = 0;";
+        "      };";
+        "      BA_.NM.StructStorage.pointers = slice;";
+        "    } in";
+        sprintf "    BA_.get_struct_list \
+                 ~data_words:%u ~pointer_words:%u struct_storage 0"
           data_words pointer_words;
-        sprintf "  let encode v slice = let _ = BA_.set_struct_list \
-                 ~data_words:%u ~pointer_words:%u v slice in () in"
+        "  in";
+        "  let encode v slice =";
+        "    let struct_storage = {";
+        "      BA_.NM.StructStorage.data = {";
+        "        slice with";
+        "        BA_.NM.Slice.len = 0;";
+        "      };";
+        "      BA_.NM.StructStorage.pointers = slice;";
+        "    } in";
+        sprintf "    let _ = BA_.set_struct_list \
+                 ~data_words:%u ~pointer_words:%u struct_storage 0 v in ()"
           data_words pointer_words;
+        "  in";
         "  BA_.NC.ListCodecs.Pointer (decode, encode)";
         "in";
       ]
@@ -278,8 +339,26 @@ let rec generate_list_element_codecs ~context ~scope list_def =
           (generate_list_element_codecs ~context ~scope inner_list_def)
       in [
         "let codecs ="; ] @ inner_codecs_decl @ [
-        "  let decode slice = BA_.get_list ~codecs slice in";
-        "  let encode v slice = BA_.set_list ~codecs v slice in";
+        "  let decode slice =";
+        "    let struct_storage = {";
+        "      BA_.NM.StructStorage.data = {";
+        "        slice with";
+        "        BA_.NM.Slice.len = 0;";
+        "      };";
+        "      BA_.NM.StructStorage.pointers = slice;";
+        "    } in";
+        "    BA_.get_list ~codecs struct_storage 0";
+        "  in";
+        "  let encode v slice =";
+        "    let struct_storage = {";
+        "      BA_.NM.StructStorage.data = {";
+        "        slice with";
+        "        BA_.NM.Slice.len = 0;";
+        "      };";
+        "      BA_.NM.StructStorage.pointers = slice;";
+        "    } in";
+        "    BA_.set_list ~codecs struct_storage 0 v";
+        "  in";
         "  BA_.NC.ListCodecs.Pointer (decode, encode)";
         "in";
       ]
@@ -313,12 +392,11 @@ let generate_list_getters ~context ~scope ~list_type ~mode
   let make_primitive_accessor element_name = [
       "let " ^ field_name ^ "_get x =";
       sprintf
-        "  let ptr = %s.get_pointer_bytes x %u in" api_module field_ofs;
-      sprintf
-      "  %s.get_%s_list%s ptr"
+        "  %s.get_%s_list%s x %u"
         api_module
         element_name
-        default_str;
+        default_str
+        field_ofs;
     ]
   in
   let basic_getter =
@@ -348,8 +426,7 @@ let generate_list_getters ~context ~scope ~list_type ~mode
         begin match mode with
         | Mode.Reader -> [
             "let " ^ field_name ^ "_get x = " ^ obj_magic;
-            sprintf "  (let ptr = RA_.get_pointer_bytes x %u in" field_ofs;
-            sprintf "  RA_.get_struct_list%s ptr)" default_str;
+            sprintf "  (RA_.get_struct_list%s x %u)" default_str field_ofs;
           ]
         | Mode.Builder ->
             let data_words, pointer_words =
@@ -364,12 +441,12 @@ let generate_list_getters ~context ~scope ~list_type ~mode
                     "Decoded non-struct node where struct node was expected."
             in [
               "let " ^ field_name ^ "_get x = " ^ obj_magic;
-              sprintf "  (let ptr = BA_.get_pointer_bytes x %u in" field_ofs;
-              sprintf "  BA_.get_struct_list%s ~data_words:%u \
-                       ~pointer_words:%u ptr)"
+              sprintf "  (BA_.get_struct_list%s ~data_words:%u \
+                       ~pointer_words:%u x %u)"
                 default_str
                 data_words
-                pointer_words;
+                pointer_words
+                field_ofs;
             ]
         end
     | List list_def ->
@@ -387,8 +464,8 @@ let generate_list_getters ~context ~scope ~list_type ~mode
             in [
               "let " ^ field_name ^ "_get x = " ^ obj_magic ^ "(";
             ] @ decoder_declaration @ [
-              sprintf "  let ptr = RA_.get_pointer_bytes x %u in" field_ofs;
-              sprintf "  RA_.get_list%s decoders ptr)" default_str;
+              sprintf "  RA_.get_list%s decoders x %u)"
+                default_str field_ofs;
             ]
         | Mode.Builder ->
             let codecs_declaration =
@@ -397,10 +474,10 @@ let generate_list_getters ~context ~scope ~list_type ~mode
             in [
               "let " ^ field_name ^ "_get x = " ^ obj_magic ^ "(";
             ] @ codecs_declaration @ [
-              sprintf "  let ptr = BA_.get_pointer_bytes x %u in" field_ofs;
               sprintf "  BA_.get_list%s \
-                ~storage_type:Capnp.Runtime.ListStorageType.Pointer ~codecs ptr)"
-                default_str;
+                       ~storage_type:Capnp.Runtime.ListStorageType.Pointer ~codecs \
+                       x %u)"
+                default_str field_ofs;
             ]
         end
     | Enum enum_def ->
@@ -416,10 +493,9 @@ let generate_list_getters ~context ~scope ~list_type ~mode
             "    " ^ unique_module_name ^
               ".decode (MessageWrapper.Slice.get_uint16 slice 0)";
             "  in";
-            sprintf "  let ptr = RA_.get_pointer_bytes x %u in" field_ofs;
-            sprintf "  RA_.get_list%s (RA_.ListDecoders.Bytes2 slice_decoder) ptr"
-              default_str;
-            ]
+            sprintf "  RA_.get_list%s (RA_.ListDecoders.Bytes2 slice_decoder) x %u"
+              default_str field_ofs;
+          ]
         | Mode.Builder -> [
             "let " ^ field_name ^ "_get x =";
             "  let slice_decoder slice =";
@@ -430,12 +506,11 @@ let generate_list_getters ~context ~scope ~list_type ~mode
             "    MessageWrapper.Slice.set_uint16 slice 0 (" ^ unique_module_name ^
               ".encode_safe v)";
             "  in";
-            sprintf "  let ptr = BA_.get_pointer_bytes x %u in" field_ofs;
             sprintf "  BA_.get_list%s" default_str;
             "    ~storage_type:Capnp.Runtime.ListStorageType.Bytes2";
             "    ~codecs:(BA_.NC.ListCodecs.Bytes2 (slice_decoder, slice_encoder))";
-            "    ptr";
-            ]
+            sprintf "    x %u" field_ofs;
+          ]
         end
     | Interface _ -> [
         "let " ^ field_name ^
@@ -461,11 +536,9 @@ let generate_list_setters ~context ~scope ~list_type
     ~discr_str ~field_name ~field_ofs =
   let make_primitive_setters element_name = [
     "let " ^ field_name ^ "_set x v =";
-    sprintf "  let ptr = BA_.get_pointer_bytes %sx %u in" discr_str field_ofs;
-    sprintf "  BA_.set_%s_list v ptr" element_name;
+    sprintf "  BA_.set_%s_list %sx %u v" element_name discr_str field_ofs;
     "let " ^ field_name ^ "_init x n =";
-    sprintf "  let ptr = BA_.get_pointer_bytes %sx %u in" discr_str field_ofs;
-    sprintf "  BA_.init_%s_list n ptr" element_name;
+    sprintf "  BA_.init_%s_list %sx %u n" element_name discr_str field_ofs;
   ] in
   let basic_setters =
     let open PS.Type in
@@ -503,20 +576,20 @@ let generate_list_setters ~context ~scope ~list_type
                 "Decoded non-struct node where struct node was expected."
         in [
           "let " ^ field_name ^ "_set x v = " ^ obj_magic;
-          sprintf "  (let ptr = BA_.get_pointer_bytes %sx %u in"
-            discr_str field_ofs;
-          sprintf "  BA_.set_struct_list ~data_words:%u \
-                   ~pointer_words:%u (%sv) ptr)"
+          sprintf "  (BA_.set_struct_list ~data_words:%u \
+                   ~pointer_words:%u %sx %u (%sv))"
             data_words
             pointer_words
+            discr_str
+            field_ofs
             obj_magic;
           "let " ^ field_name ^ "_init x n = " ^ obj_magic;
-          sprintf "  (let ptr = BA_.get_pointer_bytes %sx %u in"
-            discr_str field_ofs;
-          sprintf "  BA_.init_struct_list ~data_words:%u \
-                   ~pointer_words:%u n ptr)"
+          sprintf "  (BA_.init_struct_list ~data_words:%u \
+                   ~pointer_words:%u %sx %u n)"
             data_words
-            pointer_words;
+            pointer_words
+            discr_str
+            field_ofs;
         ]
     | List list_def ->
         let obj_magic =
@@ -531,18 +604,12 @@ let generate_list_setters ~context ~scope ~list_type
         in [
           "let " ^ field_name ^ "_set x v = " ^ obj_magic ^ "(";
         ] @ codecs_declaration @ [
-          sprintf "  let ptr = BA_.get_pointer_bytes %sx %u in"
-            discr_str field_ofs;
-          "  BA_.set_list v";
-          "    ~storage_type:Capnp.Runtime.ListStorageType.Pointer \
-           ~codecs ptr)";
+          "  BA_.set_list ~storage_type:Capnp.Runtime.ListStorageType.Pointer";
+          sprintf "    ~codecs %sx %u v)" discr_str field_ofs;
           "let " ^ field_name ^ "_init x n = " ^ obj_magic ^ "(";
         ] @ codecs_declaration @ [
-          sprintf "  let ptr = BA_.get_pointer_bytes %sx %u in"
-            discr_str field_ofs;
-          "  BA_.init_list n";
-          "    ~storage_type:Capnp.Runtime.ListStorageType.Pointer \
-           ~codecs ptr)";
+          "  BA_.init_list ~storage_type:Capnp.Runtime.ListStorageType.Pointer";
+          sprintf "    ~codecs %sx %u n)" discr_str field_ofs;
         ]
     | Enum enum_def ->
         let enum_id = Enum.type_id_get enum_def in
@@ -562,22 +629,14 @@ let generate_list_setters ~context ~scope ~list_type
         ] in [
           "let " ^ field_name ^ "_set x v =";
         ] @ codecs @ [
-          sprintf "  let ptr = BA_.get_pointer_bytes %sx %u in"
-            discr_str field_ofs;
-          "  BA_.set_list v";
-          "    ~storage_type:Capnp.Runtime.ListStorageType.Bytes2";
-          "    ~codecs:(BA_.NC.ListCodecs.Bytes2 \
-           (slice_decoder, slice_encoder))";
-          "    ptr";
+          "  BA_.set_list ~storage_type:Capnp.Runtime.ListStorageType.Bytes2";
+          "    ~codecs:(BA_.NC.ListCodecs.Bytes2 (slice_decoder, slice_encoder))";
+          sprintf "    %sx %u v" discr_str field_ofs;
           "let " ^ field_name ^ "_init x n =";
         ] @ codecs @ [
-          sprintf "  let ptr = BA_.get_pointer_bytes %sx %u in"
-            discr_str field_ofs;
-          "  BA_.init_list n";
-          "    ~storage_type:Capnp.Runtime.ListStorageType.Bytes2";
-          "    ~codecs:(BA_.NC.ListCodecs.Bytes2 \
-           (slice_decoder, slice_encoder))";
-          "    ptr";
+          "  BA_.init_list ~storage_type:Capnp.Runtime.ListStorageType.Bytes2";
+          "    ~codecs:(BA_.NC.ListCodecs.Bytes2 (slice_decoder, slice_encoder))";
+          sprintf "    %sx %u n" discr_str field_ofs;
         ]
     | Interface _ -> [
         "let " ^ field_name ^
@@ -738,8 +797,8 @@ let generate_one_field_accessors ~context ~node_id ~scope
               ]
           in [
             "let " ^ field_name ^ "_init x =";
-            "  let data = x.BA_.NC.StructStorage.data in";
-            "  let pointers = x.BA_.NC.StructStorage.pointers in";
+            "  let data = x.BA_.NM.StructStorage.data in";
+            "  let pointers = x.BA_.NM.StructStorage.pointers in";
             (* Suppress unused variable warnings *)
             "  let () = ignore data in";
             "  let () = ignore pointers in"; ] @
@@ -985,41 +1044,29 @@ let generate_one_field_accessors ~context ~node_id ~scope
         | (PS.Type.Text, PS.Value.Text a) ->
             let getters = [
               "let has_" ^ field_name ^ " x =";
-              sprintf "  let ptr = %s.get_pointer_bytes x %u in"
-                api_module field_ofs;
-              "  " ^ api_module ^ ".has_field ptr";
+              sprintf "  %s.has_field x %u" api_module field_ofs;
               "let " ^ field_name ^ "_get x =";
-              sprintf "  let ptr = %s.get_pointer_bytes x %u in"
-                api_module field_ofs;
-              sprintf "  %s.get_text ~default:\"%s\" ptr"
-                api_module
-                (String.escaped a);
+              sprintf "  %s.get_text ~default:\"%s\" x %u"
+                api_module (String.escaped a) field_ofs;
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v =";
-              sprintf "  let ptr = BA_.get_pointer_bytes %sx %u in"
+              sprintf "  BA_.set_text %sx %u v"
                 discr_str field_ofs;
-              "  BA_.set_text v ptr";
             ] in
             (getters, setters)
         | (PS.Type.Data, PS.Value.Data a) ->
             let getters = [
               "let has_" ^ field_name ^ " x =";
-              sprintf "  let ptr = %s.get_pointer_bytes x %u in"
-                api_module field_ofs;
-              "  " ^ api_module ^ ".has_field ptr";
+              sprintf "  %s.has_field x %u" api_module field_ofs;
               "let " ^ field_name ^ "_get x =";
-              sprintf "  let ptr = %s.get_pointer_bytes x %u in"
-                api_module field_ofs;
-              sprintf "  %s.get_blob ~default:\"%s\" ptr"
-                api_module
-                (String.escaped a);
+              sprintf "  %s.get_blob ~default:\"%s\" x %u"
+                api_module (String.escaped a) field_ofs;
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v =";
-              sprintf "  let ptr = BA_.get_pointer_bytes %sx %u in"
+              sprintf "  BA_.set_blob %sx %u v"
                 discr_str field_ofs;
-              "  BA_.set_blob v ptr";
             ] in
             (getters, setters)
         | (PS.Type.List list_def, PS.Value.List pointer_slice_opt) ->
@@ -1050,9 +1097,7 @@ let generate_one_field_accessors ~context ~node_id ~scope
             in
             let getters = [
               "let has_" ^ field_name ^ " x = " ^ obj_magic;
-              sprintf "  (let ptr = %s.get_pointer_bytes x %u in"
-                api_module field_ofs;
-              "  " ^ api_module ^ ".has_field ptr)";
+              sprintf "  (%s.has_field x %u)" api_module field_ofs;
               ] @ (generate_list_getters ~context ~scope ~list_type
                 ~mode ~field_name ~field_ofs ~default_str)
             in
@@ -1109,46 +1154,43 @@ let generate_one_field_accessors ~context ~node_id ~scope
               match mode with
               | Mode.Reader -> [
                   "let has_" ^ field_name ^ " x = " ^ obj_magic;
-                  sprintf "  (let ptr = RA_.get_pointer_bytes x %u in" field_ofs;
-                  "  RA_.has_field ptr)";
+                  sprintf "  (RA_.has_field x %u)" field_ofs;
                   "let " ^ field_name ^ "_get x = " ^ obj_magic;
-                  sprintf "  (let ptr = RA_.get_pointer_bytes x %u in" field_ofs;
-                  "  RA_.get_struct" ^ reader_default_str ^ " ptr)";
+                  sprintf "  (RA_.get_struct%s x %u)" reader_default_str field_ofs;
                 ]
               | Mode.Builder -> [
                   "let has_" ^ field_name ^ " x = " ^ obj_magic;
-                  sprintf "  (let ptr = BA_.get_pointer_bytes x %u in" field_ofs;
-                  "  BA_.has_field ptr)";
+                  sprintf "  (BA_.has_field x %u)" field_ofs;
                   "let " ^ field_name ^ "_get x = " ^ obj_magic;
-                  sprintf "  (let ptr = BA_.get_pointer_bytes x %u in" field_ofs;
-                  sprintf "  BA_.get_struct%s ~data_words:%u ~pointer_words:%u ptr)"
+                  sprintf "  (BA_.get_struct%s ~data_words:%u ~pointer_words:%u x %u)"
                     builder_default_str
                     data_words
-                    pointer_words;
+                    pointer_words
+                    field_ofs;
                 ]
             in
             let setters = [
               "let " ^ field_name ^ "_set_reader x v = " ^ obj_magic;
-              sprintf "  (let ptr = BA_.get_pointer_bytes %sx %u in"
-                discr_str field_ofs;
-              sprintf "  BA_.set_struct ~data_words:%u ~pointer_words:%u (%sv) ptr)"
+              sprintf "  (BA_.set_struct ~data_words:%u ~pointer_words:%u %sx %u (%sv))"
                 data_words
                 pointer_words
+                discr_str
+                field_ofs
                 obj_magic;
               "let " ^ field_name ^ "_set_builder x v = " ^ obj_magic;
-              sprintf "  (let ptr = BA_.get_pointer_bytes %sx %u in"
-                discr_str field_ofs;
-              sprintf "  BA_.set_struct ~data_words:%u ~pointer_words:%u \
-                       (Some (%sv)) ptr)"
+              sprintf "  (BA_.set_struct ~data_words:%u ~pointer_words:%u \
+                       %sx %u (Some (%sv)))"
                 data_words
                 pointer_words
+                discr_str
+                field_ofs
                 obj_magic;
               "let " ^ field_name ^ "_init x = " ^ obj_magic;
-              sprintf "  (let ptr = BA_.get_pointer_bytes %sx %u in"
-                discr_str field_ofs;
-              sprintf "  BA_.init_struct ~data_words:%u ~pointer_words:%u ptr)"
+              sprintf "  (BA_.init_struct ~data_words:%u ~pointer_words:%u %sx %u)"
                 data_words
-                pointer_words;
+                pointer_words
+                discr_str
+                field_ofs;
             ] in
             (getters, setters)
         | (PS.Type.Interface iface_def, PS.Value.Interface) ->
@@ -1160,15 +1202,14 @@ let generate_one_field_accessors ~context ~node_id ~scope
             in
             let getters = [
               "let " ^ field_name ^ "_get x = " ^ obj_magic;
-              sprintf "  (let ptr = %s.get_pointer_bytes x %u in"
-                api_module field_ofs;
-              "  " ^ api_module ^ ".get_interface ptr)";
+              sprintf "  (%s.get_interface x %u)" api_module field_ofs;
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v = " ^ obj_magic;
-              sprintf "  (let ptr = BA_.get_pointer_bytes %sx %u in"
-                discr_str field_ofs;
-              "  BA_.set_interface (" ^ obj_magic ^ "v) ptr)";
+              sprintf "  (BA_.set_interface %sx %u (%sv))"
+                discr_str
+                field_ofs
+                obj_magic;
             ] in
             (getters, setters)
         | (PS.Type.AnyPointer, PS.Value.AnyPointer pointer_slice_opt) ->
@@ -1187,18 +1228,17 @@ let generate_one_field_accessors ~context ~node_id ~scope
             in
             let getters = [
               "let " ^ field_name ^ "_get x =";
-              sprintf "  let ptr = %s.get_pointer_bytes x %u in"
-                api_module field_ofs;
-              sprintf "  %s.get_pointer%s ptr"
+              sprintf "  %s.get_pointer%s x %u"
                 api_module
                 (if mode = Mode.Reader then reader_default_str
-                 else builder_default_str);
+                 else builder_default_str)
+                field_ofs;
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v =";
-              sprintf "  let ptr = BA_.get_pointer_bytes %sx %u in"
-                discr_str field_ofs;
-              "  BA_.set_pointer v ptr";
+              sprintf "  BA_.set_pointer %sx %u v"
+                discr_str
+                field_ofs;
             ] in
             (getters, setters)
         | (PS.Type.Undefined x, _) ->
@@ -1515,7 +1555,7 @@ let rec generate_struct_node ~context ~scope ~nested_modules ~mode
           sprintf "let of_message x = BA_.get_root_struct \
                    ~data_words:%u ~pointer_words:%u x"
             data_words pointer_words;
-          "let to_message x = x.BA_.NC.StructStorage.data.MessageWrapper.Slice.msg";
+          "let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg";
           "let to_reader x = Some (RA_.StructStorage.readonly x)";
           "let init_root ?message_size () =";
           sprintf "  BA_.alloc_root_struct ?message_size \
