@@ -9,13 +9,22 @@
 
 open Core_kernel
 
+
 let make_inclusion oc variable_name filename =
   Out_channel.output_string oc ("let " ^ variable_name ^ " = [\n");
   In_channel.with_file filename ~f:(fun ic ->
     In_channel.iter_lines ic ~f:(fun line ->
-      Out_channel.output_string oc "  \"";
-      Out_channel.output_string oc (String.escaped line);
-      Out_channel.output_string oc "\";\n"));
+      if String.trim line = "INCLUDE \"common-inc.ml\"" then
+        In_channel.with_file "../runtime/common-inc.ml" ~f:(fun ic ->
+          In_channel.iter_lines ic ~f:(fun line ->
+            Out_channel.output_string oc "  \"  ";
+            Out_channel.output_string oc (String.escaped line);
+            Out_channel.output_string oc "\";\n"))
+      else begin
+        Out_channel.output_string oc "  \"";
+        Out_channel.output_string oc (String.escaped line);
+        Out_channel.output_string oc "\";\n"
+      end));
   Out_channel.output_string oc "]\n\n"
 
 

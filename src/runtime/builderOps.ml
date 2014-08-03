@@ -35,7 +35,7 @@ type rw = Message.rw
 
 let invalid_msg = Message.invalid_msg
 
-let sizeof_uint64 = Common.sizeof_uint64
+let sizeof_uint64 = 8
 
 module StructSizes = struct
   type t = {
@@ -50,8 +50,14 @@ end
    Most of the builder operations are tied to the RWM types.  The exceptional
    cases are functions that make a copy from a source to a destination. *)
 module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
-  module ROC = Common.Make(ROM)
-  module RWC = Common.Make(RWM)
+  module ROC = struct
+    module MessageWrapper = ROM
+    INCLUDE "common-inc.ml"
+  end
+  module RWC = struct
+    module MessageWrapper = RWM
+    INCLUDE "common-inc.ml"
+  end
 
   module RReader = struct
     module MessageWrapper = RWM
@@ -62,10 +68,10 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
   (* Given storage for a struct, get the pointer bytes for the given
      struct-relative pointer index. *)
   let get_struct_pointer
-      (struct_storage : 'cap RWC.StructStorage.t)
+      (struct_storage : 'cap RWM.StructStorage.t)
       (pointer_word : int)
     : 'cap RWM.Slice.t =
-    let pointers = struct_storage.RWC.StructStorage.pointers in
+    let pointers = struct_storage.RWM.StructStorage.pointers in
     let num_pointers = pointers.RWM.Slice.len / sizeof_uint64 in
     (* By design, this function should always be invoked after the struct
        has been upgraded to at least the expected data and pointer
@@ -82,7 +88,7 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
       (message : rw RWM.Message.t)
       ~(data_words : int)
       ~(pointer_words : int)
-    : rw RWC.StructStorage.t =
+    : rw RWM.StructStorage.t =
     let storage = RWM.Slice.alloc message
       ((data_words + pointer_words) * sizeof_uint64)
     in
@@ -92,8 +98,8 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
       RWM.Slice.start = data.RWM.Slice.start + data.RWM.Slice.len;
       RWM.Slice.len   = pointer_words * sizeof_uint64;
     } in {
-      RWC.StructStorage.data = data;
-      RWC.StructStorage.pointers = pointers;
+      RWM.StructStorage.data = data;
+      RWM.StructStorage.pointers = pointers;
     }
 
 
@@ -102,9 +108,8 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
       (message : rw RWM.Message.t)
       (storage_type : ListStorageType.t)
       (num_elements : int)
-    : rw RWC.ListStorage.t =
+    : rw RWM.ListStorage.t =
     let storage =
-      let open Common in
       match storage_type with
       | ListStorageType.Empty ->
           RWM.Slice.alloc message 0
@@ -132,7 +137,7 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
           let () = RWM.Slice.set_int64 slice 0 tag_val in
           slice
     in
-    let open RWC.ListStorage in {
+    let open RWM.ListStorage in {
       storage;
       storage_type;
       num_elements;
@@ -199,7 +204,6 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
 
 
   let list_pointer_type_of_storage_type tp =
-    let open Common in
     match tp with
     | ListStorageType.Empty       -> ListPointer.Void
     | ListStorageType.Bit         -> ListPointer.OneBitValue
@@ -216,9 +220,9 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
      storage. *)
   let init_normal_list_pointer
       (pointer_bytes : rw RWM.Slice.t)
-      (list_storage : rw RWC.ListStorage.t)
+      (list_storage : rw RWM.ListStorage.t)
     : unit =
-    let storage_slice = list_storage.RWC.ListStorage.storage in
+    let storage_slice = list_storage.RWM.ListStorage.storage in
     let () =
       assert (storage_slice.RWM.Slice.segment_id = pointer_bytes.RWM.Slice.segment_id)
     in
@@ -226,14 +230,14 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
     let () = assert (offset_bytes land 7 = 0) in
     let offset_words = offset_bytes / 8 in
     let element_type =
-      list_pointer_type_of_storage_type list_storage.RWC.ListStorage.storage_type
+      list_pointer_type_of_storage_type list_storage.RWM.ListStorage.storage_type
     in
     let pointer_element_count =
-      match list_storage.RWC.ListStorage.storage_type with
+      match list_storage.RWM.ListStorage.storage_type with
       | ListStorageType.Composite (data_words, pointer_words) ->
-          list_storage.RWC.ListStorage.num_elements * (data_words + pointer_words)
+          list_storage.RWM.ListStorage.num_elements * (data_words + pointer_words)
       | _ ->
-          list_storage.RWC.ListStorage.num_elements
+          list_storage.RWM.ListStorage.num_elements
     in
     let pointer_descr = {
       ListPointer.offset = offset_words;
@@ -247,32 +251,32 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
   (* Initialize a list pointer so that it points to the specified list storage. *)
   let init_list_pointer
       (pointer_bytes : rw RWM.Slice.t)
-      (list_storage : rw RWC.ListStorage.t)
+      (list_storage : rw RWM.ListStorage.t)
     : unit =
-    let storage_slice = list_storage.RWC.ListStorage.storage in
+    let storage_slice = list_storage.RWM.ListStorage.storage in
     if storage_slice.RWM.Slice.segment_id = pointer_bytes.RWM.Slice.segment_id then
       (* Use a normal intra-segment list pointer. *)
       init_normal_list_pointer pointer_bytes list_storage
     else
       let init_far_pointer_tag tag_slice =
         let pointer_element_count =
-          match list_storage.RWC.ListStorage.storage_type with
+          match list_storage.RWM.ListStorage.storage_type with
           | ListStorageType.Composite (data_words, pointer_words) ->
-              list_storage.RWC.ListStorage.num_elements * (data_words + pointer_words)
+              list_storage.RWM.ListStorage.num_elements * (data_words + pointer_words)
           | _ ->
-              list_storage.RWC.ListStorage.num_elements
+              list_storage.RWM.ListStorage.num_elements
         in
         let tag_word_desc = {
           ListPointer.offset = 0;
           ListPointer.element_type = list_pointer_type_of_storage_type
-              list_storage.RWC.ListStorage.storage_type;
+              list_storage.RWM.ListStorage.storage_type;
           ListPointer.num_elements = pointer_element_count;
         } in
         RWM.Slice.set_int64 tag_slice 0 (ListPointer.encode tag_word_desc)
       in
       init_far_pointer pointer_bytes
         ~content:list_storage
-        ~content_slice:list_storage.RWC.ListStorage.storage
+        ~content_slice:list_storage.RWM.ListStorage.storage
         ~init_normal_pointer:init_normal_list_pointer
         ~init_far_pointer_tag
 
@@ -282,18 +286,18 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
      storage. *)
   let init_normal_struct_pointer
       (pointer_bytes : rw RWM.Slice.t)
-      (struct_storage : 'cap RWC.StructStorage.t)
+      (struct_storage : 'cap RWM.StructStorage.t)
     : unit =
-    let () = assert (struct_storage.RWC.StructStorage.data.RWM.Slice.segment_id =
+    let () = assert (struct_storage.RWM.StructStorage.data.RWM.Slice.segment_id =
       pointer_bytes.RWM.Slice.segment_id)
     in
     let pointer_descr = {
-      StructPointer.offset = (struct_storage.RWC.StructStorage.data.RWM.Slice.start -
+      StructPointer.offset = (struct_storage.RWM.StructStorage.data.RWM.Slice.start -
           RWM.Slice.get_end pointer_bytes) / 8;
       StructPointer.data_words =
-        struct_storage.RWC.StructStorage.data.RWM.Slice.len / 8;
+        struct_storage.RWM.StructStorage.data.RWM.Slice.len / 8;
       StructPointer.pointer_words =
-        struct_storage.RWC.StructStorage.pointers.RWM.Slice.len / 8;
+        struct_storage.RWM.StructStorage.pointers.RWM.Slice.len / 8;
     } in
     let pointer_val = StructPointer.encode pointer_descr in
     RWM.Slice.set_int64 pointer_bytes 0 pointer_val
@@ -303,9 +307,9 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
      struct storage. *)
   let init_struct_pointer
       (pointer_bytes : rw RWM.Slice.t)
-      (struct_storage : 'cap RWC.StructStorage.t)
+      (struct_storage : 'cap RWM.StructStorage.t)
     : unit =
-    if struct_storage.RWC.StructStorage.data.RWM.Slice.segment_id =
+    if struct_storage.RWM.StructStorage.data.RWM.Slice.segment_id =
         pointer_bytes.RWM.Slice.segment_id then
       (* Use a normal intra-segment struct pointer. *)
       init_normal_struct_pointer pointer_bytes struct_storage
@@ -314,16 +318,16 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
         let tag_word_desc = {
           StructPointer.offset = 0;
           StructPointer.data_words =
-            struct_storage.RWC.StructStorage.data.RWM.Slice.len / 8;
+            struct_storage.RWM.StructStorage.data.RWM.Slice.len / 8;
           StructPointer.pointer_words =
-            struct_storage.RWC.StructStorage.pointers.RWM.Slice.len / 8;
+            struct_storage.RWM.StructStorage.pointers.RWM.Slice.len / 8;
         } in
         RWM.Slice.set_int64 tag_slice 0 (StructPointer.encode tag_word_desc)
       in
       let content_slice = {
-        struct_storage.RWC.StructStorage.data with
-        RWM.Slice.len = struct_storage.RWC.StructStorage.data.RWM.Slice.len +
-            struct_storage.RWC.StructStorage.pointers.RWM.Slice.len
+        struct_storage.RWM.StructStorage.data with
+        RWM.Slice.len = struct_storage.RWM.StructStorage.data.RWM.Slice.len +
+            struct_storage.RWM.StructStorage.pointers.RWM.Slice.len
       } in
       init_far_pointer pointer_bytes
         ~content:struct_storage
@@ -341,13 +345,13 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
       ~(dest : rw RWM.Slice.t)
     : unit =
     match RWC.deref_pointer src with
-    | RWC.Object.None ->
+    | RWM.Object.None ->
         RWM.Slice.set_int64 dest 0 Int64.zero
-    | RWC.Object.List list_storage ->
+    | RWM.Object.List list_storage ->
         init_list_pointer dest list_storage
-    | RWC.Object.Struct struct_storage ->
+    | RWM.Object.Struct struct_storage ->
         init_struct_pointer dest struct_storage
-    | RWC.Object.Capability _ ->
+    | RWM.Object.Capability _ ->
         let word = RWM.Slice.get_int64 src 0 in
         RWM.Slice.set_int64 dest 0 word
 
@@ -356,10 +360,10 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
      is a shallow copy; the data section is copied in bitwise fashion,
      and the pointers are copied using [shallow_copy_pointer]. *)
   let shallow_copy_struct
-      ~(src : 'cap RWC.StructStorage.t)
-      ~(dest : rw RWC.StructStorage.t)
+      ~(src : 'cap RWM.StructStorage.t)
+      ~(dest : rw RWM.StructStorage.t)
     : unit =
-    let open RWC.StructStorage in
+    let open RWM.StructStorage in
     let data_copy_size =
       min src.data.RWM.Slice.len dest.data.RWM.Slice.len
     in
@@ -388,13 +392,12 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
      Returns the new list storage descriptor. *)
   let upgrade_struct_list
       (pointer_bytes : rw RWM.Slice.t)
-      (list_storage : rw RWC.ListStorage.t)
+      (list_storage : rw RWM.ListStorage.t)
       ~(data_words : int)
       ~(pointer_words : int)
-    : rw RWC.ListStorage.t =
+    : rw RWM.ListStorage.t =
     let needs_upgrade =
-      let open Common in
-      match list_storage.RWC.ListStorage.storage_type with
+      match list_storage.RWM.ListStorage.storage_type with
       | ListStorageType.Empty ->
           data_words * sizeof_uint64 > 0 || pointer_words > 0
       | ListStorageType.Bytes1
@@ -402,7 +405,7 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
       | ListStorageType.Bytes4
       | ListStorageType.Bytes8 ->
           let orig_data_size =
-            ListStorageType.get_byte_count list_storage.RWC.ListStorage.storage_type
+            ListStorageType.get_byte_count list_storage.RWM.ListStorage.storage_type
           in
           data_words * sizeof_uint64 > orig_data_size || pointer_words > 0
       | ListStorageType.Pointer ->
@@ -416,16 +419,16 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
       let message = pointer_bytes.RWM.Slice.msg in
       let new_storage = alloc_list_storage message
           (ListStorageType.Composite (data_words, pointer_words))
-          list_storage.RWC.ListStorage.num_elements
+          list_storage.RWM.ListStorage.num_elements
       in
       let src_struct_of_index  = RWC.make_struct_of_list_index list_storage in
       let dest_struct_of_index = RWC.make_struct_of_list_index new_storage in
-      for i = 0 to list_storage.RWC.ListStorage.num_elements - 1 do
+      for i = 0 to list_storage.RWM.ListStorage.num_elements - 1 do
         shallow_copy_struct ~src:(src_struct_of_index i)
           ~dest:(dest_struct_of_index i)
       done;
       let () = init_list_pointer pointer_bytes new_storage in
-      let content_slice = list_storage.RWC.ListStorage.storage in
+      let content_slice = list_storage.RWM.ListStorage.storage in
       let () = RWM.Slice.zero_out content_slice
           ~ofs:0 ~len:content_slice.RWM.Slice.len
       in
@@ -439,9 +442,9 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
      for a default list is immediately allocated using [alloc_default_list]. *)
   let deref_list_pointer
       ?(struct_sizes : StructSizes.t option)
-      ~(create_default : rw RWM.Message.t -> rw RWC.ListStorage.t)
+      ~(create_default : rw RWM.Message.t -> rw RWM.ListStorage.t)
       (pointer_bytes : rw RWM.Slice.t)
-    : rw RWC.ListStorage.t =
+    : rw RWM.ListStorage.t =
     match RReader.deref_list_pointer pointer_bytes with
     | None ->
         let list_storage = create_default pointer_bytes.RWM.Slice.msg in
@@ -459,9 +462,9 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
 
   (* Set a struct to all-zeros.  Pointers are not followed. *)
   let shallow_zero_out_struct
-      (struct_storage : rw RWC.StructStorage.t)
+      (struct_storage : rw RWM.StructStorage.t)
     : unit =
-    let open RWC.StructStorage in
+    let open RWM.StructStorage in
     RWM.Slice.zero_out struct_storage.data
       ~ofs:0 ~len:struct_storage.data.RWM.Slice.len;
     RWM.Slice.zero_out struct_storage.pointers
@@ -477,11 +480,11 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
      Returns: new struct descriptor (possibly the same as the old one). *)
   let upgrade_struct
       (pointer_bytes : rw RWM.Slice.t)
-      (orig : rw RWC.StructStorage.t)
+      (orig : rw RWM.StructStorage.t)
       ~(data_words : int)
       ~(pointer_words : int)
-    : rw RWC.StructStorage.t =
-    let open RWC.StructStorage in
+    : rw RWM.StructStorage.t =
+    let open RWM.StructStorage in
     if orig.data.RWM.Slice.len < data_words * sizeof_uint64 ||
        orig.pointers.RWM.Slice.len < pointer_words * sizeof_uint64 then
       let new_storage =
@@ -502,11 +505,11 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
      if the struct has a smaller layout (i.e. from an older protocol version),
      then a new struct is allocated and the data is copied over. *)
   let deref_struct_pointer
-      ~(create_default : rw RWM.Message.t -> rw RWC.StructStorage.t)
+      ~(create_default : rw RWM.Message.t -> rw RWM.StructStorage.t)
       ~(data_words : int)
       ~(pointer_words : int)
       (pointer_bytes : rw RWM.Slice.t)
-    : rw RWC.StructStorage.t =
+    : rw RWM.StructStorage.t =
     match RReader.deref_struct_pointer pointer_bytes with
     | None ->
         let struct_storage = create_default pointer_bytes.RWM.Slice.msg in
@@ -524,26 +527,26 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
       ~(dest : rw RWM.Slice.t)
     : unit =
     match ROC.deref_pointer src with
-    | ROC.Object.None ->
+    | ROM.Object.None ->
         RWM.Slice.set_int64 dest 0 Int64.zero
-    | ROC.Object.List src_list_storage ->
+    | ROM.Object.List src_list_storage ->
         let dest_list_storage =
           deep_copy_list ~src:src_list_storage ~dest_message:dest.RWM.Slice.msg ()
         in
         init_list_pointer dest dest_list_storage
-    | ROC.Object.Struct src_struct_storage ->
+    | ROM.Object.Struct src_struct_storage ->
         let dest_struct_storage =
           let data_words =
-            src_struct_storage.ROC.StructStorage.data.ROM.Slice.len / sizeof_uint64
+            src_struct_storage.ROM.StructStorage.data.ROM.Slice.len / sizeof_uint64
           in
           let pointer_words =
-            src_struct_storage.ROC.StructStorage.pointers.ROM.Slice.len / sizeof_uint64
+            src_struct_storage.ROM.StructStorage.pointers.ROM.Slice.len / sizeof_uint64
           in
           deep_copy_struct ~src:src_struct_storage ~dest_message:dest.RWM.Slice.msg
             ~data_words ~pointer_words
         in
         init_struct_pointer dest dest_struct_storage
-    | ROC.Object.Capability _ ->
+    | ROM.Object.Capability _ ->
         let word = ROM.Slice.get_int64 src 0 in
         RWM.Slice.set_int64 dest 0 word
 
@@ -555,13 +558,13 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
      during a schema upgrade).
   *)
   and deep_copy_struct
-      ~(src : 'cap ROC.StructStorage.t)
+      ~(src : 'cap ROM.StructStorage.t)
       ~(dest_message : rw RWM.Message.t)
       ~(data_words : int)
       ~(pointer_words : int)
-    : rw RWC.StructStorage.t =
-    let src_data_words    = src.ROC.StructStorage.data.ROM.Slice.len / sizeof_uint64 in
-    let src_pointer_words = src.ROC.StructStorage.pointers.ROM.Slice.len / sizeof_uint64 in
+    : rw RWM.StructStorage.t =
+    let src_data_words    = src.ROM.StructStorage.data.ROM.Slice.len / sizeof_uint64 in
+    let src_pointer_words = src.ROM.StructStorage.pointers.ROM.Slice.len / sizeof_uint64 in
     let dest_data_words    = max data_words src_data_words in
     let dest_pointer_words = max pointer_words src_pointer_words in
     let dest = alloc_struct_storage dest_message
@@ -572,18 +575,18 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
 
   (* As [deep_copy_struct], but the destination is already allocated. *)
   and deep_copy_struct_to_dest
-      ~(src : 'cap ROC.StructStorage.t)
-      ~(dest : rw RWC.StructStorage.t)
+      ~(src : 'cap ROM.StructStorage.t)
+      ~(dest : rw RWM.StructStorage.t)
     : unit =
     let data_bytes = min
-        src.ROC.StructStorage.data.ROM.Slice.len
-        dest.RWC.StructStorage.data.RWM.Slice.len
+        src.ROM.StructStorage.data.ROM.Slice.len
+        dest.RWM.StructStorage.data.RWM.Slice.len
     in
     let () = assert ((data_bytes mod sizeof_uint64) = 0) in
     let data_words = data_bytes / sizeof_uint64 in
     let () =
-      let src_data  = src.ROC.StructStorage.data in
-      let dest_data = dest.RWC.StructStorage.data in
+      let src_data  = src.ROM.StructStorage.data in
+      let dest_data = dest.RWM.StructStorage.data in
       for i = 0 to data_words - 1 do
         let byte_ofs = i * sizeof_uint64 in
         let word = ROM.Slice.get_int64 src_data byte_ofs in
@@ -591,21 +594,21 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
       done
     in
     let src_pointer_words =
-      src.ROC.StructStorage.pointers.ROM.Slice.len / sizeof_uint64
+      src.ROM.StructStorage.pointers.ROM.Slice.len / sizeof_uint64
     in
     let dest_pointer_words =
-      dest.RWC.StructStorage.pointers.RWM.Slice.len / sizeof_uint64
+      dest.RWM.StructStorage.pointers.RWM.Slice.len / sizeof_uint64
     in
     let pointer_words = min src_pointer_words dest_pointer_words in
     for i = 0 to pointer_words - 1 do
       let src_pointer =
-        let open ROC.StructStorage in {
+        let open ROM.StructStorage in {
         src.pointers with
         ROM.Slice.start = src.pointers.ROM.Slice.start + (i * sizeof_uint64);
         ROM.Slice.len   = sizeof_uint64;
       } in
       let dest_pointer =
-        let open RWC.StructStorage in {
+        let open RWM.StructStorage in {
         dest.pointers with
         RWM.Slice.start = dest.pointers.RWM.Slice.start + (i * sizeof_uint64);
         RWM.Slice.len   = sizeof_uint64;
@@ -620,33 +623,32 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
      data and pointer regions at least as large as specified. *)
   and deep_copy_list
       ?(struct_sizes : StructSizes.t option)
-      ~(src : 'cap ROC.ListStorage.t)
+      ~(src : 'cap ROM.ListStorage.t)
       ~(dest_message : rw RWM.Message.t)
       ()
-    : rw RWC.ListStorage.t =
+    : rw RWM.ListStorage.t =
     match struct_sizes with
     | Some { StructSizes.data_words; StructSizes.pointer_words } ->
         deep_copy_struct_list ~src ~dest_message
           ~data_words ~pointer_words
     | None ->
         let dest =
-          alloc_list_storage dest_message src.ROC.ListStorage.storage_type
-            src.ROC.ListStorage.num_elements
+          alloc_list_storage dest_message src.ROM.ListStorage.storage_type
+            src.ROM.ListStorage.num_elements
         in
         let copy_by_value word_count =
           for i = 0 to word_count - 1 do
             let byte_ofs = i * sizeof_uint64 in
-            let word = ROM.Slice.get_int64 src.ROC.ListStorage.storage byte_ofs in
-            RWM.Slice.set_int64 dest.RWC.ListStorage.storage byte_ofs word
+            let word = ROM.Slice.get_int64 src.ROM.ListStorage.storage byte_ofs in
+            RWM.Slice.set_int64 dest.RWM.ListStorage.storage byte_ofs word
           done
         in
         let () =
-          let open Common in
-          match src.ROC.ListStorage.storage_type with
+          match src.ROM.ListStorage.storage_type with
           | ListStorageType.Empty ->
               ()
           | ListStorageType.Bit ->
-              let total_bytes = Util.ceil_ratio src.ROC.ListStorage.num_elements 8 in
+              let total_bytes = Util.ceil_ratio src.ROM.ListStorage.num_elements 8 in
               let total_words = Util.ceil_ratio total_bytes sizeof_uint64 in
               copy_by_value total_words
           | ListStorageType.Bytes1
@@ -654,22 +656,22 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
           | ListStorageType.Bytes4
           | ListStorageType.Bytes8 ->
               let byte_count =
-                ListStorageType.get_byte_count src.ROC.ListStorage.storage_type
+                ListStorageType.get_byte_count src.ROM.ListStorage.storage_type
               in
-              let total_bytes = src.ROC.ListStorage.num_elements * byte_count in
+              let total_bytes = src.ROM.ListStorage.num_elements * byte_count in
               let total_words = Util.ceil_ratio total_bytes sizeof_uint64 in
               copy_by_value total_words
           | ListStorageType.Pointer ->
-              let open RWC.ListStorage in
-              for i = 0 to src.ROC.ListStorage.num_elements - 1 do
+              let open RWM.ListStorage in
+              for i = 0 to src.ROM.ListStorage.num_elements - 1 do
                 let src_pointer =
-                  let open ROC.ListStorage in {
+                  let open ROM.ListStorage in {
                   src.storage with
                   ROM.Slice.start = src.storage.ROM.Slice.start + (i * sizeof_uint64);
                   ROM.Slice.len   = sizeof_uint64;
                 } in
                 let dest_pointer =
-                  let open RWC.ListStorage in {
+                  let open RWM.ListStorage in {
                   dest.storage with
                   RWM.Slice.start = dest.storage.RWM.Slice.start + (i * sizeof_uint64);
                   RWM.Slice.len   = sizeof_uint64;
@@ -681,33 +683,33 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
               (* Account for the composite tag word.  We don't need to copy the
                  tag, because a new one was created by [alloc_list_storage]. *)
               let src_content_offset =
-                src.ROC.ListStorage.storage.ROM.Slice.start + sizeof_uint64
+                src.ROM.ListStorage.storage.ROM.Slice.start + sizeof_uint64
               in
               let dest_content_offset =
-                dest.RWC.ListStorage.storage.RWM.Slice.start + sizeof_uint64
+                dest.RWM.ListStorage.storage.RWM.Slice.start + sizeof_uint64
               in
-              for i = 0 to src.ROC.ListStorage.num_elements - 1 do
+              for i = 0 to src.ROM.ListStorage.num_elements - 1 do
                 let src_struct =
-                  let open ROC.ListStorage in {
-                  ROC.StructStorage.data = {
+                  let open ROM.ListStorage in {
+                  ROM.StructStorage.data = {
                     src.storage with
                     ROM.Slice.start = src_content_offset +
                         (i * words_per_element * sizeof_uint64);
                     ROM.Slice.len = data_words * sizeof_uint64;};
-                  ROC.StructStorage.pointers = {
+                  ROM.StructStorage.pointers = {
                     src.storage with
                     ROM.Slice.start = src_content_offset +
                         ((i * words_per_element) + data_words) * sizeof_uint64;
                     ROM.Slice.len = pointer_words * sizeof_uint64;};
                 } in
                 let dest_struct =
-                  let open RWC.ListStorage in {
-                  RWC.StructStorage.data = {
+                  let open RWM.ListStorage in {
+                  RWM.StructStorage.data = {
                     dest.storage with
                     RWM.Slice.start = dest_content_offset +
                         (i * words_per_element * sizeof_uint64);
                     RWM.Slice.len = data_words * sizeof_uint64;};
-                  RWC.StructStorage.pointers = {
+                  RWM.StructStorage.pointers = {
                     dest.storage with
                     RWM.Slice.start = dest_content_offset +
                         ((i * words_per_element) + data_words) * sizeof_uint64;
@@ -728,14 +730,14 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
      Returns: new list storage
   *)
   and deep_copy_struct_list
-      ~(src : 'cap ROC.ListStorage.t)
+      ~(src : 'cap ROM.ListStorage.t)
       ~(dest_message : rw RWM.Message.t)
       ~(data_words : int)
       ~(pointer_words : int)
-    : rw RWC.ListStorage.t =
+    : rw RWM.ListStorage.t =
     let dest_storage =
       let (dest_data_words, dest_pointer_words) =
-        match src.ROC.ListStorage.storage_type with
+        match src.ROM.ListStorage.storage_type with
         | ListStorageType.Empty
         | ListStorageType.Bytes1
         | ListStorageType.Bytes2
@@ -751,11 +753,11 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
       in
       alloc_list_storage dest_message
         (ListStorageType.Composite (dest_data_words, dest_pointer_words))
-        src.ROC.ListStorage.num_elements
+        src.ROM.ListStorage.num_elements
     in
     let src_struct_of_list_index  = ROC.make_struct_of_list_index src in
     let dest_struct_of_list_index = RWC.make_struct_of_list_index dest_storage in
-    for i = 0 to src.ROC.ListStorage.num_elements - 1 do
+    for i = 0 to src.ROM.ListStorage.num_elements - 1 do
       let src_struct  = src_struct_of_list_index i in
       let dest_struct = dest_struct_of_list_index i in
       deep_copy_struct_to_dest ~src:src_struct ~dest:dest_struct
@@ -769,30 +771,29 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
       (pointer_bytes : rw RWM.Slice.t)
     : unit =
     match RWC.deref_pointer pointer_bytes with
-    | RWC.Object.None ->
+    | RWM.Object.None ->
         ()
-    | RWC.Object.List list_storage ->
+    | RWM.Object.List list_storage ->
         deep_zero_list list_storage
-    | RWC.Object.Struct struct_storage ->
+    | RWM.Object.Struct struct_storage ->
         deep_zero_struct struct_storage
-    | RWC.Object.Capability _ ->
+    | RWM.Object.Capability _ ->
         ()
 
   and deep_zero_list
-      (list_storage : rw RWC.ListStorage.t)
+      (list_storage : rw RWM.ListStorage.t)
     : unit =
-    let open Common in
-    match list_storage.RWC.ListStorage.storage_type with
+    match list_storage.RWM.ListStorage.storage_type with
     | ListStorageType.Empty
     | ListStorageType.Bit
     | ListStorageType.Bytes1
     | ListStorageType.Bytes2
     | ListStorageType.Bytes4
     | ListStorageType.Bytes8 ->
-        RWM.Slice.zero_out list_storage.RWC.ListStorage.storage
-          ~ofs:0 ~len:list_storage.RWC.ListStorage.storage.RWM.Slice.len
+        RWM.Slice.zero_out list_storage.RWM.ListStorage.storage
+          ~ofs:0 ~len:list_storage.RWM.ListStorage.storage.RWM.Slice.len
     | ListStorageType.Pointer ->
-        let open RWC.ListStorage in
+        let open RWM.ListStorage in
         let () =
           for i = 0 to list_storage.num_elements - 1 do
             let pointer_bytes = {
@@ -807,7 +808,7 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
         RWM.Slice.zero_out list_storage.storage
           ~ofs:0 ~len:list_storage.storage.RWM.Slice.len
     | ListStorageType.Composite (data_words, pointer_words) ->
-        let open RWC.ListStorage in
+        let open RWM.ListStorage in
         let () =
           let total_words = data_words + pointer_words in
           for i = 0 to list_storage.num_elements - 1 do
@@ -824,7 +825,7 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
               RWM.Slice.start = RWM.Slice.get_end data;
               RWM.Slice.len   = pointer_words * sizeof_uint64;
             } in
-            deep_zero_struct { RWC.StructStorage.data; RWC.StructStorage.pointers }
+            deep_zero_struct { RWM.StructStorage.data; RWM.StructStorage.pointers }
           done
         in
         (* Composite lists prefix the data with a tag word, so clean up
@@ -837,9 +838,9 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
         RWM.Slice.zero_out content_slice ~ofs:0 ~len:content_slice.RWM.Slice.len
 
   and deep_zero_struct
-    (struct_storage : rw RWC.StructStorage.t)
+    (struct_storage : rw RWM.StructStorage.t)
     : unit =
-    let open RWC.StructStorage in
+    let open RWM.StructStorage in
     let pointer_words =
       struct_storage.pointers.RWM.Slice.len / sizeof_uint64
     in

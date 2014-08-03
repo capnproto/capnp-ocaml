@@ -15,7 +15,8 @@ COMP_MODULES =            \
   topsort
 
 
-includes.ml: make_includes.ml ../runtime/reader-inc.ml ../runtime/builder-inc.ml
+includes.ml: make_includes.ml ../runtime/common-inc.ml \
+../runtime/reader-inc.ml ../runtime/builder-inc.ml
 	ocaml make_includes.ml
 
 

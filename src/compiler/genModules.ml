@@ -34,7 +34,6 @@ module PS        = GenCommon.PS
 module Context   = GenCommon.Context
 module Mode      = GenCommon.Mode
 module C         = Capnp
-module RC        = C.Runtime.Common.Make(GenCommon.M)
 
 module ReaderApi = struct
   open Capnp.Runtime

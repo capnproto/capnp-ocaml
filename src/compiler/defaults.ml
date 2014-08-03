@@ -56,13 +56,11 @@
 open Core.Std
 
 module Copier = Capnp.Runtime.BuilderOps.Make(GenCommon.M)(GenCommon.M)
-module DC = Capnp.Runtime.Common.Make(GenCommon.M)
 module M = GenCommon.M
 
-module Common = Capnp.Runtime.Common
 module ListStorageType = Capnp.Runtime.ListStorageType
 
-let sizeof_uint64 = Common.sizeof_uint64
+let sizeof_uint64 = 8
 
 type t = {
   (* Message storage. *)
@@ -70,11 +68,11 @@ type t = {
 
   (* Array of structs which have been stored in the message, along with
      their unique identifiers. *)
-  structs : (string * Capnp.Message.rw DC.StructStorage.t) Res.Array.t;
+  structs : (string * Capnp.Message.rw M.StructStorage.t) Res.Array.t;
 
   (* Array of lists which have been stored in the message, along with
      their unique identifiers. *)
-  lists : (string * Capnp.Message.rw DC.ListStorage.t) Res.Array.t;
+  lists : (string * Capnp.Message.rw M.ListStorage.t) Res.Array.t;
 
   (* Array of pointers which have been stored in the message, along
      with their unique identifiers. *)
@@ -100,7 +98,7 @@ let reader_string_of_ident x = "_reader_" ^ x
 
 
 let add_struct defaults ident struct_storage =
-  let open DC.StructStorage in
+  let open M.StructStorage in
   let data_words    = struct_storage.data.M.Slice.len / sizeof_uint64 in
   let pointer_words = struct_storage.pointers.M.Slice.len / sizeof_uint64 in
   let struct_copy = Copier.deep_copy_struct ~src:struct_storage
@@ -110,7 +108,7 @@ let add_struct defaults ident struct_storage =
 
 
 let add_list defaults ident list_storage =
-  let open DC.ListStorage in
+  let open M.ListStorage in
   let list_copy = Copier.deep_copy_list ~src:list_storage
       ~dest_message:defaults.message ()
   in
@@ -158,7 +156,6 @@ let emit_instantiate_builder_message message : string list =
       (emit_literal_seg (Bytes.unsafe_to_string seg) wrap_chars) @ acc)
   in [
     "module DefaultsMessage_ = Capnp.BytesMessage";
-    "module DefaultsCommon_  = Capnp.Runtime.Common.Make(DefaultsMessage_)";
     "";
     "let _builder_defaults_message =";
     "  let message_segments = ["; ] @
@@ -174,13 +171,13 @@ let emit_instantiate_builder_message message : string list =
    stored in the message. *)
 let emit_instantiate_builder_structs struct_array : string list =
   Res.Array.fold_right (fun (ident, struct_storage) acc ->
-    let open DC.StructStorage in [
+    let open M.StructStorage in [
       "let " ^ (builder_string_of_ident ident) ^ " =";
       "  let data_segment_id = " ^
         (Int.to_string struct_storage.data.M.Slice.segment_id) ^ "in";
       "  let pointers_segment_id = " ^
         (Int.to_string struct_storage.pointers.M.Slice.segment_id) ^ "in {";
-      "  DefaultsCommon_.StructStorage.data = {";
+      "  DefaultsMessage_.StructStorage.data = {";
       "    DefaultsMessage_.Slice.msg = _builder_defaults_message;";
       "    DefaultsMessage_.Slice.segment = DefaultsMessage_.Message.get_segment \
        _builder_defaults_message data_segment_id;";
@@ -190,7 +187,7 @@ let emit_instantiate_builder_structs struct_array : string list =
       "    DefaultsMessage_.Slice.len = " ^
         (Int.to_string struct_storage.data.M.Slice.len) ^ ";";
       "  };";
-      "  DefaultsCommon_.StructStorage.pointers = {";
+      "  DefaultsMessage_.StructStorage.pointers = {";
       "    DefaultsMessage_.Slice.msg = _builder_defaults_message;";
       "    DefaultsMessage_.Slice.segment = DefaultsMessage_.Message.get_segment \
        _builder_defaults_message pointers_segment_id;";
@@ -211,11 +208,11 @@ let emit_instantiate_builder_structs struct_array : string list =
    stored in the message. *)
 let emit_instantiate_builder_lists list_array : string list =
   Res.Array.fold_right (fun (ident, list_storage) acc ->
-    let open DC.ListStorage in [
+    let open M.ListStorage in [
       "let " ^ (builder_string_of_ident ident) ^ " =";
       "  let segment_id = " ^
         (Int.to_string list_storage.storage.M.Slice.segment_id) ^ " in {";
-      "  DefaultsCommon_.ListStorage.storage = {";
+      "  DefaultsMessage_.ListStorage.storage = {";
       "    DefaultsMessage_.Slice.msg = _builder_defaults_message;";
       "    DefaultsMessage_.Slice.segment = DefaultsMessage_.Message.get_segment \
        _builder_defaults_message segment_id;";
@@ -224,9 +221,9 @@ let emit_instantiate_builder_lists list_array : string list =
         (Int.to_string list_storage.storage.M.Slice.start) ^ ";";
       "    DefaultsMessage_.Slice.len = " ^
         (Int.to_string list_storage.storage.M.Slice.len) ^ "; };";
-      "  DefaultsCommon_.ListStorage.storage_type = Capnp.Runtime." ^
+      "  DefaultsMessage_.ListStorage.storage_type = Capnp.Runtime." ^
         (ListStorageType.to_string list_storage.storage_type) ^ ";";
-      "  DefaultsCommon_.ListStorage.num_elements = " ^
+      "  DefaultsMessage_.ListStorage.num_elements = " ^
         (Int.to_string list_storage.num_elements) ^ ";";
       "}";
       "";
@@ -283,12 +280,12 @@ let emit_instantiate_reader_structs struct_array =
       "let " ^ (reader_string_of_ident ident) ^ " =";
       "  let data_words =";
       "    let def = " ^ (builder_string_of_ident ident) ^ " in";
-      "    let data_slice = def.DefaultsCommon_.StructStorage.data in";
+      "    let data_slice = def.DefaultsMessage_.StructStorage.data in";
       "    data_slice.DefaultsMessage_.Slice.len / 8";
       "  in";
       "  let pointer_words =";
       "    let def = " ^ (builder_string_of_ident ident) ^ " in";
-      "    let pointers_slice = def.DefaultsCommon_.StructStorage.pointers in";
+      "    let pointers_slice = def.DefaultsMessage_.StructStorage.pointers in";
       "    pointers_slice.DefaultsMessage_.Slice.len / 8";
       "  in";
       "  DefaultsCopier_.RWC.StructStorage.readonly";

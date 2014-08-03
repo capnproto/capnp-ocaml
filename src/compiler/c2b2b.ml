@@ -19,7 +19,6 @@ module type S = sig
 end
 
 module DefaultsMessage_ = Capnp.BytesMessage
-module DefaultsCommon_  = Capnp.Runtime.Common.Make(DefaultsMessage_)
 
 let _builder_defaults_message =
   let message_segments = [

@@ -4,7 +4,6 @@ RUNTIME_MODULES =   \
   bytesStorage      \
   cArray            \
   codecs            \
-  common            \
   farPointer        \
   fragmentBuffer    \
   innerArray        \

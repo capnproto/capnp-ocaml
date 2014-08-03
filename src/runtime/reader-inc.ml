@@ -34,9 +34,11 @@
 
 open Core.Std
 
-let sizeof_uint64 = Common.sizeof_uint64
+let sizeof_uint64 = 8
 
-module RC = Common.Make(MessageWrapper)
+module RC = struct
+  INCLUDE "common-inc.ml"
+end
 include RC
 
 (* Given a pointer which is expected to be a list pointer, compute the
