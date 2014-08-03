@@ -445,16 +445,32 @@ let get_list
       let start = pointer_word * sizeof_uint64 in
       let len   = sizeof_uint64 in
       if start + len <= pointers.Slice.len then
-        let pointer_bytes = {
-          pointers with
-          Slice.start = pointers.Slice.start + start;
-          Slice.len   = len;
-        } in
-        match deref_list_pointer pointer_bytes with
-        | Some list_storage ->
-            make_array_readonly list_storage decoders
-        | None ->
-            make_default default decoders
+        (* Fast path. *)
+        let pointer64 = Slice.get_int64 pointers start in
+        let pointer_int = Caml.Int64.to_int pointer64 in
+        let tag = pointer_int land Pointer.Bitfield.tag_mask in
+        if tag = Pointer.Bitfield.tag_val_list then
+          let list_pointer = ListPointer.decode pointer64 in
+          let list_storage = make_list_storage
+            ~message:pointers.Slice.msg
+            ~segment_id:pointers.Slice.segment_id
+            ~segment_offset:((pointers.Slice.start + start + len) +
+                               (list_pointer.ListPointer.offset * sizeof_uint64))
+            ~list_pointer
+          in
+          make_array_readonly list_storage decoders
+        else
+          (* Slow path... most likely a far pointer.*)
+          let pointer_bytes = {
+            pointers with
+            Slice.start = pointers.Slice.start + start;
+            Slice.len   = len;
+          } in
+          match deref_list_pointer pointer_bytes with
+          | Some list_storage ->
+              make_array_readonly list_storage decoders
+          | None ->
+              make_default default decoders
       else
         make_default default decoders
   | None ->
