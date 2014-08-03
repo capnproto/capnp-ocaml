@@ -76,10 +76,8 @@ let ss_get_pointer
   else
     None
 
-(* Given a range of eight bytes corresponding to a cap'n proto pointer,
-   decode the information stored in the pointer. *)
-let decode_pointer (pointer_bytes : 'cap Slice.t) : Pointer.t =
-  let pointer64 = Slice.get_int64 pointer_bytes 0 in
+
+let decode_pointer64 (pointer64 : int64) : Pointer.t =
   if Util.is_int64_zero pointer64 then
     Pointer.Null
   else
@@ -100,6 +98,31 @@ let decode_pointer (pointer_bytes : 'cap Slice.t) : Pointer.t =
         assert false
 
 
+(* Given a range of eight bytes corresponding to a cap'n proto pointer,
+   decode the information stored in the pointer. *)
+let decode_pointer (pointer_bytes : 'cap Slice.t) : Pointer.t =
+  let pointer64 = Slice.get_int64 pointer_bytes 0 in
+  decode_pointer64 pointer64
+
+
+let make_list_storage_aux ~message ~num_words ~num_elements ~storage_type
+    ~segment_id ~segment_offset =
+  let storage = {
+    Slice.msg        = message;
+    Slice.segment    = Message.get_segment message segment_id;
+    Slice.segment_id = segment_id;
+    Slice.start      = segment_offset;
+    Slice.len        = num_words * sizeof_uint64;
+  } in
+  let () = bounds_check_slice_exn
+    ~err:"list pointer describes invalid storage region" storage
+  in {
+    ListStorage.storage      = storage;
+    ListStorage.storage_type = storage_type;
+    ListStorage.num_elements = num_elements;
+  }
+
+
 (* Given a list pointer descriptor, construct the corresponding list storage
    descriptor. *)
 let make_list_storage
@@ -108,83 +131,73 @@ let make_list_storage
     ~(segment_offset : int)         (* Segment offset where list storage is found *)
     ~(list_pointer : ListPointer.t)
   : 'cap ListStorage.t =
-  let make_list_storage_aux ~num_words ~num_elements ~storage_type =
-    let storage = {
-      Slice.msg        = message;
-      Slice.segment    = Message.get_segment message segment_id;
-      Slice.segment_id = segment_id;
-      Slice.start      = segment_offset;
-      Slice.len        = num_words * sizeof_uint64;
-    } in
-    let () = bounds_check_slice_exn
-      ~err:"list pointer describes invalid storage region" storage
-    in {
-      ListStorage.storage      = storage;
-      ListStorage.storage_type = storage_type;
-      ListStorage.num_elements = num_elements;
-    }
-  in
   let open ListPointer in
   match list_pointer.element_type with
   | Void ->
-      make_list_storage_aux ~num_words:0
-        ~num_elements:list_pointer.num_elements ~storage_type:ListStorageType.Empty
+      make_list_storage_aux ~message ~num_words:0
+        ~num_elements:list_pointer.num_elements
+        ~storage_type:ListStorageType.Empty ~segment_id ~segment_offset
   | OneBitValue ->
-      make_list_storage_aux
+      make_list_storage_aux ~message
         ~num_words:(Util.ceil_ratio list_pointer.num_elements 64)
         ~num_elements:list_pointer.num_elements ~storage_type:ListStorageType.Bit
+        ~segment_id ~segment_offset
   | OneByteValue ->
-      make_list_storage_aux
+      make_list_storage_aux ~message
         ~num_words:(Util.ceil_ratio list_pointer.num_elements 8)
         ~num_elements:list_pointer.num_elements
         ~storage_type:ListStorageType.Bytes1
+        ~segment_id ~segment_offset
   | TwoByteValue ->
-      make_list_storage_aux
+      make_list_storage_aux ~message
         ~num_words:(Util.ceil_ratio list_pointer.num_elements 4)
         ~num_elements:list_pointer.num_elements
         ~storage_type:ListStorageType.Bytes2
+        ~segment_id ~segment_offset
   | FourByteValue ->
-      make_list_storage_aux
+      make_list_storage_aux ~message
         ~num_words:(Util.ceil_ratio list_pointer.num_elements 2)
         ~num_elements:list_pointer.num_elements
         ~storage_type:ListStorageType.Bytes4
+        ~segment_id ~segment_offset
   | EightByteValue ->
-      make_list_storage_aux ~num_words:list_pointer.num_elements
+      make_list_storage_aux ~message ~num_words:list_pointer.num_elements
         ~num_elements:list_pointer.num_elements
         ~storage_type:ListStorageType.Bytes8
+        ~segment_id ~segment_offset
   | EightBytePointer ->
-      make_list_storage_aux ~num_words:list_pointer.num_elements
+      make_list_storage_aux ~message ~num_words:list_pointer.num_elements
         ~num_elements:list_pointer.num_elements
         ~storage_type:ListStorageType.Pointer
+        ~segment_id ~segment_offset
   | Composite ->
-      let struct_tag_bytes = {
-        Slice.msg        = message;
-        Slice.segment    = Message.get_segment message segment_id;
-        Slice.segment_id = segment_id;
-        Slice.start      = segment_offset;
-        Slice.len        = sizeof_uint64;
-      } in
-      let () = bounds_check_slice_exn
-          ~err:"composite list pointer describes invalid storage region"
-          struct_tag_bytes
-      in
-      begin match decode_pointer struct_tag_bytes with
-      | Pointer.Struct struct_pointer ->
-          let module SP = StructPointer in
-          let num_words = list_pointer.num_elements in
-          let num_elements = struct_pointer.SP.offset in
-          let words_per_element =
-            struct_pointer.SP.data_words + struct_pointer.SP.pointer_words
-          in
-          if num_elements * words_per_element > num_words then
-            invalid_msg "composite list pointer describes invalid word count"
+      if segment_id < 0 || segment_id >= Message.num_segments message then
+        invalid_msg "composite list pointer describes invalid tag region"
+      else
+        let segment = Message.get_segment message segment_id in
+        if segment_offset + sizeof_uint64 > Segment.length segment then
+          invalid_msg "composite list pointer describes invalid tag region"
+        else
+          let pointer64 = Segment.get_int64 segment segment_offset in
+          let pointer_int = Caml.Int64.to_int pointer64 in
+          let tag = pointer_int land Pointer.Bitfield.tag_mask in
+          if tag = Pointer.Bitfield.tag_val_struct then
+            let struct_pointer = StructPointer.decode pointer64 in
+            let num_words = list_pointer.num_elements in
+            let num_elements = struct_pointer.StructPointer.offset in
+            let words_per_element = struct_pointer.StructPointer.data_words +
+                struct_pointer.StructPointer.pointer_words
+            in
+            if num_elements * words_per_element > num_words then
+              invalid_msg "composite list pointer describes invalid word count"
+            else
+              make_list_storage_aux ~message ~num_words ~num_elements
+                ~storage_type:(ListStorageType.Composite
+                    (struct_pointer.StructPointer.data_words,
+                     struct_pointer.StructPointer.pointer_words))
+                ~segment_id ~segment_offset
           else
-            make_list_storage_aux ~num_words ~num_elements
-              ~storage_type:(ListStorageType.Composite
-                 (struct_pointer.SP.data_words, struct_pointer.SP.pointer_words))
-      | _ ->
-          invalid_msg "composite list pointer has malformed element type tag"
-      end
+            invalid_msg "composite list pointer has malformed element type tag"
 
 
 (* Given a description of a cap'n proto far pointer, get the object which
