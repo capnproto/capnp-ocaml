@@ -101,7 +101,7 @@ module TestCase = struct
 
 
   let setup_request () =
-    let builder = CS.Builder.ParkingLot.init_root () in
+    let builder = CS.Builder.ParkingLot.init_root ~message_size:16384 () in
     Capnp.Array.fold (CS.Builder.ParkingLot.cars_init builder (FastRand.int 200))
       ~init:(builder, 0)
       ~f:(fun (parking_lot, value) car ->
