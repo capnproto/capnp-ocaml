@@ -232,100 +232,106 @@ let get_data_region
   let () = set_opt_discriminant data discr in
   data
 
-
-let get_void
-    (data : 'cap NM.Slice.t)
-  : unit =
-  ()
-
- let get_bit
-    ~(default : bool)
-    ~(byte_ofs : int)
-    ~(bit_ofs : int)
-    (data : 'cap NM.Slice.t)
-   : bool =
-   let byte_val = NM.Slice.get_uint8 data byte_ofs in
-   let bit_val = (byte_val land (1 lsl bit_ofs)) <> 0 in
-   if default then not bit_val else bit_val
+let get_bit
+   ~(default : bool)
+   (struct_storage : rw NM.StructStorage.t)
+   ~(byte_ofs : int)
+   ~(bit_ofs : int)
+  : bool =
+  let data = struct_storage.NM.StructStorage.data in
+  let byte_val = NM.Slice.get_uint8 data byte_ofs in
+  let bit_val = (byte_val lsr bit_ofs) land 0x1 in
+  let result_int = bit_val lxor (Util.int_of_bool default) in
+  Util.bool_of_int result_int
 
 let get_int8
     ~(default : int)
-    ~(byte_ofs : int)
-    (data : 'cap NM.Slice.t)
+    (struct_storage : rw NM.StructStorage.t)
+    (byte_ofs : int)
   : int =
+  let data = struct_storage.NM.StructStorage.data in
   let numeric = NM.Slice.get_int8 data byte_ofs in
   numeric lxor default
 
 let get_int16
     ~(default : int)
-    ~(byte_ofs : int)
-    (data : 'cap NM.Slice.t)
+    (struct_storage : rw NM.StructStorage.t)
+    (byte_ofs : int)
   : int =
+  let data = struct_storage.NM.StructStorage.data in
   let numeric = NM.Slice.get_int16 data byte_ofs in
   numeric lxor default
 
 let get_int32
     ~(default : int32)
-    ~(byte_ofs : int)
-    (data : 'cap NM.Slice.t)
+    (struct_storage : rw NM.StructStorage.t)
+    (byte_ofs : int)
     : int32 =
+  let data = struct_storage.NM.StructStorage.data in
   let numeric = NM.Slice.get_int32 data byte_ofs in
   Int32.bit_xor numeric default
 
 let get_int64
     ~(default : int64)
-    ~(byte_ofs : int)
-    (data : 'cap NM.Slice.t)
+    (struct_storage : rw NM.StructStorage.t)
+    (byte_ofs : int)
   : int64 =
+  let data = struct_storage.NM.StructStorage.data in
   let numeric = NM.Slice.get_int64 data byte_ofs in
   Int64.bit_xor numeric default
 
 let get_uint8
     ~(default : int)
-    ~(byte_ofs : int)
-    (data : 'cap NM.Slice.t)
+    (struct_storage : rw NM.StructStorage.t)
+    (byte_ofs : int)
   : int =
+  let data = struct_storage.NM.StructStorage.data in
   let numeric = NM.Slice.get_uint8 data byte_ofs in
   numeric lxor default
 
 let get_uint16
     ~(default : int)
-    ~(byte_ofs : int)
-    (data : 'cap NM.Slice.t)
+    (struct_storage : rw NM.StructStorage.t)
+    (byte_ofs : int)
   : int =
+  let data = struct_storage.NM.StructStorage.data in
   let numeric = NM.Slice.get_uint16 data byte_ofs in
   numeric lxor default
 
 let get_uint32
     ~(default : Uint32.t)
-    ~(byte_ofs : int)
-    (data : 'cap NM.Slice.t)
-    : Uint32.t =
+    (struct_storage : rw NM.StructStorage.t)
+    (byte_ofs : int)
+  : Uint32.t =
+  let data = struct_storage.NM.StructStorage.data in
   let numeric = NM.Slice.get_uint32 data byte_ofs in
   Uint32.logxor numeric default
 
 let get_uint64
     ~(default : Uint64.t)
-    ~(byte_ofs : int)
-    (data : 'cap NM.Slice.t)
+    (struct_storage : rw NM.StructStorage.t)
+    (byte_ofs : int)
   : Uint64.t =
+  let data = struct_storage.NM.StructStorage.data in
   let numeric = NM.Slice.get_uint64 data byte_ofs in
   Uint64.logxor numeric default
 
 let get_float32
     ~(default_bits : int32)
-    ~(byte_ofs : int)
-    (data : 'cap NM.Slice.t)
+    (struct_storage : rw NM.StructStorage.t)
+    (byte_ofs : int)
   : float =
+  let data = struct_storage.NM.StructStorage.data in
   let numeric = NM.Slice.get_int32 data byte_ofs in
   let bits = Int32.bit_xor numeric default_bits in
   Int32.float_of_bits bits
 
 let get_float64
     ~(default_bits : int64)
-    ~(byte_ofs : int)
-    (data : 'cap NM.Slice.t)
+    (struct_storage : rw NM.StructStorage.t)
+    (byte_ofs : int)
   : float =
+  let data = struct_storage.NM.StructStorage.data in
   let numeric = NM.Slice.get_int64 data byte_ofs in
   let bits = Int64.bit_xor numeric default_bits in
   Int64.float_of_bits bits
@@ -336,19 +342,24 @@ let get_float64
  *******************************************************************************)
 
 let set_void
-    (data : 'cap NM.Slice.t)
+    ?(discr : Discr.t option)
+    (struct_storage : rw NM.StructStorage.t)
   : unit =
-  ()
+  let data = struct_storage.NM.StructStorage.data in
+  set_opt_discriminant data discr
 
 let set_bit
+    ?(discr : Discr.t option)
     ~(default : bool)
+    (struct_storage : rw NM.StructStorage.t)
     ~(byte_ofs : int)
     ~(bit_ofs : int)
     (value : bool)
-    (data : rw NM.Slice.t)
   : unit =
-  let default_bit = if default then 1 else 0 in
-  let value_bit = if value then 1 else 0 in
+  let data = struct_storage.NM.StructStorage.data in
+  let () = set_opt_discriminant data discr in
+  let default_bit = Util.int_of_bool default in
+  let value_bit = Util.int_of_bool value in
   let stored_bit = default_bit lxor value_bit in
   let byte_val = NM.Slice.get_uint8 data byte_ofs in
   let byte_val = byte_val land (lnot (1 lsl bit_ofs)) in
@@ -356,88 +367,114 @@ let set_bit
   NM.Slice.set_uint8 data byte_ofs byte_val
 
 let set_int8
+    ?(discr : Discr.t option)
     ~(default : int)
-    ~(byte_ofs : int)
+    (struct_storage : rw NM.StructStorage.t)
+    (byte_ofs : int)
     (value : int)
-    (data : rw NM.Slice.t)
   : unit =
+  let data = struct_storage.NM.StructStorage.data in
+  let () = set_opt_discriminant data discr in
   NM.Slice.set_int8 data byte_ofs (value lxor default)
 
 let set_int16
+    ?(discr : Discr.t option)
     ~(default : int)
-    ~(byte_ofs : int)
+    (struct_storage : rw NM.StructStorage.t)
+    (byte_ofs : int)
     (value : int)
-    (data : rw NM.Slice.t)
   : unit =
+  let data = struct_storage.NM.StructStorage.data in
+  let () = set_opt_discriminant data discr in
   NM.Slice.set_int16 data byte_ofs (value lxor default)
 
 let set_int32
+    ?(discr : Discr.t option)
     ~(default : int32)
-    ~(byte_ofs : int)
+    (struct_storage : rw NM.StructStorage.t)
+    (byte_ofs : int)
     (value : int32)
-    (data : rw NM.Slice.t)
   : unit =
-  NM.Slice.set_int32 data byte_ofs
-    (Int32.bit_xor value default)
+  let data = struct_storage.NM.StructStorage.data in
+  let () = set_opt_discriminant data discr in
+  NM.Slice.set_int32 data byte_ofs (Int32.bit_xor value default)
 
 let set_int64
+    ?(discr : Discr.t option)
     ~(default : int64)
-    ~(byte_ofs : int)
+    (struct_storage : rw NM.StructStorage.t)
+    (byte_ofs : int)
     (value : int64)
-    (data : rw NM.Slice.t)
   : unit =
-  NM.Slice.set_int64 data byte_ofs
-    (Int64.bit_xor value default)
+  let data = struct_storage.NM.StructStorage.data in
+  let () = set_opt_discriminant data discr in
+  NM.Slice.set_int64 data byte_ofs (Int64.bit_xor value default)
 
 let set_uint8
+    ?(discr : Discr.t option)
     ~(default : int)
-    ~(byte_ofs : int)
+    (struct_storage : rw NM.StructStorage.t)
+    (byte_ofs : int)
     (value : int)
-    (data : rw NM.Slice.t)
   : unit =
+  let data = struct_storage.NM.StructStorage.data in
+  let () = set_opt_discriminant data discr in
   NM.Slice.set_uint8 data byte_ofs (value lxor default)
 
 let set_uint16
+    ?(discr : Discr.t option)
     ~(default : int)
-    ~(byte_ofs : int)
+    (struct_storage : rw NM.StructStorage.t)
+    (byte_ofs : int)
     (value : int)
-    (data : rw NM.Slice.t)
   : unit =
+  let data = struct_storage.NM.StructStorage.data in
+  let () = set_opt_discriminant data discr in
   NM.Slice.set_uint16 data byte_ofs (value lxor default)
 
 let set_uint32
+    ?(discr : Discr.t option)
     ~(default : Uint32.t)
-    ~(byte_ofs : int)
+    (struct_storage : rw NM.StructStorage.t)
+    (byte_ofs : int)
     (value : Uint32.t)
-    (data : rw NM.Slice.t)
   : unit =
-  NM.Slice.set_uint32 data byte_ofs
-    (Uint32.logxor value default)
+  let data = struct_storage.NM.StructStorage.data in
+  let () = set_opt_discriminant data discr in
+  NM.Slice.set_uint32 data byte_ofs (Uint32.logxor value default)
 
 let set_uint64
+    ?(discr : Discr.t option)
     ~(default : Uint64.t)
-    ~(byte_ofs : int)
+    (struct_storage : rw NM.StructStorage.t)
+    (byte_ofs : int)
     (value : Uint64.t)
-    (data : rw NM.Slice.t)
   : unit =
-  NM.Slice.set_uint64 data byte_ofs
-    (Uint64.logxor value default)
+  let data = struct_storage.NM.StructStorage.data in
+  let () = set_opt_discriminant data discr in
+  NM.Slice.set_uint64 data byte_ofs (Uint64.logxor value default)
 
 let set_float32
+    ?(discr : Discr.t option)
     ~(default_bits : int32)
-    ~(byte_ofs : int)
+    (struct_storage : rw NM.StructStorage.t)
+    (byte_ofs : int)
     (value : float)
-    (data : rw NM.Slice.t)
   : unit =
+  let data = struct_storage.NM.StructStorage.data in
+  let () = set_opt_discriminant data discr in
   NM.Slice.set_int32 data byte_ofs
     (Int32.bit_xor (Int32.bits_of_float value) default_bits)
 
 let set_float64
+    ?(discr : Discr.t option)
     ~(default_bits : int64)
-    ~(byte_ofs : int)
+    (struct_storage : rw NM.StructStorage.t)
+    (byte_ofs : int)
     (value : float)
-    (data : rw NM.Slice.t)
   : unit =
+  let data = struct_storage.NM.StructStorage.data in
+  let () = set_opt_discriminant data discr in
   NM.Slice.set_int64 data byte_ofs
     (Int64.bit_xor (Int64.bits_of_float value) default_bits)
 
@@ -445,21 +482,6 @@ let set_float64
 (*******************************************************************************
  * METHODS FOR GETTING OBJECTS STORED BY POINTER
  *******************************************************************************)
-
-
-(* Given storage for a struct, get the bytes associated with struct
-   pointer at offset [pointer_word].  If the optional discriminant
-   parameter is supplied, then the discriminant is also set as a
-   side-effect. *)
-let get_pointer_bytes
-    ?(discr : Discr.t option)
-    (struct_storage : rw NM.StructStorage.t)
-    (pointer_word : int)
-  : rw NM.Slice.t =
-  let ptr = BOps.get_struct_pointer struct_storage pointer_word in
-  let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
-  ptr
-
 
 let has_field
     (struct_storage : rw NM.StructStorage.t)

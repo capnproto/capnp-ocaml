@@ -171,161 +171,167 @@ let get_root_struct (m : 'cap Message.t) : 'cap StructStorage.t option =
  * METHODS FOR GETTING OBJECTS STORED BY VALUE
  *******************************************************************************)
 
-(* Given storage for a struct, attempt to get the bytes associated
-   with the struct data section. *)
-let get_data_region
-    (struct_storage_opt : 'cap StructStorage.t option)
-  : 'cap Slice.t option =
-  match struct_storage_opt with
-  | Some struct_storage ->
-      Some struct_storage.StructStorage.data
-  | None ->
-      None
-
-
-let get_void
-    (data_opt : 'cap Slice.t option)
-  : unit =
-  ()
-
 let get_bit
     ~(default : bool)
+    (struct_storage_opt : 'cap StructStorage.t option)
     ~(byte_ofs : int)
     ~(bit_ofs : int)
-    (data_opt : 'cap Slice.t option)
   : bool =
-  let byte_val =
-    match data_opt with
-    | Some data when byte_ofs < data.Slice.len ->
-        Slice.get_uint8 data byte_ofs
-    | _ ->
-        0
-  in
-  let bit_val = (byte_val land (1 lsl bit_ofs)) <> 0 in
-  if default then not bit_val else bit_val
+  match struct_storage_opt with
+  | Some struct_storage ->
+      let data = struct_storage.StructStorage.data in
+      if byte_ofs < data.Slice.len then
+        let byte_val = Slice.get_uint8 data byte_ofs in
+        let bit_val = (byte_val lsr bit_ofs) land 0x1 in
+        let result_int = bit_val lxor (Util.int_of_bool default) in
+        Util.bool_of_int result_int
+      else
+        default
+  | None ->
+      default
 
 let get_int8
     ~(default : int)
-    ~(byte_ofs : int)
-    (data_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (byte_ofs : int)
   : int =
-  let numeric =
-    match data_opt with
-    | Some data when byte_ofs < data.Slice.len ->
-        Slice.get_int8 data byte_ofs
-    | _ ->
-        0
-  in
-  numeric lxor default
+  match struct_storage_opt with
+  | Some struct_storage ->
+      let data = struct_storage.StructStorage.data in
+      if byte_ofs < data.Slice.len then
+        let numeric = Slice.get_int8 data byte_ofs in
+        numeric lxor default
+      else
+        default
+  | None ->
+      default
 
 let get_int16
     ~(default : int)
-    ~(byte_ofs : int)
-    (data_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (byte_ofs : int)
   : int =
-  let numeric =
-    match data_opt with
-    | Some data when byte_ofs + 1 < data.Slice.len ->
-        Slice.get_int16 data byte_ofs
-    | _ ->
-        0
-  in
-  numeric lxor default
+  match struct_storage_opt with
+  | Some struct_storage ->
+      let data = struct_storage.StructStorage.data in
+      if byte_ofs + 1 < data.Slice.len then
+        let numeric = Slice.get_int16 data byte_ofs in
+        numeric lxor default
+      else
+        default
+  | None ->
+      default
 
 let get_int32
     ~(default : int32)
-    ~(byte_ofs : int)
-    (data_opt : 'cap Slice.t option)
-    : int32 =
-  let numeric =
-    match data_opt with
-    | Some data when byte_ofs + 3 < data.Slice.len ->
-        Slice.get_int32 data byte_ofs
-    | _ ->
-        Int32.zero
-  in
-  Int32.bit_xor numeric default
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (byte_ofs : int)
+  : int32 =
+  match struct_storage_opt with
+  | Some struct_storage ->
+      let data = struct_storage.StructStorage.data in
+      if byte_ofs + 3 < data.Slice.len then
+        let numeric = Slice.get_int32 data byte_ofs in
+        Int32.bit_xor numeric default
+      else
+        default
+  | None ->
+      default
 
 let get_int64
     ~(default : int64)
-    ~(byte_ofs : int)
-    (data_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (byte_ofs : int)
   : int64 =
-  let numeric =
-    match data_opt with
-    | Some data when byte_ofs + 7 < data.Slice.len ->
-        Slice.get_int64 data byte_ofs
-    | _ ->
-        Int64.zero
-  in
-  Int64.bit_xor numeric default
+  match struct_storage_opt with
+  | Some struct_storage ->
+      let data = struct_storage.StructStorage.data in
+      if byte_ofs + 7 < data.Slice.len then
+        let numeric = Slice.get_int64 data byte_ofs in
+        Int64.bit_xor numeric default
+      else
+        default
+  | None ->
+      default
 
 let get_uint8
     ~(default : int)
-    ~(byte_ofs : int)
-    (data_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (byte_ofs : int)
   : int =
-  let numeric =
-    match data_opt with
-    | Some data when byte_ofs < data.Slice.len ->
-        Slice.get_uint8 data byte_ofs
-    | _ ->
-        0
-  in
-  numeric lxor default
+  match struct_storage_opt with
+  | Some struct_storage ->
+      let data = struct_storage.StructStorage.data in
+      if byte_ofs < data.Slice.len then
+        let numeric = Slice.get_uint8 data byte_ofs in
+        numeric lxor default
+      else
+        default
+  | None ->
+      default
 
 let get_uint16
     ~(default : int)
-    ~(byte_ofs : int)
-    (data_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (byte_ofs : int)
   : int =
-  let numeric =
-    match data_opt with
-    | Some data when byte_ofs + 1 < data.Slice.len ->
-        Slice.get_uint16 data byte_ofs
-    | _ ->
-        0
-  in
-  numeric lxor default
+  match struct_storage_opt with
+  | Some struct_storage ->
+      let data = struct_storage.StructStorage.data in
+      if byte_ofs + 1 < data.Slice.len then
+        let numeric = Slice.get_uint16 data byte_ofs in
+        numeric lxor default
+      else
+        default
+  | None ->
+      default
 
 let get_uint32
     ~(default : Uint32.t)
-    ~(byte_ofs : int)
-    (data_opt : 'cap Slice.t option)
-    : Uint32.t =
-  let numeric =
-    match data_opt with
-    | Some data when byte_ofs + 3 < data.Slice.len ->
-        Slice.get_uint32 data byte_ofs
-    | _ ->
-        Uint32.zero
-  in
-  Uint32.logxor numeric default
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (byte_ofs : int)
+  : Uint32.t =
+  match struct_storage_opt with
+  | Some struct_storage ->
+      let data = struct_storage.StructStorage.data in
+      if byte_ofs + 3 < data.Slice.len then
+        let numeric = Slice.get_uint32 data byte_ofs in
+        Uint32.logxor numeric default
+      else
+        default
+  | None ->
+      default
 
 let get_uint64
     ~(default : Uint64.t)
-    ~(byte_ofs : int)
-    (data_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (byte_ofs : int)
   : Uint64.t =
-  let numeric =
-    match data_opt with
-    | Some data when byte_ofs + 7 < data.Slice.len ->
-        Slice.get_uint64 data byte_ofs
-    | _ ->
-        Uint64.zero
-  in
-  Uint64.logxor numeric default
+  match struct_storage_opt with
+  | Some struct_storage ->
+      let data = struct_storage.StructStorage.data in
+      if byte_ofs + 7 < data.Slice.len then
+        let numeric = Slice.get_uint64 data byte_ofs in
+        Uint64.logxor numeric default
+      else
+        default
+  | None ->
+      default
 
 let get_float32
     ~(default_bits : int32)
-    ~(byte_ofs : int)
-    (data_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (byte_ofs : int)
   : float =
   let numeric =
-    match data_opt with
-    | Some data when byte_ofs + 3 < data.Slice.len ->
-        Slice.get_int32 data byte_ofs
-    | _ ->
+    match struct_storage_opt with
+    | Some struct_storage ->
+        let data = struct_storage.StructStorage.data in
+        if byte_ofs + 3 < data.Slice.len then
+          Slice.get_int32 data byte_ofs
+        else
+          Int32.zero
+    | None ->
         Int32.zero
   in
   let bits = Int32.bit_xor numeric default_bits in
@@ -333,14 +339,18 @@ let get_float32
 
 let get_float64
     ~(default_bits : int64)
-    ~(byte_ofs : int)
-    (data_opt : 'cap Slice.t option)
+    (struct_storage_opt : 'cap StructStorage.t option)
+    (byte_ofs : int)
   : float =
   let numeric =
-    match data_opt with
-    | Some data when byte_ofs + 7 < data.Slice.len ->
-        Slice.get_int64 data byte_ofs
-    | _ ->
+    match struct_storage_opt with
+    | Some struct_storage ->
+        let data = struct_storage.StructStorage.data in
+        if byte_ofs + 7 < data.Slice.len then
+          Slice.get_int64 data byte_ofs
+        else
+          Int64.zero
+    | None ->
         Int64.zero
   in
   let bits = Int64.bit_xor numeric default_bits in

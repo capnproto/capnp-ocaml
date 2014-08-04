@@ -1128,15 +1128,13 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         else
           None
       
-      (* Given a range of eight bytes corresponding to a cap'n proto pointer,
-         decode the information stored in the pointer. *)
-      let decode_pointer (pointer_bytes : 'cap Slice.t) : Pointer.t =
-        let pointer64 = Slice.get_int64 pointer_bytes 0 in
+      
+      let decode_pointer64 (pointer64 : int64) : Pointer.t =
         if Util.is_int64_zero pointer64 then
           Pointer.Null
         else
-          let tag_bits = Caml.Int64.to_int pointer64 in
-          let tag = tag_bits land Pointer.Bitfield.tag_mask in
+          let pointer_int = Caml.Int64.to_int pointer64 in
+          let tag = pointer_int land Pointer.Bitfield.tag_mask in
           (* OCaml won't match an int against let-bound variables,
              only against constants. *)
           match tag with
@@ -1152,6 +1150,31 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
               assert false
       
       
+      (* Given a range of eight bytes corresponding to a cap'n proto pointer,
+         decode the information stored in the pointer. *)
+      let decode_pointer (pointer_bytes : 'cap Slice.t) : Pointer.t =
+        let pointer64 = Slice.get_int64 pointer_bytes 0 in
+        decode_pointer64 pointer64
+      
+      
+      let make_list_storage_aux ~message ~num_words ~num_elements ~storage_type
+          ~segment_id ~segment_offset =
+        let storage = {
+          Slice.msg        = message;
+          Slice.segment    = Message.get_segment message segment_id;
+          Slice.segment_id = segment_id;
+          Slice.start      = segment_offset;
+          Slice.len        = num_words * sizeof_uint64;
+        } in
+        let () = bounds_check_slice_exn
+          ~err:"list pointer describes invalid storage region" storage
+        in {
+          ListStorage.storage      = storage;
+          ListStorage.storage_type = storage_type;
+          ListStorage.num_elements = num_elements;
+        }
+      
+      
       (* Given a list pointer descriptor, construct the corresponding list storage
          descriptor. *)
       let make_list_storage
@@ -1160,83 +1183,73 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           ~(segment_offset : int)         (* Segment offset where list storage is found *)
           ~(list_pointer : ListPointer.t)
         : 'cap ListStorage.t =
-        let make_list_storage_aux ~num_words ~num_elements ~storage_type =
-          let storage = {
-            Slice.msg        = message;
-            Slice.segment    = Message.get_segment message segment_id;
-            Slice.segment_id = segment_id;
-            Slice.start      = segment_offset;
-            Slice.len        = num_words * sizeof_uint64;
-          } in
-          let () = bounds_check_slice_exn
-            ~err:"list pointer describes invalid storage region" storage
-          in {
-            ListStorage.storage      = storage;
-            ListStorage.storage_type = storage_type;
-            ListStorage.num_elements = num_elements;
-          }
-        in
         let open ListPointer in
         match list_pointer.element_type with
         | Void ->
-            make_list_storage_aux ~num_words:0
-              ~num_elements:list_pointer.num_elements ~storage_type:ListStorageType.Empty
+            make_list_storage_aux ~message ~num_words:0
+              ~num_elements:list_pointer.num_elements
+              ~storage_type:ListStorageType.Empty ~segment_id ~segment_offset
         | OneBitValue ->
-            make_list_storage_aux
+            make_list_storage_aux ~message
               ~num_words:(Util.ceil_ratio list_pointer.num_elements 64)
               ~num_elements:list_pointer.num_elements ~storage_type:ListStorageType.Bit
+              ~segment_id ~segment_offset
         | OneByteValue ->
-            make_list_storage_aux
+            make_list_storage_aux ~message
               ~num_words:(Util.ceil_ratio list_pointer.num_elements 8)
               ~num_elements:list_pointer.num_elements
               ~storage_type:ListStorageType.Bytes1
+              ~segment_id ~segment_offset
         | TwoByteValue ->
-            make_list_storage_aux
+            make_list_storage_aux ~message
               ~num_words:(Util.ceil_ratio list_pointer.num_elements 4)
               ~num_elements:list_pointer.num_elements
               ~storage_type:ListStorageType.Bytes2
+              ~segment_id ~segment_offset
         | FourByteValue ->
-            make_list_storage_aux
+            make_list_storage_aux ~message
               ~num_words:(Util.ceil_ratio list_pointer.num_elements 2)
               ~num_elements:list_pointer.num_elements
               ~storage_type:ListStorageType.Bytes4
+              ~segment_id ~segment_offset
         | EightByteValue ->
-            make_list_storage_aux ~num_words:list_pointer.num_elements
+            make_list_storage_aux ~message ~num_words:list_pointer.num_elements
               ~num_elements:list_pointer.num_elements
               ~storage_type:ListStorageType.Bytes8
+              ~segment_id ~segment_offset
         | EightBytePointer ->
-            make_list_storage_aux ~num_words:list_pointer.num_elements
+            make_list_storage_aux ~message ~num_words:list_pointer.num_elements
               ~num_elements:list_pointer.num_elements
               ~storage_type:ListStorageType.Pointer
+              ~segment_id ~segment_offset
         | Composite ->
-            let struct_tag_bytes = {
-              Slice.msg        = message;
-              Slice.segment    = Message.get_segment message segment_id;
-              Slice.segment_id = segment_id;
-              Slice.start      = segment_offset;
-              Slice.len        = sizeof_uint64;
-            } in
-            let () = bounds_check_slice_exn
-                ~err:"composite list pointer describes invalid storage region"
-                struct_tag_bytes
-            in
-            begin match decode_pointer struct_tag_bytes with
-            | Pointer.Struct struct_pointer ->
-                let module SP = StructPointer in
-                let num_words = list_pointer.num_elements in
-                let num_elements = struct_pointer.SP.offset in
-                let words_per_element =
-                  struct_pointer.SP.data_words + struct_pointer.SP.pointer_words
-                in
-                if num_elements * words_per_element > num_words then
-                  invalid_msg "composite list pointer describes invalid word count"
+            if segment_id < 0 || segment_id >= Message.num_segments message then
+              invalid_msg "composite list pointer describes invalid tag region"
+            else
+              let segment = Message.get_segment message segment_id in
+              if segment_offset + sizeof_uint64 > Segment.length segment then
+                invalid_msg "composite list pointer describes invalid tag region"
+              else
+                let pointer64 = Segment.get_int64 segment segment_offset in
+                let pointer_int = Caml.Int64.to_int pointer64 in
+                let tag = pointer_int land Pointer.Bitfield.tag_mask in
+                if tag = Pointer.Bitfield.tag_val_struct then
+                  let struct_pointer = StructPointer.decode pointer64 in
+                  let num_words = list_pointer.num_elements in
+                  let num_elements = struct_pointer.StructPointer.offset in
+                  let words_per_element = struct_pointer.StructPointer.data_words +
+                      struct_pointer.StructPointer.pointer_words
+                  in
+                  if num_elements * words_per_element > num_words then
+                    invalid_msg "composite list pointer describes invalid word count"
+                  else
+                    make_list_storage_aux ~message ~num_words ~num_elements
+                      ~storage_type:(ListStorageType.Composite
+                          (struct_pointer.StructPointer.data_words,
+                           struct_pointer.StructPointer.pointer_words))
+                      ~segment_id ~segment_offset
                 else
-                  make_list_storage_aux ~num_words ~num_elements
-                    ~storage_type:(ListStorageType.Composite
-                       (struct_pointer.SP.data_words, struct_pointer.SP.pointer_words))
-            | _ ->
-                invalid_msg "composite list pointer has malformed element type tag"
-            end
+                  invalid_msg "composite list pointer has malformed element type tag"
       
       
       (* Given a description of a cap'n proto far pointer, get the object which
@@ -2183,161 +2196,167 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
      * METHODS FOR GETTING OBJECTS STORED BY VALUE
      *******************************************************************************)
 
-    (* Given storage for a struct, attempt to get the bytes associated
-       with the struct data section. *)
-    let get_data_region
-        (struct_storage_opt : 'cap StructStorage.t option)
-      : 'cap Slice.t option =
-      match struct_storage_opt with
-      | Some struct_storage ->
-          Some struct_storage.StructStorage.data
-      | None ->
-          None
-
-
-    let get_void
-        (data_opt : 'cap Slice.t option)
-      : unit =
-      ()
-
     let get_bit
         ~(default : bool)
+        (struct_storage_opt : 'cap StructStorage.t option)
         ~(byte_ofs : int)
         ~(bit_ofs : int)
-        (data_opt : 'cap Slice.t option)
       : bool =
-      let byte_val =
-        match data_opt with
-        | Some data when byte_ofs < data.Slice.len ->
-            Slice.get_uint8 data byte_ofs
-        | _ ->
-            0
-      in
-      let bit_val = (byte_val land (1 lsl bit_ofs)) <> 0 in
-      if default then not bit_val else bit_val
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let data = struct_storage.StructStorage.data in
+          if byte_ofs < data.Slice.len then
+            let byte_val = Slice.get_uint8 data byte_ofs in
+            let bit_val = (byte_val lsr bit_ofs) land 0x1 in
+            let result_int = bit_val lxor (Util.int_of_bool default) in
+            Util.bool_of_int result_int
+          else
+            default
+      | None ->
+          default
 
     let get_int8
         ~(default : int)
-        ~(byte_ofs : int)
-        (data_opt : 'cap Slice.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (byte_ofs : int)
       : int =
-      let numeric =
-        match data_opt with
-        | Some data when byte_ofs < data.Slice.len ->
-            Slice.get_int8 data byte_ofs
-        | _ ->
-            0
-      in
-      numeric lxor default
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let data = struct_storage.StructStorage.data in
+          if byte_ofs < data.Slice.len then
+            let numeric = Slice.get_int8 data byte_ofs in
+            numeric lxor default
+          else
+            default
+      | None ->
+          default
 
     let get_int16
         ~(default : int)
-        ~(byte_ofs : int)
-        (data_opt : 'cap Slice.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (byte_ofs : int)
       : int =
-      let numeric =
-        match data_opt with
-        | Some data when byte_ofs + 1 < data.Slice.len ->
-            Slice.get_int16 data byte_ofs
-        | _ ->
-            0
-      in
-      numeric lxor default
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let data = struct_storage.StructStorage.data in
+          if byte_ofs + 1 < data.Slice.len then
+            let numeric = Slice.get_int16 data byte_ofs in
+            numeric lxor default
+          else
+            default
+      | None ->
+          default
 
     let get_int32
         ~(default : int32)
-        ~(byte_ofs : int)
-        (data_opt : 'cap Slice.t option)
-        : int32 =
-      let numeric =
-        match data_opt with
-        | Some data when byte_ofs + 3 < data.Slice.len ->
-            Slice.get_int32 data byte_ofs
-        | _ ->
-            Int32.zero
-      in
-      Int32.bit_xor numeric default
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (byte_ofs : int)
+      : int32 =
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let data = struct_storage.StructStorage.data in
+          if byte_ofs + 3 < data.Slice.len then
+            let numeric = Slice.get_int32 data byte_ofs in
+            Int32.bit_xor numeric default
+          else
+            default
+      | None ->
+          default
 
     let get_int64
         ~(default : int64)
-        ~(byte_ofs : int)
-        (data_opt : 'cap Slice.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (byte_ofs : int)
       : int64 =
-      let numeric =
-        match data_opt with
-        | Some data when byte_ofs + 7 < data.Slice.len ->
-            Slice.get_int64 data byte_ofs
-        | _ ->
-            Int64.zero
-      in
-      Int64.bit_xor numeric default
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let data = struct_storage.StructStorage.data in
+          if byte_ofs + 7 < data.Slice.len then
+            let numeric = Slice.get_int64 data byte_ofs in
+            Int64.bit_xor numeric default
+          else
+            default
+      | None ->
+          default
 
     let get_uint8
         ~(default : int)
-        ~(byte_ofs : int)
-        (data_opt : 'cap Slice.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (byte_ofs : int)
       : int =
-      let numeric =
-        match data_opt with
-        | Some data when byte_ofs < data.Slice.len ->
-            Slice.get_uint8 data byte_ofs
-        | _ ->
-            0
-      in
-      numeric lxor default
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let data = struct_storage.StructStorage.data in
+          if byte_ofs < data.Slice.len then
+            let numeric = Slice.get_uint8 data byte_ofs in
+            numeric lxor default
+          else
+            default
+      | None ->
+          default
 
     let get_uint16
         ~(default : int)
-        ~(byte_ofs : int)
-        (data_opt : 'cap Slice.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (byte_ofs : int)
       : int =
-      let numeric =
-        match data_opt with
-        | Some data when byte_ofs + 1 < data.Slice.len ->
-            Slice.get_uint16 data byte_ofs
-        | _ ->
-            0
-      in
-      numeric lxor default
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let data = struct_storage.StructStorage.data in
+          if byte_ofs + 1 < data.Slice.len then
+            let numeric = Slice.get_uint16 data byte_ofs in
+            numeric lxor default
+          else
+            default
+      | None ->
+          default
 
     let get_uint32
         ~(default : Uint32.t)
-        ~(byte_ofs : int)
-        (data_opt : 'cap Slice.t option)
-        : Uint32.t =
-      let numeric =
-        match data_opt with
-        | Some data when byte_ofs + 3 < data.Slice.len ->
-            Slice.get_uint32 data byte_ofs
-        | _ ->
-            Uint32.zero
-      in
-      Uint32.logxor numeric default
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (byte_ofs : int)
+      : Uint32.t =
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let data = struct_storage.StructStorage.data in
+          if byte_ofs + 3 < data.Slice.len then
+            let numeric = Slice.get_uint32 data byte_ofs in
+            Uint32.logxor numeric default
+          else
+            default
+      | None ->
+          default
 
     let get_uint64
         ~(default : Uint64.t)
-        ~(byte_ofs : int)
-        (data_opt : 'cap Slice.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (byte_ofs : int)
       : Uint64.t =
-      let numeric =
-        match data_opt with
-        | Some data when byte_ofs + 7 < data.Slice.len ->
-            Slice.get_uint64 data byte_ofs
-        | _ ->
-            Uint64.zero
-      in
-      Uint64.logxor numeric default
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let data = struct_storage.StructStorage.data in
+          if byte_ofs + 7 < data.Slice.len then
+            let numeric = Slice.get_uint64 data byte_ofs in
+            Uint64.logxor numeric default
+          else
+            default
+      | None ->
+          default
 
     let get_float32
         ~(default_bits : int32)
-        ~(byte_ofs : int)
-        (data_opt : 'cap Slice.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (byte_ofs : int)
       : float =
       let numeric =
-        match data_opt with
-        | Some data when byte_ofs + 3 < data.Slice.len ->
-            Slice.get_int32 data byte_ofs
-        | _ ->
+        match struct_storage_opt with
+        | Some struct_storage ->
+            let data = struct_storage.StructStorage.data in
+            if byte_ofs + 3 < data.Slice.len then
+              Slice.get_int32 data byte_ofs
+            else
+              Int32.zero
+        | None ->
             Int32.zero
       in
       let bits = Int32.bit_xor numeric default_bits in
@@ -2345,14 +2364,18 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
 
     let get_float64
         ~(default_bits : int64)
-        ~(byte_ofs : int)
-        (data_opt : 'cap Slice.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (byte_ofs : int)
       : float =
       let numeric =
-        match data_opt with
-        | Some data when byte_ofs + 7 < data.Slice.len ->
-            Slice.get_int64 data byte_ofs
-        | _ ->
+        match struct_storage_opt with
+        | Some struct_storage ->
+            let data = struct_storage.StructStorage.data in
+            if byte_ofs + 7 < data.Slice.len then
+              Slice.get_int64 data byte_ofs
+            else
+              Int64.zero
+        | None ->
             Int64.zero
       in
       let bits = Int64.bit_xor numeric default_bits in
@@ -2438,10 +2461,10 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         (struct_storage_opt : 'cap StructStorage.t option)
         (pointer_word : int)
       : (ro, 'a, 'cap ListStorage.t) InnerArray.t =
-      let make_default () =
-        begin match default with
+      let make_default default' decoders' =
+        begin match default' with
         | Some default_storage ->
-            make_array_readonly default_storage decoders
+            make_array_readonly default_storage decoders'
         | None ->
             (* Empty array *)
             { InnerArray.length     = 0;
@@ -2457,20 +2480,36 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let start = pointer_word * sizeof_uint64 in
           let len   = sizeof_uint64 in
           if start + len <= pointers.Slice.len then
-            let pointer_bytes = {
-              pointers with
-              Slice.start = pointers.Slice.start + start;
-              Slice.len   = len;
-            } in
-            match deref_list_pointer pointer_bytes with
-            | Some list_storage ->
-                make_array_readonly list_storage decoders
-            | None ->
-                make_default ()
+            (* Fast path. *)
+            let pointer64 = Slice.get_int64 pointers start in
+            let pointer_int = Caml.Int64.to_int pointer64 in
+            let tag = pointer_int land Pointer.Bitfield.tag_mask in
+            if tag = Pointer.Bitfield.tag_val_list then
+              let list_pointer = ListPointer.decode pointer64 in
+              let list_storage = make_list_storage
+                ~message:pointers.Slice.msg
+                ~segment_id:pointers.Slice.segment_id
+                ~segment_offset:((pointers.Slice.start + start + len) +
+                                   (list_pointer.ListPointer.offset * sizeof_uint64))
+                ~list_pointer
+              in
+              make_array_readonly list_storage decoders
+            else
+              (* Slow path... most likely a far pointer.*)
+              let pointer_bytes = {
+                pointers with
+                Slice.start = pointers.Slice.start + start;
+                Slice.len   = len;
+              } in
+              match deref_list_pointer pointer_bytes with
+              | Some list_storage ->
+                  make_array_readonly list_storage decoders
+              | None ->
+                  make_default default decoders
           else
-            make_default ()
+            make_default default decoders
       | None ->
-          make_default ()
+          make_default default decoders
 
     let get_void_list
         ?(default : ro ListStorage.t option)
@@ -2789,15 +2828,13 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         else
           None
       
-      (* Given a range of eight bytes corresponding to a cap'n proto pointer,
-         decode the information stored in the pointer. *)
-      let decode_pointer (pointer_bytes : 'cap Slice.t) : Pointer.t =
-        let pointer64 = Slice.get_int64 pointer_bytes 0 in
+      
+      let decode_pointer64 (pointer64 : int64) : Pointer.t =
         if Util.is_int64_zero pointer64 then
           Pointer.Null
         else
-          let tag_bits = Caml.Int64.to_int pointer64 in
-          let tag = tag_bits land Pointer.Bitfield.tag_mask in
+          let pointer_int = Caml.Int64.to_int pointer64 in
+          let tag = pointer_int land Pointer.Bitfield.tag_mask in
           (* OCaml won't match an int against let-bound variables,
              only against constants. *)
           match tag with
@@ -2813,6 +2850,31 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
               assert false
       
       
+      (* Given a range of eight bytes corresponding to a cap'n proto pointer,
+         decode the information stored in the pointer. *)
+      let decode_pointer (pointer_bytes : 'cap Slice.t) : Pointer.t =
+        let pointer64 = Slice.get_int64 pointer_bytes 0 in
+        decode_pointer64 pointer64
+      
+      
+      let make_list_storage_aux ~message ~num_words ~num_elements ~storage_type
+          ~segment_id ~segment_offset =
+        let storage = {
+          Slice.msg        = message;
+          Slice.segment    = Message.get_segment message segment_id;
+          Slice.segment_id = segment_id;
+          Slice.start      = segment_offset;
+          Slice.len        = num_words * sizeof_uint64;
+        } in
+        let () = bounds_check_slice_exn
+          ~err:"list pointer describes invalid storage region" storage
+        in {
+          ListStorage.storage      = storage;
+          ListStorage.storage_type = storage_type;
+          ListStorage.num_elements = num_elements;
+        }
+      
+      
       (* Given a list pointer descriptor, construct the corresponding list storage
          descriptor. *)
       let make_list_storage
@@ -2821,83 +2883,73 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           ~(segment_offset : int)         (* Segment offset where list storage is found *)
           ~(list_pointer : ListPointer.t)
         : 'cap ListStorage.t =
-        let make_list_storage_aux ~num_words ~num_elements ~storage_type =
-          let storage = {
-            Slice.msg        = message;
-            Slice.segment    = Message.get_segment message segment_id;
-            Slice.segment_id = segment_id;
-            Slice.start      = segment_offset;
-            Slice.len        = num_words * sizeof_uint64;
-          } in
-          let () = bounds_check_slice_exn
-            ~err:"list pointer describes invalid storage region" storage
-          in {
-            ListStorage.storage      = storage;
-            ListStorage.storage_type = storage_type;
-            ListStorage.num_elements = num_elements;
-          }
-        in
         let open ListPointer in
         match list_pointer.element_type with
         | Void ->
-            make_list_storage_aux ~num_words:0
-              ~num_elements:list_pointer.num_elements ~storage_type:ListStorageType.Empty
+            make_list_storage_aux ~message ~num_words:0
+              ~num_elements:list_pointer.num_elements
+              ~storage_type:ListStorageType.Empty ~segment_id ~segment_offset
         | OneBitValue ->
-            make_list_storage_aux
+            make_list_storage_aux ~message
               ~num_words:(Util.ceil_ratio list_pointer.num_elements 64)
               ~num_elements:list_pointer.num_elements ~storage_type:ListStorageType.Bit
+              ~segment_id ~segment_offset
         | OneByteValue ->
-            make_list_storage_aux
+            make_list_storage_aux ~message
               ~num_words:(Util.ceil_ratio list_pointer.num_elements 8)
               ~num_elements:list_pointer.num_elements
               ~storage_type:ListStorageType.Bytes1
+              ~segment_id ~segment_offset
         | TwoByteValue ->
-            make_list_storage_aux
+            make_list_storage_aux ~message
               ~num_words:(Util.ceil_ratio list_pointer.num_elements 4)
               ~num_elements:list_pointer.num_elements
               ~storage_type:ListStorageType.Bytes2
+              ~segment_id ~segment_offset
         | FourByteValue ->
-            make_list_storage_aux
+            make_list_storage_aux ~message
               ~num_words:(Util.ceil_ratio list_pointer.num_elements 2)
               ~num_elements:list_pointer.num_elements
               ~storage_type:ListStorageType.Bytes4
+              ~segment_id ~segment_offset
         | EightByteValue ->
-            make_list_storage_aux ~num_words:list_pointer.num_elements
+            make_list_storage_aux ~message ~num_words:list_pointer.num_elements
               ~num_elements:list_pointer.num_elements
               ~storage_type:ListStorageType.Bytes8
+              ~segment_id ~segment_offset
         | EightBytePointer ->
-            make_list_storage_aux ~num_words:list_pointer.num_elements
+            make_list_storage_aux ~message ~num_words:list_pointer.num_elements
               ~num_elements:list_pointer.num_elements
               ~storage_type:ListStorageType.Pointer
+              ~segment_id ~segment_offset
         | Composite ->
-            let struct_tag_bytes = {
-              Slice.msg        = message;
-              Slice.segment    = Message.get_segment message segment_id;
-              Slice.segment_id = segment_id;
-              Slice.start      = segment_offset;
-              Slice.len        = sizeof_uint64;
-            } in
-            let () = bounds_check_slice_exn
-                ~err:"composite list pointer describes invalid storage region"
-                struct_tag_bytes
-            in
-            begin match decode_pointer struct_tag_bytes with
-            | Pointer.Struct struct_pointer ->
-                let module SP = StructPointer in
-                let num_words = list_pointer.num_elements in
-                let num_elements = struct_pointer.SP.offset in
-                let words_per_element =
-                  struct_pointer.SP.data_words + struct_pointer.SP.pointer_words
-                in
-                if num_elements * words_per_element > num_words then
-                  invalid_msg "composite list pointer describes invalid word count"
+            if segment_id < 0 || segment_id >= Message.num_segments message then
+              invalid_msg "composite list pointer describes invalid tag region"
+            else
+              let segment = Message.get_segment message segment_id in
+              if segment_offset + sizeof_uint64 > Segment.length segment then
+                invalid_msg "composite list pointer describes invalid tag region"
+              else
+                let pointer64 = Segment.get_int64 segment segment_offset in
+                let pointer_int = Caml.Int64.to_int pointer64 in
+                let tag = pointer_int land Pointer.Bitfield.tag_mask in
+                if tag = Pointer.Bitfield.tag_val_struct then
+                  let struct_pointer = StructPointer.decode pointer64 in
+                  let num_words = list_pointer.num_elements in
+                  let num_elements = struct_pointer.StructPointer.offset in
+                  let words_per_element = struct_pointer.StructPointer.data_words +
+                      struct_pointer.StructPointer.pointer_words
+                  in
+                  if num_elements * words_per_element > num_words then
+                    invalid_msg "composite list pointer describes invalid word count"
+                  else
+                    make_list_storage_aux ~message ~num_words ~num_elements
+                      ~storage_type:(ListStorageType.Composite
+                          (struct_pointer.StructPointer.data_words,
+                           struct_pointer.StructPointer.pointer_words))
+                      ~segment_id ~segment_offset
                 else
-                  make_list_storage_aux ~num_words ~num_elements
-                    ~storage_type:(ListStorageType.Composite
-                       (struct_pointer.SP.data_words, struct_pointer.SP.pointer_words))
-            | _ ->
-                invalid_msg "composite list pointer has malformed element type tag"
-            end
+                  invalid_msg "composite list pointer has malformed element type tag"
       
       
       (* Given a description of a cap'n proto far pointer, get the object which
@@ -3893,100 +3945,106 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       let () = set_opt_discriminant data discr in
       data
 
-
-    let get_void
-        (data : 'cap NM.Slice.t)
-      : unit =
-      ()
-
-     let get_bit
-        ~(default : bool)
-        ~(byte_ofs : int)
-        ~(bit_ofs : int)
-        (data : 'cap NM.Slice.t)
-       : bool =
-       let byte_val = NM.Slice.get_uint8 data byte_ofs in
-       let bit_val = (byte_val land (1 lsl bit_ofs)) <> 0 in
-       if default then not bit_val else bit_val
+    let get_bit
+       ~(default : bool)
+       (struct_storage : rw NM.StructStorage.t)
+       ~(byte_ofs : int)
+       ~(bit_ofs : int)
+      : bool =
+      let data = struct_storage.NM.StructStorage.data in
+      let byte_val = NM.Slice.get_uint8 data byte_ofs in
+      let bit_val = (byte_val lsr bit_ofs) land 0x1 in
+      let result_int = bit_val lxor (Util.int_of_bool default) in
+      Util.bool_of_int result_int
 
     let get_int8
         ~(default : int)
-        ~(byte_ofs : int)
-        (data : 'cap NM.Slice.t)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
       : int =
+      let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_int8 data byte_ofs in
       numeric lxor default
 
     let get_int16
         ~(default : int)
-        ~(byte_ofs : int)
-        (data : 'cap NM.Slice.t)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
       : int =
+      let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_int16 data byte_ofs in
       numeric lxor default
 
     let get_int32
         ~(default : int32)
-        ~(byte_ofs : int)
-        (data : 'cap NM.Slice.t)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         : int32 =
+      let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_int32 data byte_ofs in
       Int32.bit_xor numeric default
 
     let get_int64
         ~(default : int64)
-        ~(byte_ofs : int)
-        (data : 'cap NM.Slice.t)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
       : int64 =
+      let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_int64 data byte_ofs in
       Int64.bit_xor numeric default
 
     let get_uint8
         ~(default : int)
-        ~(byte_ofs : int)
-        (data : 'cap NM.Slice.t)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
       : int =
+      let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_uint8 data byte_ofs in
       numeric lxor default
 
     let get_uint16
         ~(default : int)
-        ~(byte_ofs : int)
-        (data : 'cap NM.Slice.t)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
       : int =
+      let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_uint16 data byte_ofs in
       numeric lxor default
 
     let get_uint32
         ~(default : Uint32.t)
-        ~(byte_ofs : int)
-        (data : 'cap NM.Slice.t)
-        : Uint32.t =
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
+      : Uint32.t =
+      let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_uint32 data byte_ofs in
       Uint32.logxor numeric default
 
     let get_uint64
         ~(default : Uint64.t)
-        ~(byte_ofs : int)
-        (data : 'cap NM.Slice.t)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
       : Uint64.t =
+      let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_uint64 data byte_ofs in
       Uint64.logxor numeric default
 
     let get_float32
         ~(default_bits : int32)
-        ~(byte_ofs : int)
-        (data : 'cap NM.Slice.t)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
       : float =
+      let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_int32 data byte_ofs in
       let bits = Int32.bit_xor numeric default_bits in
       Int32.float_of_bits bits
 
     let get_float64
         ~(default_bits : int64)
-        ~(byte_ofs : int)
-        (data : 'cap NM.Slice.t)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
       : float =
+      let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_int64 data byte_ofs in
       let bits = Int64.bit_xor numeric default_bits in
       Int64.float_of_bits bits
@@ -3997,19 +4055,24 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
      *******************************************************************************)
 
     let set_void
-        (data : 'cap NM.Slice.t)
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
       : unit =
-      ()
+      let data = struct_storage.NM.StructStorage.data in
+      set_opt_discriminant data discr
 
     let set_bit
+        ?(discr : Discr.t option)
         ~(default : bool)
+        (struct_storage : rw NM.StructStorage.t)
         ~(byte_ofs : int)
         ~(bit_ofs : int)
         (value : bool)
-        (data : rw NM.Slice.t)
       : unit =
-      let default_bit = if default then 1 else 0 in
-      let value_bit = if value then 1 else 0 in
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
+      let default_bit = Util.int_of_bool default in
+      let value_bit = Util.int_of_bool value in
       let stored_bit = default_bit lxor value_bit in
       let byte_val = NM.Slice.get_uint8 data byte_ofs in
       let byte_val = byte_val land (lnot (1 lsl bit_ofs)) in
@@ -4017,88 +4080,114 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       NM.Slice.set_uint8 data byte_ofs byte_val
 
     let set_int8
+        ?(discr : Discr.t option)
         ~(default : int)
-        ~(byte_ofs : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         (value : int)
-        (data : rw NM.Slice.t)
       : unit =
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
       NM.Slice.set_int8 data byte_ofs (value lxor default)
 
     let set_int16
+        ?(discr : Discr.t option)
         ~(default : int)
-        ~(byte_ofs : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         (value : int)
-        (data : rw NM.Slice.t)
       : unit =
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
       NM.Slice.set_int16 data byte_ofs (value lxor default)
 
     let set_int32
+        ?(discr : Discr.t option)
         ~(default : int32)
-        ~(byte_ofs : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         (value : int32)
-        (data : rw NM.Slice.t)
       : unit =
-      NM.Slice.set_int32 data byte_ofs
-        (Int32.bit_xor value default)
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
+      NM.Slice.set_int32 data byte_ofs (Int32.bit_xor value default)
 
     let set_int64
+        ?(discr : Discr.t option)
         ~(default : int64)
-        ~(byte_ofs : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         (value : int64)
-        (data : rw NM.Slice.t)
       : unit =
-      NM.Slice.set_int64 data byte_ofs
-        (Int64.bit_xor value default)
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
+      NM.Slice.set_int64 data byte_ofs (Int64.bit_xor value default)
 
     let set_uint8
+        ?(discr : Discr.t option)
         ~(default : int)
-        ~(byte_ofs : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         (value : int)
-        (data : rw NM.Slice.t)
       : unit =
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
       NM.Slice.set_uint8 data byte_ofs (value lxor default)
 
     let set_uint16
+        ?(discr : Discr.t option)
         ~(default : int)
-        ~(byte_ofs : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         (value : int)
-        (data : rw NM.Slice.t)
       : unit =
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
       NM.Slice.set_uint16 data byte_ofs (value lxor default)
 
     let set_uint32
+        ?(discr : Discr.t option)
         ~(default : Uint32.t)
-        ~(byte_ofs : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         (value : Uint32.t)
-        (data : rw NM.Slice.t)
       : unit =
-      NM.Slice.set_uint32 data byte_ofs
-        (Uint32.logxor value default)
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
+      NM.Slice.set_uint32 data byte_ofs (Uint32.logxor value default)
 
     let set_uint64
+        ?(discr : Discr.t option)
         ~(default : Uint64.t)
-        ~(byte_ofs : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         (value : Uint64.t)
-        (data : rw NM.Slice.t)
       : unit =
-      NM.Slice.set_uint64 data byte_ofs
-        (Uint64.logxor value default)
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
+      NM.Slice.set_uint64 data byte_ofs (Uint64.logxor value default)
 
     let set_float32
+        ?(discr : Discr.t option)
         ~(default_bits : int32)
-        ~(byte_ofs : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         (value : float)
-        (data : rw NM.Slice.t)
       : unit =
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
       NM.Slice.set_int32 data byte_ofs
         (Int32.bit_xor (Int32.bits_of_float value) default_bits)
 
     let set_float64
+        ?(discr : Discr.t option)
         ~(default_bits : int64)
-        ~(byte_ofs : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         (value : float)
-        (data : rw NM.Slice.t)
       : unit =
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
       NM.Slice.set_int64 data byte_ofs
         (Int64.bit_xor (Int64.bits_of_float value) default_bits)
 
@@ -4106,21 +4195,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
     (*******************************************************************************
      * METHODS FOR GETTING OBJECTS STORED BY POINTER
      *******************************************************************************)
-
-
-    (* Given storage for a struct, get the bytes associated with struct
-       pointer at offset [pointer_word].  If the optional discriminant
-       parameter is supplied, then the discriminant is also set as a
-       side-effect. *)
-    let get_pointer_bytes
-        ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
-        (pointer_word : int)
-      : rw NM.Slice.t =
-      let ptr = BOps.get_struct_pointer struct_storage pointer_word in
-      let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
-      ptr
-
 
     let has_field
         (struct_storage : rw NM.StructStorage.t)
@@ -5121,8 +5195,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = reader_t_Enum_11389172934837766057
         type builder_t = builder_t_Enum_11389172934837766057
         let type_id_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:8 data
+          RA_.get_uint64 ~default:Uint64.zero x 8
         let type_id_get_int_exn x =
           Capnp.Runtime.Util.int_of_uint64_exn (type_id_get x)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -5132,8 +5205,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = reader_t_Interface_17116997365232503999
         type builder_t = builder_t_Interface_17116997365232503999
         let type_id_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:8 data
+          RA_.get_uint64 ~default:Uint64.zero x 8
         let type_id_get_int_exn x =
           Capnp.Runtime.Util.int_of_uint64_exn (type_id_get x)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -5153,8 +5225,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = reader_t_Struct_12410354185295152851
         type builder_t = builder_t_Struct_12410354185295152851
         let type_id_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:8 data
+          RA_.get_uint64 ~default:Uint64.zero x 8
         let type_id_get_int_exn x =
           Capnp.Runtime.Util.int_of_uint64_exn (type_id_get x)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -5201,8 +5272,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         | AnyPointer
         | Undefined of int
       let get x =
-        let data = RA_.get_data_region x in
-        match RA_.get_uint16 ~default:0 ~byte_ofs:0 data with
+        match RA_.get_uint16 ~default:0 x 0 with
         | 0 -> Void
         | 1 -> Bool
         | 2 -> Int8
@@ -5231,46 +5301,35 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       type builder_t = builder_t_Value_14853958794117909659
       let void_get x = ()
       let bool_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_bit ~default:false ~byte_ofs:2 ~bit_ofs:0 data
+        RA_.get_bit ~default:false x ~byte_ofs:2 ~bit_ofs:0
       let int8_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_int8 ~default:(0) ~byte_ofs:2 data
+        RA_.get_int8 ~default:(0) x 2
       let int16_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_int16 ~default:(0) ~byte_ofs:2 data
+        RA_.get_int16 ~default:(0) x 2
       let int32_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_int32 ~default:(0l) ~byte_ofs:4 data
+        RA_.get_int32 ~default:(0l) x 4
       let int32_get_int_exn x =
         Capnp.Runtime.Util.int_of_int32_exn (int32_get x)
       let int64_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_int64 ~default:(0L) ~byte_ofs:8 data
+        RA_.get_int64 ~default:(0L) x 8
       let int64_get_int_exn x =
         Capnp.Runtime.Util.int_of_int64_exn (int64_get x)
       let uint8_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_uint8 ~default:0 ~byte_ofs:2 data
+        RA_.get_uint8 ~default:0 x 2
       let uint16_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_uint16 ~default:0 ~byte_ofs:2 data
+        RA_.get_uint16 ~default:0 x 2
       let uint32_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_uint32 ~default:Uint32.zero ~byte_ofs:4 data
+        RA_.get_uint32 ~default:Uint32.zero x 4
       let uint32_get_int_exn x =
         Capnp.Runtime.Util.int_of_uint32_exn (uint32_get x)
       let uint64_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:8 data
+        RA_.get_uint64 ~default:Uint64.zero x 8
       let uint64_get_int_exn x =
         Capnp.Runtime.Util.int_of_uint64_exn (uint64_get x)
       let float32_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_float32 ~default_bits:(0l) ~byte_ofs:4 data
+        RA_.get_float32 ~default_bits:(0l) x 4
       let float64_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_float64 ~default_bits:(0L) ~byte_ofs:8 data
+        RA_.get_float64 ~default_bits:(0L) x 8
       let has_text x =
         RA_.has_field x 0
       let text_get x =
@@ -5282,8 +5341,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       let list_get x =
         RA_.get_pointer x 0
       let enum_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_uint16 ~default:0 ~byte_ofs:2 data
+        RA_.get_uint16 ~default:0 x 2
       let struct_get x =
         RA_.get_pointer x 0
       let interface_get x = ()
@@ -5311,8 +5369,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         | AnyPointer of pointer_t
         | Undefined of int
       let get x =
-        let data = RA_.get_data_region x in
-        match RA_.get_uint16 ~default:0 ~byte_ofs:0 data with
+        match RA_.get_uint16 ~default:0 x 0 with
         | 0 -> Void
         | 1 -> Bool (bool_get x)
         | 2 -> Int8 (int8_get x)
@@ -5340,8 +5397,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       type t = reader_t_Annotation_17422339044421236034
       type builder_t = builder_t_Annotation_17422339044421236034
       let id_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:0 data
+        RA_.get_uint64 ~default:Uint64.zero x 0
       let id_get_int_exn x =
         Capnp.Runtime.Util.int_of_uint64_exn (id_get x)
       let has_value x = 
@@ -5359,16 +5415,13 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       let name_get x =
         RA_.get_text ~default:"" x 0
       let code_order_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_uint16 ~default:0 ~byte_ofs:0 data
+        RA_.get_uint16 ~default:0 x 0
       let param_struct_type_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:8 data
+        RA_.get_uint64 ~default:Uint64.zero x 8
       let param_struct_type_get_int_exn x =
         Capnp.Runtime.Util.int_of_uint64_exn (param_struct_type_get x)
       let result_struct_type_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:16 data
+        RA_.get_uint64 ~default:Uint64.zero x 16
       let result_struct_type_get_int_exn x =
         Capnp.Runtime.Util.int_of_uint64_exn (result_struct_type_get x)
       let has_annotations x = 
@@ -5390,8 +5443,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       let name_get x =
         RA_.get_text ~default:"" x 0
       let code_order_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_uint16 ~default:0 ~byte_ofs:0 data
+        RA_.get_uint16 ~default:0 x 0
       let has_annotations x = 
         (RA_.has_field x 1)
       let annotations_get x = 
@@ -5413,15 +5465,13 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type builder_t = builder_t_Ordinal_13515537513213004774
         let implicit_get x = ()
         let explicit_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_uint16 ~default:0 ~byte_ofs:12 data
+          RA_.get_uint16 ~default:0 x 12
         type unnamed_union_t =
           | Implicit
           | Explicit of int
           | Undefined of int
         let get x =
-          let data = RA_.get_data_region x in
-          match RA_.get_uint16 ~default:0 ~byte_ofs:10 data with
+          match RA_.get_uint16 ~default:0 x 10 with
           | 0 -> Implicit
           | 1 -> Explicit (explicit_get x)
           | v -> Undefined v
@@ -5432,8 +5482,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = reader_t_Group_14626792032033250577
         type builder_t = builder_t_Group_14626792032033250577
         let type_id_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:16 data
+          RA_.get_uint64 ~default:Uint64.zero x 16
         let type_id_get_int_exn x =
           Capnp.Runtime.Util.int_of_uint64_exn (type_id_get x)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -5443,8 +5492,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = reader_t_Slot_14133145859926553711
         type builder_t = builder_t_Slot_14133145859926553711
         let offset_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_uint32 ~default:Uint32.zero ~byte_ofs:4 data
+          RA_.get_uint32 ~default:Uint32.zero x 4
         let offset_get_int_exn x =
           Capnp.Runtime.Util.int_of_uint32_exn (offset_get x)
         let has_type x = 
@@ -5456,8 +5504,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let default_value_get x = 
           (RA_.get_struct x 3)
         let had_explicit_default_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_bit ~default:false ~byte_ofs:16 ~bit_ofs:0 data
+          RA_.get_bit ~default:false x ~byte_ofs:16 ~bit_ofs:0
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
       end
@@ -5468,8 +5515,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         | Group of Group.t
         | Undefined of int
       let get x =
-        let data = RA_.get_data_region x in
-        match RA_.get_uint16 ~default:0 ~byte_ofs:8 data with
+        match RA_.get_uint16 ~default:0 x 8 with
         | 0 -> Slot (slot_get x)
         | 1 -> Group (group_get x)
         | v -> Undefined v
@@ -5478,8 +5524,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       let name_get x =
         RA_.get_text ~default:"" x 0
       let code_order_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_uint16 ~default:0 ~byte_ofs:0 data
+        RA_.get_uint16 ~default:0 x 0
       let has_annotations x = 
         (RA_.has_field x 1)
       let annotations_get x = 
@@ -5489,8 +5534,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       let annotations_get_array x =
         Capnp.Array.to_array (annotations_get x)
       let discriminant_value_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_uint16 ~default:65535 ~byte_ofs:2 data
+        RA_.get_uint16 ~default:65535 x 2
       let ordinal_get x = x
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       let of_builder x = Some (RA_.StructStorage.readonly x)
@@ -5502,24 +5546,18 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = reader_t_Struct_11430331134483579957
         type builder_t = builder_t_Struct_11430331134483579957
         let data_word_count_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_uint16 ~default:0 ~byte_ofs:14 data
+          RA_.get_uint16 ~default:0 x 14
         let pointer_count_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_uint16 ~default:0 ~byte_ofs:24 data
+          RA_.get_uint16 ~default:0 x 24
         let preferred_list_encoding_get x =
-          let data = RA_.get_data_region x in
-          let discr = RA_.get_uint16 ~default:0 ~byte_ofs:26 data in
+          let discr = RA_.get_uint16 ~default:0 x 26 in
           ElementSize_15102134695616452902.decode discr
         let is_group_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_bit ~default:false ~byte_ofs:28 ~bit_ofs:0 data
+          RA_.get_bit ~default:false x ~byte_ofs:28 ~bit_ofs:0
         let discriminant_count_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_uint16 ~default:0 ~byte_ofs:30 data
+          RA_.get_uint16 ~default:0 x 30
         let discriminant_offset_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_uint32 ~default:Uint32.zero ~byte_ofs:32 data
+          RA_.get_uint32 ~default:Uint32.zero x 32
         let discriminant_offset_get_int_exn x =
           Capnp.Runtime.Util.int_of_uint32_exn (discriminant_offset_get x)
         let has_fields x = 
@@ -5555,41 +5593,29 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let type_get x = 
           (RA_.get_struct x 3)
         let targets_file_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:0 data
+          RA_.get_bit ~default:false x ~byte_ofs:14 ~bit_ofs:0
         let targets_const_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:1 data
+          RA_.get_bit ~default:false x ~byte_ofs:14 ~bit_ofs:1
         let targets_enum_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:2 data
+          RA_.get_bit ~default:false x ~byte_ofs:14 ~bit_ofs:2
         let targets_enumerant_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:3 data
+          RA_.get_bit ~default:false x ~byte_ofs:14 ~bit_ofs:3
         let targets_struct_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:4 data
+          RA_.get_bit ~default:false x ~byte_ofs:14 ~bit_ofs:4
         let targets_field_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:5 data
+          RA_.get_bit ~default:false x ~byte_ofs:14 ~bit_ofs:5
         let targets_union_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:6 data
+          RA_.get_bit ~default:false x ~byte_ofs:14 ~bit_ofs:6
         let targets_group_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:7 data
+          RA_.get_bit ~default:false x ~byte_ofs:14 ~bit_ofs:7
         let targets_interface_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_bit ~default:false ~byte_ofs:15 ~bit_ofs:0 data
+          RA_.get_bit ~default:false x ~byte_ofs:15 ~bit_ofs:0
         let targets_method_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_bit ~default:false ~byte_ofs:15 ~bit_ofs:1 data
+          RA_.get_bit ~default:false x ~byte_ofs:15 ~bit_ofs:1
         let targets_param_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_bit ~default:false ~byte_ofs:15 ~bit_ofs:2 data
+          RA_.get_bit ~default:false x ~byte_ofs:15 ~bit_ofs:2
         let targets_annotation_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_bit ~default:false ~byte_ofs:15 ~bit_ofs:3 data
+          RA_.get_bit ~default:false x ~byte_ofs:15 ~bit_ofs:3
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
       end
@@ -5637,8 +5663,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let name_get x =
           RA_.get_text ~default:"" x 0
         let id_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:0 data
+          RA_.get_uint64 ~default:Uint64.zero x 0
         let id_get_int_exn x =
           Capnp.Runtime.Util.int_of_uint64_exn (id_get x)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -5659,8 +5684,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         | Annotation of Annotation.t
         | Undefined of int
       let get x =
-        let data = RA_.get_data_region x in
-        match RA_.get_uint16 ~default:0 ~byte_ofs:12 data with
+        match RA_.get_uint16 ~default:0 x 12 with
         | 0 -> File
         | 1 -> Struct (struct_get x)
         | 2 -> Enum (enum_get x)
@@ -5669,8 +5693,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         | 5 -> Annotation (annotation_get x)
         | v -> Undefined v
       let id_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:0 data
+        RA_.get_uint64 ~default:Uint64.zero x 0
       let id_get_int_exn x =
         Capnp.Runtime.Util.int_of_uint64_exn (id_get x)
       let has_display_name x =
@@ -5678,13 +5701,11 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       let display_name_get x =
         RA_.get_text ~default:"" x 0
       let display_name_prefix_length_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_uint32 ~default:Uint32.zero ~byte_ofs:8 data
+        RA_.get_uint32 ~default:Uint32.zero x 8
       let display_name_prefix_length_get_int_exn x =
         Capnp.Runtime.Util.int_of_uint32_exn (display_name_prefix_length_get x)
       let scope_id_get x =
-        let data = RA_.get_data_region x in
-        RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:16 data
+        RA_.get_uint64 ~default:Uint64.zero x 16
       let scope_id_get_int_exn x =
         Capnp.Runtime.Util.int_of_uint64_exn (scope_id_get x)
       let has_nested_nodes x = 
@@ -5716,8 +5737,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           type t = reader_t_Import_12560611460656617445
           type builder_t = builder_t_Import_12560611460656617445
           let id_get x =
-            let data = RA_.get_data_region x in
-            RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:0 data
+            RA_.get_uint64 ~default:Uint64.zero x 0
           let id_get_int_exn x =
             Capnp.Runtime.Util.int_of_uint64_exn (id_get x)
           let has_name x =
@@ -5728,8 +5748,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let of_builder x = Some (RA_.StructStorage.readonly x)
         end
         let id_get x =
-          let data = RA_.get_data_region x in
-          RA_.get_uint64 ~default:Uint64.zero ~byte_ofs:0 data
+          RA_.get_uint64 ~default:Uint64.zero x 0
         let id_get_int_exn x =
           Capnp.Runtime.Util.int_of_uint64_exn (id_get x)
         let has_filename x =
@@ -5792,13 +5811,11 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = builder_t_Enum_11389172934837766057
         type reader_t = reader_t_Enum_11389172934837766057
         let type_id_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_uint64 ~default:Uint64.zero ~byte_ofs:8 data
+          BA_.get_uint64 ~default:Uint64.zero x 8
         let type_id_get_int_exn x =
           Capnp.Runtime.Util.int_of_uint64_exn (type_id_get x)
         let type_id_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:8 v data
+          BA_.set_uint64 ~default:Uint64.zero x 8 v
         let type_id_set_int_exn x v = type_id_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
         let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
         let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
@@ -5810,13 +5827,11 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = builder_t_Interface_17116997365232503999
         type reader_t = reader_t_Interface_17116997365232503999
         let type_id_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_uint64 ~default:Uint64.zero ~byte_ofs:8 data
+          BA_.get_uint64 ~default:Uint64.zero x 8
         let type_id_get_int_exn x =
           Capnp.Runtime.Util.int_of_uint64_exn (type_id_get x)
         let type_id_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:8 v data
+          BA_.set_uint64 ~default:Uint64.zero x 8 v
         let type_id_set_int_exn x v = type_id_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
         let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
         let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
@@ -5847,13 +5862,11 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = builder_t_Struct_12410354185295152851
         type reader_t = reader_t_Struct_12410354185295152851
         let type_id_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_uint64 ~default:Uint64.zero ~byte_ofs:8 data
+          BA_.get_uint64 ~default:Uint64.zero x 8
         let type_id_get_int_exn x =
           Capnp.Runtime.Util.int_of_uint64_exn (type_id_get x)
         let type_id_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:8 v data
+          BA_.set_uint64 ~default:Uint64.zero x 8 v
         let type_id_set_int_exn x v = type_id_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
         let of_message x = BA_.get_root_struct ~data_words:2 ~pointer_words:1 x
         let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
@@ -5863,60 +5876,46 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       end
       let void_get x = ()
       let void_set x =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=0; BA_.Discr.byte_ofs=0} x in
-        BA_.set_void data
+        BA_.set_void ~discr:{BA_.Discr.value=0; BA_.Discr.byte_ofs=0} x
       let bool_get x = ()
       let bool_set x =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=1; BA_.Discr.byte_ofs=0} x in
-        BA_.set_void data
+        BA_.set_void ~discr:{BA_.Discr.value=1; BA_.Discr.byte_ofs=0} x
       let int8_get x = ()
       let int8_set x =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=2; BA_.Discr.byte_ofs=0} x in
-        BA_.set_void data
+        BA_.set_void ~discr:{BA_.Discr.value=2; BA_.Discr.byte_ofs=0} x
       let int16_get x = ()
       let int16_set x =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=3; BA_.Discr.byte_ofs=0} x in
-        BA_.set_void data
+        BA_.set_void ~discr:{BA_.Discr.value=3; BA_.Discr.byte_ofs=0} x
       let int32_get x = ()
       let int32_set x =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=4; BA_.Discr.byte_ofs=0} x in
-        BA_.set_void data
+        BA_.set_void ~discr:{BA_.Discr.value=4; BA_.Discr.byte_ofs=0} x
       let int64_get x = ()
       let int64_set x =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=5; BA_.Discr.byte_ofs=0} x in
-        BA_.set_void data
+        BA_.set_void ~discr:{BA_.Discr.value=5; BA_.Discr.byte_ofs=0} x
       let uint8_get x = ()
       let uint8_set x =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=6; BA_.Discr.byte_ofs=0} x in
-        BA_.set_void data
+        BA_.set_void ~discr:{BA_.Discr.value=6; BA_.Discr.byte_ofs=0} x
       let uint16_get x = ()
       let uint16_set x =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=7; BA_.Discr.byte_ofs=0} x in
-        BA_.set_void data
+        BA_.set_void ~discr:{BA_.Discr.value=7; BA_.Discr.byte_ofs=0} x
       let uint32_get x = ()
       let uint32_set x =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=8; BA_.Discr.byte_ofs=0} x in
-        BA_.set_void data
+        BA_.set_void ~discr:{BA_.Discr.value=8; BA_.Discr.byte_ofs=0} x
       let uint64_get x = ()
       let uint64_set x =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=9; BA_.Discr.byte_ofs=0} x in
-        BA_.set_void data
+        BA_.set_void ~discr:{BA_.Discr.value=9; BA_.Discr.byte_ofs=0} x
       let float32_get x = ()
       let float32_set x =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=10; BA_.Discr.byte_ofs=0} x in
-        BA_.set_void data
+        BA_.set_void ~discr:{BA_.Discr.value=10; BA_.Discr.byte_ofs=0} x
       let float64_get x = ()
       let float64_set x =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=11; BA_.Discr.byte_ofs=0} x in
-        BA_.set_void data
+        BA_.set_void ~discr:{BA_.Discr.value=11; BA_.Discr.byte_ofs=0} x
       let text_get x = ()
       let text_set x =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=12; BA_.Discr.byte_ofs=0} x in
-        BA_.set_void data
+        BA_.set_void ~discr:{BA_.Discr.value=12; BA_.Discr.byte_ofs=0} x
       let data_get x = ()
       let data_set x =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=13; BA_.Discr.byte_ofs=0} x in
-        BA_.set_void data
+        BA_.set_void ~discr:{BA_.Discr.value=13; BA_.Discr.byte_ofs=0} x
       let list_get x = x
       let list_init x =
         let data = x.BA_.NM.StructStorage.data in
@@ -5945,7 +5944,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let () = BA_.set_opt_discriminant data
           (Some {BA_.Discr.value=15; BA_.Discr.byte_ofs=0})
         in
-        let () = BA_.set_int64 ~default:0L ~byte_ofs:8 0L data in
+        let () = BA_.set_int64 ~default:0L x 8 0L in
         x
       let struct_get x = x
       let struct_init x =
@@ -5956,7 +5955,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let () = BA_.set_opt_discriminant data
           (Some {BA_.Discr.value=16; BA_.Discr.byte_ofs=0})
         in
-        let () = BA_.set_int64 ~default:0L ~byte_ofs:8 0L data in
+        let () = BA_.set_int64 ~default:0L x 8 0L in
         x
       let interface_get x = x
       let interface_init x =
@@ -5967,12 +5966,11 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let () = BA_.set_opt_discriminant data
           (Some {BA_.Discr.value=17; BA_.Discr.byte_ofs=0})
         in
-        let () = BA_.set_int64 ~default:0L ~byte_ofs:8 0L data in
+        let () = BA_.set_int64 ~default:0L x 8 0L in
         x
       let any_pointer_get x = ()
       let any_pointer_set x =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=18; BA_.Discr.byte_ofs=0} x in
-        BA_.set_void data
+        BA_.set_void ~discr:{BA_.Discr.value=18; BA_.Discr.byte_ofs=0} x
       type unnamed_union_t =
         | Void
         | Bool
@@ -5995,8 +5993,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         | AnyPointer
         | Undefined of int
       let get x =
-        let data = BA_.get_data_region x in
-        match BA_.get_uint16 ~default:0 ~byte_ofs:0 data with
+        match BA_.get_uint16 ~default:0 x 0 with
         | 0 -> Void
         | 1 -> Bool
         | 2 -> Int8
@@ -6028,86 +6025,63 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       type reader_t = reader_t_Value_14853958794117909659
       let void_get x = ()
       let void_set x =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=0; BA_.Discr.byte_ofs=0} x in
-        BA_.set_void data
+        BA_.set_void ~discr:{BA_.Discr.value=0; BA_.Discr.byte_ofs=0} x
       let bool_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_bit ~default:false ~byte_ofs:2 ~bit_ofs:0 data
+        BA_.get_bit ~default:false x ~byte_ofs:2 ~bit_ofs:0
       let bool_set x v =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=1; BA_.Discr.byte_ofs=0} x in
-        BA_.set_bit ~default:false ~byte_ofs:2 ~bit_ofs:0 v data
+        BA_.set_bit ~discr:{BA_.Discr.value=1; BA_.Discr.byte_ofs=0} ~default:false x ~byte_ofs:2 ~bit_ofs:0 v
       let int8_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_int8 ~default:(0) ~byte_ofs:2 data
+        BA_.get_int8 ~default:(0) x 2
       let int8_set_exn x v =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=2; BA_.Discr.byte_ofs=0} x in
-        BA_.set_int8 ~default:(0) ~byte_ofs:2 v data
+        BA_.set_int8 ~discr:{BA_.Discr.value=2; BA_.Discr.byte_ofs=0} ~default:(0) x 2 v
       let int16_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_int16 ~default:(0) ~byte_ofs:2 data
+        BA_.get_int16 ~default:(0) x 2
       let int16_set_exn x v =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=3; BA_.Discr.byte_ofs=0} x in
-        BA_.set_int16 ~default:(0) ~byte_ofs:2 v data
+        BA_.set_int16 ~discr:{BA_.Discr.value=3; BA_.Discr.byte_ofs=0} ~default:(0) x 2 v
       let int32_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_int32 ~default:(0l) ~byte_ofs:4 data
+        BA_.get_int32 ~default:(0l) x 4
       let int32_get_int_exn x =
         Capnp.Runtime.Util.int_of_int32_exn (int32_get x)
       let int32_set x v =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=4; BA_.Discr.byte_ofs=0} x in
-        BA_.set_int32 ~default:(0l) ~byte_ofs:4 v data
+        BA_.set_int32 ~discr:{BA_.Discr.value=4; BA_.Discr.byte_ofs=0} ~default:(0l) x 4 v
       let int32_set_int_exn x v = int32_set x (Capnp.Runtime.Util.int32_of_int_exn v)
       let int64_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_int64 ~default:(0L) ~byte_ofs:8 data
+        BA_.get_int64 ~default:(0L) x 8
       let int64_get_int_exn x =
         Capnp.Runtime.Util.int_of_int64_exn (int64_get x)
       let int64_set x v =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=5; BA_.Discr.byte_ofs=0} x in
-        BA_.set_int64 ~default:(0L) ~byte_ofs:8 v data
+        BA_.set_int64 ~discr:{BA_.Discr.value=5; BA_.Discr.byte_ofs=0} ~default:(0L) x 8 v
       let int64_set_int x v = int64_set x (Int64.of_int v)
       let uint8_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_uint8 ~default:0 ~byte_ofs:2 data
+        BA_.get_uint8 ~default:0 x 2
       let uint8_set_exn x v =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=6; BA_.Discr.byte_ofs=0} x in
-        BA_.set_uint8 ~default:0 ~byte_ofs:2 v data
+        BA_.set_uint8 ~discr:{BA_.Discr.value=6; BA_.Discr.byte_ofs=0} ~default:0 x 2 v
       let uint16_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_uint16 ~default:0 ~byte_ofs:2 data
+        BA_.get_uint16 ~default:0 x 2
       let uint16_set_exn x v =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=7; BA_.Discr.byte_ofs=0} x in
-        BA_.set_uint16 ~default:0 ~byte_ofs:2 v data
+        BA_.set_uint16 ~discr:{BA_.Discr.value=7; BA_.Discr.byte_ofs=0} ~default:0 x 2 v
       let uint32_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_uint32 ~default:Uint32.zero ~byte_ofs:4 data
+        BA_.get_uint32 ~default:Uint32.zero x 4
       let uint32_get_int_exn x =
         Capnp.Runtime.Util.int_of_uint32_exn (uint32_get x)
       let uint32_set x v =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=8; BA_.Discr.byte_ofs=0} x in
-        BA_.set_uint32 ~default:Uint32.zero ~byte_ofs:4 v data
+        BA_.set_uint32 ~discr:{BA_.Discr.value=8; BA_.Discr.byte_ofs=0} ~default:Uint32.zero x 4 v
       let uint32_set_int_exn x v = uint32_set x (Capnp.Runtime.Util.uint32_of_int_exn v)
       let uint64_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_uint64 ~default:Uint64.zero ~byte_ofs:8 data
+        BA_.get_uint64 ~default:Uint64.zero x 8
       let uint64_get_int_exn x =
         Capnp.Runtime.Util.int_of_uint64_exn (uint64_get x)
       let uint64_set x v =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=9; BA_.Discr.byte_ofs=0} x in
-        BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:8 v data
+        BA_.set_uint64 ~discr:{BA_.Discr.value=9; BA_.Discr.byte_ofs=0} ~default:Uint64.zero x 8 v
       let uint64_set_int_exn x v = uint64_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
       let float32_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_float32 ~default_bits:(0l) ~byte_ofs:4 data
+        BA_.get_float32 ~default_bits:(0l) x 4
       let float32_set x v =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=10; BA_.Discr.byte_ofs=0} x in
-        BA_.set_float32 ~default_bits:(0l) ~byte_ofs:4 v data
+        BA_.set_float32 ~discr:{BA_.Discr.value=10; BA_.Discr.byte_ofs=0} ~default_bits:(0l) x 4 v
       let float64_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_float64 ~default_bits:(0L) ~byte_ofs:8 data
+        BA_.get_float64 ~default_bits:(0L) x 8
       let float64_set x v =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=11; BA_.Discr.byte_ofs=0} x in
-        BA_.set_float64 ~default_bits:(0L) ~byte_ofs:8 v data
+        BA_.set_float64 ~discr:{BA_.Discr.value=11; BA_.Discr.byte_ofs=0} ~default_bits:(0L) x 8 v
       let has_text x =
         BA_.has_field x 0
       let text_get x =
@@ -6125,19 +6099,16 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       let list_set x v =
         BA_.set_pointer ~discr:{BA_.Discr.value=14; BA_.Discr.byte_ofs=0} x 0 v
       let enum_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_uint16 ~default:0 ~byte_ofs:2 data
+        BA_.get_uint16 ~default:0 x 2
       let enum_set_exn x v =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=15; BA_.Discr.byte_ofs=0} x in
-        BA_.set_uint16 ~default:0 ~byte_ofs:2 v data
+        BA_.set_uint16 ~discr:{BA_.Discr.value=15; BA_.Discr.byte_ofs=0} ~default:0 x 2 v
       let struct_get x =
         BA_.get_pointer x 0
       let struct_set x v =
         BA_.set_pointer ~discr:{BA_.Discr.value=16; BA_.Discr.byte_ofs=0} x 0 v
       let interface_get x = ()
       let interface_set x =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=17; BA_.Discr.byte_ofs=0} x in
-        BA_.set_void data
+        BA_.set_void ~discr:{BA_.Discr.value=17; BA_.Discr.byte_ofs=0} x
       let any_pointer_get x =
         BA_.get_pointer x 0
       let any_pointer_set x v =
@@ -6164,8 +6135,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         | AnyPointer of pointer_t
         | Undefined of int
       let get x =
-        let data = BA_.get_data_region x in
-        match BA_.get_uint16 ~default:0 ~byte_ofs:0 data with
+        match BA_.get_uint16 ~default:0 x 0 with
         | 0 -> Void
         | 1 -> Bool (bool_get x)
         | 2 -> Int8 (int8_get x)
@@ -6196,13 +6166,11 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       type t = builder_t_Annotation_17422339044421236034
       type reader_t = reader_t_Annotation_17422339044421236034
       let id_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_uint64 ~default:Uint64.zero ~byte_ofs:0 data
+        BA_.get_uint64 ~default:Uint64.zero x 0
       let id_get_int_exn x =
         Capnp.Runtime.Util.int_of_uint64_exn (id_get x)
       let id_set x v =
-        let data = BA_.get_data_region x in
-        BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:0 v data
+        BA_.set_uint64 ~default:Uint64.zero x 0 v
       let id_set_int_exn x v = id_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
       let has_value x = 
         (BA_.has_field x 0)
@@ -6230,28 +6198,22 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       let name_set x v =
         BA_.set_text x 0 v
       let code_order_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_uint16 ~default:0 ~byte_ofs:0 data
+        BA_.get_uint16 ~default:0 x 0
       let code_order_set_exn x v =
-        let data = BA_.get_data_region x in
-        BA_.set_uint16 ~default:0 ~byte_ofs:0 v data
+        BA_.set_uint16 ~default:0 x 0 v
       let param_struct_type_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_uint64 ~default:Uint64.zero ~byte_ofs:8 data
+        BA_.get_uint64 ~default:Uint64.zero x 8
       let param_struct_type_get_int_exn x =
         Capnp.Runtime.Util.int_of_uint64_exn (param_struct_type_get x)
       let param_struct_type_set x v =
-        let data = BA_.get_data_region x in
-        BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:8 v data
+        BA_.set_uint64 ~default:Uint64.zero x 8 v
       let param_struct_type_set_int_exn x v = param_struct_type_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
       let result_struct_type_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_uint64 ~default:Uint64.zero ~byte_ofs:16 data
+        BA_.get_uint64 ~default:Uint64.zero x 16
       let result_struct_type_get_int_exn x =
         Capnp.Runtime.Util.int_of_uint64_exn (result_struct_type_get x)
       let result_struct_type_set x v =
-        let data = BA_.get_data_region x in
-        BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:16 v data
+        BA_.set_uint64 ~default:Uint64.zero x 16 v
       let result_struct_type_set_int_exn x v = result_struct_type_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
       let has_annotations x = 
         (BA_.has_field x 1)
@@ -6289,11 +6251,9 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       let name_set x v =
         BA_.set_text x 0 v
       let code_order_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_uint16 ~default:0 ~byte_ofs:0 data
+        BA_.get_uint16 ~default:0 x 0
       let code_order_set_exn x v =
-        let data = BA_.get_data_region x in
-        BA_.set_uint16 ~default:0 ~byte_ofs:0 v data
+        BA_.set_uint16 ~default:0 x 0 v
       let has_annotations x = 
         (BA_.has_field x 1)
       let annotations_get x = 
@@ -6330,21 +6290,17 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type reader_t = reader_t_Ordinal_13515537513213004774
         let implicit_get x = ()
         let implicit_set x =
-          let data = BA_.get_data_region ~discr:{BA_.Discr.value=0; BA_.Discr.byte_ofs=10} x in
-          BA_.set_void data
+          BA_.set_void ~discr:{BA_.Discr.value=0; BA_.Discr.byte_ofs=10} x
         let explicit_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_uint16 ~default:0 ~byte_ofs:12 data
+          BA_.get_uint16 ~default:0 x 12
         let explicit_set_exn x v =
-          let data = BA_.get_data_region ~discr:{BA_.Discr.value=1; BA_.Discr.byte_ofs=10} x in
-          BA_.set_uint16 ~default:0 ~byte_ofs:12 v data
+          BA_.set_uint16 ~discr:{BA_.Discr.value=1; BA_.Discr.byte_ofs=10} ~default:0 x 12 v
         type unnamed_union_t =
           | Implicit
           | Explicit of int
           | Undefined of int
         let get x =
-          let data = BA_.get_data_region x in
-          match BA_.get_uint16 ~default:0 ~byte_ofs:10 data with
+          match BA_.get_uint16 ~default:0 x 10 with
           | 0 -> Implicit
           | 1 -> Explicit (explicit_get x)
           | v -> Undefined v
@@ -6358,13 +6314,11 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = builder_t_Group_14626792032033250577
         type reader_t = reader_t_Group_14626792032033250577
         let type_id_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_uint64 ~default:Uint64.zero ~byte_ofs:16 data
+          BA_.get_uint64 ~default:Uint64.zero x 16
         let type_id_get_int_exn x =
           Capnp.Runtime.Util.int_of_uint64_exn (type_id_get x)
         let type_id_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:16 v data
+          BA_.set_uint64 ~default:Uint64.zero x 16 v
         let type_id_set_int_exn x v = type_id_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
         let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:4 x
         let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
@@ -6376,13 +6330,11 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = builder_t_Slot_14133145859926553711
         type reader_t = reader_t_Slot_14133145859926553711
         let offset_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_uint32 ~default:Uint32.zero ~byte_ofs:4 data
+          BA_.get_uint32 ~default:Uint32.zero x 4
         let offset_get_int_exn x =
           Capnp.Runtime.Util.int_of_uint32_exn (offset_get x)
         let offset_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_uint32 ~default:Uint32.zero ~byte_ofs:4 v data
+          BA_.set_uint32 ~default:Uint32.zero x 4 v
         let offset_set_int_exn x v = offset_set x (Capnp.Runtime.Util.uint32_of_int_exn v)
         let has_type x = 
           (BA_.has_field x 2)
@@ -6405,11 +6357,9 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let default_value_init x = 
           (BA_.init_struct ~data_words:2 ~pointer_words:1 x 3)
         let had_explicit_default_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_bit ~default:false ~byte_ofs:16 ~bit_ofs:0 data
+          BA_.get_bit ~default:false x ~byte_ofs:16 ~bit_ofs:0
         let had_explicit_default_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_bit ~default:false ~byte_ofs:16 ~bit_ofs:0 v data
+          BA_.set_bit ~default:false x ~byte_ofs:16 ~bit_ofs:0 v
         let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:4 x
         let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
         let to_reader x = Some (RA_.StructStorage.readonly x)
@@ -6425,7 +6375,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let () = BA_.set_opt_discriminant data
           (Some {BA_.Discr.value=0; BA_.Discr.byte_ofs=8})
         in
-        let () = BA_.set_int32 ~default:0l ~byte_ofs:4 0l data in
+        let () = BA_.set_int32 ~default:0l x 4 0l in
         let () =
           let ptr = {
             pointers with
@@ -6444,7 +6394,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let () = BA_.BOps.deep_zero_pointer ptr in
           MessageWrapper.Slice.set_int64 ptr 0 0L
         in
-        let () = BA_.set_bit ~default:false ~byte_ofs:16 ~bit_ofs:0 false data in
+        let () = BA_.set_bit ~default:false x ~byte_ofs:16 ~bit_ofs:0 false in
         x
       let group_get x = x
       let group_init x =
@@ -6455,15 +6405,14 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let () = BA_.set_opt_discriminant data
           (Some {BA_.Discr.value=1; BA_.Discr.byte_ofs=8})
         in
-        let () = BA_.set_int64 ~default:0L ~byte_ofs:16 0L data in
+        let () = BA_.set_int64 ~default:0L x 16 0L in
         x
       type unnamed_union_t =
         | Slot of Slot.t
         | Group of Group.t
         | Undefined of int
       let get x =
-        let data = BA_.get_data_region x in
-        match BA_.get_uint16 ~default:0 ~byte_ofs:8 data with
+        match BA_.get_uint16 ~default:0 x 8 with
         | 0 -> Slot (slot_get x)
         | 1 -> Group (group_get x)
         | v -> Undefined v
@@ -6474,11 +6423,9 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       let name_set x v =
         BA_.set_text x 0 v
       let code_order_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_uint16 ~default:0 ~byte_ofs:0 data
+        BA_.get_uint16 ~default:0 x 0
       let code_order_set_exn x v =
-        let data = BA_.get_data_region x in
-        BA_.set_uint16 ~default:0 ~byte_ofs:0 v data
+        BA_.set_uint16 ~default:0 x 0 v
       let has_annotations x = 
         (BA_.has_field x 1)
       let annotations_get x = 
@@ -6500,19 +6447,17 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let () = Array.iteri (fun i a -> Capnp.Array.set builder i a) v in
         builder
       let discriminant_value_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_uint16 ~default:65535 ~byte_ofs:2 data
+        BA_.get_uint16 ~default:65535 x 2
       let discriminant_value_set_exn x v =
-        let data = BA_.get_data_region x in
-        BA_.set_uint16 ~default:65535 ~byte_ofs:2 v data
+        BA_.set_uint16 ~default:65535 x 2 v
       let ordinal_get x = x
       let ordinal_init x =
         let data = x.BA_.NM.StructStorage.data in
         let pointers = x.BA_.NM.StructStorage.pointers in
         let () = ignore data in
         let () = ignore pointers in
-        let () = BA_.set_int16 ~default:0 ~byte_ofs:10 0 data in
-        let () = BA_.set_int16 ~default:0 ~byte_ofs:12 0 data in
+        let () = BA_.set_int16 ~default:0 x 10 0 in
+        let () = BA_.set_int16 ~default:0 x 12 0 in
         x
       let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:4 x
       let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
@@ -6527,47 +6472,34 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         type t = builder_t_Struct_11430331134483579957
         type reader_t = reader_t_Struct_11430331134483579957
         let data_word_count_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_uint16 ~default:0 ~byte_ofs:14 data
+          BA_.get_uint16 ~default:0 x 14
         let data_word_count_set_exn x v =
-          let data = BA_.get_data_region x in
-          BA_.set_uint16 ~default:0 ~byte_ofs:14 v data
+          BA_.set_uint16 ~default:0 x 14 v
         let pointer_count_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_uint16 ~default:0 ~byte_ofs:24 data
+          BA_.get_uint16 ~default:0 x 24
         let pointer_count_set_exn x v =
-          let data = BA_.get_data_region x in
-          BA_.set_uint16 ~default:0 ~byte_ofs:24 v data
+          BA_.set_uint16 ~default:0 x 24 v
         let preferred_list_encoding_get x =
-          let data = BA_.get_data_region x in
-          let discr = BA_.get_uint16 ~default:0 ~byte_ofs:26 data in
+          let discr = BA_.get_uint16 ~default:0 x 26 in
           ElementSize_15102134695616452902.decode discr
         let preferred_list_encoding_set x e =
-          let data = BA_.get_data_region x in
-          BA_.set_uint16 ~default:0 ~byte_ofs:26 (ElementSize_15102134695616452902.encode_safe e) data
+          BA_.set_uint16 ~default:0 x 26 (ElementSize_15102134695616452902.encode_safe e)
         let preferred_list_encoding_set_unsafe x e =
-          let data = BA_.get_data_region x in
-          BA_.set_uint16 ~default:0 ~byte_ofs:26 (ElementSize_15102134695616452902.encode_unsafe e) data
+          BA_.set_uint16 ~default:0 x 26 (ElementSize_15102134695616452902.encode_unsafe e)
         let is_group_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_bit ~default:false ~byte_ofs:28 ~bit_ofs:0 data
+          BA_.get_bit ~default:false x ~byte_ofs:28 ~bit_ofs:0
         let is_group_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_bit ~default:false ~byte_ofs:28 ~bit_ofs:0 v data
+          BA_.set_bit ~default:false x ~byte_ofs:28 ~bit_ofs:0 v
         let discriminant_count_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_uint16 ~default:0 ~byte_ofs:30 data
+          BA_.get_uint16 ~default:0 x 30
         let discriminant_count_set_exn x v =
-          let data = BA_.get_data_region x in
-          BA_.set_uint16 ~default:0 ~byte_ofs:30 v data
+          BA_.set_uint16 ~default:0 x 30 v
         let discriminant_offset_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_uint32 ~default:Uint32.zero ~byte_ofs:32 data
+          BA_.get_uint32 ~default:Uint32.zero x 32
         let discriminant_offset_get_int_exn x =
           Capnp.Runtime.Util.int_of_uint32_exn (discriminant_offset_get x)
         let discriminant_offset_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_uint32 ~default:Uint32.zero ~byte_ofs:32 v data
+          BA_.set_uint32 ~default:Uint32.zero x 32 v
         let discriminant_offset_set_int_exn x v = discriminant_offset_set x (Capnp.Runtime.Util.uint32_of_int_exn v)
         let has_fields x = 
           (BA_.has_field x 3)
@@ -6638,77 +6570,53 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let type_init x = 
           (BA_.init_struct ~data_words:2 ~pointer_words:1 x 3)
         let targets_file_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:0 data
+          BA_.get_bit ~default:false x ~byte_ofs:14 ~bit_ofs:0
         let targets_file_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:0 v data
+          BA_.set_bit ~default:false x ~byte_ofs:14 ~bit_ofs:0 v
         let targets_const_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:1 data
+          BA_.get_bit ~default:false x ~byte_ofs:14 ~bit_ofs:1
         let targets_const_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:1 v data
+          BA_.set_bit ~default:false x ~byte_ofs:14 ~bit_ofs:1 v
         let targets_enum_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:2 data
+          BA_.get_bit ~default:false x ~byte_ofs:14 ~bit_ofs:2
         let targets_enum_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:2 v data
+          BA_.set_bit ~default:false x ~byte_ofs:14 ~bit_ofs:2 v
         let targets_enumerant_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:3 data
+          BA_.get_bit ~default:false x ~byte_ofs:14 ~bit_ofs:3
         let targets_enumerant_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:3 v data
+          BA_.set_bit ~default:false x ~byte_ofs:14 ~bit_ofs:3 v
         let targets_struct_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:4 data
+          BA_.get_bit ~default:false x ~byte_ofs:14 ~bit_ofs:4
         let targets_struct_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:4 v data
+          BA_.set_bit ~default:false x ~byte_ofs:14 ~bit_ofs:4 v
         let targets_field_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:5 data
+          BA_.get_bit ~default:false x ~byte_ofs:14 ~bit_ofs:5
         let targets_field_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:5 v data
+          BA_.set_bit ~default:false x ~byte_ofs:14 ~bit_ofs:5 v
         let targets_union_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:6 data
+          BA_.get_bit ~default:false x ~byte_ofs:14 ~bit_ofs:6
         let targets_union_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:6 v data
+          BA_.set_bit ~default:false x ~byte_ofs:14 ~bit_ofs:6 v
         let targets_group_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_bit ~default:false ~byte_ofs:14 ~bit_ofs:7 data
+          BA_.get_bit ~default:false x ~byte_ofs:14 ~bit_ofs:7
         let targets_group_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:7 v data
+          BA_.set_bit ~default:false x ~byte_ofs:14 ~bit_ofs:7 v
         let targets_interface_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_bit ~default:false ~byte_ofs:15 ~bit_ofs:0 data
+          BA_.get_bit ~default:false x ~byte_ofs:15 ~bit_ofs:0
         let targets_interface_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_bit ~default:false ~byte_ofs:15 ~bit_ofs:0 v data
+          BA_.set_bit ~default:false x ~byte_ofs:15 ~bit_ofs:0 v
         let targets_method_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_bit ~default:false ~byte_ofs:15 ~bit_ofs:1 data
+          BA_.get_bit ~default:false x ~byte_ofs:15 ~bit_ofs:1
         let targets_method_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_bit ~default:false ~byte_ofs:15 ~bit_ofs:1 v data
+          BA_.set_bit ~default:false x ~byte_ofs:15 ~bit_ofs:1 v
         let targets_param_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_bit ~default:false ~byte_ofs:15 ~bit_ofs:2 data
+          BA_.get_bit ~default:false x ~byte_ofs:15 ~bit_ofs:2
         let targets_param_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_bit ~default:false ~byte_ofs:15 ~bit_ofs:2 v data
+          BA_.set_bit ~default:false x ~byte_ofs:15 ~bit_ofs:2 v
         let targets_annotation_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_bit ~default:false ~byte_ofs:15 ~bit_ofs:3 data
+          BA_.get_bit ~default:false x ~byte_ofs:15 ~bit_ofs:3
         let targets_annotation_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_bit ~default:false ~byte_ofs:15 ~bit_ofs:3 v data
+          BA_.set_bit ~default:false x ~byte_ofs:15 ~bit_ofs:3 v
         let of_message x = BA_.get_root_struct ~data_words:5 ~pointer_words:5 x
         let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
         let to_reader x = Some (RA_.StructStorage.readonly x)
@@ -6803,13 +6711,11 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let name_set x v =
           BA_.set_text x 0 v
         let id_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_uint64 ~default:Uint64.zero ~byte_ofs:0 data
+          BA_.get_uint64 ~default:Uint64.zero x 0
         let id_get_int_exn x =
           Capnp.Runtime.Util.int_of_uint64_exn (id_get x)
         let id_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:0 v data
+          BA_.set_uint64 ~default:Uint64.zero x 0 v
         let id_set_int_exn x v = id_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
         let of_message x = BA_.get_root_struct ~data_words:1 ~pointer_words:1 x
         let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
@@ -6819,8 +6725,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       end
       let file_get x = ()
       let file_set x =
-        let data = BA_.get_data_region ~discr:{BA_.Discr.value=0; BA_.Discr.byte_ofs=12} x in
-        BA_.set_void data
+        BA_.set_void ~discr:{BA_.Discr.value=0; BA_.Discr.byte_ofs=12} x
       let struct_get x = x
       let struct_init x =
         let data = x.BA_.NM.StructStorage.data in
@@ -6830,12 +6735,12 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let () = BA_.set_opt_discriminant data
           (Some {BA_.Discr.value=1; BA_.Discr.byte_ofs=12})
         in
-        let () = BA_.set_int16 ~default:0 ~byte_ofs:14 0 data in
-        let () = BA_.set_int16 ~default:0 ~byte_ofs:24 0 data in
-        let () = BA_.set_int16 ~default:0 ~byte_ofs:26 0 data in
-        let () = BA_.set_bit ~default:false ~byte_ofs:28 ~bit_ofs:0 false data in
-        let () = BA_.set_int16 ~default:0 ~byte_ofs:30 0 data in
-        let () = BA_.set_int32 ~default:0l ~byte_ofs:32 0l data in
+        let () = BA_.set_int16 ~default:0 x 14 0 in
+        let () = BA_.set_int16 ~default:0 x 24 0 in
+        let () = BA_.set_int16 ~default:0 x 26 0 in
+        let () = BA_.set_bit ~default:false x ~byte_ofs:28 ~bit_ofs:0 false in
+        let () = BA_.set_int16 ~default:0 x 30 0 in
+        let () = BA_.set_int32 ~default:0l x 32 0l in
         let () =
           let ptr = {
             pointers with
@@ -6939,18 +6844,18 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let () = BA_.BOps.deep_zero_pointer ptr in
           MessageWrapper.Slice.set_int64 ptr 0 0L
         in
-        let () = BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:0 false data in
-        let () = BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:1 false data in
-        let () = BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:2 false data in
-        let () = BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:3 false data in
-        let () = BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:4 false data in
-        let () = BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:5 false data in
-        let () = BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:6 false data in
-        let () = BA_.set_bit ~default:false ~byte_ofs:14 ~bit_ofs:7 false data in
-        let () = BA_.set_bit ~default:false ~byte_ofs:15 ~bit_ofs:0 false data in
-        let () = BA_.set_bit ~default:false ~byte_ofs:15 ~bit_ofs:1 false data in
-        let () = BA_.set_bit ~default:false ~byte_ofs:15 ~bit_ofs:2 false data in
-        let () = BA_.set_bit ~default:false ~byte_ofs:15 ~bit_ofs:3 false data in
+        let () = BA_.set_bit ~default:false x ~byte_ofs:14 ~bit_ofs:0 false in
+        let () = BA_.set_bit ~default:false x ~byte_ofs:14 ~bit_ofs:1 false in
+        let () = BA_.set_bit ~default:false x ~byte_ofs:14 ~bit_ofs:2 false in
+        let () = BA_.set_bit ~default:false x ~byte_ofs:14 ~bit_ofs:3 false in
+        let () = BA_.set_bit ~default:false x ~byte_ofs:14 ~bit_ofs:4 false in
+        let () = BA_.set_bit ~default:false x ~byte_ofs:14 ~bit_ofs:5 false in
+        let () = BA_.set_bit ~default:false x ~byte_ofs:14 ~bit_ofs:6 false in
+        let () = BA_.set_bit ~default:false x ~byte_ofs:14 ~bit_ofs:7 false in
+        let () = BA_.set_bit ~default:false x ~byte_ofs:15 ~bit_ofs:0 false in
+        let () = BA_.set_bit ~default:false x ~byte_ofs:15 ~bit_ofs:1 false in
+        let () = BA_.set_bit ~default:false x ~byte_ofs:15 ~bit_ofs:2 false in
+        let () = BA_.set_bit ~default:false x ~byte_ofs:15 ~bit_ofs:3 false in
         x
       type unnamed_union_t =
         | File
@@ -6961,8 +6866,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         | Annotation of Annotation.t
         | Undefined of int
       let get x =
-        let data = BA_.get_data_region x in
-        match BA_.get_uint16 ~default:0 ~byte_ofs:12 data with
+        match BA_.get_uint16 ~default:0 x 12 with
         | 0 -> File
         | 1 -> Struct (struct_get x)
         | 2 -> Enum (enum_get x)
@@ -6971,13 +6875,11 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         | 5 -> Annotation (annotation_get x)
         | v -> Undefined v
       let id_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_uint64 ~default:Uint64.zero ~byte_ofs:0 data
+        BA_.get_uint64 ~default:Uint64.zero x 0
       let id_get_int_exn x =
         Capnp.Runtime.Util.int_of_uint64_exn (id_get x)
       let id_set x v =
-        let data = BA_.get_data_region x in
-        BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:0 v data
+        BA_.set_uint64 ~default:Uint64.zero x 0 v
       let id_set_int_exn x v = id_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
       let has_display_name x =
         BA_.has_field x 0
@@ -6986,22 +6888,18 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       let display_name_set x v =
         BA_.set_text x 0 v
       let display_name_prefix_length_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_uint32 ~default:Uint32.zero ~byte_ofs:8 data
+        BA_.get_uint32 ~default:Uint32.zero x 8
       let display_name_prefix_length_get_int_exn x =
         Capnp.Runtime.Util.int_of_uint32_exn (display_name_prefix_length_get x)
       let display_name_prefix_length_set x v =
-        let data = BA_.get_data_region x in
-        BA_.set_uint32 ~default:Uint32.zero ~byte_ofs:8 v data
+        BA_.set_uint32 ~default:Uint32.zero x 8 v
       let display_name_prefix_length_set_int_exn x v = display_name_prefix_length_set x (Capnp.Runtime.Util.uint32_of_int_exn v)
       let scope_id_get x =
-        let data = BA_.get_data_region x in
-        BA_.get_uint64 ~default:Uint64.zero ~byte_ofs:16 data
+        BA_.get_uint64 ~default:Uint64.zero x 16
       let scope_id_get_int_exn x =
         Capnp.Runtime.Util.int_of_uint64_exn (scope_id_get x)
       let scope_id_set x v =
-        let data = BA_.get_data_region x in
-        BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:16 v data
+        BA_.set_uint64 ~default:Uint64.zero x 16 v
       let scope_id_set_int_exn x v = scope_id_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
       let has_nested_nodes x = 
         (BA_.has_field x 1)
@@ -7059,13 +6957,11 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           type t = builder_t_Import_12560611460656617445
           type reader_t = reader_t_Import_12560611460656617445
           let id_get x =
-            let data = BA_.get_data_region x in
-            BA_.get_uint64 ~default:Uint64.zero ~byte_ofs:0 data
+            BA_.get_uint64 ~default:Uint64.zero x 0
           let id_get_int_exn x =
             Capnp.Runtime.Util.int_of_uint64_exn (id_get x)
           let id_set x v =
-            let data = BA_.get_data_region x in
-            BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:0 v data
+            BA_.set_uint64 ~default:Uint64.zero x 0 v
           let id_set_int_exn x v = id_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
           let has_name x =
             BA_.has_field x 0
@@ -7080,13 +6976,11 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
             BA_.alloc_root_struct ?message_size ~data_words:1 ~pointer_words:1 ()
         end
         let id_get x =
-          let data = BA_.get_data_region x in
-          BA_.get_uint64 ~default:Uint64.zero ~byte_ofs:0 data
+          BA_.get_uint64 ~default:Uint64.zero x 0
         let id_get_int_exn x =
           Capnp.Runtime.Util.int_of_uint64_exn (id_get x)
         let id_set x v =
-          let data = BA_.get_data_region x in
-          BA_.set_uint64 ~default:Uint64.zero ~byte_ofs:0 v data
+          BA_.set_uint64 ~default:Uint64.zero x 0 v
         let id_set_int_exn x v = id_set x (Capnp.Runtime.Util.uint64_of_int_exn v)
         let has_filename x =
           BA_.has_field x 0

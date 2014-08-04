@@ -153,15 +153,13 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         else
           None
       
-      (* Given a range of eight bytes corresponding to a cap'n proto pointer,
-         decode the information stored in the pointer. *)
-      let decode_pointer (pointer_bytes : 'cap Slice.t) : Pointer.t =
-        let pointer64 = Slice.get_int64 pointer_bytes 0 in
+      
+      let decode_pointer64 (pointer64 : int64) : Pointer.t =
         if Util.is_int64_zero pointer64 then
           Pointer.Null
         else
-          let tag_bits = Caml.Int64.to_int pointer64 in
-          let tag = tag_bits land Pointer.Bitfield.tag_mask in
+          let pointer_int = Caml.Int64.to_int pointer64 in
+          let tag = pointer_int land Pointer.Bitfield.tag_mask in
           (* OCaml won't match an int against let-bound variables,
              only against constants. *)
           match tag with
@@ -177,6 +175,31 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
               assert false
       
       
+      (* Given a range of eight bytes corresponding to a cap'n proto pointer,
+         decode the information stored in the pointer. *)
+      let decode_pointer (pointer_bytes : 'cap Slice.t) : Pointer.t =
+        let pointer64 = Slice.get_int64 pointer_bytes 0 in
+        decode_pointer64 pointer64
+      
+      
+      let make_list_storage_aux ~message ~num_words ~num_elements ~storage_type
+          ~segment_id ~segment_offset =
+        let storage = {
+          Slice.msg        = message;
+          Slice.segment    = Message.get_segment message segment_id;
+          Slice.segment_id = segment_id;
+          Slice.start      = segment_offset;
+          Slice.len        = num_words * sizeof_uint64;
+        } in
+        let () = bounds_check_slice_exn
+          ~err:"list pointer describes invalid storage region" storage
+        in {
+          ListStorage.storage      = storage;
+          ListStorage.storage_type = storage_type;
+          ListStorage.num_elements = num_elements;
+        }
+      
+      
       (* Given a list pointer descriptor, construct the corresponding list storage
          descriptor. *)
       let make_list_storage
@@ -185,83 +208,73 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           ~(segment_offset : int)         (* Segment offset where list storage is found *)
           ~(list_pointer : ListPointer.t)
         : 'cap ListStorage.t =
-        let make_list_storage_aux ~num_words ~num_elements ~storage_type =
-          let storage = {
-            Slice.msg        = message;
-            Slice.segment    = Message.get_segment message segment_id;
-            Slice.segment_id = segment_id;
-            Slice.start      = segment_offset;
-            Slice.len        = num_words * sizeof_uint64;
-          } in
-          let () = bounds_check_slice_exn
-            ~err:"list pointer describes invalid storage region" storage
-          in {
-            ListStorage.storage      = storage;
-            ListStorage.storage_type = storage_type;
-            ListStorage.num_elements = num_elements;
-          }
-        in
         let open ListPointer in
         match list_pointer.element_type with
         | Void ->
-            make_list_storage_aux ~num_words:0
-              ~num_elements:list_pointer.num_elements ~storage_type:ListStorageType.Empty
+            make_list_storage_aux ~message ~num_words:0
+              ~num_elements:list_pointer.num_elements
+              ~storage_type:ListStorageType.Empty ~segment_id ~segment_offset
         | OneBitValue ->
-            make_list_storage_aux
+            make_list_storage_aux ~message
               ~num_words:(Util.ceil_ratio list_pointer.num_elements 64)
               ~num_elements:list_pointer.num_elements ~storage_type:ListStorageType.Bit
+              ~segment_id ~segment_offset
         | OneByteValue ->
-            make_list_storage_aux
+            make_list_storage_aux ~message
               ~num_words:(Util.ceil_ratio list_pointer.num_elements 8)
               ~num_elements:list_pointer.num_elements
               ~storage_type:ListStorageType.Bytes1
+              ~segment_id ~segment_offset
         | TwoByteValue ->
-            make_list_storage_aux
+            make_list_storage_aux ~message
               ~num_words:(Util.ceil_ratio list_pointer.num_elements 4)
               ~num_elements:list_pointer.num_elements
               ~storage_type:ListStorageType.Bytes2
+              ~segment_id ~segment_offset
         | FourByteValue ->
-            make_list_storage_aux
+            make_list_storage_aux ~message
               ~num_words:(Util.ceil_ratio list_pointer.num_elements 2)
               ~num_elements:list_pointer.num_elements
               ~storage_type:ListStorageType.Bytes4
+              ~segment_id ~segment_offset
         | EightByteValue ->
-            make_list_storage_aux ~num_words:list_pointer.num_elements
+            make_list_storage_aux ~message ~num_words:list_pointer.num_elements
               ~num_elements:list_pointer.num_elements
               ~storage_type:ListStorageType.Bytes8
+              ~segment_id ~segment_offset
         | EightBytePointer ->
-            make_list_storage_aux ~num_words:list_pointer.num_elements
+            make_list_storage_aux ~message ~num_words:list_pointer.num_elements
               ~num_elements:list_pointer.num_elements
               ~storage_type:ListStorageType.Pointer
+              ~segment_id ~segment_offset
         | Composite ->
-            let struct_tag_bytes = {
-              Slice.msg        = message;
-              Slice.segment    = Message.get_segment message segment_id;
-              Slice.segment_id = segment_id;
-              Slice.start      = segment_offset;
-              Slice.len        = sizeof_uint64;
-            } in
-            let () = bounds_check_slice_exn
-                ~err:"composite list pointer describes invalid storage region"
-                struct_tag_bytes
-            in
-            begin match decode_pointer struct_tag_bytes with
-            | Pointer.Struct struct_pointer ->
-                let module SP = StructPointer in
-                let num_words = list_pointer.num_elements in
-                let num_elements = struct_pointer.SP.offset in
-                let words_per_element =
-                  struct_pointer.SP.data_words + struct_pointer.SP.pointer_words
-                in
-                if num_elements * words_per_element > num_words then
-                  invalid_msg "composite list pointer describes invalid word count"
+            if segment_id < 0 || segment_id >= Message.num_segments message then
+              invalid_msg "composite list pointer describes invalid tag region"
+            else
+              let segment = Message.get_segment message segment_id in
+              if segment_offset + sizeof_uint64 > Segment.length segment then
+                invalid_msg "composite list pointer describes invalid tag region"
+              else
+                let pointer64 = Segment.get_int64 segment segment_offset in
+                let pointer_int = Caml.Int64.to_int pointer64 in
+                let tag = pointer_int land Pointer.Bitfield.tag_mask in
+                if tag = Pointer.Bitfield.tag_val_struct then
+                  let struct_pointer = StructPointer.decode pointer64 in
+                  let num_words = list_pointer.num_elements in
+                  let num_elements = struct_pointer.StructPointer.offset in
+                  let words_per_element = struct_pointer.StructPointer.data_words +
+                      struct_pointer.StructPointer.pointer_words
+                  in
+                  if num_elements * words_per_element > num_words then
+                    invalid_msg "composite list pointer describes invalid word count"
+                  else
+                    make_list_storage_aux ~message ~num_words ~num_elements
+                      ~storage_type:(ListStorageType.Composite
+                          (struct_pointer.StructPointer.data_words,
+                           struct_pointer.StructPointer.pointer_words))
+                      ~segment_id ~segment_offset
                 else
-                  make_list_storage_aux ~num_words ~num_elements
-                    ~storage_type:(ListStorageType.Composite
-                       (struct_pointer.SP.data_words, struct_pointer.SP.pointer_words))
-            | _ ->
-                invalid_msg "composite list pointer has malformed element type tag"
-            end
+                  invalid_msg "composite list pointer has malformed element type tag"
       
       
       (* Given a description of a cap'n proto far pointer, get the object which
@@ -1208,161 +1221,167 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
      * METHODS FOR GETTING OBJECTS STORED BY VALUE
      *******************************************************************************)
 
-    (* Given storage for a struct, attempt to get the bytes associated
-       with the struct data section. *)
-    let get_data_region
-        (struct_storage_opt : 'cap StructStorage.t option)
-      : 'cap Slice.t option =
-      match struct_storage_opt with
-      | Some struct_storage ->
-          Some struct_storage.StructStorage.data
-      | None ->
-          None
-
-
-    let get_void
-        (data_opt : 'cap Slice.t option)
-      : unit =
-      ()
-
     let get_bit
         ~(default : bool)
+        (struct_storage_opt : 'cap StructStorage.t option)
         ~(byte_ofs : int)
         ~(bit_ofs : int)
-        (data_opt : 'cap Slice.t option)
       : bool =
-      let byte_val =
-        match data_opt with
-        | Some data when byte_ofs < data.Slice.len ->
-            Slice.get_uint8 data byte_ofs
-        | _ ->
-            0
-      in
-      let bit_val = (byte_val land (1 lsl bit_ofs)) <> 0 in
-      if default then not bit_val else bit_val
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let data = struct_storage.StructStorage.data in
+          if byte_ofs < data.Slice.len then
+            let byte_val = Slice.get_uint8 data byte_ofs in
+            let bit_val = (byte_val lsr bit_ofs) land 0x1 in
+            let result_int = bit_val lxor (Util.int_of_bool default) in
+            Util.bool_of_int result_int
+          else
+            default
+      | None ->
+          default
 
     let get_int8
         ~(default : int)
-        ~(byte_ofs : int)
-        (data_opt : 'cap Slice.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (byte_ofs : int)
       : int =
-      let numeric =
-        match data_opt with
-        | Some data when byte_ofs < data.Slice.len ->
-            Slice.get_int8 data byte_ofs
-        | _ ->
-            0
-      in
-      numeric lxor default
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let data = struct_storage.StructStorage.data in
+          if byte_ofs < data.Slice.len then
+            let numeric = Slice.get_int8 data byte_ofs in
+            numeric lxor default
+          else
+            default
+      | None ->
+          default
 
     let get_int16
         ~(default : int)
-        ~(byte_ofs : int)
-        (data_opt : 'cap Slice.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (byte_ofs : int)
       : int =
-      let numeric =
-        match data_opt with
-        | Some data when byte_ofs + 1 < data.Slice.len ->
-            Slice.get_int16 data byte_ofs
-        | _ ->
-            0
-      in
-      numeric lxor default
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let data = struct_storage.StructStorage.data in
+          if byte_ofs + 1 < data.Slice.len then
+            let numeric = Slice.get_int16 data byte_ofs in
+            numeric lxor default
+          else
+            default
+      | None ->
+          default
 
     let get_int32
         ~(default : int32)
-        ~(byte_ofs : int)
-        (data_opt : 'cap Slice.t option)
-        : int32 =
-      let numeric =
-        match data_opt with
-        | Some data when byte_ofs + 3 < data.Slice.len ->
-            Slice.get_int32 data byte_ofs
-        | _ ->
-            Int32.zero
-      in
-      Int32.bit_xor numeric default
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (byte_ofs : int)
+      : int32 =
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let data = struct_storage.StructStorage.data in
+          if byte_ofs + 3 < data.Slice.len then
+            let numeric = Slice.get_int32 data byte_ofs in
+            Int32.bit_xor numeric default
+          else
+            default
+      | None ->
+          default
 
     let get_int64
         ~(default : int64)
-        ~(byte_ofs : int)
-        (data_opt : 'cap Slice.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (byte_ofs : int)
       : int64 =
-      let numeric =
-        match data_opt with
-        | Some data when byte_ofs + 7 < data.Slice.len ->
-            Slice.get_int64 data byte_ofs
-        | _ ->
-            Int64.zero
-      in
-      Int64.bit_xor numeric default
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let data = struct_storage.StructStorage.data in
+          if byte_ofs + 7 < data.Slice.len then
+            let numeric = Slice.get_int64 data byte_ofs in
+            Int64.bit_xor numeric default
+          else
+            default
+      | None ->
+          default
 
     let get_uint8
         ~(default : int)
-        ~(byte_ofs : int)
-        (data_opt : 'cap Slice.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (byte_ofs : int)
       : int =
-      let numeric =
-        match data_opt with
-        | Some data when byte_ofs < data.Slice.len ->
-            Slice.get_uint8 data byte_ofs
-        | _ ->
-            0
-      in
-      numeric lxor default
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let data = struct_storage.StructStorage.data in
+          if byte_ofs < data.Slice.len then
+            let numeric = Slice.get_uint8 data byte_ofs in
+            numeric lxor default
+          else
+            default
+      | None ->
+          default
 
     let get_uint16
         ~(default : int)
-        ~(byte_ofs : int)
-        (data_opt : 'cap Slice.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (byte_ofs : int)
       : int =
-      let numeric =
-        match data_opt with
-        | Some data when byte_ofs + 1 < data.Slice.len ->
-            Slice.get_uint16 data byte_ofs
-        | _ ->
-            0
-      in
-      numeric lxor default
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let data = struct_storage.StructStorage.data in
+          if byte_ofs + 1 < data.Slice.len then
+            let numeric = Slice.get_uint16 data byte_ofs in
+            numeric lxor default
+          else
+            default
+      | None ->
+          default
 
     let get_uint32
         ~(default : Uint32.t)
-        ~(byte_ofs : int)
-        (data_opt : 'cap Slice.t option)
-        : Uint32.t =
-      let numeric =
-        match data_opt with
-        | Some data when byte_ofs + 3 < data.Slice.len ->
-            Slice.get_uint32 data byte_ofs
-        | _ ->
-            Uint32.zero
-      in
-      Uint32.logxor numeric default
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (byte_ofs : int)
+      : Uint32.t =
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let data = struct_storage.StructStorage.data in
+          if byte_ofs + 3 < data.Slice.len then
+            let numeric = Slice.get_uint32 data byte_ofs in
+            Uint32.logxor numeric default
+          else
+            default
+      | None ->
+          default
 
     let get_uint64
         ~(default : Uint64.t)
-        ~(byte_ofs : int)
-        (data_opt : 'cap Slice.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (byte_ofs : int)
       : Uint64.t =
-      let numeric =
-        match data_opt with
-        | Some data when byte_ofs + 7 < data.Slice.len ->
-            Slice.get_uint64 data byte_ofs
-        | _ ->
-            Uint64.zero
-      in
-      Uint64.logxor numeric default
+      match struct_storage_opt with
+      | Some struct_storage ->
+          let data = struct_storage.StructStorage.data in
+          if byte_ofs + 7 < data.Slice.len then
+            let numeric = Slice.get_uint64 data byte_ofs in
+            Uint64.logxor numeric default
+          else
+            default
+      | None ->
+          default
 
     let get_float32
         ~(default_bits : int32)
-        ~(byte_ofs : int)
-        (data_opt : 'cap Slice.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (byte_ofs : int)
       : float =
       let numeric =
-        match data_opt with
-        | Some data when byte_ofs + 3 < data.Slice.len ->
-            Slice.get_int32 data byte_ofs
-        | _ ->
+        match struct_storage_opt with
+        | Some struct_storage ->
+            let data = struct_storage.StructStorage.data in
+            if byte_ofs + 3 < data.Slice.len then
+              Slice.get_int32 data byte_ofs
+            else
+              Int32.zero
+        | None ->
             Int32.zero
       in
       let bits = Int32.bit_xor numeric default_bits in
@@ -1370,14 +1389,18 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
 
     let get_float64
         ~(default_bits : int64)
-        ~(byte_ofs : int)
-        (data_opt : 'cap Slice.t option)
+        (struct_storage_opt : 'cap StructStorage.t option)
+        (byte_ofs : int)
       : float =
       let numeric =
-        match data_opt with
-        | Some data when byte_ofs + 7 < data.Slice.len ->
-            Slice.get_int64 data byte_ofs
-        | _ ->
+        match struct_storage_opt with
+        | Some struct_storage ->
+            let data = struct_storage.StructStorage.data in
+            if byte_ofs + 7 < data.Slice.len then
+              Slice.get_int64 data byte_ofs
+            else
+              Int64.zero
+        | None ->
             Int64.zero
       in
       let bits = Int64.bit_xor numeric default_bits in
@@ -1463,10 +1486,10 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         (struct_storage_opt : 'cap StructStorage.t option)
         (pointer_word : int)
       : (ro, 'a, 'cap ListStorage.t) InnerArray.t =
-      let make_default () =
-        begin match default with
+      let make_default default' decoders' =
+        begin match default' with
         | Some default_storage ->
-            make_array_readonly default_storage decoders
+            make_array_readonly default_storage decoders'
         | None ->
             (* Empty array *)
             { InnerArray.length     = 0;
@@ -1482,20 +1505,36 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let start = pointer_word * sizeof_uint64 in
           let len   = sizeof_uint64 in
           if start + len <= pointers.Slice.len then
-            let pointer_bytes = {
-              pointers with
-              Slice.start = pointers.Slice.start + start;
-              Slice.len   = len;
-            } in
-            match deref_list_pointer pointer_bytes with
-            | Some list_storage ->
-                make_array_readonly list_storage decoders
-            | None ->
-                make_default ()
+            (* Fast path. *)
+            let pointer64 = Slice.get_int64 pointers start in
+            let pointer_int = Caml.Int64.to_int pointer64 in
+            let tag = pointer_int land Pointer.Bitfield.tag_mask in
+            if tag = Pointer.Bitfield.tag_val_list then
+              let list_pointer = ListPointer.decode pointer64 in
+              let list_storage = make_list_storage
+                ~message:pointers.Slice.msg
+                ~segment_id:pointers.Slice.segment_id
+                ~segment_offset:((pointers.Slice.start + start + len) +
+                                   (list_pointer.ListPointer.offset * sizeof_uint64))
+                ~list_pointer
+              in
+              make_array_readonly list_storage decoders
+            else
+              (* Slow path... most likely a far pointer.*)
+              let pointer_bytes = {
+                pointers with
+                Slice.start = pointers.Slice.start + start;
+                Slice.len   = len;
+              } in
+              match deref_list_pointer pointer_bytes with
+              | Some list_storage ->
+                  make_array_readonly list_storage decoders
+              | None ->
+                  make_default default decoders
           else
-            make_default ()
+            make_default default decoders
       | None ->
-          make_default ()
+          make_default default decoders
 
     let get_void_list
         ?(default : ro ListStorage.t option)
@@ -1814,15 +1853,13 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         else
           None
       
-      (* Given a range of eight bytes corresponding to a cap'n proto pointer,
-         decode the information stored in the pointer. *)
-      let decode_pointer (pointer_bytes : 'cap Slice.t) : Pointer.t =
-        let pointer64 = Slice.get_int64 pointer_bytes 0 in
+      
+      let decode_pointer64 (pointer64 : int64) : Pointer.t =
         if Util.is_int64_zero pointer64 then
           Pointer.Null
         else
-          let tag_bits = Caml.Int64.to_int pointer64 in
-          let tag = tag_bits land Pointer.Bitfield.tag_mask in
+          let pointer_int = Caml.Int64.to_int pointer64 in
+          let tag = pointer_int land Pointer.Bitfield.tag_mask in
           (* OCaml won't match an int against let-bound variables,
              only against constants. *)
           match tag with
@@ -1838,6 +1875,31 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
               assert false
       
       
+      (* Given a range of eight bytes corresponding to a cap'n proto pointer,
+         decode the information stored in the pointer. *)
+      let decode_pointer (pointer_bytes : 'cap Slice.t) : Pointer.t =
+        let pointer64 = Slice.get_int64 pointer_bytes 0 in
+        decode_pointer64 pointer64
+      
+      
+      let make_list_storage_aux ~message ~num_words ~num_elements ~storage_type
+          ~segment_id ~segment_offset =
+        let storage = {
+          Slice.msg        = message;
+          Slice.segment    = Message.get_segment message segment_id;
+          Slice.segment_id = segment_id;
+          Slice.start      = segment_offset;
+          Slice.len        = num_words * sizeof_uint64;
+        } in
+        let () = bounds_check_slice_exn
+          ~err:"list pointer describes invalid storage region" storage
+        in {
+          ListStorage.storage      = storage;
+          ListStorage.storage_type = storage_type;
+          ListStorage.num_elements = num_elements;
+        }
+      
+      
       (* Given a list pointer descriptor, construct the corresponding list storage
          descriptor. *)
       let make_list_storage
@@ -1846,83 +1908,73 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           ~(segment_offset : int)         (* Segment offset where list storage is found *)
           ~(list_pointer : ListPointer.t)
         : 'cap ListStorage.t =
-        let make_list_storage_aux ~num_words ~num_elements ~storage_type =
-          let storage = {
-            Slice.msg        = message;
-            Slice.segment    = Message.get_segment message segment_id;
-            Slice.segment_id = segment_id;
-            Slice.start      = segment_offset;
-            Slice.len        = num_words * sizeof_uint64;
-          } in
-          let () = bounds_check_slice_exn
-            ~err:"list pointer describes invalid storage region" storage
-          in {
-            ListStorage.storage      = storage;
-            ListStorage.storage_type = storage_type;
-            ListStorage.num_elements = num_elements;
-          }
-        in
         let open ListPointer in
         match list_pointer.element_type with
         | Void ->
-            make_list_storage_aux ~num_words:0
-              ~num_elements:list_pointer.num_elements ~storage_type:ListStorageType.Empty
+            make_list_storage_aux ~message ~num_words:0
+              ~num_elements:list_pointer.num_elements
+              ~storage_type:ListStorageType.Empty ~segment_id ~segment_offset
         | OneBitValue ->
-            make_list_storage_aux
+            make_list_storage_aux ~message
               ~num_words:(Util.ceil_ratio list_pointer.num_elements 64)
               ~num_elements:list_pointer.num_elements ~storage_type:ListStorageType.Bit
+              ~segment_id ~segment_offset
         | OneByteValue ->
-            make_list_storage_aux
+            make_list_storage_aux ~message
               ~num_words:(Util.ceil_ratio list_pointer.num_elements 8)
               ~num_elements:list_pointer.num_elements
               ~storage_type:ListStorageType.Bytes1
+              ~segment_id ~segment_offset
         | TwoByteValue ->
-            make_list_storage_aux
+            make_list_storage_aux ~message
               ~num_words:(Util.ceil_ratio list_pointer.num_elements 4)
               ~num_elements:list_pointer.num_elements
               ~storage_type:ListStorageType.Bytes2
+              ~segment_id ~segment_offset
         | FourByteValue ->
-            make_list_storage_aux
+            make_list_storage_aux ~message
               ~num_words:(Util.ceil_ratio list_pointer.num_elements 2)
               ~num_elements:list_pointer.num_elements
               ~storage_type:ListStorageType.Bytes4
+              ~segment_id ~segment_offset
         | EightByteValue ->
-            make_list_storage_aux ~num_words:list_pointer.num_elements
+            make_list_storage_aux ~message ~num_words:list_pointer.num_elements
               ~num_elements:list_pointer.num_elements
               ~storage_type:ListStorageType.Bytes8
+              ~segment_id ~segment_offset
         | EightBytePointer ->
-            make_list_storage_aux ~num_words:list_pointer.num_elements
+            make_list_storage_aux ~message ~num_words:list_pointer.num_elements
               ~num_elements:list_pointer.num_elements
               ~storage_type:ListStorageType.Pointer
+              ~segment_id ~segment_offset
         | Composite ->
-            let struct_tag_bytes = {
-              Slice.msg        = message;
-              Slice.segment    = Message.get_segment message segment_id;
-              Slice.segment_id = segment_id;
-              Slice.start      = segment_offset;
-              Slice.len        = sizeof_uint64;
-            } in
-            let () = bounds_check_slice_exn
-                ~err:"composite list pointer describes invalid storage region"
-                struct_tag_bytes
-            in
-            begin match decode_pointer struct_tag_bytes with
-            | Pointer.Struct struct_pointer ->
-                let module SP = StructPointer in
-                let num_words = list_pointer.num_elements in
-                let num_elements = struct_pointer.SP.offset in
-                let words_per_element =
-                  struct_pointer.SP.data_words + struct_pointer.SP.pointer_words
-                in
-                if num_elements * words_per_element > num_words then
-                  invalid_msg "composite list pointer describes invalid word count"
+            if segment_id < 0 || segment_id >= Message.num_segments message then
+              invalid_msg "composite list pointer describes invalid tag region"
+            else
+              let segment = Message.get_segment message segment_id in
+              if segment_offset + sizeof_uint64 > Segment.length segment then
+                invalid_msg "composite list pointer describes invalid tag region"
+              else
+                let pointer64 = Segment.get_int64 segment segment_offset in
+                let pointer_int = Caml.Int64.to_int pointer64 in
+                let tag = pointer_int land Pointer.Bitfield.tag_mask in
+                if tag = Pointer.Bitfield.tag_val_struct then
+                  let struct_pointer = StructPointer.decode pointer64 in
+                  let num_words = list_pointer.num_elements in
+                  let num_elements = struct_pointer.StructPointer.offset in
+                  let words_per_element = struct_pointer.StructPointer.data_words +
+                      struct_pointer.StructPointer.pointer_words
+                  in
+                  if num_elements * words_per_element > num_words then
+                    invalid_msg "composite list pointer describes invalid word count"
+                  else
+                    make_list_storage_aux ~message ~num_words ~num_elements
+                      ~storage_type:(ListStorageType.Composite
+                          (struct_pointer.StructPointer.data_words,
+                           struct_pointer.StructPointer.pointer_words))
+                      ~segment_id ~segment_offset
                 else
-                  make_list_storage_aux ~num_words ~num_elements
-                    ~storage_type:(ListStorageType.Composite
-                       (struct_pointer.SP.data_words, struct_pointer.SP.pointer_words))
-            | _ ->
-                invalid_msg "composite list pointer has malformed element type tag"
-            end
+                  invalid_msg "composite list pointer has malformed element type tag"
       
       
       (* Given a description of a cap'n proto far pointer, get the object which
@@ -2918,100 +2970,106 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       let () = set_opt_discriminant data discr in
       data
 
-
-    let get_void
-        (data : 'cap NM.Slice.t)
-      : unit =
-      ()
-
-     let get_bit
-        ~(default : bool)
-        ~(byte_ofs : int)
-        ~(bit_ofs : int)
-        (data : 'cap NM.Slice.t)
-       : bool =
-       let byte_val = NM.Slice.get_uint8 data byte_ofs in
-       let bit_val = (byte_val land (1 lsl bit_ofs)) <> 0 in
-       if default then not bit_val else bit_val
+    let get_bit
+       ~(default : bool)
+       (struct_storage : rw NM.StructStorage.t)
+       ~(byte_ofs : int)
+       ~(bit_ofs : int)
+      : bool =
+      let data = struct_storage.NM.StructStorage.data in
+      let byte_val = NM.Slice.get_uint8 data byte_ofs in
+      let bit_val = (byte_val lsr bit_ofs) land 0x1 in
+      let result_int = bit_val lxor (Util.int_of_bool default) in
+      Util.bool_of_int result_int
 
     let get_int8
         ~(default : int)
-        ~(byte_ofs : int)
-        (data : 'cap NM.Slice.t)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
       : int =
+      let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_int8 data byte_ofs in
       numeric lxor default
 
     let get_int16
         ~(default : int)
-        ~(byte_ofs : int)
-        (data : 'cap NM.Slice.t)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
       : int =
+      let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_int16 data byte_ofs in
       numeric lxor default
 
     let get_int32
         ~(default : int32)
-        ~(byte_ofs : int)
-        (data : 'cap NM.Slice.t)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         : int32 =
+      let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_int32 data byte_ofs in
       Int32.bit_xor numeric default
 
     let get_int64
         ~(default : int64)
-        ~(byte_ofs : int)
-        (data : 'cap NM.Slice.t)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
       : int64 =
+      let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_int64 data byte_ofs in
       Int64.bit_xor numeric default
 
     let get_uint8
         ~(default : int)
-        ~(byte_ofs : int)
-        (data : 'cap NM.Slice.t)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
       : int =
+      let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_uint8 data byte_ofs in
       numeric lxor default
 
     let get_uint16
         ~(default : int)
-        ~(byte_ofs : int)
-        (data : 'cap NM.Slice.t)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
       : int =
+      let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_uint16 data byte_ofs in
       numeric lxor default
 
     let get_uint32
         ~(default : Uint32.t)
-        ~(byte_ofs : int)
-        (data : 'cap NM.Slice.t)
-        : Uint32.t =
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
+      : Uint32.t =
+      let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_uint32 data byte_ofs in
       Uint32.logxor numeric default
 
     let get_uint64
         ~(default : Uint64.t)
-        ~(byte_ofs : int)
-        (data : 'cap NM.Slice.t)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
       : Uint64.t =
+      let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_uint64 data byte_ofs in
       Uint64.logxor numeric default
 
     let get_float32
         ~(default_bits : int32)
-        ~(byte_ofs : int)
-        (data : 'cap NM.Slice.t)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
       : float =
+      let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_int32 data byte_ofs in
       let bits = Int32.bit_xor numeric default_bits in
       Int32.float_of_bits bits
 
     let get_float64
         ~(default_bits : int64)
-        ~(byte_ofs : int)
-        (data : 'cap NM.Slice.t)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
       : float =
+      let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_int64 data byte_ofs in
       let bits = Int64.bit_xor numeric default_bits in
       Int64.float_of_bits bits
@@ -3022,19 +3080,24 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
      *******************************************************************************)
 
     let set_void
-        (data : 'cap NM.Slice.t)
+        ?(discr : Discr.t option)
+        (struct_storage : rw NM.StructStorage.t)
       : unit =
-      ()
+      let data = struct_storage.NM.StructStorage.data in
+      set_opt_discriminant data discr
 
     let set_bit
+        ?(discr : Discr.t option)
         ~(default : bool)
+        (struct_storage : rw NM.StructStorage.t)
         ~(byte_ofs : int)
         ~(bit_ofs : int)
         (value : bool)
-        (data : rw NM.Slice.t)
       : unit =
-      let default_bit = if default then 1 else 0 in
-      let value_bit = if value then 1 else 0 in
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
+      let default_bit = Util.int_of_bool default in
+      let value_bit = Util.int_of_bool value in
       let stored_bit = default_bit lxor value_bit in
       let byte_val = NM.Slice.get_uint8 data byte_ofs in
       let byte_val = byte_val land (lnot (1 lsl bit_ofs)) in
@@ -3042,88 +3105,114 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       NM.Slice.set_uint8 data byte_ofs byte_val
 
     let set_int8
+        ?(discr : Discr.t option)
         ~(default : int)
-        ~(byte_ofs : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         (value : int)
-        (data : rw NM.Slice.t)
       : unit =
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
       NM.Slice.set_int8 data byte_ofs (value lxor default)
 
     let set_int16
+        ?(discr : Discr.t option)
         ~(default : int)
-        ~(byte_ofs : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         (value : int)
-        (data : rw NM.Slice.t)
       : unit =
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
       NM.Slice.set_int16 data byte_ofs (value lxor default)
 
     let set_int32
+        ?(discr : Discr.t option)
         ~(default : int32)
-        ~(byte_ofs : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         (value : int32)
-        (data : rw NM.Slice.t)
       : unit =
-      NM.Slice.set_int32 data byte_ofs
-        (Int32.bit_xor value default)
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
+      NM.Slice.set_int32 data byte_ofs (Int32.bit_xor value default)
 
     let set_int64
+        ?(discr : Discr.t option)
         ~(default : int64)
-        ~(byte_ofs : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         (value : int64)
-        (data : rw NM.Slice.t)
       : unit =
-      NM.Slice.set_int64 data byte_ofs
-        (Int64.bit_xor value default)
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
+      NM.Slice.set_int64 data byte_ofs (Int64.bit_xor value default)
 
     let set_uint8
+        ?(discr : Discr.t option)
         ~(default : int)
-        ~(byte_ofs : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         (value : int)
-        (data : rw NM.Slice.t)
       : unit =
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
       NM.Slice.set_uint8 data byte_ofs (value lxor default)
 
     let set_uint16
+        ?(discr : Discr.t option)
         ~(default : int)
-        ~(byte_ofs : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         (value : int)
-        (data : rw NM.Slice.t)
       : unit =
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
       NM.Slice.set_uint16 data byte_ofs (value lxor default)
 
     let set_uint32
+        ?(discr : Discr.t option)
         ~(default : Uint32.t)
-        ~(byte_ofs : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         (value : Uint32.t)
-        (data : rw NM.Slice.t)
       : unit =
-      NM.Slice.set_uint32 data byte_ofs
-        (Uint32.logxor value default)
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
+      NM.Slice.set_uint32 data byte_ofs (Uint32.logxor value default)
 
     let set_uint64
+        ?(discr : Discr.t option)
         ~(default : Uint64.t)
-        ~(byte_ofs : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         (value : Uint64.t)
-        (data : rw NM.Slice.t)
       : unit =
-      NM.Slice.set_uint64 data byte_ofs
-        (Uint64.logxor value default)
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
+      NM.Slice.set_uint64 data byte_ofs (Uint64.logxor value default)
 
     let set_float32
+        ?(discr : Discr.t option)
         ~(default_bits : int32)
-        ~(byte_ofs : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         (value : float)
-        (data : rw NM.Slice.t)
       : unit =
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
       NM.Slice.set_int32 data byte_ofs
         (Int32.bit_xor (Int32.bits_of_float value) default_bits)
 
     let set_float64
+        ?(discr : Discr.t option)
         ~(default_bits : int64)
-        ~(byte_ofs : int)
+        (struct_storage : rw NM.StructStorage.t)
+        (byte_ofs : int)
         (value : float)
-        (data : rw NM.Slice.t)
       : unit =
+      let data = struct_storage.NM.StructStorage.data in
+      let () = set_opt_discriminant data discr in
       NM.Slice.set_int64 data byte_ofs
         (Int64.bit_xor (Int64.bits_of_float value) default_bits)
 
@@ -3131,21 +3220,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
     (*******************************************************************************
      * METHODS FOR GETTING OBJECTS STORED BY POINTER
      *******************************************************************************)
-
-
-    (* Given storage for a struct, get the bytes associated with struct
-       pointer at offset [pointer_word].  If the optional discriminant
-       parameter is supplied, then the discriminant is also set as a
-       side-effect. *)
-    let get_pointer_bytes
-        ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
-        (pointer_word : int)
-      : rw NM.Slice.t =
-      let ptr = BOps.get_struct_pointer struct_storage pointer_word in
-      let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
-      ptr
-
 
     let has_field
         (struct_storage : rw NM.StructStorage.t)
