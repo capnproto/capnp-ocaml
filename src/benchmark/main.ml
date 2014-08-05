@@ -70,6 +70,16 @@ let () =
       in
       let module BR = BenchmarkRunner(BM) in
       BR.f mode compression iters
+    else if name = "catrank" then
+      let module BM = Methods.Benchmark
+          (CapnpCatrank.TestCase)
+          (CapnpCatrank.CR.Reader.SearchResultList)
+          (CapnpCatrank.CR.Builder.SearchResultList)
+          (CapnpCatrank.CR.Reader.SearchResultList)
+          (CapnpCatrank.CR.Builder.SearchResultList)
+      in
+      let module BR = BenchmarkRunner(BM) in
+      BR.f mode compression iters
     else begin
       fprintf stderr "Unknown benchmark name \"%s\".\n" name;
       exit 1

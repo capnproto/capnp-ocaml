@@ -44,6 +44,7 @@ src/benchmark/carsales.ml
 src/benchmark/eval.mli
 src/benchmark/eval.ml
 src/benchmark/carsales
+src/benchmark/catrank
 src/compiler/includes.ml
 src/benchmark/c2b2b_defun.ml
 src/benchmark/carsales_defun.ml

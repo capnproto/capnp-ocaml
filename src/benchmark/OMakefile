@@ -21,6 +21,7 @@ MODULES = \
   fastRand \
   testCaseSig \
   capnpCarsales \
+  capnpCatrank \
   methods \
   main
 
@@ -63,13 +64,16 @@ OCamlProgram($(PROGRAM), $(MODULES))
 carsales: $(PROGRAM)
 	ln -f -s $(PROGRAM) carsales
 
+catrank: $(PROGRAM)
+	ln -f -s $(PROGRAM) catrank
+
 .PHONY: all-bench bench-clean bench-distclean
 
-all-bench: carsales
+all-bench: carsales catrank
 
 bench-clean:
 	rm -f $(PROGRAM)$(EXE) $(PROGRAM).opt $(PROGRAM).run \
-		carsales $(GENERATED) *.cmi *.cmo *.cmx *.cma *.cmxa *.cmxs \
+		carsales catrank $(GENERATED) *.cmi *.cmo *.cmx *.cma *.cmxa *.cmxs \
 		*.a *.o
 
 bench-distclean: bench-clean
