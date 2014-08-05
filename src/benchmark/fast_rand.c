@@ -84,3 +84,12 @@ value capnp_bench_fastRandDouble(value range) {
 }
 
 
+#include <string.h>
+
+// I didn't feel like making another C module to do this.
+value capnp_bench_string_contains(value haystack, value needle) {
+  int ret = strstr(String_val(haystack), String_val(needle)) != NULL;
+  return Val_bool(ret);
+}
+
+

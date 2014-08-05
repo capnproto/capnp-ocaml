@@ -24,39 +24,11 @@ module TestCase = struct
     "xyzzy "; "thud "; |]
 
 
-  (* For this workload, this brute-force substring search outperforms
+  (* For this workload, calling into glibc 'strstr' significantly outperforms
      the KMP algorithm found in Core_string. *)
-  let string_contains ~(haystack : string) ~(needle : string) : bool =
-    let rec substr_equal ~haystack ~needle ~pos ~len i =
-      if i = len then
-        true
-      else
-        if (String.unsafe_get haystack (i + pos)) = (String.unsafe_get needle i) then
-          substr_equal ~haystack ~needle ~pos ~len (i + 1)
-        else
-          false
-    in
-    let rec loop_find h n first_char pos h_len n_len =
-      let index = String.index_from_exn h pos first_char in
-      let bytes_available = h_len - index in
-      if bytes_available < n_len then
-        false
-      else if substr_equal ~haystack:h ~needle:n ~pos:index ~len:n_len 1 then
-        true
-      else
-        loop_find h n first_char (index + 1) h_len n_len
-    in
-    let needle_len = String.length needle in
-    if needle_len = 0 then
-      true
-    else
-      begin try
-        loop_find haystack needle
-          (String.unsafe_get needle 0) 0
-          (String.length haystack) needle_len
-      with Not_found ->
-        false
-      end
+  external _string_contains : string -> string -> bool =
+    "capnp_bench_string_contains" "noalloc"
+  let string_contains ~haystack ~needle = _string_contains haystack needle
 
 
   let setup_request () =
