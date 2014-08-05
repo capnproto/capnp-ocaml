@@ -912,12 +912,10 @@ let string_of_uint8_list
           list_storage.num_elements
       in
       let buf = Bytes.create result_byte_count in
-      let () =
-        for i = 0 to result_byte_count - 1 do
-          Bytes.set buf i (Char.of_int_exn (Slice.get_uint8 list_storage.storage i))
-        done
-      in
-      Bytes.to_string buf
+      for i = 0 to result_byte_count - 1 do
+        Bytes.unsafe_set buf i (Char.unsafe_of_int (Slice.get_uint8 list_storage.storage i))
+      done;
+      Bytes.unsafe_to_string buf
   | _ ->
       invalid_msg "decoded non-UInt8 list where string data was expected"
 

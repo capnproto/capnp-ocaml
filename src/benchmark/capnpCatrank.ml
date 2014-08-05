@@ -45,7 +45,7 @@ module TestCase = struct
       for j = 0 to url_size - 1 do
         let char_ofs = FastRand.int 26 in
         let byte = (Char.to_int 'a') + char_ofs in
-        Bytes.unsafe_set url (url_prefix_len + j) (Char.of_int_exn byte)
+        Bytes.unsafe_set url (url_prefix_len + j) (Char.unsafe_of_int byte)
       done;
 
       let is_cat = FastRand.int 8 = 0 in
@@ -81,7 +81,10 @@ module TestCase = struct
       score  : float;
       result : CR.Reader.SearchResult.t;
     }
+
+    let compare a b = Float.compare a.score b.score
   end
+
 
   let handle_request result_list =
     let module R = CR.Reader.SearchResult in
@@ -91,7 +94,7 @@ module TestCase = struct
     let num_results = Capnp.Array.length results in
 
     if num_results = 0 then
-      CR.Builder.SearchResultList.init_root () 
+      CR.Builder.SearchResultList.init_root ()
     else begin
       let result0 = Capnp.Array.get results 0 in
       let scored_results = Array.create ~len:num_results
@@ -113,8 +116,7 @@ module TestCase = struct
         }
       done;
 
-      Array.sort scored_results
-        ~cmp:(fun a b -> Float.compare a.ScoredResult.score b.ScoredResult.score);
+      Array.sort scored_results ~cmp:ScoredResult.compare;
 
       let response = CR.Builder.SearchResultList.init_root () in
       let results = CR.Builder.SearchResultList.results_init response num_results in
