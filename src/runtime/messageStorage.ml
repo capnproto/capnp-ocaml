@@ -77,5 +77,23 @@ module type S = sig
   val set_int16  : t -> int -> int -> unit
   val set_int32  : t -> int -> Int32.t -> unit
   val set_int64  : t -> int -> Int64.t -> unit
+
+  (** [blit ~src ~src_pos ~dst ~dst_pos ~len] transfers [len] bytes
+      from position [dst_pos] in [dst] to position [src_pos] in [pos].
+      The blit operation shall work correctly even for the case of
+      overlapping buffers. *)
+  val blit : src:t -> src_pos:int -> dst:t -> dst_pos:int -> len:int -> unit
+
+  (** As [blit], but the destination is a [bytes] buffer. *)
+  val blit_to_bytes : src:t -> src_pos:int ->
+    dst:Bytes.t -> dst_pos:int -> len:int -> unit
+
+  (** As [blit], but the source is a [string] buffer. *)
+  val blit_from_string : src:string -> src_pos:int ->
+    dst:t -> dst_pos:int -> len:int -> unit
+
+  (** [zero_out segment ~pos ~len] sets [len] bytes of the segment
+      to zero, beginning at byte offset [pos]. *)
+  val zero_out : t -> pos:int -> len:int -> unit
 end
 

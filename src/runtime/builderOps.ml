@@ -368,8 +368,8 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
       min src.data.RWM.Slice.len dest.data.RWM.Slice.len
     in
     let () = RWM.Slice.blit
-        ~src:src.data ~src_ofs:0
-        ~dest:dest.data ~dest_ofs:0
+        ~src:src.data ~src_pos:0
+        ~dst:dest.data ~dst_pos:0
         ~len:data_copy_size
     in
     let pointer_copy_size =
@@ -430,7 +430,7 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
       let () = init_list_pointer pointer_bytes new_storage in
       let content_slice = list_storage.RWM.ListStorage.storage in
       let () = RWM.Slice.zero_out content_slice
-          ~ofs:0 ~len:content_slice.RWM.Slice.len
+          ~pos:0 ~len:content_slice.RWM.Slice.len
       in
       new_storage
     else
@@ -466,9 +466,9 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
     : unit =
     let open RWM.StructStorage in
     RWM.Slice.zero_out struct_storage.data
-      ~ofs:0 ~len:struct_storage.data.RWM.Slice.len;
+      ~pos:0 ~len:struct_storage.data.RWM.Slice.len;
     RWM.Slice.zero_out struct_storage.pointers
-      ~ofs:0 ~len:struct_storage.pointers.RWM.Slice.len
+      ~pos:0 ~len:struct_storage.pointers.RWM.Slice.len
 
 
   (* Upgrade a struct so that its data and pointer regions are at least as large
@@ -791,7 +791,7 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
     | ListStorageType.Bytes4
     | ListStorageType.Bytes8 ->
         RWM.Slice.zero_out list_storage.RWM.ListStorage.storage
-          ~ofs:0 ~len:list_storage.RWM.ListStorage.storage.RWM.Slice.len
+          ~pos:0 ~len:list_storage.RWM.ListStorage.storage.RWM.Slice.len
     | ListStorageType.Pointer ->
         let open RWM.ListStorage in
         let () =
@@ -806,7 +806,7 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
           done
         in
         RWM.Slice.zero_out list_storage.storage
-          ~ofs:0 ~len:list_storage.storage.RWM.Slice.len
+          ~pos:0 ~len:list_storage.storage.RWM.Slice.len
     | ListStorageType.Composite (data_words, pointer_words) ->
         let open RWM.ListStorage in
         let () =
@@ -835,7 +835,7 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
           RWM.Slice.start = list_storage.storage.RWM.Slice.start - sizeof_uint64;
           RWM.Slice.len   = list_storage.storage.RWM.Slice.len   + sizeof_uint64;
         } in
-        RWM.Slice.zero_out content_slice ~ofs:0 ~len:content_slice.RWM.Slice.len
+        RWM.Slice.zero_out content_slice ~pos:0 ~len:content_slice.RWM.Slice.len
 
   and deep_zero_struct
     (struct_storage : rw RWM.StructStorage.t)
@@ -849,9 +849,9 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
       deep_zero_pointer pointer_bytes
     done;
     RWM.Slice.zero_out struct_storage.data
-      ~ofs:0 ~len:struct_storage.data.RWM.Slice.len;
+      ~pos:0 ~len:struct_storage.data.RWM.Slice.len;
     RWM.Slice.zero_out struct_storage.pointers
-      ~ofs:0 ~len:struct_storage.pointers.RWM.Slice.len
+      ~pos:0 ~len:struct_storage.pointers.RWM.Slice.len
 
 end
 

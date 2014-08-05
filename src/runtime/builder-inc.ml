@@ -71,11 +71,10 @@ let uint8_list_of_string
       ListStorageType.Bytes1
       (String.length src + (if null_terminated then 1 else 0))
   in
-  let len = String.length src in
-  for i = 0 to len - 1 do
-    let byte = Char.to_int src.[i] in
-    NM.Slice.set_uint8 list_storage.NM.ListStorage.storage i byte
-  done;
+  NM.Slice.blit_from_string
+    ~src ~src_pos:0
+    ~dst:list_storage.NM.ListStorage.storage ~dst_pos:0
+    ~len:(String.length src);
   list_storage
 
 

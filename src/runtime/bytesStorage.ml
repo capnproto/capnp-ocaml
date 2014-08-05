@@ -86,4 +86,15 @@ let set_int16 s i v =
     in
     LittleEndian.set_int16 s i u16
 
+let blit ~src ~src_pos ~dst ~dst_pos ~len =
+	Bytes.blit src src_pos dst dst_pos len
+
+let blit_to_bytes ~src ~src_pos ~dst ~dst_pos ~len =
+	Bytes.blit src src_pos dst dst_pos len
+
+let blit_from_string ~src ~src_pos ~dst ~dst_pos ~len =
+	Bytes.blit (Bytes.unsafe_of_string src) src_pos dst dst_pos len
+
+let zero_out buf ~pos ~len =
+	Bytes.fill buf pos len '\x00'
 

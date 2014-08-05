@@ -41,22 +41,26 @@ module Segment = struct
   let of_storage s = s
   let to_storage s = s
 
-  let get_uint8  = Storage.get_uint8
-  let get_uint16 = Storage.get_uint16
-  let get_uint32 = Storage.get_uint32
-  let get_uint64 = Storage.get_uint64
-  let get_int8   = Storage.get_int8
-  let get_int16  = Storage.get_int16
-  let get_int32  = Storage.get_int32
-  let get_int64  = Storage.get_int64
-  let set_uint8  = Storage.set_uint8
-  let set_uint16 = Storage.set_uint16
-  let set_uint32 = Storage.set_uint32
-  let set_uint64 = Storage.set_uint64
-  let set_int8   = Storage.set_int8
-  let set_int16  = Storage.set_int16
-  let set_int32  = Storage.set_int32
-  let set_int64  = Storage.set_int64
+  let get_uint8        = Storage.get_uint8
+  let get_uint16       = Storage.get_uint16
+  let get_uint32       = Storage.get_uint32
+  let get_uint64       = Storage.get_uint64
+  let get_int8         = Storage.get_int8
+  let get_int16        = Storage.get_int16
+  let get_int32        = Storage.get_int32
+  let get_int64        = Storage.get_int64
+  let set_uint8        = Storage.set_uint8
+  let set_uint16       = Storage.set_uint16
+  let set_uint32       = Storage.set_uint32
+  let set_uint64       = Storage.set_uint64
+  let set_int8         = Storage.set_int8
+  let set_int16        = Storage.set_int16
+  let set_int32        = Storage.set_int32
+  let set_int64        = Storage.set_int64
+  let blit             = Storage.blit
+  let blit_to_bytes    = Storage.blit_to_bytes
+  let blit_from_string = Storage.blit_from_string
+  let zero_out         = Storage.zero_out
 end   (* module Segment *)
 
 module Message = struct
@@ -305,19 +309,40 @@ module Slice = struct
       let segment = get_segment slice in
       Segment.set_int64 segment (slice.start + i) v
 
-  (* TODO: this should delegate to a possibly-more-efficient [blit] provided by
-     the underlying message (e.g. [String.blit]). *)
-  let blit ~src ~src_ofs ~dest ~dest_ofs ~len =
-    for i = 0 to len - 1 do
-      let byte = get_uint8 src (src_ofs + i) in
-      set_uint8 dest (dest_ofs + i) byte
-    done
+  let blit ~src ~src_pos ~dst ~dst_pos ~len =
+    if src_pos < 0 || src_pos + len > src.len ||
+       dst_pos < 0 || dst_pos + len > dst.len then
+      invalid_arg "Slice.blit"
+    else
+      let src_seg = get_segment src in
+      let dst_seg = get_segment dst in
+      Segment.blit
+        ~src:src_seg ~src_pos:(src.start + src_pos)
+        ~dst:dst_seg ~dst_pos:(dst.start + dst_pos)
+        ~len
 
-  (* TODO: again, could possibly delegate to a more efficient implementation *)
-  let zero_out ~ofs ~len slice =
-    for i = 0 to len - 1 do
-      set_uint8 slice (ofs + i) 0
-    done
+  let blit_to_bytes ~src ~src_pos ~dst ~dst_pos ~len =
+    if src_pos < 0 || src_pos + len > src.len then
+      invalid_arg "Slice.blit_to_bytes"
+    else
+      Segment.blit_to_bytes
+        ~src:(get_segment src) ~src_pos:(src.start + src_pos)
+        ~dst ~dst_pos ~len
+
+  let blit_from_string ~src ~src_pos ~dst ~dst_pos ~len =
+    if dst_pos < 0 || dst_pos + len > dst.len then
+      invalid_arg "Slice.blit_from_string"
+    else
+      Segment.blit_from_string
+        ~src ~src_pos
+        ~dst:(get_segment dst) ~dst_pos:(dst.start + dst_pos)
+        ~len
+
+  let zero_out slice ~pos ~len =
+    if pos < 0 || pos + len > slice.len then
+      invalid_arg "Slice.zero_out"
+    else
+      Segment.zero_out ~pos:(slice.start + pos) ~len (get_segment slice)
 
 end   (* module Slice *)
 

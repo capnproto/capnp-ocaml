@@ -97,6 +97,25 @@ module type SEGMENT = sig
   val set_int16 : rw t -> int -> int -> unit
   val set_int32 : rw t -> int -> Int32.t -> unit
   val set_int64 : rw t -> int -> Int64.t -> unit
+
+  (** [blit ~src ~src_pos ~dst ~dst_pos ~len] transfers [len] bytes
+      from position [dst_pos] in [dst] to position [src_pos] in [pos].
+      The blit operation shall work correctly even for the case of
+      overlapping buffers. *)
+  val blit : src:('cap t) -> src_pos:int ->
+    dst:(rw t) -> dst_pos:int -> len:int -> unit
+
+  (** As [blit], but the destination is a [bytes] buffer. *)
+  val blit_to_bytes : src:('cap t) -> src_pos:int ->
+    dst:Bytes.t -> dst_pos:int -> len:int -> unit
+
+  (** As [blit], but the source is a [string] buffer. *)
+  val blit_from_string : src:string -> src_pos:int ->
+    dst:(rw t) -> dst_pos:int -> len:int -> unit
+
+  (** [zero_out segment ~pos ~len] sets [len] bytes of the segment
+      to zero, beginning at byte offset [pos]. *)
+  val zero_out : rw t -> pos:int -> len:int -> unit
 end
 
 module type MESSAGE = sig
@@ -216,14 +235,23 @@ module type SLICE = sig
   val set_int32  : rw t -> int -> Int32.t -> unit
   val set_int64  : rw t -> int -> Int64.t -> unit
 
-  (** [blit ~src ~src_ofs ~dest ~dest_ofs ~len] copies [len] bytes from the
-      source slice (beginning at [src_ofs] to the destination slice (beginning
-      at [dest_ofs]. *)
-  val blit : src:('cap t) -> src_ofs:int -> dest:(rw t) -> dest_ofs:int -> len:int -> unit
+  (** [blit ~src ~src_pos ~dst ~dst_pos ~len] copies [len] bytes from the
+      source slice (beginning at [src_pos]) to the destination slice
+      (beginning at [dst_pos]). *)
+  val blit : src:('cap t) -> src_pos:int ->
+    dst:(rw t) -> dst_pos:int -> len:int -> unit
 
-  (** [zero_out ~ofs ~len slice] sets [len] bytes of the [slice] to zero, beginning
-      at byte offset [ofs]. *)
-  val zero_out : ofs:int -> len:int -> rw t -> unit
+  (** As [blit], but the destination is a [bytes] buffer. *)
+  val blit_to_bytes : src:('cap t) -> src_pos:int ->
+    dst:Bytes.t -> dst_pos:int -> len:int -> unit
+
+  (** As [blit], but the source is a [string] buffer. *)
+  val blit_from_string : src:string -> src_pos:int ->
+    dst:(rw t) -> dst_pos:int -> len:int -> unit
+
+  (** [zero_out ~pos ~len slice] sets [len] bytes of the [slice]
+      to zero, beginning at byte offset [pos]. *)
+  val zero_out : rw t -> pos:int -> len:int -> unit
 end
 
 module type S = sig
