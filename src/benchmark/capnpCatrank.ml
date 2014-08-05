@@ -23,8 +23,41 @@ module TestCase = struct
     "grault "; "garply "; "waldo "; "fred "; "plugh ";
     "xyzzy "; "thud "; |]
 
-  let cat_search_pattern = String.Search_pattern.create " cat "
-  let dog_search_pattern = String.Search_pattern.create " dog "
+
+  (* For this workload, this brute-force substring search outperforms
+     the KMP algorithm found in Core_string. *)
+  let string_contains ~(haystack : string) ~(needle : string) : bool =
+    let rec substr_equal ~haystack ~needle ~pos ~len i =
+      if i = len then
+        true
+      else
+        if (String.unsafe_get haystack (i + pos)) = (String.unsafe_get needle i) then
+          substr_equal ~haystack ~needle ~pos ~len (i + 1)
+        else
+          false
+    in
+    let rec loop_find h n first_char pos h_len n_len =
+      let index = String.index_from_exn h pos first_char in
+      let bytes_available = h_len - index in
+      if bytes_available < n_len then
+        false
+      else if substr_equal ~haystack:h ~needle:n ~pos:index ~len:n_len 1 then
+        true
+      else
+        loop_find h n first_char (index + 1) h_len n_len
+    in
+    let needle_len = String.length needle in
+    if needle_len = 0 then
+      true
+    else
+      begin try
+        loop_find haystack needle
+          (String.unsafe_get needle 0) 0
+          (String.length haystack) needle_len
+      with Not_found ->
+        false
+      end
+
 
   let setup_request () =
     let builder = CR.Builder.SearchResultList.init_root () in
@@ -104,12 +137,12 @@ module TestCase = struct
         let result = Capnp.Array.get results i in
         let score = ref (R.score_get result) in
         let snippet = R.snippet_get result in
-        if Option.is_some
-            (String.Search_pattern.index cat_search_pattern ~in_:snippet) then
+
+        if string_contains ~haystack:snippet ~needle:" cat " then
           score := !score *. 10000.0;
-        if Option.is_some
-            (String.Search_pattern.index dog_search_pattern ~in_:snippet) then
+        if string_contains ~haystack:snippet ~needle:" dog " then
           score := !score /. 10000.0;
+
         scored_results.(i) <- {
           ScoredResult.score = !score;
           ScoredResult.result;
