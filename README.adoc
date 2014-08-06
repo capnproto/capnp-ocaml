@@ -214,8 +214,9 @@ val has_foo : t -> bool
 val foo_init : t -> Foo.t
 
 (** [foo_get s] gets a reference to the content of field [foo].  (For the
-    Builder implementation, this also default-initializes the structure
-    and causes [has_foo s] to return [true].)
+    Builder implementation, if the field was not previously initialized
+    then as a side-effect this function will default-initialize the
+    structure and cause [has_foo s] to return [true].)
 
     @raise Message.Invalid_message if the message is ill-formatted *)
 val foo_get : t -> Foo.t
@@ -256,8 +257,9 @@ val has_foo : t -> bool
 val foo_init : t -> int -> (rw, Inner.t, 'a) Capnp.Array.t
 
 (** [foo_get s] gets a reference to the content of field [foo].  (For the
-    Builder implementation, this also default-initializes the list and
-    causes [has_foo s] to return [true].
+    Builder implementation, if the field was not previously initialized
+    then as a side-effect this function will default-initialize the
+    list and cause [has_foo s] to return [true].)
 
     @raise Message.Invalid_message if the message is ill-formatted *)
 val foo_get : t -> ('cap, Inner.t, 'arr) Capnp.Array.t
@@ -286,7 +288,7 @@ val foo_set : t -> ('cap, Inner.t, 'a) Capnp.Array.t ->
 
 (** [foo_set_list s v] sets the content of field [foo] from OCaml list [v].
     (This may result in reallocation of [foo], which may lead to poor
-    performance.
+    performance.)
 
     @return a reference to the content of field [foo]
 
@@ -295,7 +297,7 @@ val foo_set_list : t -> Inner.t list -> (rw, Inner.t, 'b) Capnp.Array.t
 
 (** [foo_set_array s v] sets the content of field [foo] from OCaml array [v].
     (This may result in reallocation of [foo], which may lead to poor
-    performance.
+    performance.)
 
     @return a reference to the content of field [foo]
 
@@ -309,8 +311,8 @@ Cap\'n Proto has first-class support for union (sum) types.  These are mapped
 to OCaml variants in a straightforward way.  To retrieve a union value,
 use the generated `get` function which will return a variant specifying which
 of the possible fields is present.  To set a union value, use the generated
-`get_foo` functions which simultaneously set the field value and set the
-union discriminant.
+`set_foo` (or `init_foo`) functions which simultaneously set (or init) the field
+value and set the union discriminant.
 
 Variant constructors are generated simply by capitalizing the first letters of
 the associated union fields.  In addition, to allow forward compatibility
@@ -340,11 +342,11 @@ contain the following functions:
 val of_message : 'cap message_t -> t
 
 (** [of_builder b] converts a read/write reference to the struct into
-    a read-only interface.  (Found only in the Reader module. *)
+    a read-only interface.  (Found only in the Reader module.) *)
 val of_builder : Builder.Bar.t -> Reader.Bar.t
 
 (** [to_reader b] converts a read/write reference to the struct into
-    a read-only interface.  (Found only in the Builder module. *)
+    a read-only interface.  (Found only in the Builder module.) *)
 val to_reader : Builder.Bar.t -> Reader.Bar.t
 
 (** [init_root ?message_size ()] constructs a new message and
