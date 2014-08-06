@@ -80,6 +80,16 @@ let () =
       in
       let module BR = BenchmarkRunner(BM) in
       BR.f mode compression iters
+    else if name = "eval" then
+      let module BM = Methods.Benchmark
+          (CapnpEval.TestCase)
+          (CapnpEval.E.Reader.Expression)
+          (CapnpEval.E.Builder.Expression)
+          (CapnpEval.E.Reader.EvaluationResult)
+          (CapnpEval.E.Builder.EvaluationResult)
+      in
+      let module BR = BenchmarkRunner(BM) in
+      BR.f mode compression iters
     else begin
       fprintf stderr "Unknown benchmark name \"%s\".\n" name;
       exit 1

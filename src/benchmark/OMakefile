@@ -22,6 +22,7 @@ MODULES = \
   testCaseSig \
   capnpCarsales \
   capnpCatrank \
+  capnpEval \
   methods \
   main
 
@@ -67,13 +68,16 @@ carsales: $(PROGRAM)
 catrank: $(PROGRAM)
 	ln -f -s $(PROGRAM) catrank
 
+eval: $(PROGRAM)
+	ln -f -s $(PROGRAM) eval
+
 .PHONY: all-bench bench-clean bench-distclean
 
 all-bench: carsales catrank
 
 bench-clean:
 	rm -f $(PROGRAM)$(EXE) $(PROGRAM).opt $(PROGRAM).run \
-		carsales catrank $(GENERATED) *.cmi *.cmo *.cmx *.cma *.cmxa *.cmxs \
+		carsales catrank eval $(GENERATED) *.cmi *.cmo *.cmx *.cma *.cmxa *.cmxs \
 		*.a *.o
 
 bench-distclean: bench-clean
