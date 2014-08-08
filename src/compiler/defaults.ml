@@ -149,10 +149,11 @@ let emit_literal_seg (segment : string) (wrap : int) : string list =
    all the struct and list default values. *)
 let emit_instantiate_builder_message message : string list =
   let message_segment_literals =
-    let strings = M.Message.to_storage message in
+    let segment_descrs = M.Message.to_storage message in
     (* 64 characters works out to 16 bytes per line. *)
     let wrap_chars = 64 in
-    List.fold_left (List.rev strings) ~init:[] ~f:(fun acc seg ->
+    List.fold_left (List.rev segment_descrs) ~init:[] ~f:(fun acc descr ->
+      let seg = Bytes.sub descr.M.Message.segment 0 descr.M.Message.bytes_consumed in
       (emit_literal_seg (Bytes.unsafe_to_string seg) wrap_chars) @ acc)
   in [
     "module DefaultsMessage_ = Capnp.BytesMessage";

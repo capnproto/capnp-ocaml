@@ -67,22 +67,22 @@ module Message = struct
   type storage_t = Storage.t
   type -'cap segment_t = Storage.t
 
-  type segment_descr_t = {
-    segment : Storage.t;
-    free_start : int;  (* Offset into segment where free space begins *)
+  type storage_descr_t = {
+    segment : storage_t;
+    bytes_consumed : int;
   }
 
-  type -'cap t = segment_descr_t Res.Array.t
+  type -'cap t = storage_descr_t Res.Array.t
 
   let create size =
     let segment = Storage.alloc (Util.round_up_mult_8 size) in
-    Res.Array.create 1 {segment; free_start = 0}
+    Res.Array.create 1 {segment; bytes_consumed = 0}
 
   (** [add_segment m size] allocates a new segment of [size] bytes and appends
       it to the message, raising an exception if storage cannot be allocated. *)
   let add_segment m size =
     let new_segment = Storage.alloc (Util.round_up_mult_8 size) in
-    Res.Array.add_one m {segment = new_segment; free_start = 0}
+    Res.Array.add_one m {segment = new_segment; bytes_consumed = 0}
 
   let release m =
     let () = Res.Array.iter (fun descr -> Storage.release descr.segment) m in
@@ -91,25 +91,22 @@ module Message = struct
   let num_segments = Res.Array.length
 
   let total_size m =
+    Res.Array.fold_left (fun acc x -> acc + x.bytes_consumed) 0 m
+
+  let total_alloc_size m =
     Res.Array.fold_left (fun acc x -> acc + (Segment.length x.segment)) 0 m
 
   let get_segment m i = (Res.Array.get m i).segment
-
-  (** [get_size m] computes the aggregate size of the message, in bytes. *)
-  let get_size m =
-    (* Not too worried about using O(segments) implementation, because number
-       of segments is O(log(message size)). *)
-    Res.Array.fold_left (fun acc x -> acc + (Storage.length x.segment)) 0 m
 
   let readonly m = m
 
   let of_storage ms =
     let arr = Res.Array.empty () in
     let () = List.iter ms ~f:(fun x ->
-        Res.Array.add_one arr {segment = x; free_start = Storage.length x}) in
+        Res.Array.add_one arr {segment = x; bytes_consumed = Storage.length x}) in
     arr
 
-  let to_storage m = Res.Array.fold_right (fun x acc -> x.segment :: acc) m []
+  let to_storage m = Res.Array.fold_right (fun x acc -> x :: acc) m []
 
   let with_message m ~f = Exn.protectx m ~f ~finally:release
 end   (* module Message *)
@@ -136,16 +133,16 @@ module Slice = struct
       let last_seg_id = Res.Array.length m - 1 in
       let last_seg_descr = Res.Array.get m last_seg_id in
       let bytes_avail = Storage.length last_seg_descr.Message.segment -
-        last_seg_descr.Message.free_start
+        last_seg_descr.Message.bytes_consumed
       in
       if size <= bytes_avail then
         last_seg_id, last_seg_descr
       else
         (* Doubling message size on each allocation, under the assumption
            that message sizes will be exponentially distributed. *)
-        let min_alloc_size = Message.get_size m in
+        let min_alloc_size = Message.total_alloc_size m in
         let new_seg = Storage.alloc (max min_alloc_size size) in
-        let new_seg_descr = {Message.segment = new_seg; Message.free_start = 0} in
+        let new_seg_descr = {Message.segment = new_seg; Message.bytes_consumed = 0} in
         let () = Res.Array.add_one m new_seg_descr in
         last_seg_id + 1, new_seg_descr
     in
@@ -153,12 +150,12 @@ module Slice = struct
       msg = m;
       segment = segment_descr.Message.segment;
       segment_id;
-      start = segment_descr.Message.free_start;
+      start = segment_descr.Message.bytes_consumed;
       len = size;
     } in
     let () = Res.Array.set m segment_id
       { segment_descr with
-        Message.free_start = slice.start + slice.len }
+        Message.bytes_consumed = slice.start + slice.len }
     in
     (* Allocations should be eight-byte aligned *)
     let () = assert ((slice.start land 7) = 0) in
@@ -168,19 +165,19 @@ module Slice = struct
     let size = Util.round_up_mult_8 size in
     let seg_descr = Res.Array.get m segment_id in
     let bytes_avail = Storage.length seg_descr.Message.segment -
-        seg_descr.Message.free_start
+        seg_descr.Message.bytes_consumed
     in
     if size <= bytes_avail then
       let slice = {
         msg = m;
         segment = seg_descr.Message.segment;
         segment_id;
-        start = seg_descr.Message.free_start;
+        start = seg_descr.Message.bytes_consumed;
         len = size;
       } in
       let () = Res.Array.set m segment_id
         { seg_descr with
-          Message.free_start = slice.start + slice.len }
+          Message.bytes_consumed = slice.start + slice.len }
       in
       (* Allocations should be eight-byte aligned *)
       let () = assert ((slice.start land 7) = 0) in

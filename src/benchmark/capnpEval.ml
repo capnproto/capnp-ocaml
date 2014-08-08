@@ -134,12 +134,12 @@ module TestCase = struct
 
 
   let setup_request () =
-    let builder = E.Builder.Expression.init_root ~message_size:800 () in
+    let builder = E.Builder.Expression.init_root () in
     (builder, make_expression builder 0)
 
   let handle_request reader =
     let v = evaluate_expression reader in
-    let builder = E.Builder.EvaluationResult.init_root ~message_size:0 () in
+    let builder = E.Builder.EvaluationResult.init_root () in
     E.Builder.EvaluationResult.value_set_int_exn builder v;
     builder
 

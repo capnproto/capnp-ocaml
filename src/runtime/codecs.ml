@@ -248,11 +248,11 @@ module FramedStream = struct
 end
 
 
-let make_header segments : string =
+let make_header segment_descrs : string =
   let buf = Buffer.create 8 in
-  let () = List.iter segments ~f:(fun segment ->
+  let () = List.iter segment_descrs ~f:(fun descr ->
       let size_buf = Bytes.create 4 in
-      let seg_len = Bytes.length segment in
+      let seg_len = descr.Message.BytesMessage.Message.bytes_consumed in
       let () = assert ((seg_len mod 8) = 0) in
       let seg_word_count = seg_len / 8 in
       let () = BytesStorage.set_uint32 size_buf 0
@@ -278,12 +278,19 @@ let make_header segments : string =
 
 
 let rec serialize_fold message ~compression ~init ~f =
-  let segments = Message.BytesMessage.Message.to_storage message in
+  let segment_descrs = Message.BytesMessage.Message.to_storage message in
   match compression with
   | `None ->
-      let header = make_header segments in
-      List.fold_left segments ~init:(f init header) ~f:(fun acc segment ->
-        f acc (Bytes.unsafe_to_string segment))
+      let header = make_header segment_descrs in
+      List.fold_left segment_descrs ~init:(f init header) ~f:(fun acc descr ->
+        let open Message.BytesMessage in
+        let seg =
+          if descr.Message.bytes_consumed = Bytes.length descr.Message.segment then
+            descr.Message.segment
+          else
+            Bytes.sub descr.Message.segment 0 descr.Message.bytes_consumed
+        in
+        f acc (Bytes.unsafe_to_string seg))
   | `Packing ->
       serialize_fold message ~compression:`None ~init
         ~f:(fun acc unpacked_fragment ->
@@ -294,12 +301,29 @@ let serialize_iter message ~compression ~f =
   serialize_fold message ~compression ~init:() ~f:(fun () s -> f s)
 
 
-let rec serialize ~compression message=
+let rec serialize ~compression message =
   match compression with
   | `None ->
-      let segments = Message.BytesMessage.Message.to_storage message in
-      (make_header segments) ^
-        (Bytes.unsafe_to_string (Bytes.concat (Bytes.unsafe_of_string "") segments))
+      let segment_descrs = Message.BytesMessage.Message.to_storage message in
+      let header = make_header segment_descrs in
+      let header_size = String.length header in
+      let segments_size = Message.BytesMessage.Message.total_size message in
+      let total_size = header_size + segments_size in
+      let buf = Bytes.create total_size in
+      Bytes.blit
+        (Bytes.unsafe_of_string header) 0
+        buf 0
+        header_size;
+      let (_ : int) = List.fold_left segment_descrs ~init:header_size
+          ~f:(fun pos descr ->
+            let open Message.BytesMessage in
+            Bytes.blit
+              descr.Message.segment 0
+              buf pos
+              descr.Message.bytes_consumed;
+            pos + descr.Message.bytes_consumed)
+      in
+      Bytes.unsafe_to_string buf
   | `Packing ->
       Packing.pack_string (serialize ~compression:`None message)
 

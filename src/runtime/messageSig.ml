@@ -123,6 +123,14 @@ module type MESSAGE = sig
       this segment (e.g. "bytes"). *)
   type storage_t
 
+  type storage_descr_t = {
+    (** Storage for one of the message segments *)
+    segment : storage_t;
+
+    (** Number of bytes actually consumed in this segment *)
+    bytes_consumed : int;
+  }
+
   type -'cap segment_t
 
   (** ['cap t] is the type of a message.  The ['cap] annotation is type [ro]
@@ -146,6 +154,11 @@ module type MESSAGE = sig
       segments. *)
   val total_size : 'cap t -> int
 
+  (** [total_alloc_size m] gets total size of the underlying storage for the
+      message, in bytes, across all segments.  (This is at least as large
+      as the value returned by [total_size]. *)
+  val total_alloc_size : 'cap t -> int
+
   (** [get_segment m i] gets zero-indexed segment [i] associated with message [m].
       @raise [Invalid_argument] if the index is out of bounds. *)
   val get_segment : 'cap t -> int -> 'cap segment_t
@@ -159,7 +172,7 @@ module type MESSAGE = sig
 
   (** [to_storage m] retrieves a list of the storage elements associated with
       the message segments. *)
-  val to_storage : 'cap t -> storage_t list
+  val to_storage : 'cap t -> storage_descr_t list
 
   (** [with_message m ~f] first evaluates [f m], then invokes [release m], then
       returns the result of the application of [f].  If [f m] raises an exception,

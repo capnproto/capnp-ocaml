@@ -135,7 +135,7 @@ module TestCase = struct
 
 
   let handle_request parking_lot =
-    let total_value = CS.Builder.TotalValue.init_root ~message_size:0 () in
+    let total_value = CS.Builder.TotalValue.init_root () in
     let cars = CS.Reader.ParkingLot.cars_get parking_lot in
     let num_cars = Capnp.Array.length cars in
     let result = ref 0 in

@@ -6,6 +6,7 @@
   instead of `Bytes.t list`.
 * Module `Codecs`: change API accept a `compression` specifier, instead of using
   separate functions and separate types for compressed and uncompressed streams.
+* Module `Message`: `to_storage` now returns a list of (storage, length) pairs
 
 === Other changes
 
