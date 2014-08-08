@@ -91,6 +91,7 @@ module Benchmark
       ~(compression : Codecs.compression_t)
       ~(iters : int)
     : int =
+    let () = Unix.set_nonblock output_fd in
     let in_context = IO.create_read_context_for_fd ~compression input_fd in
     let out_stream = {
       CountingOutputStream.fd = output_fd;
