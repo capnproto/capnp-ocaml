@@ -52,6 +52,7 @@ module TestCase = struct
         let byte = (Char.to_int 'a') + char_ofs in
         Bytes.unsafe_set url (url_prefix_len + j) (Char.unsafe_of_int byte)
       done;
+      CR.Builder.SearchResult.url_set result url;
 
       let is_cat = FastRand.int 8 = 0 in
       let is_dog = FastRand.int 8 = 0 in
