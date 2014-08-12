@@ -105,7 +105,6 @@ module Benchmark
     let final_send_complete = ref false in
     while !num_sent < iters || (not (Queue.is_empty expectations)) do
       let write_watch_fds = if !final_send_complete then [] else [output_fd] in
-      flush stdout;
       let ready = Unix.select ~restart:true
           ~read:[input_fd] ~write:write_watch_fds ~except:[input_fd] ~timeout:`Never ()
       in
@@ -125,8 +124,7 @@ module Benchmark
               ()
         in
         loop ()
-      end else
-        ();
+      end;
 
       if not (List.is_empty ready.Unix.Select_fds.write) then begin
         let (_ : int) = IO.WriteContext.write out_context in
@@ -136,18 +134,16 @@ module Benchmark
             final_send_complete := true
           else
             ()
-        (* This test is just to create an upper bound on memory requirements,
-           and should not be important for performance (provided the threshold
-           is sufficiently large). *)
-        else if bytes_remaining < 512 * 1024 then begin
+        (* A large queue isn't actually helpful here, it just increases
+           GC pressure. *)
+        else if Queue.length expectations < 4 then begin
           let (request, expect) = TestCase.setup_request () in
           let req_message = RequestBuilder.to_message request in
           IO.WriteContext.enqueue_message out_context req_message;
           Queue.enqueue expectations expect;
           num_sent := !num_sent + 1
         end
-      end else
-        ()
+      end
     done;
     out_stream.CountingOutputStream.throughput
 
