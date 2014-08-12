@@ -61,6 +61,9 @@ let () =
 
   let throughput =
     if name = "carsales" then
+      (* Carsales benefits a small amount from tuning the GC to
+         increase the space overhead. *)
+      let () = Gc.tune ~space_overhead:1000 () in
       let module BM = Methods.Benchmark
           (CapnpCarsales.TestCase)
           (CapnpCarsales.CS.Reader.ParkingLot)
@@ -71,6 +74,10 @@ let () =
       let module BR = BenchmarkRunner(BM) in
       BR.f mode compression iters
     else if name = "catrank" then
+      (* Catrank allocates relatively large messages.  It benefits from
+         tuning the GC to increase the space overhead and thus reduce
+         the major collection rate. *)
+      let () = Gc.tune ~space_overhead:10000 () in
       let module BM = Methods.Benchmark
           (CapnpCatrank.TestCase)
           (CapnpCatrank.CR.Reader.SearchResultList)
