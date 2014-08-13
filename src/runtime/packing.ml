@@ -215,37 +215,65 @@ let bits_set_lookup =
 let bits_set x = bits_set_lookup.(x)
 
 
+(* Persistent buffers used while unpacking sequences of mixed bytes.
+   Using persistent buffers reduces GC pressure. *)
+module MixedContext = struct
+  type t = {
+    (* Sequences of mixed bytes are stored in this temporary buffer,
+       and transferred to the deque-based FragmentBuffer only when
+       necessary.  This approach avoids filling the FragmentBuffer with
+       lots of small strings. *)
+    fragments : Buffer.t;
+
+    (* Reusable buffer which stores a single word as it is unpacked. *)
+    word : Bytes.t;
+  }
+end
+
+
+(* Move a series of mixed bytes from a temporary Buffer.t into the
+   FragmentBuffer. *)
+let transfer_mixed_bytes ~unpacked ~mixed_context =
+  FragmentBuffer.add_fragment unpacked
+    (Buffer.contents mixed_context.MixedContext.fragments);
+  Buffer.clear mixed_context.MixedContext.fragments
+
+
 (* Consider coalescing the remaining bytes of [buf] with the next fragment in
    the buffer. If this is large enough to satisfy the [required_bytes_count],
    then proceed with [unpack_decode_tag].  Otherwise, put the remainder of
    the buffer back into [packed] and give up. *)
 let rec unpack_coalesce_buffer_and_retry ~packed ~unpacked ~buf ~ofs
-    ~required_byte_count : unit =
+    ~mixed_context ~required_byte_count : unit =
+  transfer_mixed_bytes ~unpacked ~mixed_context;
   let unconsumed_bytes = Util.str_slice ~start:ofs buf in
   let bytes_missing =
     required_byte_count - (String.length unconsumed_bytes)
   in
   match FragmentBuffer.remove_at_least packed bytes_missing with
   | Some fragment ->
-      unpack_decode_tag ~packed ~unpacked ~buf:(unconsumed_bytes ^ fragment) ~ofs:0
+      unpack_decode_tag ~packed ~unpacked ~buf:(unconsumed_bytes ^ fragment)
+        ~ofs:0 ~mixed_context
   | None ->
       FragmentBuffer.unremove packed unconsumed_bytes
 
 
-and unpack_zeros ~packed ~unpacked ~buf ~ofs =
+and unpack_zeros ~packed ~unpacked ~buf ~ofs ~mixed_context =
+  transfer_mixed_bytes ~unpacked ~mixed_context;
   (* Tag byte is followed by a count byte specifying number of zero words - 1 *)
   let required_byte_count = 2 in
   if String.length buf - ofs >= required_byte_count then
     let zero_word_count = 1 + (Char.to_int buf.[ofs + 1]) in
     let zeros = String.make (zero_word_count * 8) '\x00' in
     let () = FragmentBuffer.add_fragment unpacked zeros in
-    unpack_decode_tag ~packed ~unpacked ~buf ~ofs:(ofs + 2)
+    unpack_decode_tag ~packed ~unpacked ~buf ~ofs:(ofs + 2) ~mixed_context
   else
     unpack_coalesce_buffer_and_retry ~packed ~unpacked ~buf ~ofs
-      ~required_byte_count
+      ~mixed_context ~required_byte_count
 
 
-and unpack_literal_bytes ~packed ~unpacked ~buf ~ofs =
+and unpack_literal_bytes ~packed ~unpacked ~buf ~ofs ~mixed_context =
+  transfer_mixed_bytes ~unpacked ~mixed_context;
   (* Tag byte is followed by 8 literal bytes, followed by count byte *)
   let required_byte_count = 10 in
   if String.length buf - ofs >= required_byte_count then
@@ -263,95 +291,100 @@ and unpack_literal_bytes ~packed ~unpacked ~buf ~ofs =
       let () = FragmentBuffer.add_fragment unpacked first_literal_word in
       let () = FragmentBuffer.add_fragment unpacked other_literal_words in
       unpack_decode_tag ~packed ~unpacked ~buf ~ofs:(ofs + 10 + extra_bytes_required)
+        ~mixed_context
     else
       unpack_coalesce_buffer_and_retry ~packed ~unpacked ~buf ~ofs
-        ~required_byte_count:required_byte_count'
+        ~mixed_context ~required_byte_count:required_byte_count'
   else
     unpack_coalesce_buffer_and_retry ~packed ~unpacked ~buf ~ofs
-      ~required_byte_count
+      ~mixed_context ~required_byte_count
 
 
-and unpack_mixed_bytes ~packed ~unpacked ~buf ~ofs ~tag =
+and unpack_mixed_bytes ~packed ~unpacked ~buf ~ofs ~mixed_context ~tag =
   (* Tag byte is followed by one literal byte for every bit set *)
   let c_int = Char.to_int tag in
   let literal_bytes_required = bits_set c_int in
   let required_byte_count = 1 + literal_bytes_required in
   if String.length buf - ofs >= required_byte_count then begin
     let src_ofs = ref (ofs + 1) in
-    let output_word = Bytes.make 8 '\x00' in
+    Bytes.fill mixed_context.MixedContext.word 0 8 '\x00';
 
     (* This is the dual of the hot loop in [pack_loop_bytes]. *)
 
     if (c_int land 0x1) <> 0 then begin
       let c = String.unsafe_get buf !src_ofs in
-      Bytes.unsafe_set output_word 0 c;
+      Bytes.unsafe_set mixed_context.MixedContext.word 0 c;
       src_ofs := !src_ofs + 1
     end;
     if (c_int land 0x2) <> 0 then begin
       let c = String.unsafe_get buf !src_ofs in
-      Bytes.unsafe_set output_word 1 c;
+      Bytes.unsafe_set mixed_context.MixedContext.word 1 c;
       src_ofs := !src_ofs + 1
     end;
     if (c_int land 0x4) <> 0 then begin
       let c = String.unsafe_get buf !src_ofs in
-      Bytes.unsafe_set output_word 2 c;
+      Bytes.unsafe_set mixed_context.MixedContext.word 2 c;
       src_ofs := !src_ofs + 1
     end;
     if (c_int land 0x8) <> 0 then begin
       let c = String.unsafe_get buf !src_ofs in
-      Bytes.unsafe_set output_word 3 c;
+      Bytes.unsafe_set mixed_context.MixedContext.word 3 c;
       src_ofs := !src_ofs + 1
     end;
     if (c_int land 0x10) <> 0 then begin
       let c = String.unsafe_get buf !src_ofs in
-      Bytes.unsafe_set output_word 4 c;
+      Bytes.unsafe_set mixed_context.MixedContext.word 4 c;
       src_ofs := !src_ofs + 1
     end;
     if (c_int land 0x20) <> 0 then begin
       let c = String.unsafe_get buf !src_ofs in
-      Bytes.unsafe_set output_word 5 c;
+      Bytes.unsafe_set mixed_context.MixedContext.word 5 c;
       src_ofs := !src_ofs + 1
     end;
     if (c_int land 0x40) <> 0 then begin
       let c = String.unsafe_get buf !src_ofs in
-      Bytes.unsafe_set output_word 6 c;
+      Bytes.unsafe_set mixed_context.MixedContext.word 6 c;
       src_ofs := !src_ofs + 1
     end;
     if (c_int land 0x80) <> 0 then begin
       let c = String.unsafe_get buf !src_ofs in
-      Bytes.unsafe_set output_word 7 c;
+      Bytes.unsafe_set mixed_context.MixedContext.word 7 c;
       src_ofs := !src_ofs + 1
     end;
 
-    let () = FragmentBuffer.add_fragment unpacked
-        (Bytes.unsafe_to_string output_word)
-    in
-    unpack_decode_tag ~packed ~unpacked ~buf ~ofs:!src_ofs
+    Buffer.add_string
+      mixed_context.MixedContext.fragments
+      (Bytes.unsafe_to_string mixed_context.MixedContext.word);
+    unpack_decode_tag ~packed ~unpacked ~buf ~ofs:!src_ofs ~mixed_context
   end else
     unpack_coalesce_buffer_and_retry ~packed ~unpacked ~buf ~ofs
-      ~required_byte_count
+      ~mixed_context ~required_byte_count
 
 
 (* Decode a tag byte and then attempt to decode all the bytes that are
    associated with the tag. *)
-and unpack_decode_tag ~packed ~unpacked ~buf ~ofs =
+and unpack_decode_tag ~packed ~unpacked ~buf ~ofs ~mixed_context =
   if ofs = String.length buf then
     unpack_coalesce_buffer_and_retry ~packed ~unpacked ~buf ~ofs
-      ~required_byte_count:1
+      ~mixed_context ~required_byte_count:1
   else
     match buf.[ofs] with
     | '\x00' ->
-        unpack_zeros ~packed ~unpacked ~buf ~ofs
+        unpack_zeros ~packed ~unpacked ~buf ~ofs ~mixed_context
     | '\xff' ->
-        unpack_literal_bytes ~packed ~unpacked ~buf ~ofs
+        unpack_literal_bytes ~packed ~unpacked ~buf ~ofs ~mixed_context 
     | c ->
-        unpack_mixed_bytes ~packed ~unpacked ~buf ~ofs ~tag:c
+        unpack_mixed_bytes ~packed ~unpacked ~buf ~ofs ~mixed_context ~tag:c
 
 
 (** Unpack as much data as possible from the packed fragment buffer.
     into the unpacked fragment buffer. *)
 let unpack ~(packed : FragmentBuffer.t) ~(unpacked : FragmentBuffer.t) : unit =
   unpack_decode_tag ~packed ~unpacked ~buf:"" ~ofs:0
+    ~mixed_context:{
+      MixedContext.fragments = Buffer.create 1024;
+      MixedContext.word = Bytes.create 8;
+    }
 
 
 (* Provided for testing purposes only. *)
