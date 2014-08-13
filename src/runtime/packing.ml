@@ -41,19 +41,32 @@ let count_zeros ~start ~stop s =
   !sum
 
 
+(* Persistent buffers for use with [pack_loop_XXX].  Using persistent
+   buffers reduces GC pressure. *)
+type output_buffers_t = {
+  (* Collects compressed output *)
+  output_buf : Buffer.t;
+
+  (* Collects literals during pack_loop_literal_words *)
+  lit_buf : Buffer.t;
+
+  (* Collects groups of tagged bytes during pack_loop_bytes *)
+  tagged_bytes : Bytes.t;
+}
+
+
 (* Main loop across words of the message *)
-let rec pack_loop_words ~input ~ofs ~buf =
+let rec pack_loop_words ~input ~ofs ~buffers =
   let () = assert (ofs <= String.length input) in
   if ofs = String.length input then
-    Buffer.contents buf
+    Buffer.contents buffers.output_buf
   else
-    pack_loop_bytes ~input ~ofs ~buf
+    pack_loop_bytes ~input ~ofs ~buffers
 
 
 (* Loop across bytes within a word, emitting a tag byte followed by
    a variable number of literal bytes *)
-and pack_loop_bytes ~input ~ofs ~buf =
-  let output_buf = Bytes.create 9 in
+and pack_loop_bytes ~input ~ofs ~buffers =
   let tag_byte = ref 0 in
   let output_count = ref 1 in
 
@@ -62,7 +75,7 @@ and pack_loop_bytes ~input ~ofs ~buf =
   let () =
     let c = String.unsafe_get input ofs in
     if c <> '\x00' then begin
-      Bytes.unsafe_set output_buf !output_count c;
+      Bytes.unsafe_set buffers.tagged_bytes !output_count c;
       tag_byte := !tag_byte lor 0x1;
       output_count := !output_count + 1
     end
@@ -70,7 +83,7 @@ and pack_loop_bytes ~input ~ofs ~buf =
   let () =
     let c = String.unsafe_get input (ofs + 1) in
     if c <> '\x00' then begin
-      Bytes.unsafe_set output_buf !output_count c;
+      Bytes.unsafe_set buffers.tagged_bytes !output_count c;
       tag_byte := !tag_byte lor 0x2;
       output_count := !output_count + 1
     end
@@ -78,7 +91,7 @@ and pack_loop_bytes ~input ~ofs ~buf =
   let () =
     let c = String.unsafe_get input (ofs + 2) in
     if c <> '\x00' then begin
-      Bytes.unsafe_set output_buf !output_count c;
+      Bytes.unsafe_set buffers.tagged_bytes !output_count c;
       tag_byte := !tag_byte lor 0x4;
       output_count := !output_count + 1
     end
@@ -86,7 +99,7 @@ and pack_loop_bytes ~input ~ofs ~buf =
   let () =
     let c = String.unsafe_get input (ofs + 3) in
     if c <> '\x00' then begin
-      Bytes.unsafe_set output_buf !output_count c;
+      Bytes.unsafe_set buffers.tagged_bytes !output_count c;
       tag_byte := !tag_byte lor 0x8;
       output_count := !output_count + 1
     end
@@ -94,7 +107,7 @@ and pack_loop_bytes ~input ~ofs ~buf =
   let () =
     let c = String.unsafe_get input (ofs + 4) in
     if c <> '\x00' then begin
-      Bytes.unsafe_set output_buf !output_count c;
+      Bytes.unsafe_set buffers.tagged_bytes !output_count c;
       tag_byte := !tag_byte lor 0x10;
       output_count := !output_count + 1
     end
@@ -102,7 +115,7 @@ and pack_loop_bytes ~input ~ofs ~buf =
   let () =
     let c = String.unsafe_get input (ofs + 5) in
     if c <> '\x00' then begin
-      Bytes.unsafe_set output_buf !output_count c;
+      Bytes.unsafe_set buffers.tagged_bytes !output_count c;
       tag_byte := !tag_byte lor 0x20;
       output_count := !output_count + 1
     end
@@ -110,7 +123,7 @@ and pack_loop_bytes ~input ~ofs ~buf =
   let () =
     let c = String.unsafe_get input (ofs + 6) in
     if c <> '\x00' then begin
-      Bytes.unsafe_set output_buf !output_count c;
+      Bytes.unsafe_set buffers.tagged_bytes !output_count c;
       tag_byte := !tag_byte lor 0x40;
       output_count := !output_count + 1
     end
@@ -118,63 +131,66 @@ and pack_loop_bytes ~input ~ofs ~buf =
   let () =
     let c = String.unsafe_get input (ofs + 7) in
     if c <> '\x00' then begin
-      Bytes.unsafe_set output_buf !output_count c;
+      Bytes.unsafe_set buffers.tagged_bytes !output_count c;
       tag_byte := !tag_byte lor 0x80;
       output_count := !output_count + 1
     end
   in
 
-
-  let () = Bytes.unsafe_set output_buf 0 (Char.unsafe_of_int !tag_byte) in
-  let () = Buffer.add_substring buf
-    (Bytes.unsafe_to_string output_buf) 0 !output_count
+  let () = Bytes.unsafe_set buffers.tagged_bytes 0 (Char.unsafe_of_int !tag_byte) in
+  let () = Buffer.add_substring buffers.output_buf
+    (Bytes.unsafe_to_string buffers.tagged_bytes) 0 !output_count
   in
   if !tag_byte = 0 then
-    pack_loop_zero_words ~input ~ofs:(ofs + 8) ~count:0 ~buf
+    pack_loop_zero_words ~input ~ofs:(ofs + 8) ~buffers ~count:0
   else if !tag_byte = 0xff then
-    pack_loop_literal_words ~input ~ofs:(ofs + 8) ~buf ~count:0
-      ~lit_buf:(Buffer.create 128)
+    let () = Buffer.clear buffers.lit_buf in
+    pack_loop_literal_words ~input ~ofs:(ofs + 8) ~buffers ~count:0
   else
-    pack_loop_words ~input ~ofs:(ofs + 8) ~buf
+    pack_loop_words ~input ~ofs:(ofs + 8) ~buffers
 
 
 (* Emitting a run of zeros *)
-and pack_loop_zero_words ~input ~ofs ~count ~buf =
+and pack_loop_zero_words ~input ~ofs ~count ~buffers =
   let () = assert (ofs <= String.length input) in
   if ofs + 8 > String.length input || count = 0xff ||
      count_zeros ~start:ofs ~stop:(ofs + 8) input <> 8 then
-    let () = Buffer.add_char buf (Char.of_int_exn count) in
-    pack_loop_words ~input ~ofs ~buf
+    let () = Buffer.add_char buffers.output_buf (Char.of_int_exn count) in
+    pack_loop_words ~input ~ofs ~buffers
   else
-    pack_loop_zero_words ~input ~ofs:(ofs + 8) ~count:(count + 1) ~buf
+    pack_loop_zero_words ~input ~ofs:(ofs + 8) ~count:(count + 1) ~buffers
 
 
 (* Emitting a run of literal bytes.  This algorithm is only using
    a single word of lookahead, which is fast but will not optimize
    packing efficiency. *)
-and pack_loop_literal_words ~input ~ofs ~buf ~count ~lit_buf =
+and pack_loop_literal_words ~input ~ofs ~buffers ~count =
   let () = assert (ofs <= String.length input) in
   if ofs + 8 > String.length input || count = 0xff then
-    let () = Buffer.add_char buf (Char.of_int_exn count) in
-    let () = Buffer.add_buffer buf lit_buf in
-    pack_loop_words ~input ~ofs ~buf
+    let () = Buffer.add_char buffers.output_buf (Char.of_int_exn count) in
+    let () = Buffer.add_buffer buffers.output_buf buffers.lit_buf in
+    pack_loop_words ~input ~ofs ~buffers
   else
     let num_zeros = count_zeros ~start:ofs ~stop:(ofs + 8) input in
     if num_zeros < 3 then
-      let () = Buffer.add_substring lit_buf input ofs 8 in
-      pack_loop_literal_words ~input ~ofs:(ofs + 8) ~buf ~count:(count + 1) ~lit_buf
+      let () = Buffer.add_substring buffers.lit_buf input ofs 8 in
+      pack_loop_literal_words ~input ~ofs:(ofs + 8) ~buffers ~count:(count + 1)
     else
-      let () = Buffer.add_char buf (Char.of_int_exn count) in
-      let () = Buffer.add_buffer buf lit_buf in
-      pack_loop_words ~input ~ofs ~buf
+      let () = Buffer.add_char buffers.output_buf (Char.of_int_exn count) in
+      let () = Buffer.add_buffer buffers.output_buf buffers.lit_buf in
+      pack_loop_words ~input ~ofs ~buffers
 
 
 (** Pack a word_aligned string. *)
 let pack_string (s : string) : string =
   (* String should be padded out to a word boundary *)
   let () = assert ((String.length s) mod 8 = 0) in
-  let buf = Buffer.create ((String.length s) / 4) in
-  pack_loop_words ~input:s ~ofs:0 ~buf
+  let buffers = {
+    output_buf   = Buffer.create ((String.length s) / 4);
+    lit_buf      = Buffer.create 128;
+    tagged_bytes = Bytes.create 9;
+  } in
+  pack_loop_words ~input:s ~ofs:0 ~buffers
 
 
 let bits_set_lookup =
