@@ -239,9 +239,11 @@ let get_bit
   : bool =
   let data = struct_storage.NM.StructStorage.data in
   let byte_val = NM.Slice.get_uint8 data byte_ofs in
-  let bit_val = (byte_val lsr bit_ofs) land 0x1 in
-  let result_int = bit_val lxor (Util.int_of_bool default) in
-  Util.bool_of_int result_int
+  let is_set = Util.get_bit byte_val bit_ofs in
+  if default then
+    not is_set
+  else
+    is_set
 
 let get_int8
     ~(default : int)

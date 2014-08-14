@@ -182,9 +182,11 @@ let get_bit
       let data = struct_storage.StructStorage.data in
       if byte_ofs < data.Slice.len then
         let byte_val = Slice.get_uint8 data byte_ofs in
-        let bit_val = (byte_val lsr bit_ofs) land 0x1 in
-        let result_int = bit_val lxor (Util.int_of_bool default) in
-        Util.bool_of_int result_int
+        let is_set = Util.get_bit byte_val bit_ofs in
+        if default then
+          not is_set
+        else
+          is_set
       else
         default
   | None ->

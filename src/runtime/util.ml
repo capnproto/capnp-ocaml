@@ -194,3 +194,22 @@ let is_int64_zero i64 =
 let int_of_bool (x : bool) : int = Obj.magic x
 let bool_of_int (x : int) : bool = Obj.magic x
 
+
+(* The standard bit twiddling logic for "give me bit N of this byte"
+   generates kind of crappy assembly in OCaml, due to the tagged
+   integer representation (which interacts poorly with bit shifts).
+   It turns out to be more efficient to do table lookups. *)
+
+let get_bit_lookup = Array.create ~len:(256 * 8) false
+let () =
+  for byte = 0 to 0xff do
+    for bit = 0 to 7 do
+      get_bit_lookup.((8 * byte) + bit) <-
+        (byte land (1 lsl bit)) <> 0
+    done
+  done
+
+let get_bit byte bit =
+  Array.unsafe_get get_bit_lookup ((8 * byte) + bit)
+
+
