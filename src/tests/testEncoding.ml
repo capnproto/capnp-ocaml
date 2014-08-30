@@ -47,7 +47,7 @@ let assert_float_equal f1 f2 eps =
   assert_bool "floating point equality" (delta <= largest *. 3.0 *. eps)
 
 let assert_float32_equal f1 f2 = assert_float_equal f1 f2 1.192092896e-07
-let assert_float64_equal f1 f2 = assert_float_equal f1 f2 Float.epsilon
+let assert_float64_equal f1 f2 = assert_float_equal f1 f2 Float.epsilon_float
 
 let assert_raises_invalid_arg f =
   try
