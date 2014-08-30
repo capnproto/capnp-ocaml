@@ -1,8 +1,13 @@
 USE_OCAMLFIND = true
 
 OCAMLFINDFLAGS += -syntax camlp4o
-OCAMLFLAGS += -thread -short-paths
 OCAMLOPTFLAGS += -inline 1000
+OCAMLFLAGS = -thread -short-paths
+
+if $(defined-env CAPNP_DEV)
+  OCAMLFLAGS += -warn-error A
+  export
+
 
 OCAMLPACKS[] =  \
   core          \
