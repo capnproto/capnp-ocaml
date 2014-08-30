@@ -127,7 +127,13 @@ module Benchmark
       end;
 
       if not (List.is_empty ready.Unix.Select_fds.write) then begin
-        let (_ : int) = IO.WriteContext.write out_context in
+        begin try
+          while IO.WriteContext.write out_context > 0 do () done
+        with
+        | Unix.Unix_error (Unix.EAGAIN, _, _)
+        | Unix.Unix_error (Unix.EWOULDBLOCK, _, _) ->
+          ()
+        end;
         let bytes_remaining = IO.WriteContext.bytes_remaining out_context in
         if !num_sent = iters then
           if bytes_remaining = 0 then
