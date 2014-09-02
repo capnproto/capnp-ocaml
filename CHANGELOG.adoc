@@ -1,4 +1,9 @@
 
+== capnp-ocaml 2.0.1
+
+* Invoke OCaml scripts using `-I $OCAML_TOPLEVEL_PATH`, to avoid missing
+  `topfind`.
+
 == capnp-ocaml 2.0.0
 
 === Backwards-incompatible changes
