@@ -9,5 +9,4 @@ github_username: pelzlpj
 
 # Build settings
 markdown: kramdown
-permalink: /capnp-ocaml/:categories/:year/:month/:day/:title/
-
+permalink: pretty
