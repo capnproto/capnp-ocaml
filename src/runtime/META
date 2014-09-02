@@ -1,6 +1,6 @@
 description = "Runtime support library for capnp-ocaml"
-version = "0.1.0"
-requires = "core uint res ocplib-endian"
+version = "2.0.0"
+requires = "core uint res ocplib-endian camlp4.macro"
 archive(byte) = "libcapnp.cma"
 archive(byte, plugin) = "libcapnp.cma"
 archive(native) = "libcapnp.cmxa"
