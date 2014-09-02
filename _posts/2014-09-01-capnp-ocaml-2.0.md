@@ -44,7 +44,7 @@ of affairs, I started work on an implementation of the \"suite of silly
 benchmarks\" that ships with the Cap\'n Proto C++ compiler. My first run
 of the \"carsales\" benchmark looked something like this:
 
-![Early carsales benchmark](/public/bench/orig-bar.png)
+![Early carsales benchmark]({{ site.baseurl }}/public/bench/orig-bar.png)
 
 Oh dear.
 
@@ -95,7 +95,7 @@ a lot of places. _Le sigh._
 So I started chipping away. And here\'s what I did to the benchmark
 timings over the course of about 40 commits:
 
-![Carsales benchmark over time](/public/bench/bench-commits.png)
+![Carsales benchmark over time]({{ site.baseurl }}/public/bench/bench-commits.png)
 
 
 ### Testing the Right Thing
@@ -313,7 +313,7 @@ opportunities?
 
 So where do things sit now? Here is the current performance for the
 \"carsales\" benchmark:
-![Current carsales benchmark](/public/bench/curr-carsales.png)
+![Current carsales benchmark]({{ site.baseurl }}/public/bench/curr-carsales.png)
 This probably requires some explanation:
 
 * `object-none` performs a series of RPC-like operations by passing
@@ -352,7 +352,7 @@ this copy was slow due to the lack of a `memcpy()`-like primitive.
 This optimization has
 [since been added](https://github.com/pelzlpj/capnp-ocaml/commit/dbccf430906d584fecf5ec88de4d346b229f6f88),
 and consequently capnp-ocaml performs somewhat better on \"catrank\":
-![Current catrank benchmark](/public/bench/curr-catrank.png)
+![Current catrank benchmark]({{ site.baseurl }}/public/bench/curr-catrank.png)
 This plot also makes clear the relatively poor performance of the OCaml
 \"packing\" implementation relative to the C++ version. This probably
 will not improve without the use of a C extension, which I would prefer
@@ -362,7 +362,7 @@ The \"eval\" benchmark constructs relatively short tree-structured
 messages which make use of Cap\'n Proto\'s schema-level support for
 sum types (which capnp-ocaml conveniently represents as OCaml variants).
 Once again, capnp-ocaml does OK relative to capnp-c++:
-![Current eval benchmark](/public/bench/curr-eval.png)
+![Current eval benchmark]({{ site.baseurl }}/public/bench/curr-eval.png)
 
 ## Conclusion
 
