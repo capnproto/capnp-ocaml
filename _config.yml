@@ -1,0 +1,12 @@
+# Site settings
+title: capnp-ocaml blog
+email: pelzlpj@gmail.com
+description: "Technical write-ups related to the Cap'n Proto OCaml plugin."
+paginate: 1
+baseurl: "/"
+url: "http://pelzlpj.github.io/capnp-ocaml"
+github_username: pelzlpj
+
+# Build settings
+markdown: kramdown
+permalink: pretty
