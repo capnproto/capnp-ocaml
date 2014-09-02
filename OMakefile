@@ -5,7 +5,7 @@ OCAMLOPTFLAGS += -inline 1000
 OCAMLFLAGS = -thread -short-paths
 
 if $(defined-env CAPNP_DEV)
-  OCAMLFLAGS += -warn-error A
+  OCAMLFLAGS += -safe-string -warn-error A
   export
 
 
