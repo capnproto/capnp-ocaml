@@ -368,7 +368,8 @@ You will need to
 http://kentonv.github.io/capnproto/install.html[install the Cap\'n Proto compiler].
 Once the Cap\'n Proto compiler and capnp-ocaml are both installed, you should be
 able to use `capnp compile -o ocaml yourSchemaFile.capnp` in order to generate
-`yourSchemaFile.mli` and `yourSchemaFile.ml`.  These modules will link against
+`yourSchemaFile.mli` and `yourSchemaFile.ml` (as well as `yourSchemaFile_defun.ml`,
+referenced below).  These modules will link against
 OCaml packages `core`, `uint`, `ocplib-endian`, `res`, and of course `capnp`.
 
 Instantiating the Modules
@@ -379,26 +380,50 @@ message type as input.
 In principle, messages can be stored using any underlying data structure that
 satisfies the `Capnp.MessageStorage.S` signature.  At present, capnp-ocaml
 contains one implementation: `Capnp.BytesStorage` provides message storage in
-the form of native OCaml `bytes` buffers.  This module makes it easy to
+the form of native OCaml `bytes` buffers, and `Capnp.BytesMessage` provides
+a `Message` implementation based on `BytesStorage`.  This module makes it easy to
 retrieve messages in a format suitable for use with file I/O, socket I/O,
 etc.
 
-To instantiate your code using BytesStorage, you could use the following
+To instantiate your code using BytesMessage, you could use the following
 pattern:
 [source,ocaml]
 --------------------------------------------------------------------------------
-module BytesMessage = Capnp.Message.Make(Capnp.BytesStorage)
-module YSF = YourSchemaFile.Make(BytesMessage)
+module YSF = YourSchemaFile.Make(Capnp.BytesMessage)
 
 let root_struct = YSF.Builder.Foo.init_root () in
 (* ... *)
 --------------------------------------------------------------------------------
 
+Defunctorized Module Instantiation
+----------------------------------
+For certain applications, the overhead associated with OCaml functors may
+be problematic. The functors may be eliminated by directly including the
+generated accessor code, at the cost of increased compile time. The code
+generator plugin emits `*_defun.ml` files intended for this use case:
+[source,ocaml]
+--------------------------------------------------------------------------------
+module YSF :
+  YourSchemaFile.S with type 'cap message_t = 'cap Capnp.BytesMessage.Message.t
+= struct
+  module MessageWrapper = Capnp.BytesMessage
+  INCLUDE "yourSchemaFile_defun.ml"
+end
+
+let root_struct = YSF.Builder.Foo.init_root () in
+(* ... *)
+--------------------------------------------------------------------------------
+
+The `INCLUDE` directive is a standard `camlp4` syntax extension provided by
+the `camlp4.macro` package.
+
+
 I Need to See an Example
 ------------------------
 I should really put together some trivial example code.  But in the meantime,
 the https://github.com/pelzlpj/capnp-ocaml/tree/master/src/tests[tests]
-subdirectory may be helpful to look at.
+and https://github.com/pelzlpj/capnp-ocmal/tree/master/src/benchmark[benchmark]
+subdirectories may be helpful to look at.
 
 
 Installation
@@ -409,8 +434,8 @@ You should be able to install capnp-ocaml with
 http://opam.ocaml.org[OPAM] using using `opam install capnp`.
 
 If you prefer to compile manually, you will need OMake, Findlib, and OCaml
-packages `core`, `uint`, `ocplib-endian`, and `res`.  Run `omake` to build
-both the compiler and the runtime library, and then use `omake install`
+packages `core`, `uint`, `ocplib-endian`, `res`, and `camlp4`.  Run `omake` to
+build both the compiler and the runtime library, and then use `omake install`
 to copy them into appropriate places within your filesystem.
 
 Contact
