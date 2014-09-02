@@ -15,9 +15,16 @@ COMP_MODULES =            \
   topsort
 
 
+if $(defined-env OCAML_TOPLEVEL_PATH)
+  TOPLEVEL_INCLUDE = -I $(getenv OCAML_TOPLEVEL_PATH)
+  export
+else
+  TOPLEVEL_INCLUDE = $(EMPTY)
+  export
+
 includes.ml: make_includes.ml ../runtime/common-inc.ml \
 ../runtime/reader-inc.ml ../runtime/builder-inc.ml
-	ocaml make_includes.ml
+	ocaml $(TOPLEVEL_INCLUDE) make_includes.ml
 
 
 PROGRAM = capnpc-ocaml
@@ -32,7 +39,7 @@ OCamlProgram($(PROGRAM), $(COMP_MODULES))
 
 compiler-clean:
 	rm -f $(PROGRAM)$(EXE) $(PROGRAM).opt $(PROGRAM).byte \
-	    *.cmi *.cmo *.cmx *.cma *.cmxa *.cmxs *.a *.o
+	    includes.ml *.cmi *.cmo *.cmx *.cma *.cmxa *.cmxs *.a *.o
 
 compiler-distclean: compiler-clean
 	rm -f *.omc
