@@ -3,42 +3,12 @@ layout: post
 title: "capnp-ocaml 2.0: The Road to Unembarrassing Performance"
 ---
 
-## Background
-
-The OCaml library ecosystem has strong support for serialization of
-OCaml data structures through `camlp4`-based libraries like
-[`sexplib`](https://github.com/janestreet/sexplib) and
-[`bin_prot`](https://github.com/janestreet/bin_prot). Unfortunately
-these are OCaml-only solutions; if you want to export data for
-processing by a high-performance C++ back-end or for visualization via a
-Python front-end, you need to look elsewhere.
-
-There is some OCaml support for Protocol Buffers, via the
-[Piqi project](http://piqi.org/) and (more recently)
-[deriving Protobuf](https://github.com/whitequark/ppx_deriving_protobuf).
-But the support here is at the wire protocol level only; you can\'t take
-a Protocol Buffers schema file and compile it directly to OCaml
-serialization code. This has advantages and disadvantages: discarding
-the shackles of the Protobuf schema can lead to improved integration
-with the OCaml language, but in a multiple-language environment one
-loses the significant advantage of having a single authoritative schema
-definition that describes the behavior of all serializers.
-
-Apache Thrift does
-[offer OCaml code generation](https://thrift.apache.org/tutorial/ocaml).
-But the implementation makes some design choices that I\'m not thrilled with.
-
-In mid 2013, Kenton Varda announced the
-[Cap\'n Proto project](http://kentonv.github.io/capnproto/).
-Intrigued by the combination of an experienced implementor with an
-interesting lazy-parsing model and schema-level support for algebraic
-datatypes, I thought the time was right and soon started work on
-[capnp-ocaml](https://github.com/pelzlpj/capnp-ocaml).
-
-## Opportunities for Improvement
-
-The first release of capnp-ocaml went out the door in a largely
-functional state, but without much attention paid to the performance
+In July I published the first release of
+[capnp-ocaml](https://github.com/pelzlpj/capnp-ocaml), an OCaml
+code generator plugin for the
+[Cap'n Proto](http://kentonv.github.io/capnproto/) serialization
+framework.  This release went out the door in a largely functional
+state, but without much attention paid to the performance
 characteristics of generated code. Feeling uncomfortable with this state
 of affairs, I started work on an implementation of the \"suite of silly
 benchmarks\" that ships with the Cap\'n Proto C++ compiler. My first run
@@ -79,13 +49,7 @@ Time to dig out the profiler and get to work.
      1.10%  camlCapnpRuntime__Common__decode_pointer_1879
      1.05%  sweep_slice
      1.04%  camlCapnpRuntime__Builder__set_bit_7290
-     1.02%  camlFastRand__double_1015
-     0.92%  camlCapnpRuntime__Message__get_int64_2123
-     0.91%  caml_alloc_small
-     0.89%  camlCapnpRuntime__Reader__get_data_field_3488
-     0.84%  camlCapnpCarsales__fun_3570
-     0.84%  caml_alloc_custom
-     0.83%  camlCapnpCarsales__fun_3565
+     ...
 
 You know how great it is when your profiler trace resembles a textbook
 example of the Pareto principle? This doesn\'t look like that. This is
@@ -97,8 +61,12 @@ timings over the course of about 40 commits:
 
 ![Carsales benchmark over time]({{ site.baseurl }}/public/bench/bench-commits.png)
 
+## Benchmarking is Hard
 
-### Testing the Right Thing
+Some of the poor performance had very little to do with Cap\'n Proto
+serialization. The benchmark test cases perform some computations on
+the data being serialized, both on the client side and on the server
+side. Some of these computations happen to run a little slow in OCaml.
 
 The benchmark uses an
 [Xorshift RNG](http://en.wikipedia.org/wiki/Xorshift),
@@ -122,104 +90,34 @@ static inline uint32_t nextFastRand() {
 }
 {% endhighlight %}
 
-Early on,
-I could see that my
+Early on, I could see that my
 [OCaml implementation](https://github.com/pelzlpj/capnp-ocaml/blob/772b27e59ee827fb99c1cce91189e8768cca2cb4/src/benchmark/fastRand.ml)
-of this RNG algorithm was not performing very well. Looking at the
-generated assembly, we can see that access to the persistent RNG state
-is kind of expensive.  Furthermore, the assembly for the Xorshift
-operations is bloated pretty badly as an unfortunate result of OCaml\'s
-tagged integer representation--operations which are intended to compile
-down to single instructions get transformed into more complicated
-sequences that preserve the integer tag bits.
-
-The OCaml amd64 assembly looks like this:
-{% highlight gas %}
-camlFastRand__next_1015:
-.cfi_startproc
-.L100:
-	movq	camlFastRand@GOTPCREL(%rip), %rsi
-	movq	24(%rsi), %rax
-	movq	(%rax), %rdi
-	movq	%rdi, %rbx
-	decq	%rbx
-	salq	$11, %rbx
-	xorq	%rbx, %rdi
-	orq	$1, %rdi
-	movq	32(%rsi), %rbx
-	movq	(%rbx), %rbx
-	movq	%rbx, (%rax)
-	movq	32(%rsi), %rax
-	movq	40(%rsi), %rbx
-	movq	(%rbx), %rbx
-	movq	%rbx, (%rax)
-	movq	40(%rsi), %rax
-	movq	48(%rsi), %rbx
-	movq	(%rbx), %rbx
-	movq	%rbx, (%rax)
-	movq	48(%rsi), %rbx
-	movq	%rdi, %rax
-	shrq	$8, %rax
-	movq	24(%rsi), %rdx
-	movq	(%rdx), %rdx
-	shrq	$19, %rdx
-	movq	(%rbx), %rcx
-	xorq	%rdx, %rcx
-	xorq	%rdi, %rcx
-	xorq	%rax, %rcx
-	orq	$1, %rcx
-	movq	%rcx, (%rbx)
-	movq	48(%rsi), %rax
-	movabsq	$8589934591, %rbx
-	movq	(%rax), %rdi
-	andq	%rbx, %rdi
-	movq	%rdi, (%rax)
-	movq	48(%rsi), %rax
-	movq	(%rax), %rax
-	ret
-	.cfi_endproc
-{% endhighlight %}
-whereas GCC generates something much more reasonable for the C
-implementation:
-{% highlight gas %}
-capnp_bench_nextFastRand:
-.LFB10:
-	.cfi_startproc
-	movl	x.2445(%rip), %eax
-	movl	w.2448(%rip), %ecx
-	movl	%eax, %edx
-	sall	$11, %edx
-	xorl	%eax, %edx
-	movl	y.2446(%rip), %eax
-	movl	%eax, x.2445(%rip)
-	movl	z.2447(%rip), %eax
-	movl	%ecx, z.2447(%rip)
-	movl	%eax, y.2446(%rip)
-	movl	%ecx, %eax
-	shrl	$19, %eax
-	xorl	%ecx, %eax
-	xorl	%edx, %eax
-	shrl	$8, %edx
-	xorl	%edx, %eax
-	movl	%eax, w.2448(%rip)
-	leaq	1(%rax,%rax), %rax
-	ret
-	.cfi_endproc
-{% endhighlight %}
+of this RNG algorithm was not performing very well.
+[Looking at the generated assembly]({{ site.baseurl }}/public/bench/xorshift-ocaml.html),
+we can see that access to the persistent RNG state is kind of expensive
+(a different OCaml data structure might improve the situtation, but
+ideally the RNG state should be completely decoupled from the OCaml heap).
+Furthermore, the assembly for the Xorshift operations is bloated as an
+unfortunate result of OCaml\'s tagged integer representation--operations
+which are intended to compile down to single instructions get
+transformed into more complicated sequences that preserve the integer
+tag bits.  GCC generates
+[something much more compact and straightforward]({{ site.baseurl }}/public/bench/xorshift-c.html)
+for the C implementation.
 
 The decision here was easy. The point of the benchmark is not to test
 RNG performance; we care a lot more about testing the performance of the
 capnp-ocaml serializers. The RNG code was trivially replaced with a C
 extension that performs well. Similarly, OCaml-based implementations of
-`strstr()` were not competitive for the data set found in the
+`strstr()` were not competitive for the short-string data set found in the
 \"catrank\" benchmark, and
 [calling straight into glibc](https://github.com/pelzlpj/capnp-ocaml/commit/1373bbc704ac909ac2748360babb0a088838ca63)
 was an easy way to make the benchmark results more informative.
 
-### Sources of Performance Loss
+## Optimization Opportunities
 
-Ignoring these uninteresting cases, what were the biggest optimization
-opportunities?
+Ignoring these uninteresting cases, what were the most effective
+optimizations?
 
 *   **Defunctorization.** OCaml
     [functors](http://caml.inria.fr/pub/docs/manual-ocaml/moduleexamples.html#sec20)
@@ -268,8 +166,8 @@ opportunities?
     In general, OCaml will compile such code using indirect calls which
     access the environment via a closure record. The indirect calls can
     be expensive, and the additional GC pressure due to closure record
-    allocation can be expensive.  A compiler with more aggressive
-    optimization passes might, in some circumstances, be able to compile
+    allocation can also be expensive.  A compiler with more aggressive
+    optimization passes might, in many circumstances, be able to compile
     a closure using an inlined function call which passes the
     environment in registers.  OCaml might get there some day, but not
     yet.
@@ -303,11 +201,14 @@ opportunities?
     proves to be worthwhile.
 
 *   **Reuse of buffers where possible.** OCaml heap allocation is cheap,
-    but you pay for it at GC time.  Allocations in a hot loop [should be
-    avoided if
-    possible](https://github.com/pelzlpj/capnp-ocaml/commit/d6468e04608ba264788c9b4c62d91339eb70807c)
+    but you pay for it at GC time.  Allocations in a hot loop
+    [should be avoided if possible](https://github.com/pelzlpj/capnp-ocaml/commit/d6468e04608ba264788c9b4c62d91339eb70807c)
     (not because the allocation is expensive, but because it means
     you're creating a lot of garbage that will need to be dealt with).
+
+*   **Loop Unrolling.** This is a textbook optimization which `ocamlopt`
+    does not perform, as far as I know. For tight loops,
+    [the difference can be measurable](https://github.com/pelzlpj/capnp-ocaml/commit/c3bda2d60771fa2a248f670d2af82725e585661f).
 
 ## Current Performance
 
@@ -347,16 +248,16 @@ a large improvement over the initial release.
 The \"catrank\" benchmark is heavy on accesses to string fields.
 For ease of use in OCaml code, code for reading a string from a message
 will always allocate a new OCaml string and copy data into it--there
-is no method to perform a zero-copy access. At the first release,
-this copy was slow due to the lack of a `memcpy()`-like primitive.
-This optimization has
+are no generated accessors that perform a zero-copy access. At the first
+release, this copy was slow due to the lack of a `memcpy()`-like
+primitive.  This optimization has
 [since been added](https://github.com/pelzlpj/capnp-ocaml/commit/dbccf430906d584fecf5ec88de4d346b229f6f88),
-and consequently capnp-ocaml performs somewhat better on \"catrank\":
+and consequently capnp-ocaml has somewhat stronger performance on \"catrank\":
 ![Current catrank benchmark]({{ site.baseurl }}/public/bench/curr-catrank.png)
 This plot also makes clear the relatively poor performance of the OCaml
-\"packing\" implementation relative to the C++ version. This probably
-will not improve without the use of a C extension, which I would prefer
-to avoid.
+\"packing\" implementation relative to the C++ version. This is unlikely
+to improve without the use of a C extension, which I would prefer to
+avoid.
 
 The \"eval\" benchmark constructs relatively short tree-structured
 messages which make use of Cap\'n Proto\'s schema-level support for
