@@ -95,7 +95,7 @@ Early on, I could see that my
 of this RNG algorithm was not performing very well.
 [Looking at the generated assembly]({{ site.baseurl }}/public/bench/xorshift-ocaml.html),
 we can see that access to the persistent RNG state is kind of expensive
-(a different OCaml data structure might improve the situtation, but
+(a different OCaml data structure might improve the situation, but
 ideally the RNG state should be completely decoupled from the OCaml heap).
 Furthermore, the assembly for the Xorshift operations is bloated as an
 unfortunate result of OCaml\'s tagged integer representation--operations
