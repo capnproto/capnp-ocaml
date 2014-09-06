@@ -422,7 +422,7 @@ I Need to See an Example
 ------------------------
 I should really put together some trivial example code.  But in the meantime,
 the https://github.com/pelzlpj/capnp-ocaml/tree/master/src/tests[tests]
-and https://github.com/pelzlpj/capnp-ocmal/tree/master/src/benchmark[benchmark]
+and https://github.com/pelzlpj/capnp-ocaml/tree/master/src/benchmark[benchmark]
 subdirectories may be helpful to look at.
 
 
