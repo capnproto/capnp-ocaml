@@ -1045,7 +1045,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
        reading from truncated structs both lead to default data being returned. *)
 
 
-    open Core.Std
+    open Core_kernel.Std
 
     let sizeof_uint64 = 8
 
@@ -1081,7 +1081,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       
       (* Runtime support which is common to both Reader and Builder interfaces. *)
       
-      open Core.Std
+      open Core_kernel.Std
       
       
       let sizeof_uint32 = 4
@@ -2735,7 +2735,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
        pointer will cause struct storage to be immediately allocated if that pointer
        was null). *)
 
-    open Core.Std
+    open Core_kernel.Std
 
     type ro = Message.ro
     type rw = Message.rw
@@ -2781,7 +2781,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       
       (* Runtime support which is common to both Reader and Builder interfaces. *)
       
-      open Core.Std
+      open Core_kernel.Std
       
       
       let sizeof_uint32 = 4

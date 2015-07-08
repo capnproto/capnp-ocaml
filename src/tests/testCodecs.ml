@@ -27,7 +27,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
-open Core.Std
+open Core_kernel.Std
 open OUnit2
 module Quickcheck = Core_extended.Quickcheck
 

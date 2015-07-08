@@ -1,5 +1,5 @@
 
-open Core.Std
+open Core_kernel.Std
 module IO = Capnp.IO
 module Codecs = Capnp.Codecs
 

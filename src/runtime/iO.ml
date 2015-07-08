@@ -27,7 +27,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
-open Core.Std
+open Core_kernel.Std
 
 type compression_t = [ `None | `Packing ]
 
@@ -104,6 +104,13 @@ module WriteContext = struct
 
 end
 
+let rec select fd ?(restart = true) =
+  try
+    select fd ~restart
+  with Unix.Unix_error (Unix.EINTR, _, _) ->
+    if restart
+      then select fd ~restart
+      else ()
 
 module ReadContext = struct
   type 'a t = {
@@ -170,7 +177,7 @@ end
 
 let create_write_context_for_fd ?(restart = true) ~compression fd =
   let unix_write fd' ~buf ~pos ~len =
-    Unix.single_write ~restart ~buf ~pos ~len fd'
+    Unix.single_write fd' buf pos len
   in
   WriteContext.create ~write:unix_write ~compression fd
 
@@ -218,10 +225,7 @@ let write_message_to_fd ?(restart = true) ~compression message fd =
     | Unix.Unix_error (Unix.EAGAIN, _, _)
     | Unix.Unix_error (Unix.EWOULDBLOCK, _, _) ->
         (* Avoid burning CPU time looping on EAGAIN *)
-        let (_ : Unix.Select_fds.t) = Unix.select ~restart
-            ~read:[] ~write:[fd] ~except:[fd] ~timeout:`Never ()
-        in
-        ()
+        select fd ~restart
   done
 
 
@@ -236,13 +240,12 @@ let write_message_to_file ?perm ~compression message filename =
 
 
 let write_message_to_file_robust ?perm ~compression message filename =
-  let tmp_prefix = filename ^ "-tmp" in
-  let (tmp_filename, tmp_fd) = Unix.mkstemp tmp_prefix in
-  let () = Exn.protectx tmp_fd ~finally:Unix.close ~f:(fun fd ->
-      let () = write_message_to_fd ~restart:true ~compression message fd in
-      Unix.fsync fd)
+  let (tmp_filename, tmp_oc) = Filename.open_temp_file filename "-tmp" in
+  let () = Exn.protectx tmp_oc ~finally:Out_channel.close ~f:(fun fd ->
+      let () = write_message_to_channel ~compression message fd in
+      Out_channel.flush tmp_oc)
   in
-  let () = Unix.rename ~src:tmp_filename ~dst:filename in
+  let () = Unix.rename tmp_filename filename in
   let () =
     (* [mkstemp] always creates as 0o600, so we may need to touch up permissions *)
     match perm with
@@ -251,15 +254,7 @@ let write_message_to_file_robust ?perm ~compression message filename =
     | None ->
         ()
   in
-  (* Attempt to sync directory metadata, so the rename is durably
-     recorded.  May not work as expected on all platforms, so
-     suppress errors. *)
-  let parent_dir = Filename.dirname filename in
-  try
-    Unix.with_file parent_dir ~mode:[Unix.O_RDONLY] ~f:Unix.fsync
-  with Unix.Unix_error (_, _, _) ->
-    ()
-
+  ()
 
 let read_single_message_from_fd ?(restart = true) ~compression fd =
   let context = create_read_context_for_fd ~restart ~compression fd in
@@ -270,9 +265,7 @@ let read_single_message_from_fd ?(restart = true) ~compression fd =
     | Unix.Unix_error (Unix.EAGAIN, _, _)
     | Unix.Unix_error (Unix.EWOULDBLOCK, _, _) ->
         (* Avoid burning CPU time looping on EAGAIN *)
-        let (_ : Unix.Select_fds.t) = Unix.select ~restart
-            ~read:[] ~write:[fd] ~except:[fd] ~timeout:`Never ()
-        in
+        select fd ~restart;
         read_loop ()
   in
   let rec loop () =

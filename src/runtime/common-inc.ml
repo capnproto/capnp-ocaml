@@ -29,7 +29,7 @@
 
 (* Runtime support which is common to both Reader and Builder interfaces. *)
 
-open Core.Std
+open Core_kernel.Std
 
 
 let sizeof_uint32 = 4

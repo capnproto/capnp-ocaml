@@ -28,7 +28,7 @@
  ******************************************************************************)
 
 
-open Core.Std
+open Core_kernel.Std
 
 let count_zeros ~start ~stop s =
   let sum = ref 0 in

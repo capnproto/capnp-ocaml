@@ -27,7 +27,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
-open Core.Std
+open Core_kernel.Std
 
 type ro = Message.ro
 type rw = Message.rw
@@ -162,7 +162,7 @@ let to_list a =
   List.init (length a) ~f:(fun i -> get a i)
 
 let to_array a =
-  Core.Std.Array.init (length a) (fun i -> get a i)
+  Core_kernel.Std.Array.init (length a) (fun i -> get a i)
 
 let set_list a lst =
   let () = init a (List.length lst) in
@@ -173,7 +173,7 @@ let set_array a arr =
   Array.iteri arr ~f:(fun i x -> set a i x)
 
 let map_array a ~f =
-  Core.Std.Array.init (length a) (fun i -> f (get a i))
+  Core_kernel.Std.Array.init (length a) (fun i -> f (get a i))
 
 let map_list a ~f =
   List.init (length a) ~f:(fun i -> f (get a i))

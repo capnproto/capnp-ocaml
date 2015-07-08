@@ -28,7 +28,7 @@
  ******************************************************************************)
 
 
-open Core.Std
+open Core_kernel.Std
 
 type ro = MessageSig.ro
 type rw = MessageSig.rw

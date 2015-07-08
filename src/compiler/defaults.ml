@@ -53,7 +53,7 @@
 *)
 
 
-open Core.Std
+open Core_kernel.Std
 
 module Copier = Capnp.Runtime.BuilderOps.Make(GenCommon.M)(GenCommon.M)
 module M = GenCommon.M

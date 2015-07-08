@@ -28,7 +28,7 @@
  ******************************************************************************)
 
 
-open Core.Std
+open Core_kernel.Std
 open EndianBytes
 
 type t = Bytes.t

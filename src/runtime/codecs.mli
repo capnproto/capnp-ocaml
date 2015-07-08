@@ -69,7 +69,7 @@ module FramedStream : sig
       A successful decode removes the data from the stream and returns the
       frame data in the form of a BytesMessage. *)
   val get_next_frame : t ->
-    (Message.rw Message.BytesMessage.Message.t, FramingError.t) Core.Std.Result.t
+    (Message.rw Message.BytesMessage.Message.t, FramingError.t) Core_kernel.Std.Result.t
 end
 
 

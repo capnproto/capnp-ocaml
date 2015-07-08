@@ -6,7 +6,7 @@ module CR :
   INCLUDE "catrank_defun.ml"
 end
 
-open Core.Std
+open Core_kernel.Std
 
 module TestCase = struct
   type request_reader_t   = CR.Reader.SearchResultList.t

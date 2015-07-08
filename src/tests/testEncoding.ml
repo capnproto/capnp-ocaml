@@ -29,7 +29,7 @@
 
 (* Inspired by encoding-test.c++, as found in the capnproto source. *)
 
-open Core.Std
+open Core_kernel.Std
 
 module BM  = Capnp.BytesMessage
 module T   = Test.Make(BM)

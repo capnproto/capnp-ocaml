@@ -28,7 +28,7 @@
  ******************************************************************************)
 
 
-open Core.Std
+open Core_kernel.Std
 
 exception Out_of_int_range of string
 let out_of_int_range s = raise (Out_of_int_range s)
@@ -75,7 +75,7 @@ let round_up_mult_8 (x : int) : int =
    This variant parallels the behavior of Python's slicing operator. *)
 let str_slice ?(start : int option) ?(stop : int option) (s : string)
   : string =
-  let norm s i = Core.Ordered_collection_common.normalize
+  let norm s i = Core_kernel.Ordered_collection_common.normalize
       ~length_fun:String.length s i
   in
   let real_start =

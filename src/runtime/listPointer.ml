@@ -1,6 +1,6 @@
 
-module Int64 = Core.Core_int64;;
-module Caml  = Core.Caml
+module Int64 = Core_kernel.Core_int64;;
+module Caml  = Core_kernel.Caml
 
 type element_type_t =
   | Void

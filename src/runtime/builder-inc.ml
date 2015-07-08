@@ -34,7 +34,7 @@
    pointer will cause struct storage to be immediately allocated if that pointer
    was null). *)
 
-open Core.Std
+open Core_kernel.Std
 
 type ro = Message.ro
 type rw = Message.rw

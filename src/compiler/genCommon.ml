@@ -28,7 +28,7 @@
  ******************************************************************************)
 
 
-open Core.Std
+open Core_kernel.Std
 
 module M   = Capnp.BytesMessage
 module PS_ = PluginSchema.Make(M)

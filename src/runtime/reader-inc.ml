@@ -32,7 +32,7 @@
    reading from truncated structs both lead to default data being returned. *)
 
 
-open Core.Std
+open Core_kernel.Std
 
 let sizeof_uint64 = 8
 

@@ -28,7 +28,7 @@
  ******************************************************************************)
 
 
-open Core.Std
+open Core_kernel.Std
 
 module PS        = GenCommon.PS
 module Context   = GenCommon.Context

@@ -28,8 +28,8 @@
  ******************************************************************************)
 
 
-module Int64 = Core.Core_int64
-module Caml  = Core.Caml
+module Int64 = Core_kernel.Core_int64
+module Caml  = Core_kernel.Caml
 
 type t = {
   (** Signed offset in words from end of the pointer to start of struct

@@ -10,7 +10,7 @@ if $(defined-env CAPNP_DEV)
 
 
 OCAMLPACKS[] =  \
-  core          \
+  core_kernel   \
   uint          \
   res           \
   ocplib-endian \

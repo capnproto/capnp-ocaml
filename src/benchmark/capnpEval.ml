@@ -6,7 +6,7 @@ module E :
   INCLUDE "eval_defun.ml"
 end
 
-open Core.Std
+open Core_kernel.Std
 
 module TestCase = struct
   type request_reader_t   = E.Reader.Expression.t

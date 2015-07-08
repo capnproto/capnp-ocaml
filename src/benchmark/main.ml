@@ -1,5 +1,5 @@
 
-open Core.Std
+open Core_kernel.Std
 
 let printf = Printf.printf
 let fprintf = Printf.fprintf
