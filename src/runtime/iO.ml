@@ -104,7 +104,7 @@ module WriteContext = struct
 
 end
 
-let rec select fd ?(restart = true) =
+let rec select ?(restart = true) fd =
   try
     select fd ~restart
   with Unix.Unix_error (Unix.EINTR, _, _) ->
