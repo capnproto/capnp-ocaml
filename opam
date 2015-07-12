@@ -12,6 +12,7 @@ depends: [
   "omake"
   "ocamlfind" {>= "1.5.1"}
   "core_kernel"
+  "extunix"
   "ocplib-endian" {>= "0.7"}
   "res"
   "uint"

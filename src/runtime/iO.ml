@@ -241,21 +241,35 @@ let write_message_to_file ?perm ~compression message filename =
 
 
 let write_message_to_file_robust ?perm ~compression message filename =
-  let (tmp_filename, tmp_oc) = Filename.open_temp_file filename "-tmp" in
-  let () = Exn.protectx tmp_oc ~finally:Out_channel.close ~f:(fun fd ->
-      let () = write_message_to_channel ~compression message fd in
-      Out_channel.flush tmp_oc)
+  let parent_dir = Filename.dirname filename in
+  let tmp_prefix = (Filename.basename filename) ^ "-tmp" in
+  let (tmp_filename, tmp_oc) = Filename.open_temp_file
+      ~mode:[Open_binary] ~temp_dir:parent_dir tmp_prefix ""
+  in
+  let () = Exn.protectx tmp_oc ~finally:Out_channel.close ~f:(fun oc ->
+      let () = write_message_to_channel ~compression message oc in
+      let () = Out_channel.flush oc in
+      let fd = UnixLabels.descr_of_out_channel tmp_oc in
+      ExtUnix.Specific.fsync fd)
   in
   let () = UnixLabels.rename ~src:tmp_filename ~dst:filename in
   let () =
-    (* [mkstemp] always creates as 0o600, so we may need to touch up permissions *)
+    (* [open_temp_file] always creates as 0o600, so we may need to touch up permissions *)
     match perm with
     | Some perm ->
         UnixLabels.chmod filename ~perm
     | None ->
         ()
   in
-  ()
+  (* Attempt to sync directory metadata, so the rename is durably
+     recorded.  May not work as expected on all platforms, so
+     suppress errors. *)
+  try
+    let fd = UnixLabels.openfile parent_dir ~mode:[UnixLabels.O_RDONLY] ~perm:0o600 in
+    Exn.protectx fd ~finally:UnixLabels.close ~f:ExtUnix.Specific.fsync
+  with Unix.Unix_error (_, _, _) ->
+    ()
+
 
 let read_single_message_from_fd ?(restart = true) ~compression fd =
   let context = create_read_context_for_fd ~restart ~compression fd in

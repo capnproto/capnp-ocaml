@@ -369,8 +369,8 @@ http://kentonv.github.io/capnproto/install.html[install the Cap\'n Proto compile
 Once the Cap\'n Proto compiler and capnp-ocaml are both installed, you should be
 able to use `capnp compile -o ocaml yourSchemaFile.capnp` in order to generate
 `yourSchemaFile.mli` and `yourSchemaFile.ml` (as well as `yourSchemaFile_defun.ml`,
-referenced below).  These modules will link against
-OCaml packages `core`, `uint`, `ocplib-endian`, `res`, and of course `capnp`.
+referenced below).  These modules will link against OCaml packages
+`core_kernel`, `extunix`, `uint`, `ocplib-endian`, `res`, and of course `capnp`.
 
 Instantiating the Modules
 -------------------------
@@ -434,9 +434,9 @@ You should be able to install capnp-ocaml with
 http://opam.ocaml.org[OPAM] using using `opam install capnp`.
 
 If you prefer to compile manually, you will need OMake, Findlib, and OCaml
-packages `core`, `uint`, `ocplib-endian`, `res`, and `camlp4`.  Run `omake` to
-build both the compiler and the runtime library, and then use `omake install`
-to copy them into appropriate places within your filesystem.
+packages `core_kernel`, `extunix`, `uint`, `ocplib-endian`, `res`, and `camlp4`.
+Run `omake` to build both the compiler and the runtime library, and then use
+`omake install` to copy them into appropriate places within your filesystem.
 
 Contact
 -------
