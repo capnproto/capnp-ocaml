@@ -52,6 +52,8 @@
    from string storage into this new message of the correct type.
 *)
 
+(* Workaround for missing Caml.Bytes in Core 112.35.00 *)
+module CamlBytes = Bytes
 
 open Core_kernel.Std
 
@@ -153,8 +155,8 @@ let emit_instantiate_builder_message message : string list =
     (* 64 characters works out to 16 bytes per line. *)
     let wrap_chars = 64 in
     List.fold_left (List.rev segment_descrs) ~init:[] ~f:(fun acc descr ->
-      let seg = Bytes.sub descr.M.Message.segment 0 descr.M.Message.bytes_consumed in
-      (emit_literal_seg (Bytes.unsafe_to_string seg) wrap_chars) @ acc)
+      let seg = CamlBytes.sub descr.M.Message.segment 0 descr.M.Message.bytes_consumed in
+      (emit_literal_seg (CamlBytes.unsafe_to_string seg) wrap_chars) @ acc)
   in [
     "module DefaultsMessage_ = Capnp.BytesMessage";
     "";

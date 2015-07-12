@@ -1,6 +1,7 @@
 OCAMLINCLUDES += ../runtime
 OCAML_LIBS += ../runtime/libcapnp
 OCAML_CLIBS = libfastrand
+OCAMLPACKS += core
 
 GENERATED = \
   c2b2b.mli \

@@ -27,8 +27,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
+(* Workaround for missing Caml.Bytes in Core 112.35.00 *)
+module CamlBytes = Bytes
 
 open Core_kernel.Std
+module Bytes = CamlBytes
 
 exception Out_of_int_range of string
 let out_of_int_range s = raise (Out_of_int_range s)

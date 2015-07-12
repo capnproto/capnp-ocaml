@@ -1,4 +1,6 @@
 
+module CamlBytes = Bytes
+
 module CR :
   Catrank.S with type 'cap message_t = 'cap Capnp.BytesMessage.Message.t
 = struct
@@ -42,17 +44,17 @@ module TestCase = struct
       score_set result (Float.of_int (1000 - i));
       let url_size = FastRand.int 100 in
       let url_total_size = url_size + url_prefix_len in
-      let url = Bytes.create url_total_size in
-      Bytes.blit
-        (Bytes.unsafe_of_string url_prefix) 0
+      let url = CamlBytes.create url_total_size in
+      CamlBytes.blit
+        (CamlBytes.unsafe_of_string url_prefix) 0
         url 0
         url_prefix_len;
       for j = 0 to url_size - 1 do
         let char_ofs = FastRand.int 26 in
         let byte = (Char.to_int 'a') + char_ofs in
-        Bytes.unsafe_set url (url_prefix_len + j) (Char.unsafe_of_int byte)
+        CamlBytes.unsafe_set url (url_prefix_len + j) (Char.unsafe_of_int byte)
       done;
-      CR.Builder.SearchResult.url_set result url;
+      CR.Builder.SearchResult.url_set result (CamlBytes.unsafe_to_string url);
 
       let is_cat = FastRand.int 8 = 0 in
       let is_dog = FastRand.int 8 = 0 in

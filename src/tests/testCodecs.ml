@@ -27,9 +27,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
+module CamlBytes = Bytes
 open Core_kernel.Std
+module Bytes = CamlBytes
+
 open OUnit2
-module Quickcheck = Core_extended.Quickcheck
+module Quickcheck = Core_extended.Quickcheck_deprecated
 
 
 let expect_packs_to unpacked packed =

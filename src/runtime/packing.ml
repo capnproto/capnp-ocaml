@@ -27,8 +27,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
+(* Workaround for missing Caml.Bytes in Core 112.35.00 *)
+module CamlBytes = Bytes
 
 open Core_kernel.Std
+module Bytes = CamlBytes
 
 let count_zeros ~start ~stop s =
   let sum = ref 0 in

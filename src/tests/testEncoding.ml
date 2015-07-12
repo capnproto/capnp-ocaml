@@ -29,7 +29,9 @@
 
 (* Inspired by encoding-test.c++, as found in the capnproto source. *)
 
+module CamlBytes = Bytes
 open Core_kernel.Std
+module Bytes = CamlBytes
 
 module BM  = Capnp.BytesMessage
 module T   = Test.Make(BM)

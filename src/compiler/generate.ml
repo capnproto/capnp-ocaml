@@ -90,6 +90,7 @@ let functor_sig ~context = [
 
 let mod_functor_header = [
   "module Make (MessageWrapper : Capnp.MessageSig.S) = struct";
+  "  module CamlBytes = Bytes";
 ]
 
 let mod_header ~context = [
@@ -268,6 +269,7 @@ let compile
     in
     let mod_defun_content =
       string_of_lines ( [
+        "  module CamlBytes = Bytes";
         "  type ro = Capnp.Message.ro";
         "  type rw = Capnp.Message.rw";
       ] @

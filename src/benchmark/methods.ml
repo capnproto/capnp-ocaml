@@ -1,5 +1,6 @@
 
-open Core_kernel.Std
+module CamlBytes = Bytes
+open Core.Std
 module IO = Capnp.IO
 module Codecs = Capnp.Codecs
 
@@ -270,10 +271,10 @@ let pass_by_pipe client_func server_func : int =
           ~output_fd:client_to_server_write
       in
       let tp64 = Int64.of_int throughput in
-      let buf = Bytes.create 8 in
+      let buf = CamlBytes.create 8 in
       let () = EndianBytes.LittleEndian.set_int64 buf 0 tp64 in
       let bytes_written = Unix.write client_to_server_write
-          ~buf:(Bytes.unsafe_to_string buf)
+          ~buf:(CamlBytes.unsafe_to_string buf)
       in
       assert (bytes_written = 8);
       exit 0

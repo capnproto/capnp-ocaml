@@ -911,12 +911,12 @@ let string_of_uint8_list
         else
           list_storage.num_elements
       in
-      let buf = Bytes.create result_byte_count in
+      let buf = CamlBytes.create result_byte_count in
       Slice.blit_to_bytes
         ~src:list_storage.storage ~src_pos:0
         ~dst:buf ~dst_pos:0
         ~len:result_byte_count;
-      Bytes.unsafe_to_string buf
+      CamlBytes.unsafe_to_string buf
   | _ ->
       invalid_msg "decoded non-UInt8 list where string data was expected"
 

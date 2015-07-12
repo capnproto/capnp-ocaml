@@ -994,15 +994,13 @@ module type S = sig
 end
 
 module Make (MessageWrapper : Capnp.MessageSig.S) = struct
+  module CamlBytes = Bytes
   module DefaultsMessage_ = Capnp.BytesMessage
 
   let _builder_defaults_message =
     let message_segments = [
       Bytes.unsafe_of_string "\
-      \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
-      \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
-      \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\
-      \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+      ";
     ] in
     DefaultsMessage_.Message.readonly
       (DefaultsMessage_.Message.of_storage message_segments)
@@ -1963,13 +1961,12 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
               else
                 list_storage.num_elements
             in
-            let buf = Bytes.create result_byte_count in
-            let () =
-              for i = 0 to result_byte_count - 1 do
-                Bytes.set buf i (Char.of_int_exn (Slice.get_uint8 list_storage.storage i))
-              done
-            in
-            Bytes.to_string buf
+            let buf = CamlBytes.create result_byte_count in
+            Slice.blit_to_bytes
+              ~src:list_storage.storage ~src_pos:0
+              ~dst:buf ~dst_pos:0
+              ~len:result_byte_count;
+            CamlBytes.unsafe_to_string buf
         | _ ->
             invalid_msg "decoded non-UInt8 list where string data was expected"
       
@@ -2207,9 +2204,11 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let data = struct_storage.StructStorage.data in
           if byte_ofs < data.Slice.len then
             let byte_val = Slice.get_uint8 data byte_ofs in
-            let bit_val = (byte_val lsr bit_ofs) land 0x1 in
-            let result_int = bit_val lxor (Util.int_of_bool default) in
-            Util.bool_of_int result_int
+            let is_set = Util.get_bit byte_val bit_ofs in
+            if default then
+              not is_set
+            else
+              is_set
           else
             default
       | None ->
@@ -3663,13 +3662,12 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
               else
                 list_storage.num_elements
             in
-            let buf = Bytes.create result_byte_count in
-            let () =
-              for i = 0 to result_byte_count - 1 do
-                Bytes.set buf i (Char.of_int_exn (Slice.get_uint8 list_storage.storage i))
-              done
-            in
-            Bytes.to_string buf
+            let buf = CamlBytes.create result_byte_count in
+            Slice.blit_to_bytes
+              ~src:list_storage.storage ~src_pos:0
+              ~dst:buf ~dst_pos:0
+              ~len:result_byte_count;
+            CamlBytes.unsafe_to_string buf
         | _ ->
             invalid_msg "decoded non-UInt8 list where string data was expected"
       
@@ -3784,11 +3782,10 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           ListStorageType.Bytes1
           (String.length src + (if null_terminated then 1 else 0))
       in
-      let len = String.length src in
-      for i = 0 to len - 1 do
-        let byte = Char.to_int src.[i] in
-        NM.Slice.set_uint8 list_storage.NM.ListStorage.storage i byte
-      done;
+      NM.Slice.blit_from_string
+        ~src ~src_pos:0
+        ~dst:list_storage.NM.ListStorage.storage ~dst_pos:0
+        ~len:(String.length src);
       list_storage
 
 
@@ -3953,9 +3950,11 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       : bool =
       let data = struct_storage.NM.StructStorage.data in
       let byte_val = NM.Slice.get_uint8 data byte_ofs in
-      let bit_val = (byte_val lsr bit_ofs) land 0x1 in
-      let result_int = bit_val lxor (Util.int_of_bool default) in
-      Util.bool_of_int result_int
+      let is_set = Util.get_bit byte_val bit_ofs in
+      if default then
+        not is_set
+      else
+        is_set
 
     let get_int8
         ~(default : int)
