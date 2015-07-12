@@ -108,14 +108,6 @@ module WriteContext = struct
 
 end
 
-let rec select ?(restart = true) fd =
-  try
-    select fd ~restart
-  with Unix.Unix_error (Unix.EINTR, _, _) ->
-    if restart
-      then select fd ~restart
-      else ()
-
 module ReadContext = struct
   type 'a t = {
     (** File descriptor we're writing to *)
@@ -179,9 +171,17 @@ module ReadContext = struct
 end
 
 
+let rec loop_eintr f =
+  try
+    f ()
+  with UnixLabels.Unix_error (UnixLabels.EINTR, _, _) ->
+    loop_eintr f
+
+
 let create_write_context_for_fd ?(restart = true) ~compression fd =
   let unix_write fd' ~buf ~pos ~len =
-    Unix.single_write fd' buf pos len
+    let f () = UnixLabels.single_write_substring fd' ~buf ~pos ~len in
+    if restart then loop_eintr f else f ()
   in
   WriteContext.create ~write:unix_write ~compression fd
 
@@ -194,19 +194,10 @@ let create_write_context_for_channel ~compression chan =
   WriteContext.create ~write:chan_write ~compression chan
 
 
-let rec loop_eintr f =
-  try
-    f ()
-  with Unix.Unix_error (Unix.EINTR, _, _) ->
-    loop_eintr f
-
-
 let create_read_context_for_fd ?(restart = true) ~compression fd =
   let unix_read fd' ~buf ~pos ~len =
-    if restart then
-      loop_eintr (fun () -> UnixLabels.read fd' ~buf ~pos ~len)
-    else
-      UnixLabels.read fd' ~buf ~pos ~len
+    let f () = UnixLabels.read fd' ~buf ~pos ~len in
+    if restart then loop_eintr f else f ()
   in
   ReadContext.create ~read:unix_read ~compression fd
 
@@ -226,10 +217,16 @@ let write_message_to_fd ?(restart = true) ~compression message fd =
       let (_ : int) = WriteContext.write context in
       ()
     with
-    | Unix.Unix_error (Unix.EAGAIN, _, _)
-    | Unix.Unix_error (Unix.EWOULDBLOCK, _, _) ->
+    | UnixLabels.Unix_error (UnixLabels.EAGAIN, _, _)
+    | UnixLabels.Unix_error (UnixLabels.EWOULDBLOCK, _, _) ->
         (* Avoid burning CPU time looping on EAGAIN *)
-        select fd ~restart
+        let (_, _, _) =
+          let select () =
+            UnixLabels.select ~read:[] ~write:[fd] ~except:[fd] ~timeout:(-1.0)
+          in
+          if restart then loop_eintr select else select ()
+        in
+        ()
   done
 
 
@@ -249,12 +246,12 @@ let write_message_to_file_robust ?perm ~compression message filename =
       let () = write_message_to_channel ~compression message fd in
       Out_channel.flush tmp_oc)
   in
-  let () = Unix.rename tmp_filename filename in
+  let () = UnixLabels.rename ~src:tmp_filename ~dst:filename in
   let () =
     (* [mkstemp] always creates as 0o600, so we may need to touch up permissions *)
     match perm with
     | Some perm ->
-        Unix.chmod filename perm
+        UnixLabels.chmod filename ~perm
     | None ->
         ()
   in
@@ -266,10 +263,15 @@ let read_single_message_from_fd ?(restart = true) ~compression fd =
     try
       ReadContext.read context
     with
-    | Unix.Unix_error (Unix.EAGAIN, _, _)
-    | Unix.Unix_error (Unix.EWOULDBLOCK, _, _) ->
+    | UnixLabels.Unix_error (UnixLabels.EAGAIN, _, _)
+    | UnixLabels.Unix_error (UnixLabels.EWOULDBLOCK, _, _) ->
         (* Avoid burning CPU time looping on EAGAIN *)
-        select fd ~restart;
+        let (_, _, _) =
+          let select () =
+            UnixLabels.select ~read:[fd] ~write:[] ~except:[fd] ~timeout:(-1.0)
+          in
+          if restart then loop_eintr select else select ()
+        in
         read_loop ()
   in
   let rec loop () =
