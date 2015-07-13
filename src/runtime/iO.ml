@@ -180,7 +180,9 @@ let rec loop_eintr f =
 
 let create_write_context_for_fd ?(restart = true) ~compression fd =
   let unix_write fd' ~buf ~pos ~len =
-    let f () = UnixLabels.single_write_substring fd' ~buf ~pos ~len in
+    let f () = UnixLabels.single_write fd'
+      ~buf:(CamlBytes.unsafe_of_string buf) ~pos ~len
+    in
     if restart then loop_eintr f else f ()
   in
   WriteContext.create ~write:unix_write ~compression fd
