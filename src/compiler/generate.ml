@@ -176,8 +176,7 @@ let compile
     let imports = C.Array.map_list (RequestedFile.imports_get requested_file)
         ~f:(fun import ->
           let import_id = RequestedFile.Import.id_get import in
-          let import_node = Hashtbl.find_exn nodes_table import_id in
-          let schema_filename = PS.Node.display_name_get import_node in
+          let schema_filename = RequestedFile.Import.name_get import in
           let module_name = GenCommon.make_legal_module_name schema_filename in {
             Context.id = import_id;
             Context.schema_name = module_name ^ "_" ^
