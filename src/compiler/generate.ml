@@ -184,10 +184,13 @@ let compile
             Context.module_name = module_name
           })
     in
-    let context = {
+    let context_unfiltered = {
       Context.nodes   = nodes_table;
       Context.imports = imports;
     } in
+    let context = GenCommon.filter_interesting_imports
+        ~context:context_unfiltered requested_file_node
+    in
     let sig_unique_types = List.rev_map
         (GenCommon.collect_unique_types ~context requested_file_node)
         ~f:(fun (name, tp) -> "  type " ^ name)

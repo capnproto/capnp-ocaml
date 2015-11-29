@@ -334,6 +334,138 @@ let rec find_import_providing_node ~context node : Context.import_t option =
   loop_node_scope node
 
 
+let rec union_imports_for_struct_fields ~visited_node_ids ~import_ids ~context
+    (struct_descr : PS.Node.Struct.t) : unit =
+  let struct_fields = PS.Node.Struct.fields_get struct_descr in
+  C.Array.iter struct_fields ~f:(fun field ->
+    match PS.Field.get field with
+    | PS.Field.Slot slot ->
+        let contained_type = PS.Field.Slot.type_get slot in
+        union_imports_for_type ~visited_node_ids ~import_ids ~context contained_type
+    | PS.Field.Group group ->
+        let contained_type_id = PS.Field.Group.type_id_get group in
+        let contained_type_node =
+          Hashtbl.find_exn context.Context.nodes contained_type_id
+        in
+        begin match find_import_providing_node ~context contained_type_node with
+        | Some import -> Hashtbl.replace import_ids ~key:import.Context.id ~data:()
+        | None -> ()
+        end
+    | PS.Field.Undefined x ->
+        failwith (sprintf "Unknown Type union discriminant %d" x))
+
+
+(* Determine the set of imports necessary to define the given type, and union
+   them with the [import_ids] hash table. *)
+and union_imports_for_type ~visited_node_ids ~import_ids ~context (tp : PS.Type.t) : unit =
+  let open PS.Type in
+  match get tp with
+  | Void
+  | Bool
+  | Int8
+  | Int16
+  | Int32
+  | Int64
+  | Uint8
+  | Uint16
+  | Uint32
+  | Uint64
+  | Float32
+  | Float64
+  | Text
+  | Data
+  | Enum _
+  | AnyPointer -> ()
+  | List list_descr ->
+      let contained_type = List.element_type_get list_descr in
+      union_imports_for_type ~visited_node_ids ~import_ids ~context contained_type
+  | Struct struct_descr ->
+      (* It's possible for a struct to contain recursively-defined types.
+         So track nodes already visited in order to ensure termination. *)
+      let struct_id = Struct.type_id_get struct_descr in
+      begin match Hashtbl.add visited_node_ids ~key:struct_id ~data:() with
+      | `Ok ->
+          let struct_node = Hashtbl.find_exn context.Context.nodes struct_id in
+          let () = begin match PS.Node.get struct_node with
+          | PS.Node.Struct struct_descr ->
+              union_imports_for_struct_fields ~visited_node_ids ~import_ids
+                ~context struct_descr
+          | _ ->
+              failwith "found non-struct node where struct node was expected"
+          end in
+          begin match find_import_providing_node ~context struct_node with
+          | Some import -> Hashtbl.replace import_ids ~key:import.Context.id ~data:()
+          | None -> ()
+          end
+      | `Duplicate ->
+          ()
+      end
+  | Interface iface_descr ->
+      (* FIXME: flesh this out when interfaces are properly supported *)
+      let iface_id = Interface.type_id_get iface_descr in
+      let iface_node = Hashtbl.find_exn context.Context.nodes iface_id in
+      begin match find_import_providing_node ~context iface_node with
+      | Some import -> Hashtbl.replace import_ids ~key:import.Context.id ~data:()
+      | None -> ()
+      end
+  | Undefined x ->
+      failwith (sprintf "Unknown Type union discriminant %d" x)
+
+
+(** Not all imports contain interesting content.  In particular, the
+    common import "/capnp/c++.capnp" contains nothing of OCaml relevance.
+    [find_interesting_import_ids] recurses through the node tree to
+    extract the subset of imports which contain interesting content. *)
+and find_interesting_import_ids ~visited_node_ids ~import_ids ~context node =
+  (* It's possible for a struct to contain recursively-defined types.
+     So track nodes already visited in order to ensure termination. *)
+  let node_id = PS.Node.id_get node in
+  match Hashtbl.add visited_node_ids ~key:node_id ~data:() with
+  | `Duplicate ->
+      ()
+  | `Ok ->
+      let () = List.iter (children_of ~context node)
+          ~f:(fun child -> find_interesting_import_ids ~visited_node_ids
+              ~import_ids ~context child)
+      in
+      begin match PS.Node.get node with
+      | PS.Node.Const const_descr ->
+          let tp = PS.Node.Const.type_get const_descr in
+          union_imports_for_type ~visited_node_ids ~import_ids ~context tp
+      | PS.Node.Struct struct_descr ->
+          let () = union_imports_for_struct_fields ~visited_node_ids ~import_ids
+              ~context struct_descr
+          in
+          begin match find_import_providing_node ~context node with
+          | Some import -> Hashtbl.replace import_ids ~key:import.Context.id ~data:()
+          | None -> ()
+          end
+      | PS.Node.Enum _
+      | PS.Node.File
+      | PS.Node.Annotation _
+      | PS.Node.Interface _ ->
+          (* FIXME: recurse here when interfaces are complete *)
+          begin match find_import_providing_node ~context node with
+          | Some import -> Hashtbl.replace import_ids ~key:import.Context.id ~data:()
+          | None -> ()
+          end
+      | PS.Node.Undefined x ->
+          failwith (sprintf "Unknown Node union discriminant %u" x)
+      end
+
+
+let filter_interesting_imports ~context root_node : Context.codegen_context_t =
+  let interesting_ids = Hashtbl.Poly.create () in
+  let visited_node_ids = Hashtbl.Poly.create () in
+  let () = find_interesting_import_ids ~visited_node_ids ~import_ids:interesting_ids
+      ~context root_node
+  in
+  let filtered_imports = List.filter context.Context.imports ~f:(fun import ->
+      Hashtbl.mem interesting_ids import.Context.id)
+  in
+  { context with Context.imports = filtered_imports }
+
+
 (* When modules refer to types defined in other modules, readability dictates
  * that we use OtherModule.t/OtherModule.reader_t/OtherModule.builder_t as
  * the preferred type name.  However, consider the case of nested modules:
