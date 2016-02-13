@@ -1,6 +1,6 @@
 OCAMLINCLUDES += ../runtime
 OCAML_LIBS += ../runtime/libcapnp
-OCAMLPACKS += core_extended
+OCAMLPACKS += core_extended oUnit
 
 # It's OK if tests run slowly; if something goes wrong, we want the
 # best possible backtrace support.
