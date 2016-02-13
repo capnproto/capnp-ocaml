@@ -51,11 +51,11 @@ let add_parentage_maps
       in
       let child_node_id = id_get child_node in
       let () = add_children child_node in
-      Hashtbl.replace parentage_table ~key:child_node_id ~data:node_id)
+      Hashtbl.set parentage_table ~key:child_node_id ~data:node_id)
   in
   let () = add_children node in
   (* Also adding an identity map for the parent node *)
-  Hashtbl.replace parentage_table ~key:node_id ~data:node_id
+  Hashtbl.set parentage_table ~key:node_id ~data:node_id
 
 
 let build_parentage_table
@@ -87,10 +87,10 @@ let register_reference ~parentage_table ~edges ~referrer ~referee : unit =
               (* This reference is already present *)
               ()
             else
-              Hashtbl.replace edges ~key:parent_referee
+              Hashtbl.set edges ~key:parent_referee
                 ~data:(referrer :: referrer_list)
         | None ->
-            Hashtbl.replace edges ~key:parent_referee ~data:[referrer]
+            Hashtbl.set edges ~key:parent_referee ~data:[referrer]
         end
   | None ->
       (* When recursing within node M, we may find reference to nodes which are

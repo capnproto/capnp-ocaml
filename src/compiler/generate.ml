@@ -165,7 +165,7 @@ let compile
   let nodes_table = Hashtbl.Poly.create () in
   let nodes = PS.CodeGeneratorRequest.nodes_get request in
   let () = C.Array.iter nodes ~f:(fun node ->
-      Hashtbl.replace nodes_table ~key:(PS.Node.id_get node) ~data:node)
+      Hashtbl.set nodes_table ~key:(PS.Node.id_get node) ~data:node)
   in
   let requested_files = PS.CodeGeneratorRequest.requested_files_get request in
   C.Array.iter requested_files ~f:(fun requested_file ->

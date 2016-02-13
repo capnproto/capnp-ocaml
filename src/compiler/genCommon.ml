@@ -348,7 +348,7 @@ let rec union_imports_for_struct_fields ~visited_node_ids ~import_ids ~context
           Hashtbl.find_exn context.Context.nodes contained_type_id
         in
         begin match find_import_providing_node ~context contained_type_node with
-        | Some import -> Hashtbl.replace import_ids ~key:import.Context.id ~data:()
+        | Some import -> Hashtbl.set import_ids ~key:import.Context.id ~data:()
         | None -> ()
         end
     | PS.Field.Undefined x ->
@@ -394,7 +394,7 @@ and union_imports_for_type ~visited_node_ids ~import_ids ~context (tp : PS.Type.
               failwith "found non-struct node where struct node was expected"
           end in
           begin match find_import_providing_node ~context struct_node with
-          | Some import -> Hashtbl.replace import_ids ~key:import.Context.id ~data:()
+          | Some import -> Hashtbl.set import_ids ~key:import.Context.id ~data:()
           | None -> ()
           end
       | `Duplicate ->
@@ -405,7 +405,7 @@ and union_imports_for_type ~visited_node_ids ~import_ids ~context (tp : PS.Type.
       let iface_id = Interface.type_id_get iface_descr in
       let iface_node = Hashtbl.find_exn context.Context.nodes iface_id in
       begin match find_import_providing_node ~context iface_node with
-      | Some import -> Hashtbl.replace import_ids ~key:import.Context.id ~data:()
+      | Some import -> Hashtbl.set import_ids ~key:import.Context.id ~data:()
       | None -> ()
       end
   | Undefined x ->
@@ -437,7 +437,7 @@ and find_interesting_import_ids ~visited_node_ids ~import_ids ~context node =
               ~context struct_descr
           in
           begin match find_import_providing_node ~context node with
-          | Some import -> Hashtbl.replace import_ids ~key:import.Context.id ~data:()
+          | Some import -> Hashtbl.set import_ids ~key:import.Context.id ~data:()
           | None -> ()
           end
       | PS.Node.Enum _
@@ -446,7 +446,7 @@ and find_interesting_import_ids ~visited_node_ids ~import_ids ~context node =
       | PS.Node.Interface _ ->
           (* FIXME: recurse here when interfaces are complete *)
           begin match find_import_providing_node ~context node with
-          | Some import -> Hashtbl.replace import_ids ~key:import.Context.id ~data:()
+          | Some import -> Hashtbl.set import_ids ~key:import.Context.id ~data:()
           | None -> ()
           end
       | PS.Node.Undefined x ->
