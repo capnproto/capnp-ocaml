@@ -1,3 +1,10 @@
+== capnp-ocaml 2.1.1
+
+* Fix `Not_found` exception when a capnp import is not referenced within the schema file.
+* Omit references to capnp imports which are not used within the generated code.  In
+  particular, importing `"/capnp/c++.capnp"` no longer generates a reference to an OCaml
+  module with the confusing name of `C2b2b`, and there should no longer be a need to
+  separately compile that imported schema file.
 
 == capnp-ocaml 2.1.0
 
