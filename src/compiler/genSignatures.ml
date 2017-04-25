@@ -36,8 +36,8 @@ module Mode    = GenCommon.Mode
 module C = Capnp
 
 let sprintf = Printf.sprintf
+let failf msg = Format.kasprintf failwith msg
 let apply_indent = GenCommon.apply_indent
-
 
 (* Generate a function for unpacking a capnp union type as an OCaml variant. *)
 let generate_union_getter ~context ~scope ~mode fields =
@@ -273,8 +273,11 @@ let generate_accessors ~context ~scope ~mode
  * stack of scope IDs corresponding to this lexical context, and is used to figure
  * out what module prefixes are required to properly qualify a type.
  *
+ * For struct without parents (e.g. auto-generated method parameters), [uqname] must be
+ * supplied.
+ *
  * Raises: Failure if the children of this node contain a cycle. *)
-let generate_struct_node ~context ~scope ~nested_modules
+let generate_struct_node ?uq_name ~context ~scope ~nested_modules
     ~mode ~node struct_def : string list =
   let unsorted_fields =
     C.Array.to_list (PS.Node.Struct.fields_get struct_def)
@@ -305,10 +308,10 @@ let generate_struct_node ~context ~scope ~nested_modules
     in
     generate_accessors ~context ~scope ~mode ~f:selector non_union_fields
   in
-  let unique_reader = GenCommon.make_unique_typename ~mode:Mode.Reader
+  let unique_reader = GenCommon.make_unique_typename ?uq_name ~mode:Mode.Reader
       ~context node
   in
-  let unique_builder = GenCommon.make_unique_typename ~mode:Mode.Builder
+  let unique_builder = GenCommon.make_unique_typename ?uq_name ~mode:Mode.Builder
       ~context node
   in
   let header =
@@ -343,6 +346,63 @@ let generate_struct_node ~context ~scope ~nested_modules
     non_union_accessors @
     footer
 
+let generate_methods ~context ~scope ~nested_modules ~mode interface_def : string list =
+  (* todo: superclasses *)
+  let auto_mod_name ~method_name dir =
+    let prefix = String.capitalize method_name in
+    match dir with
+    | `Params -> prefix ^ "_params"
+    | `Results -> prefix ^ "_results"
+  in
+  let make_auto ~method_name dir struct_id =
+    let struct_node = Hashtbl.find_exn context.Context.nodes struct_id in
+    (* If scopeID is zero then the struct was auto-generated, and we should emit it. *)
+    if PS.Node.scope_id_get struct_node = Uint64.zero then (
+      match PS.Node.get struct_node with
+      | PS.Node.Struct struct_def ->
+        let body = generate_struct_node
+            ~uq_name:method_name ~context ~scope ~nested_modules ~mode ~node:struct_node struct_def
+        in
+        [ "module " ^ auto_mod_name ~method_name dir ^ " : sig" ] @
+          (apply_indent ~indent:"  " body) @
+        [ "end" ]
+      | _ ->
+        failf "Method payload %s is not a struct!" (PS.Node.display_name_get struct_node)
+    ) else (
+      []
+    )
+  in
+  let methods = PS.Node.Interface.methods_get_list interface_def in
+  let structs =
+    List.map methods ~f:(fun method_def ->
+        let method_name = PS.Method.name_get method_def in
+        make_auto ~method_name `Params (PS.Method.param_struct_type_get method_def) @
+        make_auto ~method_name `Results (PS.Method.result_struct_type_get method_def)
+      )
+    |> List.concat
+  in
+  let make_type ~method_name dir mode struct_id =
+    let node = Hashtbl.find_exn context.Context.nodes struct_id in
+    if PS.Node.scope_id_get node = Uint64.zero then (
+      GenCommon.make_unique_typename ~uq_name:method_name ~context ~mode node
+    ) else (
+      GenCommon.make_unique_typename ~mode ~context node
+    )
+  in
+  let client =
+    let methods =
+      List.map methods ~f:(fun method_def ->
+          let method_name = PS.Method.name_get method_def in
+          let params = make_type ~method_name `Params Mode.Builder @@ PS.Method.param_struct_type_get method_def in
+          let results = make_type ~method_name `Results Mode.Reader @@ PS.Method.result_struct_type_get method_def in
+          sprintf "method %s : (%s, %s) proxy_method_t" (GenCommon.mangle_method method_name) params results
+        )
+    in
+    [ "class client : rpc_client_t -> object" ] @
+    (apply_indent ~indent:"  " methods) @
+    [ "end" ]
+  in
+  structs @ client
 
 (* Generate the OCaml type signature corresponding to a node.  [scope] is
  * a stack of scope IDs corresponding to this lexical context, and is used to figure out
@@ -406,7 +466,14 @@ let rec generate_node
           (apply_indent ~indent:"  " body) @
           [ "end" ]
   | Interface iface_def ->
-      let body = generate_nested_modules () in
+      let nested_modules = generate_nested_modules () in
+      let unique_reader = GenCommon.make_unique_typename ~context ~mode:Mode.Reader node in
+      let body = [
+        "type t = " ^ unique_reader;
+        "type reader_t = " ^ unique_reader;
+        "val interface_id : Uint64.t";
+      ] @ generate_methods ~context ~scope ~nested_modules ~mode iface_def
+      in
       if suppress_module_wrapper then
         body
       else
