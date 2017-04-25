@@ -44,6 +44,7 @@ module ReaderApi = struct
 end
 
 let sprintf = Printf.sprintf
+let failf msg = Format.kasprintf failwith msg
 let apply_indent = GenCommon.apply_indent
 
 
@@ -642,10 +643,14 @@ let generate_list_setters ~context ~scope ~list_type
     | Interface _ -> [
         "let " ^ field_name ^
           "_set x v = failwith \"not implemented (type iface)\"";
+        "let " ^ field_name ^
+          "_init x n = failwith \"not implemented (type iface)\"";
         ]
     | AnyPointer -> [
         "let " ^ field_name ^
           "_set x v = failwith \"not implemented (type anyptr)\"";
+        "let " ^ field_name ^
+          "_init x n = failwith \"not implemented (type anyptr)\"";
         ]
     | Undefined x ->
          failwith (sprintf "Unknown Type union discriminant %d" x)
@@ -1500,7 +1505,7 @@ let generate_constant ~context ~scope ~node ~node_name const_def =
  * out what module prefixes are required to properly qualify a type.
  *
  * Raises: Failure if the children of this node contain a cycle. *)
-let rec generate_struct_node ~context ~scope ~nested_modules ~mode
+let rec generate_struct_node ?uq_name ~context ~scope ~nested_modules ~mode
     ~node struct_def =
   let unsorted_fields =
     C.Array.to_list (PS.Node.Struct.fields_get struct_def)
@@ -1522,10 +1527,10 @@ let rec generate_struct_node ~context ~scope ~nested_modules ~mode
   let non_union_accessors =
     generate_accessors ~context ~node ~scope ~mode struct_def non_union_fields
   in
-  let unique_reader = GenCommon.make_unique_typename ~mode:Mode.Reader
+  let unique_reader = GenCommon.make_unique_typename ?uq_name ~mode:Mode.Reader
       ~context node
   in
-  let unique_builder = GenCommon.make_unique_typename ~mode:Mode.Builder
+  let unique_builder = GenCommon.make_unique_typename ?uq_name ~mode:Mode.Builder
       ~context node
   in
   let header =
@@ -1569,6 +1574,39 @@ let rec generate_struct_node ~context ~scope ~nested_modules ~mode
     union_accessors @
     non_union_accessors @
     footer
+
+
+and generate_methods ~context ~scope ~nested_modules ~mode interface_def : string list =
+  (* todo: superclasses *)
+  let make_auto ~method_name ~name struct_id =
+    let struct_node = Hashtbl.find_exn context.Context.nodes struct_id in
+    (* If scopeID is zero then the struct was auto-generated, and we should emit it. *)
+    if PS.Node.scope_id_get struct_node = Uint64.zero then (
+      match PS.Node.get struct_node with
+      | PS.Node.Struct struct_def ->
+        let body = generate_struct_node
+            ~uq_name:method_name ~context ~scope ~nested_modules ~mode ~node:struct_node struct_def
+        in
+        [ "module " ^ name ^ " = struct" ] @
+          (apply_indent ~indent:"  " body) @
+        [ "end" ]
+      | _ ->
+        failf "Method payload %s is not a struct!" (PS.Node.display_name_get struct_node)
+    ) else (
+      []
+    )
+  in
+  let methods = PS.Node.Interface.methods_get_list interface_def in
+  List.mapi methods ~f:(fun method_id method_def ->
+      let method_name = PS.Method.name_get method_def in
+      let params = make_auto ~method_name ~name:"Params" @@ PS.Method.param_struct_type_get method_def in
+      let result = make_auto ~method_name ~name:"Results" @@ PS.Method.result_struct_type_get method_def in
+      let body = sprintf "let method_id = %u" method_id :: (params @ result) in
+      [ "module " ^ String.capitalize method_name ^ " = struct" ] @
+        (apply_indent ~indent:"  " body) @
+      [ "end" ]
+    )
+  |> List.concat
 
 
 (* Generate the OCaml module and type signature corresponding to a node.  [scope] is
@@ -1632,7 +1670,14 @@ and generate_node
           (apply_indent ~indent:"  " body) @
           [ "end" ]
   | PS.Node.Interface iface_def ->
-      let body = generate_nested_modules () in
+      let nested_modules = generate_nested_modules () in
+      let unique_reader = GenCommon.make_unique_typename ~context ~mode:Mode.Reader node in
+      let body = [
+        "type t = " ^ unique_reader;
+        "type reader_t = " ^ unique_reader;
+        sprintf "let interface_id = Uint64.of_string \"%s\"" (Uint64.to_string_hex (PS.Node.id_get node));
+      ] @ generate_methods ~context ~scope ~nested_modules ~mode iface_def
+      in
       if suppress_module_wrapper then
         body
       else
