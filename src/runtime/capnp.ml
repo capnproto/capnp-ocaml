@@ -34,5 +34,5 @@ module BytesStorage = CapnpRuntime.BytesStorage
 module BytesMessage = CapnpRuntime.Message.BytesMessage
 module Codecs       = CapnpRuntime.Codecs
 module IO           = CapnpRuntime.IO
+module RPC          = CapnpRuntime.RPC
 module Runtime      = CapnpRuntime
-

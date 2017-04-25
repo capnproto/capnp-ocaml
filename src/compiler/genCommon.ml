@@ -36,8 +36,11 @@ module PS  = PS_.Reader
 module C   = Capnp
 
 let sprintf = Printf.sprintf
+let failf msg = Format.kasprintf failwith msg
 let uint64_equal = C.Runtime.Util.uint64_equal
 
+(* An (incomplete) list of names to avoid. *)
+let ocaml_reserved_names = ["class"; "type"; "method"; "end"; "for"; "while"; "when"; "if"; "then"; "else"; "struct"]
 
 module Context = struct
   type import_t = {
@@ -58,6 +61,11 @@ module Context = struct
     (* List of imports associated with the module to be generated *)
     imports : import_t list;
   }
+
+  let find t id =
+    match Hashtbl.find t.nodes id with
+    | None -> failf "Node with ID %a not found" Uint64.printer id
+    | Some x -> x
 end
 
 
@@ -66,6 +74,10 @@ module Mode = struct
   type t =
     | Reader
     | Builder
+
+  let flip = function
+    | Reader -> Builder
+    | Builder -> Reader
 end
 
 
@@ -83,6 +95,9 @@ let mangle_ident (ident : string) (idents : string list) =
       mangled
   in
   loop ident
+
+let mangle_method ident =
+  mangle_ident ident ocaml_reserved_names
 
 let mangle_undefined reserved_names =
   String.capitalize (mangle_ident "undefined" reserved_names)
@@ -263,7 +278,7 @@ let make_unique_enum_module_name ~context enum_node =
   (String.capitalize uq_name) ^ "_" ^ (Uint64.to_string node_id)
 
 
-let make_unique_typename ~context ~(mode : Mode.t) node =
+let make_unique_typename ?uq_name ~context ~(mode : Mode.t) node =
   match PS.Node.get node with
   | PS.Node.Enum enum_def ->
       (* Enums don't have unique type names, they have unique module names.  This
@@ -276,10 +291,12 @@ let make_unique_typename ~context ~(mode : Mode.t) node =
         | Mode.Reader  -> "reader_t"
         | Mode.Builder -> "builder_t"
       in
-      let uq_name = get_unqualified_name
-          ~parent:(Hashtbl.find_exn context.Context.nodes
-              (PS.Node.scope_id_get node))
-          ~child:node
+      let uq_name =
+        match uq_name with
+        | Some x -> x
+        | None -> get_unqualified_name
+                    ~parent:(Context.find context (PS.Node.scope_id_get node))
+                    ~child:node
       in
       let node_id = PS.Node.id_get node in
       sprintf "%s_%s_%s" t_str uq_name (Uint64.to_string node_id)
@@ -769,6 +786,38 @@ let generate_enum_sig ?unique_module_name enum_def =
   header @ variants
 
 
+let method_param_types ~method_name:uq_name ~context node =
+  let reader_name = make_unique_typename ~uq_name ~context ~mode:Mode.Reader node in
+  let builder_name = make_unique_typename ~uq_name ~context ~mode:Mode.Builder node in
+  let reader_type = "ro MessageWrapper.StructStorage.t option" in
+  let builder_type = "rw MessageWrapper.StructStorage.t" in
+  [
+    (builder_name, builder_type);
+    (reader_name, reader_type);
+  ]
+
+
+let method_types ~context interface_def =
+  let methods = PS.Node.Interface.methods_get_list interface_def in
+  List.map methods ~f:(fun method_def ->
+      let method_name = PS.Method.name_get method_def in
+      let make_auto ~name struct_id =
+        let struct_node = Context.find context struct_id in
+        if PS.Node.scope_id_get struct_node = Uint64.zero then (
+          match PS.Node.get struct_node with
+          | PS.Node.Struct struct_def ->
+            method_param_types ~method_name ~context struct_node
+          | _ ->
+            failf "Method payload %s is not a struct!" (PS.Node.display_name_get struct_node)
+        ) else []
+      in
+      let params = make_auto ~name:"Params" @@ PS.Method.param_struct_type_get method_def in
+      let result = make_auto ~name:"Results" @@ PS.Method.result_struct_type_get method_def in
+      params @ result
+    )
+  |> List.concat
+
+
 (* Recurse through the schema, collecting unique type names and type
    definitions for all the nodes. *)
 let rec collect_unique_types ?acc ~context node =
@@ -786,8 +835,7 @@ let rec collect_unique_types ?acc ~context node =
   | PS.Node.Annotation _
   | PS.Node.Enum _ ->
       names
-  | PS.Node.Struct _
-  | PS.Node.Interface _ ->
+  | PS.Node.Struct _ ->
       let reader_name = make_unique_typename ~context
           ~mode:Mode.Reader node
       in
@@ -797,6 +845,10 @@ let rec collect_unique_types ?acc ~context node =
       in
       let builder_type = "rw MessageWrapper.StructStorage.t" in
       (builder_name, builder_type) :: (reader_name, reader_type) :: names
+  | PS.Node.Interface interface_def ->
+      let reader_name = make_unique_typename ~context ~mode:Mode.Reader node in
+      let reader_type = "Uint32.t option" in
+      (reader_name, reader_type) :: method_types ~context interface_def @ names
   | PS.Node.Undefined x ->
       failwith (sprintf "Unknown Node union discriminant %u" x)
 
@@ -848,5 +900,62 @@ let rec collect_unique_enums ?(toplevel = true) ~is_sig ~context ~node_name node
   else
     (* Recursive call *)
     all_decls
+
+
+module Method = struct
+  type phase = Params | Results
+
+  type t = {
+    method_id : int;
+    method_def : PS.Method.t;
+    context : Context.codegen_context_t;
+  }
+
+  let create ~context method_id method_def =
+    { method_id; method_def; context }
+
+  let capnp_name t = PS.Method.name_get t.method_def
+
+  let ocaml_name t =
+    mangle_method (capnp_name t)
+
+  let payload t = function
+    | Params -> PS.Method.param_struct_type_get t.method_def
+    | Results -> PS.Method.result_struct_type_get t.method_def
+
+  let auto_struct phase t =
+    let struct_id = payload t phase in
+    let struct_node = Hashtbl.find_exn t.context.Context.nodes struct_id in
+    (* If scopeID is zero then the struct was auto-generated, and we should emit it. *)
+    if PS.Node.scope_id_get struct_node = Uint64.zero then (
+      match PS.Node.get struct_node with
+      | PS.Node.Struct struct_def ->
+        let prefix = String.capitalize (capnp_name t) in
+        let mod_name =
+          match phase with
+          | Params -> prefix ^ "_params"
+          | Results -> prefix ^ "_results"
+        in
+        `Auto (struct_node, struct_def, mod_name)
+      | _ -> failf "Method payload %s is not a struct!" (PS.Node.display_name_get struct_node)
+    ) else `Existing struct_node
+
+  let payload_type ~mode phase t =
+    match auto_struct phase t with
+    | `Existing struct_node ->
+      let mode = match phase with Params -> Mode.flip mode | Results -> mode in
+      make_unique_typename ~mode ~context:t.context struct_node
+    | `Auto (_, _, mod_name) ->
+      match mode, phase with
+      | Mode.Reader, Params -> mod_name ^ ".builder_t"
+      | Mode.Reader, Results -> mod_name ^ ".t"
+      | Mode.Builder, Params -> mod_name ^ ".reader_t"
+      | Mode.Builder, Results -> mod_name ^ ".t"
+
+  let id t = t.method_id
+
+  let methods_of_interface ~context interface_def =
+    PS.Node.Interface.methods_get_list interface_def |> List.mapi ~f:(create ~context)
+end
 
 

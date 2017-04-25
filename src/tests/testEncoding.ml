@@ -1636,7 +1636,7 @@ let test_any_pointers ctx =
   let rchild = T.Reader.TestSturdyRefHostId.of_pointer rptr in
   assert_equal ~printer:(fun f -> f) "test-host" (T.Reader.TestSturdyRefHostId.host_get rchild);
   (* Test zeroing out *)
-  T.Builder.TestAnyPointer.any_pointer_field_set_reader root None;
+  ignore (T.Builder.TestAnyPointer.any_pointer_field_set_reader root None);
   assert_equal ~printer:(fun f -> f) "" (T.Reader.TestSturdyRefHostId.host_get rchild);
   (* Interfaces *)
   T.Builder.TestAnyPointer.any_pointer_field_set_interface root (Some (Uint32.of_int 42));

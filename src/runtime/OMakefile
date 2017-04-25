@@ -18,6 +18,7 @@ RUNTIME_MODULES =   \
   packing           \
   pointer           \
   structPointer     \
+  rPC               \
   util
 
 INSTALL_FILES = \

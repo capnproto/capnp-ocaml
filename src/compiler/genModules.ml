@@ -44,6 +44,7 @@ module ReaderApi = struct
 end
 
 let sprintf = Printf.sprintf
+let failf msg = Format.kasprintf failwith msg
 let apply_indent = GenCommon.apply_indent
 
 
@@ -642,10 +643,14 @@ let generate_list_setters ~context ~scope ~list_type
     | Interface _ -> [
         "let " ^ field_name ^
           "_set x v = failwith \"not implemented (type iface)\"";
+        "let " ^ field_name ^
+          "_init x n = failwith \"not implemented (type iface)\"";
         ]
     | AnyPointer -> [
         "let " ^ field_name ^
           "_set x v = failwith \"not implemented (type anyptr)\"";
+        "let " ^ field_name ^
+          "_init x n = failwith \"not implemented (type anyptr)\"";
         ]
     | Undefined x ->
          failwith (sprintf "Unknown Type union discriminant %d" x)
@@ -1146,6 +1151,8 @@ let generate_one_field_accessors ~context ~node_id ~scope
                   sprintf "  (RA_.has_field x %u)" field_ofs;
                   "let " ^ field_name ^ "_get x = " ^ obj_magic;
                   sprintf "  (RA_.get_struct%s x %u)" reader_default_str field_ofs;
+                  "let " ^ field_name ^ "_get_pipelined x = ";
+                  sprintf "  RPC.Untyped.struct_field x %u" field_ofs;
                 ]
               | Mode.Builder -> [
                   "let has_" ^ field_name ^ " x = " ^ obj_magic;
@@ -1192,6 +1199,8 @@ let generate_one_field_accessors ~context ~node_id ~scope
             let getters = [
               "let " ^ field_name ^ "_get x = " ^ obj_magic;
               sprintf "  (%s.get_interface x %u)" api_module field_ofs;
+              "let " ^ field_name ^ "_get_pipelined x = ";
+              sprintf "  RPC.Untyped.capability_field x %u" field_ofs;
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v = " ^ obj_magic;
@@ -1504,7 +1513,7 @@ let generate_constant ~context ~scope ~node ~node_name const_def =
  * out what module prefixes are required to properly qualify a type.
  *
  * Raises: Failure if the children of this node contain a cycle. *)
-let rec generate_struct_node ~context ~scope ~nested_modules ~mode
+let rec generate_struct_node ?uq_name ~context ~scope ~nested_modules ~mode
     ~node struct_def =
   let unsorted_fields =
     C.Array.to_list (PS.Node.Struct.fields_get struct_def)
@@ -1526,10 +1535,10 @@ let rec generate_struct_node ~context ~scope ~nested_modules ~mode
   let non_union_accessors =
     generate_accessors ~context ~node ~scope ~mode struct_def non_union_fields
   in
-  let unique_reader = GenCommon.make_unique_typename ~mode:Mode.Reader
+  let unique_reader = GenCommon.make_unique_typename ?uq_name ~mode:Mode.Reader
       ~context node
   in
-  let unique_builder = GenCommon.make_unique_typename ~mode:Mode.Builder
+  let unique_builder = GenCommon.make_unique_typename ?uq_name ~mode:Mode.Builder
       ~context node
   in
   let header =
@@ -1549,6 +1558,7 @@ let rec generate_struct_node ~context ~scope ~nested_modules ~mode
         "let of_message x = RA_.get_root_struct (RA_.Message.readonly x)";
         "let of_builder x = Some (RA_.StructStorage.readonly x)";
         "let of_pointer = RA_.deref_opt_struct_pointer";
+        "let of_payload x = RA_.deref_opt_struct_pointer (RPC.Untyped.content_of_payload x)";
       ]
     | Mode.Builder ->
         let data_words    = PS.Node.Struct.data_word_count_get struct_def in
@@ -1573,6 +1583,81 @@ let rec generate_struct_node ~context ~scope ~nested_modules ~mode
     union_accessors @
     non_union_accessors @
     footer
+
+
+and generate_methods ~context ~scope ~nested_modules ~mode interface_def : string list =
+  (* todo: superclasses *)
+  let module Method = GenCommon.Method in
+  let methods = Method.methods_of_interface ~context interface_def in
+  let make_auto m phase =
+    match Method.auto_struct phase m with
+    | `Existing _ -> []
+    | `Auto (struct_node, struct_def, mod_name) ->
+      let uq_name = Method.capnp_name m in
+      let body = generate_struct_node
+          ~uq_name ~context ~scope ~nested_modules:[] ~mode ~node:struct_node struct_def
+      in
+      [ "module " ^ mod_name ^ " = struct" ] @
+      (apply_indent ~indent:"  " body) @
+      [ "end" ]
+  in
+  let structs =
+    List.map methods ~f:(fun m ->
+        make_auto m Method.Params @
+        make_auto m Method.Results
+      )
+    |> List.concat
+  in
+  match mode with
+  | Mode.Reader ->
+    let client =
+      let body =
+        List.map methods ~f:(fun m ->
+            [
+              sprintf "method %s : (%s, %s) RPC.Capability.method_t = RPC.Untyped.bind_method x ~interface_id ~method_id:%d"
+                (Method.ocaml_name m)
+                (Method.(payload_type Params) ~mode m)
+                (Method.(payload_type Results) ~mode m)
+                (Method.id m);
+            ]
+          )
+        |> List.concat
+      in
+      [ "class client x = object" ] @
+      (apply_indent ~indent:"  " body) @
+      [ "end" ]
+    in
+    nested_modules @ structs @ client
+  | Mode.Builder ->
+    let service =
+      let body =
+        List.map methods ~f:(fun m ->
+            sprintf "method %s : (%s, %s) RPC.Service.method_t"
+              (Method.ocaml_name m)
+              (Method.(payload_type Params) ~mode m)
+              (Method.(payload_type Results) ~mode m)
+          )
+      in
+      let dispatch_body =
+        List.map methods ~f:(fun m ->
+            sprintf "| %d -> RPC.Untyped.abstract_method service#%s"
+              (Method.id m)
+              (Method.ocaml_name m)
+          )
+      in
+      [ "class type service = object" ] @
+      (apply_indent ~indent:"  " body) @
+      [ "end";
+        "let local (service:#service) =";
+        "  RPC.Untyped.local (fun ~interface_id:i ~method_id ->";
+        "    assert (i = interface_id);";
+        "    match method_id with";
+      ] @ apply_indent ~indent:"    " dispatch_body @
+      [ "    | x -> failwith (Printf.sprintf \"Unknown method ID %d\" x)";
+        "  )";
+      ]
+    in
+    nested_modules @ structs @ service
 
 
 (* Generate the OCaml module and type signature corresponding to a node.  [scope] is
@@ -1636,7 +1721,14 @@ and generate_node
           (apply_indent ~indent:"  " body) @
           [ "end" ]
   | PS.Node.Interface iface_def ->
-      let body = generate_nested_modules () in
+      let nested_modules = generate_nested_modules () in
+      let unique_reader = GenCommon.make_unique_typename ~context ~mode:Mode.Reader node in
+      let body = [
+        "type t = " ^ unique_reader;
+        "type reader_t = " ^ unique_reader;
+        sprintf "let interface_id = Uint64.of_string \"%s\"" (Uint64.to_string_hex (PS.Node.id_get node));
+      ] @ generate_methods ~context ~scope ~nested_modules ~mode iface_def
+      in
       if suppress_module_wrapper then
         body
       else
