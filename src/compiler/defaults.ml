@@ -177,9 +177,9 @@ let emit_instantiate_builder_structs struct_array : string list =
     let open M.StructStorage in [
       "let " ^ (builder_string_of_ident ident) ^ " =";
       "  let data_segment_id = " ^
-        (Int.to_string struct_storage.data.M.Slice.segment_id) ^ "in";
+        (Int.to_string struct_storage.data.M.Slice.segment_id) ^ " in";
       "  let pointers_segment_id = " ^
-        (Int.to_string struct_storage.pointers.M.Slice.segment_id) ^ "in {";
+        (Int.to_string struct_storage.pointers.M.Slice.segment_id) ^ " in {";
       "  DefaultsMessage_.StructStorage.data = {";
       "    DefaultsMessage_.Slice.msg = _builder_defaults_message;";
       "    DefaultsMessage_.Slice.segment = DefaultsMessage_.Message.get_segment \
