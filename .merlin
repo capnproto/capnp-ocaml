@@ -1,4 +1,4 @@
-S src
+S src/**
 B _build/src
 PKG uint
 PKG core

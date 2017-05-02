@@ -149,12 +149,16 @@ let generate_one_field_accessors ~context ~scope ~mode field
           Getter [
             sprintf "val %s_get : t -> %s"
               field_name
-              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp); ];
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp);
+            sprintf "val %s_get_interface : t -> Uint32.t option"
+              field_name ];
           Setter [
             sprintf "val %s_set : t -> %s -> %s"
               field_name
               (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp)
-              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp); ];
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp);
+            sprintf "val %s_set_interface : t -> Uint32.t option -> unit"
+              field_name ];
         ]
       | List list_descr ->
           let list_type = List.element_type_get list_descr in [
@@ -319,12 +323,14 @@ let generate_struct_node ~context ~scope ~nested_modules
     | Mode.Reader -> [
         "val of_message : 'cap message_t -> t";
         "val of_builder : builder_t -> t";
+        "val of_pointer : pointer_t -> t";
       ]
     | Mode.Builder -> [
         "val of_message : rw message_t -> t";
         "val to_message : t -> rw message_t";
         "val to_reader : t -> reader_t";
         "val init_root : ?message_size:int -> unit -> t";
+        "val init_pointer : pointer_t -> t";
       ]
   in
   header @

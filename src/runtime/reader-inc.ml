@@ -73,6 +73,11 @@ let deref_struct_pointer (pointer_bytes : 'cap Slice.t)
       invalid_msg "decoded capability pointer where struct pointer was expected"
 
 
+let deref_opt_struct_pointer = function
+  | None -> None
+  | Some x -> deref_struct_pointer x
+
+
 let void_list_decoders =
   ListDecoders.Empty (fun (x : unit) -> x)
 
