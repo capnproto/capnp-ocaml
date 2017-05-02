@@ -1308,6 +1308,18 @@ let init_struct
   let () = BOps.init_struct_pointer pointer_bytes storage in
   storage
 
+let init_struct_pointer
+    pointer_bytes
+    ~(data_words : int)
+    ~(pointer_words : int)
+  : rw NM.StructStorage.t =
+  let () = BOps.deep_zero_pointer pointer_bytes in
+  let storage =
+    BOps.alloc_struct_storage pointer_bytes.NM.Slice.msg ~data_words ~pointer_words
+  in
+  let () = BOps.init_struct_pointer pointer_bytes storage in
+  storage
+
 (* Locate the storage region corresponding to the root struct of a message.
    The [data_words] and [pointer_words] specify the expected struct layout. *)
 let get_root_struct

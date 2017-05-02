@@ -1222,10 +1222,18 @@ let generate_one_field_accessors ~context ~node_id ~scope
                 (if mode = Mode.Reader then reader_default_str
                  else builder_default_str)
                 field_ofs;
+              "let " ^ field_name ^ "_get_interface x =";
+              sprintf "  %s.get_interface x %u"
+                api_module
+                field_ofs;
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v =";
               sprintf "  BA_.set_pointer %sx %u v"
+                discr_str
+                field_ofs;
+              "let " ^ field_name ^ "_set_interface x v =";
+              sprintf "  BA_.set_interface %sx %u v"
                 discr_str
                 field_ofs;
             ] in
@@ -1536,6 +1544,7 @@ let rec generate_struct_node ~context ~scope ~nested_modules ~mode
     | Mode.Reader -> [
         "let of_message x = RA_.get_root_struct (RA_.Message.readonly x)";
         "let of_builder x = Some (RA_.StructStorage.readonly x)";
+        "let of_pointer = RA_.deref_opt_struct_pointer";
       ]
     | Mode.Builder ->
         let data_words    = PS.Node.Struct.data_word_count_get struct_def in
@@ -1548,6 +1557,10 @@ let rec generate_struct_node ~context ~scope ~nested_modules ~mode
           "let init_root ?message_size () =";
           sprintf "  BA_.alloc_root_struct ?message_size \
                    ~data_words:%u ~pointer_words:%u ()"
+            data_words pointer_words;
+          "let init_pointer ptr =";
+          sprintf "  BA_.init_struct_pointer ptr \
+                   ~data_words:%u ~pointer_words:%u"
             data_words pointer_words;
         ]
   in

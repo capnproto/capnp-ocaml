@@ -1626,6 +1626,20 @@ let test_int_accessors ctx =
   assert_raises_invalid_arg (fun () -> B.u_int64_field_set_int_exn root (-1))
 
 
+let test_any_pointers ctx =
+  let root  = T.Builder.TestAnyPointer.init_root () in
+  let ptr = T.Builder.TestAnyPointer.any_pointer_field_get root in
+  let child = T.Builder.TestSturdyRefHostId.init_pointer ptr in
+  T.Builder.TestSturdyRefHostId.host_set child "test-host";
+  let rroot = T.Reader.TestAnyPointer.of_builder root in
+  let rptr = T.Reader.TestAnyPointer.any_pointer_field_get rroot in
+  let rchild = T.Reader.TestSturdyRefHostId.of_pointer rptr in
+  assert_equal ~printer:(fun f -> f) (T.Reader.TestSturdyRefHostId.host_get rchild) "test-host";
+  (* Interfaces *)
+  T.Builder.TestAnyPointer.any_pointer_field_set_interface root (Some (Uint32.of_int 42));
+  let iface = T.Reader.TestAnyPointer.any_pointer_field_get_interface rroot in
+  assert_equal iface (Some (Uint32.of_int 42))
+
 
 let encoding_suite =
   "all_types" >::: [
@@ -1647,6 +1661,7 @@ let encoding_suite =
     "test constants" >:: test_constants;
     "test global constants" >:: test_global_constants;
     "test int accessors" >:: test_int_accessors;
+    "test any pointers" >:: test_any_pointers;
   ]
 
 let () = run_test_tt_main encoding_suite
