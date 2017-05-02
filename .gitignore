@@ -51,3 +51,5 @@ src/benchmark/c2b2b_defun.ml
 src/benchmark/carsales_defun.ml
 src/benchmark/catrank_defun.ml
 src/benchmark/eval_defun.ml
+oUnit*.cache
+oUnit*.log
