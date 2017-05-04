@@ -1,3 +1,4 @@
+OCAMLFINDFLAGS += -syntax camlp4o
 
 RUNTIME_MODULES =   \
   builderOps        \
