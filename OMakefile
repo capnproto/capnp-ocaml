@@ -1,6 +1,5 @@
 USE_OCAMLFIND = true
 
-OCAMLFINDFLAGS += -syntax camlp4o
 OCAMLOPTFLAGS += -inline 1000
 OCAMLFLAGS = -thread -short-paths
 
