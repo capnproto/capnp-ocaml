@@ -51,7 +51,8 @@ $(GENERATED): $(COMPILER) .capnp-repo
 
 
 open build/C
-CFLAGS += -O3
+CFLAGS += -O3 -I$(shell $(OCAMLC) -where)
+
 StaticCLibrary(libfastrand, fast_rand)
 
 
