@@ -9,4 +9,6 @@ env:
   - OPAMERRLOGLEN=0
   - PACKAGE=capnp
   matrix:
+  - DISTRO=debian-9 OCAML_VERSION=4.02.3
+  - DISTRO=debian-9 OCAML_VERSION=4.03.0
   - DISTRO=debian-9 OCAML_VERSION=4.04.0
