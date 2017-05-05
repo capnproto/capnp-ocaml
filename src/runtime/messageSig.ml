@@ -303,4 +303,3 @@ module type S = sig
       | Capability of Uint32.t
   end
 end
-

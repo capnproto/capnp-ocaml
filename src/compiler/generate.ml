@@ -39,11 +39,14 @@ module Mode    = GenCommon.Mode
 
 let sig_s_header ~context = [
   "[@@@ocaml.warning \"-27-32-37-60\"]";
+  "";
   "type ro = Capnp.Message.ro";
   "type rw = Capnp.Message.rw";
   "";
   "module type S = sig";
   "  type 'cap message_t";
+  "  type rpc_client_t";
+  "  type ('a, 'b) proxy_method_t";
   "";
 ] @ (List.concat_map context.Context.imports ~f:(fun import -> [
       "  module " ^ import.Context.schema_name ^ " : " ^
@@ -77,7 +80,7 @@ let sig_s_footer = [
 
 
 let functor_sig ~context = [
-  "module Make (MessageWrapper : Capnp.MessageSig.S) :";
+  "module MakeRPC (RPC : Capnp.RPC.S) (MessageWrapper : Capnp.MessageSig.S) :";
   "  (S with type 'cap message_t = 'cap MessageWrapper.Message.t";
   "    and type Reader.pointer_t = ro MessageWrapper.Slice.t option";
   "    and type Builder.pointer_t = rw MessageWrapper.Slice.t"; ] @
@@ -87,11 +90,14 @@ let functor_sig ~context = [
   ])) @ [
   ")";
   "";
+  "module Make : module type of MakeRPC(Capnp.RPC.None)";
 ]
 
 let mod_functor_header = [
-  "module Make (MessageWrapper : Capnp.MessageSig.S) = struct";
+  "module MakeRPC (RPC : Capnp.RPC.S) (MessageWrapper : Capnp.MessageSig.S) = struct";
   "  module CamlBytes = Bytes";
+  "  type rpc_client_t = RPC.client";
+  "  type ('a, 'b) proxy_method_t = RPC.untyped_call";
 ]
 
 let mod_header ~context = [
@@ -140,6 +146,7 @@ let mod_footer = [
 let mod_functor_footer = [
   "end";
   "";
+  "module Make = MakeRPC(Capnp.RPC.None)";
 ]
 
 

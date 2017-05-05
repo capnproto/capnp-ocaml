@@ -39,6 +39,9 @@ let sprintf = Printf.sprintf
 let failf msg = Format.kasprintf failwith msg
 let uint64_equal = C.Runtime.Util.uint64_equal
 
+(* An (incomplete) list of names to avoid. *)
+let ocaml_reserved_names = ["class"; "type"; "method"; "end"; "for"; "while"; "when"; "if"; "then"; "else"; "struct"]
+
 module Context = struct
   type import_t = {
     (* ID associated with an imported file *)
@@ -88,6 +91,9 @@ let mangle_ident (ident : string) (idents : string list) =
       mangled
   in
   loop ident
+
+let mangle_method ident =
+  mangle_ident ident ocaml_reserved_names
 
 let mangle_undefined reserved_names =
   String.capitalize (mangle_ident "undefined" reserved_names)

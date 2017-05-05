@@ -378,4 +378,3 @@ module Object = struct
     | Struct of 'cap StructStorage.t
     | Capability of Uint32.t
 end
-

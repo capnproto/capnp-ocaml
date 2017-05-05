@@ -1578,7 +1578,13 @@ let rec generate_struct_node ?uq_name ~context ~scope ~nested_modules ~mode
 
 and generate_methods ~context ~scope ~nested_modules ~mode interface_def : string list =
   (* todo: superclasses *)
-  let make_auto ~method_name ~name struct_id =
+  let auto_mod_name ~method_name dir =
+    let prefix = String.capitalize method_name in
+    match dir with
+    | `Params -> prefix ^ "_params"
+    | `Results -> prefix ^ "_results"
+  in
+  let make_auto ~method_name dir struct_id =
     let struct_node = Hashtbl.find_exn context.Context.nodes struct_id in
     (* If scopeID is zero then the struct was auto-generated, and we should emit it. *)
     if PS.Node.scope_id_get struct_node = Uint64.zero then (
@@ -1587,7 +1593,7 @@ and generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
         let body = generate_struct_node
             ~uq_name:method_name ~context ~scope ~nested_modules ~mode ~node:struct_node struct_def
         in
-        [ "module " ^ name ^ " = struct" ] @
+        [ "module " ^ auto_mod_name ~method_name dir ^ " = struct" ] @
           (apply_indent ~indent:"  " body) @
         [ "end" ]
       | _ ->
@@ -1597,16 +1603,32 @@ and generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
     )
   in
   let methods = PS.Node.Interface.methods_get_list interface_def in
-  List.mapi methods ~f:(fun method_id method_def ->
-      let method_name = PS.Method.name_get method_def in
-      let params = make_auto ~method_name ~name:"Params" @@ PS.Method.param_struct_type_get method_def in
-      let result = make_auto ~method_name ~name:"Results" @@ PS.Method.result_struct_type_get method_def in
-      let body = sprintf "let method_id = %u" method_id :: (params @ result) in
-      [ "module " ^ String.capitalize method_name ^ " = struct" ] @
-        (apply_indent ~indent:"  " body) @
-      [ "end" ]
-    )
-  |> List.concat
+  let structs =
+    List.mapi methods ~f:(fun method_id method_def ->
+        let method_name = PS.Method.name_get method_def in
+        let params = make_auto ~method_name `Params @@ PS.Method.param_struct_type_get method_def in
+        let result = make_auto ~method_name `Results @@ PS.Method.result_struct_type_get method_def in
+        params @ result
+      )
+    |> List.concat
+  in
+  let client =
+    let methods =
+      List.mapi methods ~f:(fun method_id method_def ->
+          let method_name = PS.Method.name_get method_def in
+          [
+            sprintf "method %s = RPC.call x ~interface_id ~method_id:%d"
+              (GenCommon.mangle_method method_name)
+              method_id;
+          ]
+        )
+      |> List.concat
+    in
+    [ "class client x = object" ] @
+    (apply_indent ~indent:"  " methods) @
+    [ "end" ]
+  in
+  structs @ client
 
 
 (* Generate the OCaml module and type signature corresponding to a node.  [scope] is
