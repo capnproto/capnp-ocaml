@@ -22,7 +22,6 @@ depends: [
   "res"
   "uint"
   "camlp4"
-  "core_extended" {test}
 ]
 depexts: [
   [["debian"] ["capnproto"]]
