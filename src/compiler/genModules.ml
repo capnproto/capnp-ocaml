@@ -1603,7 +1603,7 @@ and generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
       match PS.Node.get struct_node with
       | PS.Node.Struct struct_def ->
         let body = generate_struct_node
-            ~uq_name:method_name ~context ~scope ~nested_modules ~mode ~node:struct_node struct_def
+            ~uq_name:method_name ~context ~scope ~nested_modules:[] ~mode ~node:struct_node struct_def
         in
         let mod_name = auto_mod_name ~method_name dir in
         let code =
@@ -1657,9 +1657,9 @@ and generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
       (apply_indent ~indent:"  " body) @
       [ "end" ]
     in
-    structs @ client
+    nested_modules @ structs @ client
   | Mode.Builder ->
-    structs
+    nested_modules @ structs
 
 
 (* Generate the OCaml module and type signature corresponding to a node.  [scope] is

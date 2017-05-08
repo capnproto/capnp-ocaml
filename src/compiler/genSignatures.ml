@@ -361,7 +361,7 @@ let generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
       match PS.Node.get struct_node with
       | PS.Node.Struct struct_def ->
         let body = generate_struct_node
-            ~uq_name:method_name ~context ~scope ~nested_modules ~mode ~node:struct_node struct_def
+            ~uq_name:method_name ~context ~scope ~nested_modules:[] ~mode ~node:struct_node struct_def
         in
         [ "module " ^ auto_mod_name ~method_name dir ^ " : sig" ] @
           (apply_indent ~indent:"  " body) @
@@ -404,9 +404,9 @@ let generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
       (apply_indent ~indent:"  " methods) @
       [ "end" ]
     in
-    structs @ client
+    nested_modules @ structs @ client
   | Mode.Builder ->
-    structs
+    nested_modules @ structs
 
 (* Generate the OCaml type signature corresponding to a node.  [scope] is
  * a stack of scope IDs corresponding to this lexical context, and is used to figure out
