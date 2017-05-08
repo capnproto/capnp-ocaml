@@ -74,6 +74,10 @@ module Mode = struct
   type t =
     | Reader
     | Builder
+
+  let flip = function
+    | Reader -> Builder
+    | Builder -> Reader
 end
 
 
@@ -896,5 +900,62 @@ let rec collect_unique_enums ?(toplevel = true) ~is_sig ~context ~node_name node
   else
     (* Recursive call *)
     all_decls
+
+
+module Method = struct
+  type phase = Params | Results
+
+  type t = {
+    method_id : int;
+    method_def : PS.Method.t;
+    context : Context.codegen_context_t;
+  }
+
+  let create ~context method_id method_def =
+    { method_id; method_def; context }
+
+  let capnp_name t = PS.Method.name_get t.method_def
+
+  let ocaml_name t =
+    mangle_method (capnp_name t)
+
+  let payload t = function
+    | Params -> PS.Method.param_struct_type_get t.method_def
+    | Results -> PS.Method.result_struct_type_get t.method_def
+
+  let auto_struct phase t =
+    let struct_id = payload t phase in
+    let struct_node = Hashtbl.find_exn t.context.Context.nodes struct_id in
+    (* If scopeID is zero then the struct was auto-generated, and we should emit it. *)
+    if PS.Node.scope_id_get struct_node = Uint64.zero then (
+      match PS.Node.get struct_node with
+      | PS.Node.Struct struct_def ->
+        let prefix = String.capitalize (capnp_name t) in
+        let mod_name =
+          match phase with
+          | Params -> prefix ^ "_params"
+          | Results -> prefix ^ "_results"
+        in
+        `Auto (struct_node, struct_def, mod_name)
+      | _ -> failf "Method payload %s is not a struct!" (PS.Node.display_name_get struct_node)
+    ) else `Existing struct_node
+
+  let payload_type ~mode phase t =
+    match auto_struct phase t with
+    | `Existing struct_node ->
+      let mode = match phase with Params -> Mode.flip mode | Results -> mode in
+      make_unique_typename ~mode ~context:t.context struct_node
+    | `Auto (_, _, mod_name) ->
+      match mode, phase with
+      | Mode.Reader, Params -> mod_name ^ ".builder_t"
+      | Mode.Reader, Results -> mod_name ^ ".t"
+      | Mode.Builder, Params -> mod_name ^ ".reader_t"
+      | Mode.Builder, Results -> mod_name ^ ".t"
+
+  let id t = t.method_id
+
+  let methods_of_interface ~context interface_def =
+    PS.Node.Interface.methods_get_list interface_def |> List.mapi ~f:(create ~context)
+end
 
 
