@@ -39,21 +39,32 @@ module Runtime      = CapnpRuntime
 module RPC = struct
   module type S = sig
     (** A client proxy object, which can be used to send messages to a remote object. *)
-    type client
+    type 'a client
 
-    (* Generally, an RPC system will define this to take a function for building the parameters,
-       and to return a reader of the results. Typically it will also need extending with a way
-       to attach and get capabilities, and the result will be some kind of promise. *)
-    type untyped_call
+    (** The type of a method, as seen by the client application code.
+        Generally, an RPC system will define this to take a function for building the parameters,
+        and to return a reader of the results. Typically it will also need extending with a way
+        to attach and get capabilities, and the result will be some kind of promise. *)
+    type ('a, 'b) proxy_method_t
 
-    val call : client -> interface_id:Uint64.t -> method_id:int -> untyped_call
+    (** The type of a method provided by the server application code. *)
+    type ('a, 'b) method_impl_t
+
+    type generic_method_t
+
+    val call : _ client -> interface_id:Uint64.t -> method_id:int -> ('a, 'b) proxy_method_t
+
+    val generic : ('a, 'b) method_impl_t -> generic_method_t
   end
 
   module None = struct
     (** A dummy RPC provider, for when the RPC features (interfaces) aren't needed. *)
 
-    type client = [`No_RPC_provider]
-    type untyped_call = [`No_RPC_provider]
+    type 'a client = [`No_RPC_provider]
+    type ('a, 'b) proxy_method_t = [`No_RPC_provider]
+    type ('a, 'b) method_impl_t = [`No_RPC_provider]
+    type generic_method_t = [`No_RPC_provider]
     let call `No_RPC_provider ~interface_id:_ ~method_id:_ = `No_RPC_provider
+    let generic `No_RPC_provider = `No_RPC_provider
   end
 end

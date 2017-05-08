@@ -1578,57 +1578,74 @@ let rec generate_struct_node ?uq_name ~context ~scope ~nested_modules ~mode
 
 and generate_methods ~context ~scope ~nested_modules ~mode interface_def : string list =
   (* todo: superclasses *)
-  let auto_mod_name ~method_name dir =
-    let prefix = String.capitalize method_name in
-    match dir with
-    | `Params -> prefix ^ "_params"
-    | `Results -> prefix ^ "_results"
+  let module Method = GenCommon.Method in
+  let methods = Method.methods_of_interface ~context interface_def in
+  let make_auto m phase =
+    match Method.auto_struct phase m with
+    | `Existing _ -> []
+    | `Auto (struct_node, struct_def, mod_name) ->
+      let uq_name = Method.capnp_name m in
+      let body = generate_struct_node
+          ~uq_name ~context ~scope ~nested_modules:[] ~mode ~node:struct_node struct_def
+      in
+      [ "module " ^ mod_name ^ " = struct" ] @
+      (apply_indent ~indent:"  " body) @
+      [ "end" ]
   in
-  let make_auto ~method_name dir struct_id =
-    let struct_node = Hashtbl.find_exn context.Context.nodes struct_id in
-    (* If scopeID is zero then the struct was auto-generated, and we should emit it. *)
-    if PS.Node.scope_id_get struct_node = Uint64.zero then (
-      match PS.Node.get struct_node with
-      | PS.Node.Struct struct_def ->
-        let body = generate_struct_node
-            ~uq_name:method_name ~context ~scope ~nested_modules ~mode ~node:struct_node struct_def
-        in
-        [ "module " ^ auto_mod_name ~method_name dir ^ " = struct" ] @
-          (apply_indent ~indent:"  " body) @
-        [ "end" ]
-      | _ ->
-        failf "Method payload %s is not a struct!" (PS.Node.display_name_get struct_node)
-    ) else (
-      []
-    )
-  in
-  let methods = PS.Node.Interface.methods_get_list interface_def in
   let structs =
-    List.mapi methods ~f:(fun method_id method_def ->
-        let method_name = PS.Method.name_get method_def in
-        let params = make_auto ~method_name `Params @@ PS.Method.param_struct_type_get method_def in
-        let result = make_auto ~method_name `Results @@ PS.Method.result_struct_type_get method_def in
-        params @ result
+    List.map methods ~f:(fun m ->
+        make_auto m Method.Params @
+        make_auto m Method.Results
       )
     |> List.concat
   in
-  let client =
-    let methods =
-      List.mapi methods ~f:(fun method_id method_def ->
-          let method_name = PS.Method.name_get method_def in
-          [
-            sprintf "method %s = RPC.call x ~interface_id ~method_id:%d"
-              (GenCommon.mangle_method method_name)
-              method_id;
-          ]
-        )
-      |> List.concat
+  match mode with
+  | Mode.Reader ->
+    let client =
+      let body =
+        List.map methods ~f:(fun m ->
+            [
+              sprintf "method %s : (%s, %s) proxy_method_t = RPC.call x ~interface_id ~method_id:%d"
+                (Method.ocaml_name m)
+                (Method.(payload_type Params) ~mode m)
+                (Method.(payload_type Results) ~mode m)
+                (Method.id m);
+            ]
+          )
+        |> List.concat
+      in
+      [ "class client x = object" ] @
+      (apply_indent ~indent:"  " body) @
+      [ "end" ]
     in
-    [ "class client x = object" ] @
-    (apply_indent ~indent:"  " methods) @
-    [ "end" ]
-  in
-  structs @ client
+    nested_modules @ structs @ client
+  | Mode.Builder ->
+    let server =
+      let body =
+        List.map methods ~f:(fun m ->
+            sprintf "method %s : (%s, %s) method_impl_t"
+              (Method.ocaml_name m)
+              (Method.(payload_type Params) ~mode m)
+              (Method.(payload_type Results) ~mode m)
+          )
+      in
+      let dispatch_body =
+        List.map methods ~f:(fun m ->
+            sprintf "| %d -> RPC.generic server#%s"
+              (Method.id m)
+              (Method.ocaml_name m)
+          )
+      in
+      [ "class type server = object" ] @
+      (apply_indent ~indent:"  " body) @
+      [ "end";
+        "let dispatch (server:#server) ~interface_id:i ~method_id =";
+        "  assert (i = interface_id);";
+        "  match method_id with";
+      ] @ apply_indent ~indent:"  " dispatch_body @
+      [ "  | x -> failwith (Printf.sprintf \"Unknown method ID %d\" x)"]
+    in
+    nested_modules @ structs @ server
 
 
 (* Generate the OCaml module and type signature corresponding to a node.  [scope] is
