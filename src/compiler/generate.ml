@@ -47,6 +47,8 @@ let sig_s_header ~context = [
   "  type 'cap message_t";
   "  type rpc_client_t";
   "  type ('a, 'b) proxy_method_t";
+  "  type ('a, 'b) method_impl_t";
+  "  type generic_method_t";
   "";
 ] @ (List.concat_map context.Context.imports ~f:(fun import -> [
       "  module " ^ import.Context.schema_name ^ " : " ^
@@ -85,6 +87,8 @@ let functor_sig ~context = [
   "    and type 'a Reader.pointer_t = 'a MessageWrapper.StructStorage.pointer_r option";
   "    and type 'a Builder.pointer_t = 'a MessageWrapper.StructStorage.pointer_w";
   "    and type ('a, 'b) proxy_method_t = ('a, 'b) RPC.proxy_method_t";
+  "    and type ('a, 'b) method_impl_t = ('a, 'b) RPC.method_impl_t";
+  "    and type generic_method_t = RPC.generic_method_t";
   "    and type rpc_client_t = RPC.client"; ] @
   (List.concat_map context.Context.imports ~f:(fun import -> [
         "    and module " ^ import.Context.schema_name ^ " = " ^
@@ -100,6 +104,8 @@ let mod_functor_header = [
   "  module CamlBytes = Bytes";
   "  type rpc_client_t = RPC.client";
   "  type ('a, 'b) proxy_method_t = ('a, 'b) RPC.proxy_method_t";
+  "  type ('a, 'b) method_impl_t = ('a, 'b) RPC.method_impl_t";
+  "  type generic_method_t = RPC.generic_method_t";
 ]
 
 let mod_header ~context = [
