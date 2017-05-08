@@ -282,8 +282,14 @@ module type S = sig
   end
 
   module StructStorage : sig
+    (* Pointer-sized slices for holding values of type 'a.
+       The generated schema code can constain ['a] where this is useful. *)
+    type +'a pointer_r = private ro Slice.t
+    type -'a pointer_w = private rw Slice.t
     type 'cap t = { data : 'cap Slice.t; pointers : 'cap Slice.t; }
     val readonly : 'cap t -> ro t
+    val pointer_r : ro t -> int -> 'a pointer_r
+    val pointer_w : rw t -> int -> 'a pointer_w
   end
 
   module ListStorage : sig

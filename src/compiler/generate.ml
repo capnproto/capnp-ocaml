@@ -60,7 +60,7 @@ let sig_s_reader_header = [
   "  module Reader : sig";
   "    type array_t";
   "    type builder_array_t";
-  "    type pointer_t";
+  "    type +'a pointer_t";
 ]
 
 let sig_s_divide_reader_builder = [
@@ -69,7 +69,7 @@ let sig_s_divide_reader_builder = [
   "  module Builder : sig";
   "    type array_t = Reader.builder_array_t";
   "    type reader_array_t = Reader.array_t";
-  "    type pointer_t";
+  "    type -'a pointer_t";
 ]
 
 let sig_s_footer = [
@@ -82,8 +82,10 @@ let sig_s_footer = [
 let functor_sig ~context = [
   "module MakeRPC (RPC : Capnp.RPC.S) (MessageWrapper : Capnp.MessageSig.S) :";
   "  (S with type 'cap message_t = 'cap MessageWrapper.Message.t";
-  "    and type Reader.pointer_t = ro MessageWrapper.Slice.t option";
-  "    and type Builder.pointer_t = rw MessageWrapper.Slice.t"; ] @
+  "    and type 'a Reader.pointer_t = 'a MessageWrapper.StructStorage.pointer_r option";
+  "    and type 'a Builder.pointer_t = 'a MessageWrapper.StructStorage.pointer_w";
+  "    and type ('a, 'b) proxy_method_t = ('a, 'b) RPC.proxy_method_t";
+  "    and type rpc_client_t = RPC.client"; ] @
   (List.concat_map context.Context.imports ~f:(fun import -> [
         "    and module " ^ import.Context.schema_name ^ " = " ^
           import.Context.module_name ^ ".Make(MessageWrapper)";
@@ -97,7 +99,7 @@ let mod_functor_header = [
   "module MakeRPC (RPC : Capnp.RPC.S) (MessageWrapper : Capnp.MessageSig.S) = struct";
   "  module CamlBytes = Bytes";
   "  type rpc_client_t = RPC.client";
-  "  type ('a, 'b) proxy_method_t = RPC.untyped_call";
+  "  type ('a, 'b) proxy_method_t = ('a, 'b) RPC.proxy_method_t";
 ]
 
 let mod_header ~context = [
@@ -125,7 +127,7 @@ let mod_reader_header = [
   "  module Reader = struct";
   "    type array_t = ro MessageWrapper.ListStorage.t";
   "    type builder_array_t = rw MessageWrapper.ListStorage.t";
-  "    type pointer_t = ro MessageWrapper.Slice.t option";
+  "    type 'a pointer_t = 'a MessageWrapper.StructStorage.pointer_r option";
   "";
 ]
 
@@ -135,7 +137,7 @@ let mod_divide_reader_builder = [
   "  module Builder = struct";
   "    type array_t = Reader.builder_array_t";
   "    type reader_array_t = Reader.array_t";
-  "    type pointer_t = rw MessageWrapper.Slice.t";
+  "    type 'a pointer_t = 'a MessageWrapper.StructStorage.pointer_w";
   "";
 ]
 

@@ -30,6 +30,8 @@
 (* Body of the Message.Make functor.  By placing the body in a separate file,
    we can use camlp4 to INCLUDE the body for an inlined implementation. *)
 
+let sizeof_uint64 = 8
+
 module Segment = struct
   type storage_t = Storage.t
   type -'cap t = Storage.t
@@ -344,6 +346,9 @@ module Slice = struct
 end   (* module Slice *)
 
 module StructStorage = struct
+  type +'a pointer_r = ro Slice.t
+  type -'a pointer_w = rw Slice.t
+
   (** Storage associated with a cap'n proto struct. *)
   type 'cap t = {
     data     : 'cap Slice.t;  (** Storage for struct fields stored by value *)
@@ -354,6 +359,18 @@ module StructStorage = struct
     data     = Slice.readonly struct_storage.data;
     pointers = Slice.readonly struct_storage.pointers;
   }
+
+  let pointer_w t pointer_word =
+    let pointers = t.pointers in
+    let num_pointers = pointers.Slice.len / sizeof_uint64 in
+    assert (pointer_word < num_pointers);
+    {
+      pointers with
+      Slice.start = pointers.Slice.start + (pointer_word * sizeof_uint64);
+      Slice.len   = sizeof_uint64;
+    }
+
+  let pointer_r = pointer_w
 end
 
 module ListStorage = struct

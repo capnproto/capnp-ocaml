@@ -745,27 +745,21 @@ let get_struct
   BOps.deref_struct_pointer ~create_default ~data_words ~pointer_words pointer_bytes
 
 let get_pointer
+    (type a)
     ?(default : ro DM.Slice.t option)
     (struct_storage : rw NM.StructStorage.t)
     (pointer_word : int)
-  : rw NM.Slice.t =
-  let pointers = struct_storage.NM.StructStorage.pointers in
-  let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+  : a NM.StructStorage.pointer_w =
   (* Struct should have already been upgraded to at least the
      expected data region and pointer region sizes *)
-  assert (pointer_word < num_pointers);
-  let pointer_bytes = {
-    pointers with
-    NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
-    NM.Slice.len   = sizeof_uint64;
-  } in
+  let pointer_bytes : a NM.StructStorage.pointer_w = NM.StructStorage.pointer_w struct_storage pointer_word in
   let () =
-    let pointer_val = NM.Slice.get_int64 pointer_bytes 0 in
+    let pointer_val = NM.Slice.get_int64 (pointer_bytes :> rw NC.Slice.t) 0 in
     if Util.is_int64_zero pointer_val then
       match default with
       | Some default_pointer ->
           DefaultsCopier.deep_copy_pointer ~src:default_pointer
-            ~dest:pointer_bytes
+            ~dest:(pointer_bytes :> rw NC.Slice.t)
       | None ->
           ()
     else
@@ -1065,23 +1059,17 @@ let set_struct
   dest_storage
 
 let set_pointer
+    (type a)
     ?(discr : Discr.t option)
     (struct_storage : rw NM.StructStorage.t)
     (pointer_word : int)
     (value : 'cap NM.Slice.t)
-  : rw NM.Slice.t =
-  let pointers = struct_storage.NM.StructStorage.pointers in
-  let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
+  : a NM.StructStorage.pointer_w =
   (* Struct should have already been upgraded to at least the
      expected data region and pointer region sizes *)
-  assert (pointer_word < num_pointers);
-  let pointer_bytes = {
-    pointers with
-    NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
-    NM.Slice.len   = sizeof_uint64;
-  } in
+  let pointer_bytes : a NM.StructStorage.pointer_w = NM.StructStorage.pointer_w struct_storage pointer_word in
   let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
-  let () = BOps.deep_copy_pointer ~src:value ~dest:pointer_bytes in
+  let () = BOps.deep_copy_pointer ~src:value ~dest:(pointer_bytes :> rw NM.Slice.t) in
   pointer_bytes
 
 let set_interface

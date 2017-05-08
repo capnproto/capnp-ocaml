@@ -326,14 +326,14 @@ let generate_struct_node ?uq_name ~context ~scope ~nested_modules
     | Mode.Reader -> [
         "val of_message : 'cap message_t -> t";
         "val of_builder : builder_t -> t";
-        "val of_pointer : pointer_t -> t";
+        "val of_pointer : t pointer_t -> t";
       ]
     | Mode.Builder -> [
         "val of_message : rw message_t -> t";
         "val to_message : t -> rw message_t";
         "val to_reader : t -> reader_t";
         "val init_root : ?message_size:int -> unit -> t";
-        "val init_pointer : pointer_t -> t";
+        "val init_pointer : t pointer_t -> t";
       ]
   in
   header @
@@ -385,20 +385,24 @@ let generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
       GenCommon.make_unique_typename ~mode ~context node
     )
   in
-  let client =
-    let methods =
-      List.map methods ~f:(fun method_def ->
-          let method_name = PS.Method.name_get method_def in
-          let params = make_type ~method_name `Params Mode.Builder @@ PS.Method.param_struct_type_get method_def in
-          let results = make_type ~method_name `Results Mode.Reader @@ PS.Method.result_struct_type_get method_def in
-          sprintf "method %s : (%s, %s) proxy_method_t" (GenCommon.mangle_method method_name) params results
-        )
+  match mode with
+  | Mode.Reader ->
+    let client =
+      let methods =
+        List.map methods ~f:(fun method_def ->
+            let method_name = PS.Method.name_get method_def in
+            let params = make_type ~method_name `Params Mode.Builder @@ PS.Method.param_struct_type_get method_def in
+            let results = make_type ~method_name `Results Mode.Reader @@ PS.Method.result_struct_type_get method_def in
+            sprintf "method %s : (%s, %s) proxy_method_t" (GenCommon.mangle_method method_name) params results
+          )
+      in
+      [ "class client : rpc_client_t -> object" ] @
+      (apply_indent ~indent:"  " methods) @
+      [ "end" ]
     in
-    [ "class client : rpc_client_t -> object" ] @
-    (apply_indent ~indent:"  " methods) @
-    [ "end" ]
-  in
-  structs @ client
+    structs @ client
+  | Mode.Builder ->
+    structs
 
 (* Generate the OCaml type signature corresponding to a node.  [scope] is
  * a stack of scope IDs corresponding to this lexical context, and is used to figure out

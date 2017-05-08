@@ -664,11 +664,11 @@ let rec type_name ~context ~(mode : Mode.t) ~(scope_mode : Mode.t)
       begin match (mode, scope_mode) with
       | (Mode.Reader, Mode.Reader)
       | (Mode.Builder, Mode.Builder) ->
-          "pointer_t"
+          "'a pointer_t"
       | (Mode.Reader, Mode.Builder) ->
-          "Reader.pointer_t"
+          "'a Reader.pointer_t"
       | (Mode.Builder, Mode.Reader) ->
-          "Builder.pointer_t"
+          "'a Builder.pointer_t"
       end
   | Undefined x ->
       failwith (sprintf "Unknown Type union discriminant %d" x)
@@ -685,8 +685,9 @@ let generate_union_type ~context ~(mode : Mode.t) scope fields =
         | PS.Type.Void ->
             ("  | " ^ field_name) :: acc
         | _ ->
-            ("  | " ^ field_name ^ " of " ^
-               (type_name ~context ~mode ~scope_mode:mode scope field_type))
+            sprintf "  | %s : %s -> unnamed_union_t"    (* New-style format needed for ['a pointer_t] *)
+              field_name
+              (type_name ~context ~mode ~scope_mode:mode scope field_type)
             :: acc
         end
     | Group group ->

@@ -625,10 +625,10 @@ let get_struct
       default
 
 let get_pointer
-    ?(default: ro Slice.t option)
+    ?(default: 'a StructStorage.pointer_r option)
     (struct_storage_opt : 'cap StructStorage.t option)
     (pointer_word : int)
-  : 'cap Slice.t option =
+  : 'a StructStorage.pointer_r option =
   match struct_storage_opt with
   | Some struct_storage ->
       let pointers = struct_storage.StructStorage.pointers in
@@ -639,12 +639,7 @@ let get_pointer
         if Util.is_int64_zero pointer64 then
           default
         else
-          let pointer_bytes = {
-            pointers with
-            Slice.start = pointers.Slice.start + start;
-            Slice.len   = len;
-          } in
-          Some pointer_bytes
+          Some (StructStorage.pointer_r struct_storage pointer_word)
       else
         default
   | None ->
