@@ -379,7 +379,7 @@ let generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
             sprintf "method %s : (%s, %s) proxy_method_t" (Method.ocaml_name m) params results
           )
       in
-      [ "class client : rpc_client_t -> object" ] @
+      [ "class client : t rpc_client_t -> object" ] @
       (apply_indent ~indent:"  " methods) @
       [ "end" ]
     in
