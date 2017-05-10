@@ -39,7 +39,7 @@ module Runtime      = CapnpRuntime
 module RPC = struct
   module type S = sig
     (** A client proxy object, which can be used to send messages to a remote object. *)
-    type client
+    type 'a client
 
     (** The type of a method, as seen by the client application code.
         Generally, an RPC system will define this to take a function for building the parameters,
@@ -52,7 +52,7 @@ module RPC = struct
 
     type generic_method_t
 
-    val call : client -> interface_id:Uint64.t -> method_id:int -> ('a, 'b) proxy_method_t
+    val call : _ client -> interface_id:Uint64.t -> method_id:int -> ('a, 'b) proxy_method_t
 
     val generic : ('a, 'b) method_impl_t -> generic_method_t
   end
@@ -60,7 +60,7 @@ module RPC = struct
   module None : S = struct
     (** A dummy RPC provider, for when the RPC features (interfaces) aren't needed. *)
 
-    type client = [`No_RPC_provider]
+    type 'a client = [`No_RPC_provider]
     type ('a, 'b) proxy_method_t = [`No_RPC_provider]
     type ('a, 'b) method_impl_t = [`No_RPC_provider]
     type generic_method_t = [`No_RPC_provider]
