@@ -371,6 +371,9 @@ module StructStorage = struct
     }
 
   let pointer_r = pointer_w
+
+  let cast_pointer_r x = x
+  let cast_pointer_w x = x
 end
 
 module ListStorage = struct

@@ -290,6 +290,8 @@ module type S = sig
     val readonly : 'cap t -> ro t
     val pointer_r : ro t -> int -> 'a pointer_r
     val pointer_w : rw t -> int -> 'a pointer_w
+    val cast_pointer_r : 'a pointer_r -> 'b pointer_r
+    val cast_pointer_w : 'a pointer_r -> 'b pointer_r
   end
 
   module ListStorage : sig
