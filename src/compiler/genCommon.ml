@@ -848,7 +848,7 @@ let rec collect_unique_types ?acc ~context node =
       (builder_name, builder_type) :: (reader_name, reader_type) :: names
   | PS.Node.Interface interface_def ->
       let reader_name = make_unique_typename ~context ~mode:Mode.Reader node in
-      let reader_type = "Uint32.t" in
+      let reader_type = "Uint32.t option" in
       (reader_name, reader_type) :: method_types ~context interface_def @ names
   | PS.Node.Undefined x ->
       failwith (sprintf "Unknown Node union discriminant %u" x)
