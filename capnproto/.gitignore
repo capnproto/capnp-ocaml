@@ -1,0 +1,38 @@
+# Kenton's personal backup script.
+/backup.sh
+
+# Eclipse-generated stuff.
+.cproject
+.project
+.pydevproject
+.settings
+.dist-buildwrapper
+/c++/gen/
+
+# Code you may want to map in from elsewhere.
+/c++/src/base
+/c++/src/capnp/compilerbin
+/c++/src/ekam
+/c++/src/os
+/c++/src/protobuf
+/c++/src/snappy
+/c++/src/samples
+
+# Ekam build artifacts.
+/c++/tmp/
+/c++/bin/
+
+# setup-ekam.sh
+/c++/.ekam
+
+# setup-autotools.sh
+/c++/gtest
+
+# Jekyll-generated site
+/doc/_site
+
+# Checkout of gh-pages made by /doc/push-site.sh
+/doc/.gh-pages
+
+# cabal-install artifacts
+/compiler/dist/

@@ -28,24 +28,17 @@ TEST_MODULES = \
 
 PROGRAM = run-tests
 
-# We will check out a local copy of the capnproto repo in order to generate
+# We use our local copy of the capnproto repo in order to generate
 # code based on the "test.capnp" schema.
 COMPILER = ../compiler/capnpc-ocaml
-CAPNPROTO_REPO = https://github.com/kentonv/capnproto.git
-CAPNPROTO_REVISION = 25509cf4f1fe6b3f5a6faa2f42b865f7571db8c4
+CAPNP_REPO_DIR = ../../capnproto
 
-.capnp-repo:
-	bash -c 'REPO_DIR=`mktemp -d`/capnproto && git clone $(CAPNPROTO_REPO) $$REPO_DIR && \
-	pushd $$REPO_DIR && git checkout $(CAPNPROTO_REVISION) && popd && \
-	echo "$$REPO_DIR" > .capnp-repo'
-
-$(GENERATED): $(COMPILER) .capnp-repo
-	bash -c 'REPO_DIR=`cat .capnp-repo` && \
-	capnp compile -o $(COMPILER) -I $$REPO_DIR/c++/src \
-		$$REPO_DIR/c++/src/capnp/c++.capnp \
-		$$REPO_DIR/c++/src/capnp/test.capnp \
-		$$REPO_DIR/c++/src/capnp/test-import.capnp \
-		testLists.capnp'
+$(GENERATED): $(COMPILER)
+	capnp compile -o $(COMPILER) -I $(CAPNP_REPO_DIR)/c++/src \
+		$(CAPNP_REPO_DIR)/c++/src/capnp/c++.capnp \
+		$(CAPNP_REPO_DIR)/c++/src/capnp/test.capnp \
+		$(CAPNP_REPO_DIR)/c++/src/capnp/test-import.capnp \
+		testLists.capnp
 
 OCAMLDEP_MODULES_ENABLED = false
 LocalOCamlGeneratedFiles($(GENERATED))
