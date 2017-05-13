@@ -1641,6 +1641,29 @@ let test_any_pointers ctx =
   assert_equal iface (Some (Uint32.of_int 42))
 
 
+let test_lists ctx =
+  let assert_equal = assert_equal ~printer:string_of_float in
+  (* Create Ptr/FloatList/012 *)
+  let root1 = T.Builder.TestAnyPointer.init_root () in
+  let ptr = T.Builder.TestAnyPointer.any_pointer_field_get root1 in
+  let holder = T.Builder.TestAllTypes.init_pointer ptr in
+  let arr = T.Builder.TestAllTypes.float64_list_init holder 3 in
+  Capnp.Array.set arr 0 3.0;
+  Capnp.Array.set arr 1 (-7.0);
+  Capnp.Array.set arr 2 9.5;
+  assert_equal (Capnp.Array.get arr 2) 9.5;
+  (* Copy to a new message *)
+  let root2 = T.Builder.TestAnyPointer.init_root () in
+  let _ = T.Builder.TestAnyPointer.any_pointer_field_set root2 ptr in
+  (* Check copy worked *)
+  let root = T.Builder.TestAnyPointer.to_reader root2 in
+  let ptr = T.Reader.TestAnyPointer.any_pointer_field_get root in
+  let tat = T.Reader.TestAllTypes.of_pointer ptr in
+  let arr = T.Reader.TestAllTypes.float64_list_get tat in
+  assert_equal (Capnp.Array.get arr 0) 3.0;
+  assert_equal (Capnp.Array.get arr 1) (-7.);
+  assert_equal (Capnp.Array.get arr 2) 9.5
+
 let encoding_suite =
   "all_types" >::: [
     "encode/decode" >:: test_encode_decode;
@@ -1662,6 +1685,7 @@ let encoding_suite =
     "test global constants" >:: test_global_constants;
     "test int accessors" >:: test_int_accessors;
     "test any pointers" >:: test_any_pointers;
+    "copy lists" >:: test_lists;
   ]
 
 let () = run_test_tt_main encoding_suite
