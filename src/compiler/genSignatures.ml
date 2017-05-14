@@ -389,20 +389,24 @@ let generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
       GenCommon.make_unique_typename ~mode ~context node
     )
   in
-  let client =
-    let methods =
-      List.map methods ~f:(fun method_def ->
-          let method_name = PS.Method.name_get method_def in
-          let params = make_type ~method_name `Params Mode.Builder @@ PS.Method.param_struct_type_get method_def in
-          let results = make_type ~method_name `Results Mode.Reader @@ PS.Method.result_struct_type_get method_def in
-          sprintf "method %s : (%s, %s) proxy_method_t" (GenCommon.mangle_method method_name) params results
-        )
+  match mode with
+  | Mode.Reader ->
+    let client =
+      let methods =
+        List.map methods ~f:(fun method_def ->
+            let method_name = PS.Method.name_get method_def in
+            let params = make_type ~method_name `Params Mode.Builder @@ PS.Method.param_struct_type_get method_def in
+            let results = make_type ~method_name `Results Mode.Reader @@ PS.Method.result_struct_type_get method_def in
+            sprintf "method %s : (%s, %s) proxy_method_t" (GenCommon.mangle_method method_name) params results
+          )
+      in
+      [ "class client : rpc_client_t -> object" ] @
+      (apply_indent ~indent:"  " methods) @
+      [ "end" ]
     in
-    [ "class client : rpc_client_t -> object" ] @
-    (apply_indent ~indent:"  " methods) @
-    [ "end" ]
-  in
-  structs @ client
+    structs @ client
+  | Mode.Builder ->
+    structs
 
 (* Generate the OCaml type signature corresponding to a node.  [scope] is
  * a stack of scope IDs corresponding to this lexical context, and is used to figure out
