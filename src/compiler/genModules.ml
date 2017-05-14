@@ -1229,6 +1229,10 @@ let generate_one_field_accessors ~context ~node_id ~scope
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v =";
+              sprintf "  BA_.set_pointer %sx %u (Some v)"
+                discr_str
+                field_ofs;
+              "let " ^ field_name ^ "_set_reader x v =";
               sprintf "  BA_.set_pointer %sx %u v"
                 discr_str
                 field_ofs;
