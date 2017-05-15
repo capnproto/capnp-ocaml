@@ -38,6 +38,9 @@ module Runtime      = CapnpRuntime
 
 module RPC = struct
   module type S = sig
+    type pointer_r
+    type pointer_w
+
     module Client : sig
       (** A client proxy object, which can be used to send messages to a remote object. *)
       type 'a t
@@ -46,9 +49,15 @@ module RPC = struct
           This is typically an [('a t, interface_id, method_id)] tuple. *)
       type ('a, 'b) method_t
 
-      type 'a request
-      type 'a response
+      module Request : sig
+        type 'a t
+      end
+      module Response : sig
+        type 'a t
+        val content : 'a t -> pointer_r
+      end
 
+      (* These are used by the generated code to make type-safe equivalents. *)
       val bind_method : _ t -> interface_id:Uint64.t -> method_id:int -> ('a, 'b) method_t
     end
 
@@ -58,37 +67,51 @@ module RPC = struct
       (** The type of a method provided by the server application code. *)
       type ('a, 'b) method_t
 
-      type 'a request
-      type 'a response
+      module Request : sig
+        type 'a t
+        val content : 'a t -> pointer_r
+      end
+      module Response : sig
+        type 'a t
+      end
 
+      (* These are used by the generated code to make type-safe equivalents. *)
       type generic_method_t
       val generic : ('a, 'b) method_t -> generic_method_t
-
       val server : (interface_id:Uint64.t -> method_id:int -> generic_method_t) -> 'a t
     end
   end
 
-  module None : S = struct
+  module None(M : CapnpRuntime.MessageSig.S) = struct
     (** A dummy RPC provider, for when the RPC features (interfaces) aren't needed. *)
+
+    type pointer_r = Message.ro M.Slice.t option
+    type pointer_w = Message.rw M.Slice.t
 
     module Client = struct
       type 'a t = [`No_RPC_provider]
       type ('a, 'b) method_t = Uint64.t * int
-      type 'a request = [`No_RPC_provider]
-      type 'a response = [`No_RPC_provider]
+      module Request = struct
+        type 'a t
+        let content _ = assert false
+      end
+      module Response = Request
 
       let bind_method `No_RPC_provider ~interface_id ~method_id = (interface_id, method_id)
+      let content_of_response `No_RPC_provider = assert false
     end
 
     module Server = struct
       type generic_method_t = [`No_RPC_provider]
       type 'a t = interface_id:Uint64.t -> method_id:int -> generic_method_t
       type ('a, 'b) method_t = [`No_RPC_provider]
-      type 'a request = [`No_RPC_provider]
-      type 'a response = [`No_RPC_provider]
+
+      module Request = Client.Request
+      module Response = Client.Request
 
       let generic `No_RPC_provider = `No_RPC_provider
       let server x = x
+      let content_of_request `No_RPC_provider = assert false
     end
   end
 end

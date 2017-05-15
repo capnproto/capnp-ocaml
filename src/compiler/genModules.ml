@@ -1554,6 +1554,8 @@ let rec generate_struct_node ?uq_name ~context ~scope ~nested_modules ~mode
         "let of_message x = RA_.get_root_struct (RA_.Message.readonly x)";
         "let of_builder x = Some (RA_.StructStorage.readonly x)";
         "let of_pointer = RA_.deref_opt_struct_pointer";
+        "let of_request x = RA_.deref_opt_struct_pointer (RPC.Server.Request.content x)";
+        "let of_response x = RA_.deref_opt_struct_pointer (RPC.Client.Response.content x)";
       ]
     | Mode.Builder ->
         let data_words    = PS.Node.Struct.data_word_count_get struct_def in
@@ -1609,7 +1611,7 @@ and generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
       let body =
         List.map methods ~f:(fun m ->
             [
-              sprintf "method %s : (%s, %s) proxy_method_t = RPC.Client.bind_method x ~interface_id ~method_id:%d"
+              sprintf "method %s : (%s, %s) RPC.Client.method_t = RPC.Client.bind_method x ~interface_id ~method_id:%d"
                 (Method.ocaml_name m)
                 (Method.(payload_type Params) ~mode m)
                 (Method.(payload_type Results) ~mode m)
@@ -1627,7 +1629,7 @@ and generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
     let server =
       let body =
         List.map methods ~f:(fun m ->
-            sprintf "method %s : (%s, %s) method_impl_t"
+            sprintf "method %s : (%s, %s) RPC.Server.method_t"
               (Method.ocaml_name m)
               (Method.(payload_type Params) ~mode m)
               (Method.(payload_type Results) ~mode m)

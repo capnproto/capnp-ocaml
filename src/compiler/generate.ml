@@ -45,11 +45,7 @@ let sig_s_header ~context = [
   "";
   "module type S = sig";
   "  type 'cap message_t";
-  "  type 'a rpc_client_t";
-  "  type 'a rpc_server_t";
-  "  type ('a, 'b) proxy_method_t";
-  "  type ('a, 'b) method_impl_t";
-  "  type generic_method_t";
+  "  module RPC : Capnp.RPC.S";
   "";
 ] @ (List.concat_map context.Context.imports ~f:(fun import -> [
       "  module " ^ import.Context.schema_name ^ " : " ^
@@ -83,32 +79,34 @@ let sig_s_footer = [
 
 
 let functor_sig ~context = [
-  "module MakeRPC (RPC : Capnp.RPC.S) (MessageWrapper : Capnp.MessageSig.S) :";
+  "module MakeRPC";
+  "  (MessageWrapper : Capnp.MessageSig.S)";
+  "  (RPC : Capnp.RPC.S with";
+  "    type pointer_r = ro MessageWrapper.Slice.t option and";
+  "    type pointer_w = rw MessageWrapper.Slice.t";
+  "  ) :";
   "  (S with type 'cap message_t = 'cap MessageWrapper.Message.t";
   "    and type Reader.pointer_t = ro MessageWrapper.Slice.t option";
   "    and type Builder.pointer_t = rw MessageWrapper.Slice.t";
-  "    and type ('a, 'b) proxy_method_t = ('a, 'b) RPC.Client.method_t";
-  "    and type ('a, 'b) method_impl_t = ('a, 'b) RPC.Server.method_t";
-  "    and type generic_method_t = RPC.Server.generic_method_t";
-  "    and type 'a rpc_client_t = 'a RPC.Client.t";
-  "    and type 'a rpc_server_t = 'a RPC.Server.t"; ] @
+  "    and module RPC = RPC"; ] @
   (List.concat_map context.Context.imports ~f:(fun import -> [
         "    and module " ^ import.Context.schema_name ^ " = " ^
           import.Context.module_name ^ ".Make(MessageWrapper)";
   ])) @ [
   ")";
   "";
-  "module Make : module type of MakeRPC(Capnp.RPC.None)";
+  "module Make(M : Capnp.MessageSig.S) : module type of MakeRPC(M)(Capnp.RPC.None(M))";
 ]
 
 let mod_functor_header = [
-  "module MakeRPC (RPC : Capnp.RPC.S) (MessageWrapper : Capnp.MessageSig.S) = struct";
+  "module MakeRPC";
+  "  (MessageWrapper : Capnp.MessageSig.S)";
+  "  (RPC : Capnp.RPC.S with";
+  "    type pointer_r = ro MessageWrapper.Slice.t option and";
+  "    type pointer_w = rw MessageWrapper.Slice.t";
+  ") = struct";
   "  module CamlBytes = Bytes";
-  "  type 'a rpc_client_t = 'a RPC.Client.t";
-  "  type 'a rpc_server_t = 'a RPC.Server.t";
-  "  type ('a, 'b) proxy_method_t = ('a, 'b) RPC.Client.method_t";
-  "  type ('a, 'b) method_impl_t = ('a, 'b) RPC.Server.method_t";
-  "  type generic_method_t = RPC.Server.generic_method_t";
+  "  module RPC = RPC";
 ]
 
 let mod_header ~context = [
@@ -157,7 +155,7 @@ let mod_footer = [
 let mod_functor_footer = [
   "end";
   "";
-  "module Make = MakeRPC(Capnp.RPC.None)";
+  "module Make(M:Capnp.MessageSig.S) = MakeRPC(M)(Capnp.RPC.None(M))";
 ]
 
 

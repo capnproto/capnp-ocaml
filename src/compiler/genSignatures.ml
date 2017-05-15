@@ -331,6 +331,8 @@ let generate_struct_node ?uq_name ~context ~scope ~nested_modules
         "val of_message : 'cap message_t -> t";
         "val of_builder : builder_t -> t";
         "val of_pointer : pointer_t -> t";
+        "val of_request : 'a RPC.Server.Request.t -> t";
+        "val of_response : 'a RPC.Client.Response.t -> t";
       ]
     | Mode.Builder -> [
         "val of_message : rw message_t -> t";
@@ -376,10 +378,10 @@ let generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
         List.map methods ~f:(fun m ->
             let params = Method.(payload_type Params) ~mode m in
             let results = Method.(payload_type Results) ~mode m in
-            sprintf "method %s : (%s, %s) proxy_method_t" (Method.ocaml_name m) params results
+            sprintf "method %s : (%s, %s) RPC.Client.method_t" (Method.ocaml_name m) params results
           )
       in
-      [ "class client : t rpc_client_t -> object" ] @
+      [ "class client : t RPC.Client.t -> object" ] @
       (apply_indent ~indent:"  " methods) @
       [ "end" ]
     in
@@ -388,7 +390,7 @@ let generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
     let server =
       let body =
         List.map methods ~f:(fun m ->
-            sprintf "method %s : (%s, %s) method_impl_t"
+            sprintf "method %s : (%s, %s) RPC.Server.method_t"
               (Method.ocaml_name m)
               (Method.(payload_type Params) ~mode m)
               (Method.(payload_type Results) ~mode m)
@@ -397,7 +399,7 @@ let generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
       [ "class type server = object" ] @
       (apply_indent ~indent:"  " body) @
       [ "end";
-        "val dispatch : #server -> reader_t rpc_server_t";
+        "val dispatch : #server -> reader_t RPC.Server.t";
       ]
     in
     nested_modules @ structs @ server
