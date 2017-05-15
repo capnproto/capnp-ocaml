@@ -1609,7 +1609,7 @@ and generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
       let body =
         List.map methods ~f:(fun m ->
             [
-              sprintf "method %s : (%s, %s) proxy_method_t = RPC.call x ~interface_id ~method_id:%d"
+              sprintf "method %s : (%s, %s) proxy_method_t = RPC.Client.bind_method x ~interface_id ~method_id:%d"
                 (Method.ocaml_name m)
                 (Method.(payload_type Params) ~mode m)
                 (Method.(payload_type Results) ~mode m)
@@ -1635,7 +1635,7 @@ and generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
       in
       let dispatch_body =
         List.map methods ~f:(fun m ->
-            sprintf "| %d -> RPC.generic server#%s"
+            sprintf "| %d -> RPC.Server.generic server#%s"
               (Method.id m)
               (Method.ocaml_name m)
           )

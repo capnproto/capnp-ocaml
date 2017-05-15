@@ -86,10 +86,10 @@ let functor_sig ~context = [
   "  (S with type 'cap message_t = 'cap MessageWrapper.Message.t";
   "    and type Reader.pointer_t = ro MessageWrapper.Slice.t option";
   "    and type Builder.pointer_t = rw MessageWrapper.Slice.t";
-  "    and type ('a, 'b) proxy_method_t = ('a, 'b) RPC.proxy_method_t";
-  "    and type ('a, 'b) method_impl_t = ('a, 'b) RPC.method_impl_t";
-  "    and type generic_method_t = RPC.generic_method_t";
-  "    and type 'a rpc_client_t = 'a RPC.client"; ] @
+  "    and type ('a, 'b) proxy_method_t = ('a, 'b) RPC.Client.method_t";
+  "    and type ('a, 'b) method_impl_t = ('a, 'b) RPC.Server.method_t";
+  "    and type generic_method_t = RPC.Server.generic_method_t";
+  "    and type 'a rpc_client_t = 'a RPC.Client.t"; ] @
   (List.concat_map context.Context.imports ~f:(fun import -> [
         "    and module " ^ import.Context.schema_name ^ " = " ^
           import.Context.module_name ^ ".Make(MessageWrapper)";
@@ -102,10 +102,10 @@ let functor_sig ~context = [
 let mod_functor_header = [
   "module MakeRPC (RPC : Capnp.RPC.S) (MessageWrapper : Capnp.MessageSig.S) = struct";
   "  module CamlBytes = Bytes";
-  "  type 'a rpc_client_t = 'a RPC.client";
-  "  type ('a, 'b) proxy_method_t = ('a, 'b) RPC.proxy_method_t";
-  "  type ('a, 'b) method_impl_t = ('a, 'b) RPC.method_impl_t";
-  "  type generic_method_t = RPC.generic_method_t";
+  "  type 'a rpc_client_t = 'a RPC.Client.t";
+  "  type ('a, 'b) proxy_method_t = ('a, 'b) RPC.Client.method_t";
+  "  type ('a, 'b) method_impl_t = ('a, 'b) RPC.Server.method_t";
+  "  type generic_method_t = RPC.Server.generic_method_t";
 ]
 
 let mod_header ~context = [

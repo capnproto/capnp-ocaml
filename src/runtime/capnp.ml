@@ -38,33 +38,51 @@ module Runtime      = CapnpRuntime
 
 module RPC = struct
   module type S = sig
-    (** A client proxy object, which can be used to send messages to a remote object. *)
-    type 'a client
+    module Client : sig
+      (** A client proxy object, which can be used to send messages to a remote object. *)
+      type 'a t
 
-    (** The type of a method, as seen by the client application code.
-        Generally, an RPC system will define this to take a function for building the parameters,
-        and to return a reader of the results. Typically it will also need extending with a way
-        to attach and get capabilities, and the result will be some kind of promise. *)
-    type ('a, 'b) proxy_method_t
+      (** A method on some instance, as seen by the client application code.
+          This is typically an [('a t, interface_id, method_id)] tuple. *)
+      type ('a, 'b) method_t
 
-    (** The type of a method provided by the server application code. *)
-    type ('a, 'b) method_impl_t
+      type 'a request
+      type 'a response
 
-    type generic_method_t
+      val bind_method : _ t -> interface_id:Uint64.t -> method_id:int -> ('a, 'b) method_t
+    end
 
-    val call : _ client -> interface_id:Uint64.t -> method_id:int -> ('a, 'b) proxy_method_t
+    module Server : sig
+      (** The type of a method provided by the server application code. *)
+      type ('a, 'b) method_t
 
-    val generic : ('a, 'b) method_impl_t -> generic_method_t
+      type 'a request
+      type 'a response
+
+      type generic_method_t
+      val generic : ('a, 'b) method_t -> generic_method_t
+    end
   end
 
   module None : S = struct
     (** A dummy RPC provider, for when the RPC features (interfaces) aren't needed. *)
 
-    type 'a client = [`No_RPC_provider]
-    type ('a, 'b) proxy_method_t = [`No_RPC_provider]
-    type ('a, 'b) method_impl_t = [`No_RPC_provider]
-    type generic_method_t = [`No_RPC_provider]
-    let call `No_RPC_provider ~interface_id:_ ~method_id:_ = `No_RPC_provider
-    let generic `No_RPC_provider = `No_RPC_provider
+    module Client = struct
+      type 'a t = [`No_RPC_provider]
+      type ('a, 'b) method_t = Uint64.t * int
+      type 'a request = [`No_RPC_provider]
+      type 'a response = [`No_RPC_provider]
+
+      let bind_method `No_RPC_provider ~interface_id ~method_id = (interface_id, method_id)
+    end
+
+    module Server = struct
+      type ('a, 'b) method_t = [`No_RPC_provider]
+      type 'a request = [`No_RPC_provider]
+      type 'a response = [`No_RPC_provider]
+
+      type generic_method_t = [`No_RPC_provider]
+      let generic `No_RPC_provider = `No_RPC_provider
+    end
   end
 end
