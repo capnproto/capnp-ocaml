@@ -53,6 +53,8 @@ module RPC = struct
     end
 
     module Server : sig
+      type 'a t
+
       (** The type of a method provided by the server application code. *)
       type ('a, 'b) method_t
 
@@ -61,6 +63,8 @@ module RPC = struct
 
       type generic_method_t
       val generic : ('a, 'b) method_t -> generic_method_t
+
+      val server : (interface_id:Uint64.t -> method_id:int -> generic_method_t) -> 'a t
     end
   end
 
@@ -77,12 +81,14 @@ module RPC = struct
     end
 
     module Server = struct
+      type generic_method_t = [`No_RPC_provider]
+      type 'a t = interface_id:Uint64.t -> method_id:int -> generic_method_t
       type ('a, 'b) method_t = [`No_RPC_provider]
       type 'a request = [`No_RPC_provider]
       type 'a response = [`No_RPC_provider]
 
-      type generic_method_t = [`No_RPC_provider]
       let generic `No_RPC_provider = `No_RPC_provider
+      let server x = x
     end
   end
 end

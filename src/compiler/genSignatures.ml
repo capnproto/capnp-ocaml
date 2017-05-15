@@ -397,7 +397,7 @@ let generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
       [ "class type server = object" ] @
       (apply_indent ~indent:"  " body) @
       [ "end";
-        "val dispatch : #server -> interface_id:Uint64.t -> method_id:int -> generic_method_t";
+        "val dispatch : #server -> reader_t rpc_server_t";
       ]
     in
     nested_modules @ structs @ server

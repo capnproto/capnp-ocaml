@@ -1643,7 +1643,7 @@ and generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
       [ "class type server = object" ] @
       (apply_indent ~indent:"  " body) @
       [ "end";
-        "let dispatch (server:#server) ~interface_id:i ~method_id =";
+        "let dispatch (server:#server) = RPC.Server.server @@ fun ~interface_id:i ~method_id ->";
         "  assert (i = interface_id);";
         "  match method_id with";
       ] @ apply_indent ~indent:"  " dispatch_body @
