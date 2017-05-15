@@ -1151,6 +1151,8 @@ let generate_one_field_accessors ~context ~node_id ~scope
                   sprintf "  (RA_.has_field x %u)" field_ofs;
                   "let " ^ field_name ^ "_get x = " ^ obj_magic;
                   sprintf "  (RA_.get_struct%s x %u)" reader_default_str field_ofs;
+                  "let " ^ field_name ^ "_get_pipelined x = ";
+                  sprintf "  RPC.Client.field x %u" field_ofs;
                 ]
               | Mode.Builder -> [
                   "let has_" ^ field_name ^ " x = " ^ obj_magic;
@@ -1197,6 +1199,8 @@ let generate_one_field_accessors ~context ~node_id ~scope
             let getters = [
               "let " ^ field_name ^ "_get x = " ^ obj_magic;
               sprintf "  (%s.get_interface x %u)" api_module field_ofs;
+              "let " ^ field_name ^ "_get_pipelined x = ";
+              sprintf "  RPC.Client.field x %u" field_ofs;
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v = " ^ obj_magic;

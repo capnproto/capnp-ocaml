@@ -59,6 +59,7 @@ module RPC = struct
 
       (* These are used by the generated code to make type-safe equivalents. *)
       val bind_method : _ t -> interface_id:Uint64.t -> method_id:int -> ('a, 'b) method_t
+      val field : 'a t -> int -> 'b t
     end
 
     module Server : sig
@@ -99,6 +100,7 @@ module RPC = struct
 
       let bind_method `No_RPC_provider ~interface_id ~method_id = (interface_id, method_id)
       let content_of_response `No_RPC_provider = assert false
+      let field `No_RPC_provider _ = `No_RPC_provider
     end
 
     module Server = struct
