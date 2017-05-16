@@ -147,7 +147,7 @@ let generate_one_field_accessors ~context ~scope ~mode field
                   let iface_id = Interface.type_id_get iface_descr in
                   let iface_node = Hashtbl.find_exn context.Context.nodes iface_id in
                   [
-                    sprintf "val %s_get_pipelined : t RPC.Client.t -> %s RPC.Client.t"
+                    sprintf "val %s_get_pipelined : t RPC.Struct.t -> %s RPC.Capability.t"
                       field_name
                       (* Use long name here, as interfaces may need forward references *)
                       (GenCommon.make_unique_typename ~context ~mode iface_node);
@@ -236,7 +236,7 @@ let generate_one_field_accessors ~context ~scope ~mode field
               (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp);
           ] @ (
             if mode = Mode.Reader then [
-              sprintf "val %s_get_pipelined : t RPC.Client.t -> %s RPC.Client.t"
+              sprintf "val %s_get_pipelined : t RPC.Struct.t -> %s RPC.Struct.t"
                 field_name
                 (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp);
             ] else []
@@ -396,10 +396,10 @@ let generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
         List.map methods ~f:(fun m ->
             let params = Method.(payload_type Params) ~mode m in
             let results = Method.(payload_type Results) ~mode m in
-            sprintf "method %s : (%s, %s) RPC.Client.method_t" (Method.ocaml_name m) params results
+            sprintf "method %s : (%s, %s) RPC.Capability.method_t" (Method.ocaml_name m) params results
           )
       in
-      [ "class client : t RPC.Client.t -> object" ] @
+      [ "class client : t RPC.Capability.t -> object" ] @
       (apply_indent ~indent:"  " methods) @
       [ "end" ]
     in
@@ -408,16 +408,16 @@ let generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
     let server =
       let body =
         List.map methods ~f:(fun m ->
-            sprintf "method %s : (%s, %s) RPC.Server.method_t"
+            sprintf "method %s : (%s, %s) RPC.Service.method_t"
               (Method.ocaml_name m)
               (Method.(payload_type Params) ~mode m)
               (Method.(payload_type Results) ~mode m)
           )
       in
-      [ "class type server = object" ] @
+      [ "class type service = object" ] @
       (apply_indent ~indent:"  " body) @
       [ "end";
-        "val dispatch : #server -> reader_t RPC.Server.t";
+        "val local : #service -> reader_t RPC.Capability.t";
       ]
     in
     nested_modules @ structs @ server

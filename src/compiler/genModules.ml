@@ -1152,7 +1152,7 @@ let generate_one_field_accessors ~context ~node_id ~scope
                   "let " ^ field_name ^ "_get x = " ^ obj_magic;
                   sprintf "  (RA_.get_struct%s x %u)" reader_default_str field_ofs;
                   "let " ^ field_name ^ "_get_pipelined x = ";
-                  sprintf "  RPC.Client.field x %u" field_ofs;
+                  sprintf "  RPC.Untyped.struct_field x %u" field_ofs;
                 ]
               | Mode.Builder -> [
                   "let has_" ^ field_name ^ " x = " ^ obj_magic;
@@ -1200,7 +1200,7 @@ let generate_one_field_accessors ~context ~node_id ~scope
               "let " ^ field_name ^ "_get x = " ^ obj_magic;
               sprintf "  (%s.get_interface x %u)" api_module field_ofs;
               "let " ^ field_name ^ "_get_pipelined x = ";
-              sprintf "  RPC.Client.field x %u" field_ofs;
+              sprintf "  RPC.Untyped.capability_field x %u" field_ofs;
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v = " ^ obj_magic;
@@ -1558,7 +1558,7 @@ let rec generate_struct_node ?uq_name ~context ~scope ~nested_modules ~mode
         "let of_message x = RA_.get_root_struct (RA_.Message.readonly x)";
         "let of_builder x = Some (RA_.StructStorage.readonly x)";
         "let of_pointer = RA_.deref_opt_struct_pointer";
-        "let of_payload x = RA_.deref_opt_struct_pointer (RPC.Payload.content x)";
+        "let of_payload x = RA_.deref_opt_struct_pointer (RPC.Untyped.content_of_payload x)";
       ]
     | Mode.Builder ->
         let data_words    = PS.Node.Struct.data_word_count_get struct_def in
@@ -1614,7 +1614,7 @@ and generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
       let body =
         List.map methods ~f:(fun m ->
             [
-              sprintf "method %s : (%s, %s) RPC.Client.method_t = RPC.Client.bind_method x ~interface_id ~method_id:%d"
+              sprintf "method %s : (%s, %s) RPC.Capability.method_t = RPC.Untyped.bind_method x ~interface_id ~method_id:%d"
                 (Method.ocaml_name m)
                 (Method.(payload_type Params) ~mode m)
                 (Method.(payload_type Results) ~mode m)
@@ -1629,10 +1629,10 @@ and generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
     in
     nested_modules @ structs @ client
   | Mode.Builder ->
-    let server =
+    let service =
       let body =
         List.map methods ~f:(fun m ->
-            sprintf "method %s : (%s, %s) RPC.Server.method_t"
+            sprintf "method %s : (%s, %s) RPC.Service.method_t"
               (Method.ocaml_name m)
               (Method.(payload_type Params) ~mode m)
               (Method.(payload_type Results) ~mode m)
@@ -1640,21 +1640,24 @@ and generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
       in
       let dispatch_body =
         List.map methods ~f:(fun m ->
-            sprintf "| %d -> RPC.Server.generic server#%s"
+            sprintf "| %d -> RPC.Untyped.abstract_method service#%s"
               (Method.id m)
               (Method.ocaml_name m)
           )
       in
-      [ "class type server = object" ] @
+      [ "class type service = object" ] @
       (apply_indent ~indent:"  " body) @
       [ "end";
-        "let dispatch (server:#server) = RPC.Server.server @@ fun ~interface_id:i ~method_id ->";
-        "  assert (i = interface_id);";
-        "  match method_id with";
-      ] @ apply_indent ~indent:"  " dispatch_body @
-      [ "  | x -> failwith (Printf.sprintf \"Unknown method ID %d\" x)"]
+        "let local (service:#service) =";
+        "  RPC.Untyped.local (fun ~interface_id:i ~method_id ->";
+        "    assert (i = interface_id);";
+        "    match method_id with";
+      ] @ apply_indent ~indent:"    " dispatch_body @
+      [ "    | x -> failwith (Printf.sprintf \"Unknown method ID %d\" x)";
+        "  )";
+      ]
     in
-    nested_modules @ structs @ server
+    nested_modules @ structs @ service
 
 
 (* Generate the OCaml module and type signature corresponding to a node.  [scope] is
