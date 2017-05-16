@@ -83,7 +83,6 @@ let functor_sig ~context = [
   "  (MessageWrapper : Capnp.MessageSig.S)";
   "  (RPC : Capnp.RPC.S with";
   "    type pointer_r = ro MessageWrapper.Slice.t option and";
-  "    type pointer_w = rw MessageWrapper.Slice.t";
   "  ) :";
   "  (S with type 'cap message_t = 'cap MessageWrapper.Message.t";
   "    and type Reader.pointer_t = ro MessageWrapper.Slice.t option";
@@ -103,7 +102,6 @@ let mod_functor_header = [
   "  (MessageWrapper : Capnp.MessageSig.S)";
   "  (RPC : Capnp.RPC.S with";
   "    type pointer_r = ro MessageWrapper.Slice.t option and";
-  "    type pointer_w = rw MessageWrapper.Slice.t";
   ") = struct";
   "  module CamlBytes = Bytes";
   "  module RPC = RPC";

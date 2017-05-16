@@ -350,8 +350,7 @@ let generate_struct_node ?uq_name ~context ~scope ~nested_modules
         "val of_message : 'cap message_t -> t";
         "val of_builder : builder_t -> t";
         "val of_pointer : pointer_t -> t";
-        "val of_request : 'a RPC.Server.Request.t -> t";
-        "val of_response : 'a RPC.Client.Response.t -> t";
+        "val of_payload : 'a RPC.Payload.t -> t";
       ]
     | Mode.Builder -> [
         "val of_message : rw message_t -> t";

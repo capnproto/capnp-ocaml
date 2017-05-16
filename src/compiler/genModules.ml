@@ -1558,8 +1558,7 @@ let rec generate_struct_node ?uq_name ~context ~scope ~nested_modules ~mode
         "let of_message x = RA_.get_root_struct (RA_.Message.readonly x)";
         "let of_builder x = Some (RA_.StructStorage.readonly x)";
         "let of_pointer = RA_.deref_opt_struct_pointer";
-        "let of_request x = RA_.deref_opt_struct_pointer (RPC.Server.Request.content x)";
-        "let of_response x = RA_.deref_opt_struct_pointer (RPC.Client.Response.content x)";
+        "let of_payload x = RA_.deref_opt_struct_pointer (RPC.Payload.content x)";
       ]
     | Mode.Builder ->
         let data_words    = PS.Node.Struct.data_word_count_get struct_def in
