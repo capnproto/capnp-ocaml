@@ -39,6 +39,9 @@ module type S = sig
     (** An 8-byte slice containing a untyped Cap'n'Proto read-only pointer. *)
     type pointer_r
 
+    (** Abstract version of [Capability.t] *)
+    type cap
+
     (** [content_of_payload t] is the pointer to the payload's content struct.
         The compiler uses this to implement the [of_payload] methods in the
         generated files. *)
@@ -75,6 +78,9 @@ module type S = sig
     val local :
       (interface_id:Uint64.t -> method_id:int -> abstract_method_t) ->
       'a Capability.t
+
+    (** [get_cap i p] gets the capability at index [i] in [p]'s CapDescriptor table. *)
+    val get_cap : 'a Payload.t -> Uint32.t option -> 'b Capability.t option
   end
 end
 
@@ -84,8 +90,13 @@ module None (M : MessageSig.S)
   (** A dummy RPC provider, for when the RPC features (interfaces) aren't needed. *)
 
   type untyped_struct = [`No_RPC_struct]
-  type untyped_cap = [`No_RPC_cap]
-  type untyped_payload = [`No_RPC_payload]
+
+  type untyped_cap =
+    [`CapIndex of Uint32.t * untyped_payload
+    | `Field of int * untyped_struct
+    | `Local of interface_id:Uint64.uint64 -> method_id:int -> untyped_payload -> untyped_struct
+    ]
+  and untyped_payload = untyped_struct * untyped_cap list
 
   module Struct = struct
     type 'a t = untyped_struct
@@ -93,7 +104,7 @@ module None (M : MessageSig.S)
 
   module Capability = struct
     type 'a t = untyped_cap
-    type ('a, 'b) method_t = Uint64.t * int
+    type ('a, 'b) method_t = untyped_cap * Uint64.t * int
   end
 
   module Payload = struct
@@ -101,17 +112,21 @@ module None (M : MessageSig.S)
   end
 
   module Untyped = struct
+    type cap = untyped_cap
     type pointer_r = Message.ro M.Slice.t option
     type abstract_method_t = untyped_payload -> untyped_struct
 
-    let bind_method `No_RPC_cap ~interface_id ~method_id = (interface_id, method_id)
-    let content_of_payload `No_RPC_payload = None
+    let bind_method cap ~interface_id ~method_id = (cap, interface_id, method_id)
+    let content_of_payload _ = None
 
     let abstract_method x = x
 
     let struct_field `No_RPC_struct _ = `No_RPC_struct
-    let capability_field `No_RPC_struct _ = `No_RPC_cap
-    let local _ = `No_RPC_cap
+    let capability_field x i = `Field (i, x)
+    let local x = `Local x
+    let get_cap p = function
+      | None -> None
+      | Some i -> Some (`CapIndex (i, p))
   end
 
   module Service = struct

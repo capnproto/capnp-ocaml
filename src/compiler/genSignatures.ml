@@ -139,21 +139,22 @@ let generate_one_field_accessors ~context ~scope ~mode field
               field_name
               (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp); ];
         ]
-      | Interface iface_descr -> [
+      | Interface iface_descr ->
+        let cap_type =
+          let iface_id = Interface.type_id_get iface_descr in
+          let iface_node = Hashtbl.find_exn context.Context.nodes iface_id in
+          (* Use long name here, as interfaces may need forward references *)
+          GenCommon.make_unique_typename ~context ~mode:Mode.Reader iface_node
+        in [
           Getter ([
-            "val " ^ field_name ^ "_get : t -> Uint32.t option";
-          ] @ (
-                if mode = Mode.Reader then (
-                  let iface_id = Interface.type_id_get iface_descr in
-                  let iface_node = Hashtbl.find_exn context.Context.nodes iface_id in
-                  [
-                    sprintf "val %s_get_pipelined : t RPC.Struct.t -> %s RPC.Capability.t"
-                      field_name
-                      (* Use long name here, as interfaces may need forward references *)
-                      (GenCommon.make_unique_typename ~context ~mode iface_node);
-                  ]
-                ) else []
-          ));
+              sprintf "val %s_get : t -> _ RPC.Payload.t -> %s RPC.Capability.t option"
+                field_name cap_type
+            ] @ if mode = Mode.Reader then [
+              sprintf "val %s_get_pipelined : t RPC.Struct.t -> %s RPC.Capability.t"
+                field_name cap_type;
+            ]
+              else []
+            );
           Setter [
             "val " ^ field_name ^ "_set : t -> Uint32.t option -> unit"; ];
         ]

@@ -1197,8 +1197,8 @@ let generate_one_field_accessors ~context ~node_id ~scope
                 ""
             in
             let getters = [
-              "let " ^ field_name ^ "_get x = " ^ obj_magic;
-              sprintf "  (%s.get_interface x %u)" api_module field_ofs;
+              "let " ^ field_name ^ "_get x p = " ^ obj_magic;
+              sprintf "  RPC.Untyped.get_cap p (%s.get_interface x %u)" api_module field_ofs;
               "let " ^ field_name ^ "_get_pipelined x = ";
               sprintf "  RPC.Untyped.capability_field x %u" field_ofs;
             ] in
