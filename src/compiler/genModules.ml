@@ -1660,10 +1660,10 @@ and generate_methods ~context ~scope ~nested_modules ~mode ~node_name interface_
       [ "end";
         "let local (service:#service) =";
         "  RPC.Untyped.local (fun ~interface_id:i ~method_id ->";
-        "    assert (i = interface_id);";
-        "    match method_id with";
+        "    if i <> interface_id then RPC.Untyped.unknown_interface ~interface_id";
+        "    else match method_id with";
       ] @ apply_indent ~indent:"    " dispatch_body @
-      [ "    | x -> failwith (Printf.sprintf \"Unknown method ID %d\" x)";
+      [ "    | x -> RPC.Untyped.unknown_method ~interface_id ~method_id";
         "  )";
       ]
     in

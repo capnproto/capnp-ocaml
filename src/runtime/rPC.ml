@@ -81,6 +81,12 @@ module type S = sig
 
     (** Used in the generated code to record the type of a CapDescriptor index. *)
     val cap_index : Uint32.t option -> 'a Payload.index option
+
+    (** Used to handle calls when the interface ID isn't known. *)
+    val unknown_interface : interface_id:Uint64.t -> abstract_method_t
+
+    (** Used to handle calls when the method ID isn't known. *)
+    val unknown_method : interface_id:Uint64.t -> method_id:int -> abstract_method_t
   end
 end
 
@@ -118,6 +124,8 @@ module None (M : MessageSig.S) = struct
     let capability_field `No_RPC_struct _ = `No_RPC_cap
     let local _ = `No_RPC_cap
     let cap_index x = x
+    let unknown_interface ~interface_id req = failwith "Unknown interface"
+    let unknown_method ~interface_id ~method_id req = failwith "Unknown method"
   end
 
   module Service = struct
