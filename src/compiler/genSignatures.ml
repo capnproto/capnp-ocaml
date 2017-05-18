@@ -60,7 +60,7 @@ let generate_one_field_accessors ~context ~scope ~mode field
   match PS.Field.get field with
   | PS.Field.Group group ->
       let group_id = PS.Field.Group.type_id_get group in
-      let group_node = Hashtbl.find_exn context.Context.nodes group_id in
+      let group_node = Context.node context group_id in
       let group_name =
         GenCommon.get_scope_relative_name ~context scope group_node
       in [
@@ -140,10 +140,7 @@ let generate_one_field_accessors ~context ~scope ~mode field
         ]
       | Interface iface_descr ->
         let cap_type =
-          let iface_id = Interface.type_id_get iface_descr in
-          let iface_node = Hashtbl.find_exn context.Context.nodes iface_id in
-          (* Use long name here, as interfaces may need forward references *)
-          GenCommon.make_unique_typename ~context ~mode:Mode.Reader iface_node
+          GenCommon.type_name ~context ~mode:Mode.Reader ~scope_mode:mode scope tp
         in [
           Getter ([
             sprintf "val %s_get : t -> %s RPC.Payload.index option"
@@ -397,8 +394,8 @@ let generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
     let client =
       let methods =
         List.map methods ~f:(fun m ->
-            let params = Method.(payload_type Params) ~mode m in
-            let results = Method.(payload_type Results) ~mode m in
+            let params = Method.(payload_type Params) ~context ~scope ~mode m in
+            let results = Method.(payload_type Results) ~context ~scope ~mode m in
             sprintf "method %s : (%s, %s) RPC.Capability.method_t" (Method.ocaml_name m) params results
           )
       in
@@ -413,8 +410,8 @@ let generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
         List.map methods ~f:(fun m ->
             sprintf "method %s : (%s, %s) RPC.Service.method_t"
               (Method.ocaml_name m)
-              (Method.(payload_type Params) ~mode m)
-              (Method.(payload_type Results) ~mode m)
+              (Method.(payload_type Params) ~context ~scope ~mode m)
+              (Method.(payload_type Results) ~context ~scope ~mode m)
           )
       in
       [ "class type service = object" ] @
@@ -441,21 +438,12 @@ let rec generate_node
   let open PS.Node in
   let node_id = id_get node in
   let generate_nested_modules () =
-    match Topsort.topological_sort context.Context.nodes
-            (GenCommon.children_of ~context node) with
-    | Some child_nodes ->
-        List.concat_map child_nodes ~f:(fun child ->
-          let child_name = GenCommon.get_unqualified_name ~parent:node ~child in
-          let child_node_id = id_get child in
-          generate_node ~suppress_module_wrapper:false ~context
-            ~scope:(child_node_id :: scope) ~mode ~node_name:child_name child)
-    | None ->
-        let error_msg = sprintf
-          "The children of node %s (%s) have a cyclic dependency."
-          (Uint64.to_string node_id)
-          (display_name_get node)
-        in
-        failwith error_msg
+    let child_nodes = GenCommon.children_of ~context node in
+    List.concat_map child_nodes ~f:(fun child ->
+        let child_name = GenCommon.get_unqualified_name ~parent:node ~child in
+        let child_node_id = id_get child in
+        generate_node ~suppress_module_wrapper:false ~context
+          ~scope:(child_node_id :: scope) ~mode ~node_name:child_name child)
   in
   match get node with
   | File ->

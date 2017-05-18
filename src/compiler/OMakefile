@@ -9,8 +9,7 @@ COMP_MODULES =            \
   genSignatures           \
   generate                \
   main                    \
-  pluginSchema            \
-  topsort
+  pluginSchema
 
 
 if $(defined-env OCAML_TOPLEVEL_PATH)

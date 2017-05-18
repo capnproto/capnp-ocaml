@@ -219,7 +219,7 @@ let rec generate_list_element_decoder ~context ~scope list_def =
       ]
   | Enum enum_def ->
       let enum_id = PS.Type.Enum.type_id_get enum_def in
-      let enum_node = Hashtbl.find_exn context.Context.nodes enum_id in
+      let enum_node = Context.node context enum_id in
       let enum_getters =
         apply_indent ~indent:"  "
           (generate_enum_runtime_getters ~context ~mode:Mode.Reader enum_node)
@@ -297,7 +297,7 @@ let rec generate_list_element_codecs ~context ~scope list_def =
   | Struct struct_def ->
       let data_words, pointer_words =
         let id = PS.Type.Struct.type_id_get struct_def in
-        let node = Hashtbl.find_exn context.Context.nodes id in
+        let node = Context.node context id in
         match PS.Node.get node with
         | PS.Node.Struct struct_def ->
             (PS.Node.Struct.data_word_count_get struct_def,
@@ -365,7 +365,7 @@ let rec generate_list_element_codecs ~context ~scope list_def =
       ]
   | Enum enum_def ->
       let enum_id = PS.Type.Enum.type_id_get enum_def in
-      let enum_node = Hashtbl.find_exn context.Context.nodes enum_id in
+      let enum_node = Context.node context enum_id in
       let enum_getters =
         apply_indent ~indent:"  "
           (generate_enum_runtime_getters ~context ~mode:Mode.Builder enum_node)
@@ -432,7 +432,7 @@ let generate_list_getters ~context ~scope ~list_type ~mode
         | Mode.Builder ->
             let data_words, pointer_words =
               let id = PS.Type.Struct.type_id_get struct_def in
-              let node = Hashtbl.find_exn context.Context.nodes id in
+              let node = Context.node context id in
               match PS.Node.get node with
               | PS.Node.Struct struct_def ->
                   (PS.Node.Struct.data_word_count_get struct_def,
@@ -483,7 +483,7 @@ let generate_list_getters ~context ~scope ~list_type ~mode
         end
     | Enum enum_def ->
         let enum_id = Enum.type_id_get enum_def in
-        let enum_node = Hashtbl.find_exn context.Context.nodes enum_id in
+        let enum_node = Context.node context enum_id in
         let unique_module_name =
           GenCommon.make_unique_enum_module_name ~context enum_node
         in
@@ -567,7 +567,7 @@ let generate_list_setters ~context ~scope ~list_type
         in
         let data_words, pointer_words =
           let id = PS.Type.Struct.type_id_get struct_def in
-          let node = Hashtbl.find_exn context.Context.nodes id in
+          let node = Context.node context id in
           match PS.Node.get node with
           | PS.Node.Struct struct_def ->
               (PS.Node.Struct.data_word_count_get struct_def,
@@ -614,7 +614,7 @@ let generate_list_setters ~context ~scope ~list_type
         ]
     | Enum enum_def ->
         let enum_id = Enum.type_id_get enum_def in
-        let enum_node = Hashtbl.find_exn context.Context.nodes enum_id in
+        let enum_node = Context.node context enum_id in
         let unique_module_name =
           GenCommon.make_unique_enum_module_name ~context enum_node
         in
@@ -677,7 +677,7 @@ let generate_list_setters ~context ~scope ~list_type
 
    The resulting lines are returned in reverse order. *)
 let rec generate_clear_group_fields_rev ~acc ~context ~group_id =
-  let node = Hashtbl.find_exn context.Context.nodes group_id in
+  let node = Context.node context group_id in
   match PS.Node.get node with
   | PS.Node.Struct struct_def ->
       let () = assert (PS.Node.Struct.is_group_get struct_def) in
@@ -1100,7 +1100,7 @@ let generate_one_field_accessors ~context ~node_id ~scope
             (getters, setters)
         | (PS.Type.Enum enum_def, PS.Value.Enum val_uint16) ->
             let enum_id = PS.Type.Enum.type_id_get enum_def in
-            let enum_node = Hashtbl.find_exn context.Context.nodes enum_id in
+            let enum_node = Context.node context enum_id in
             let getters = generate_enum_getter ~context ~enum_node
                 ~mode ~field_name ~field_ofs ~default:val_uint16
             in
@@ -1128,7 +1128,7 @@ let generate_one_field_accessors ~context ~node_id ~scope
             in
             let data_words, pointer_words =
               let id = PS.Type.Struct.type_id_get struct_def in
-              let node = Hashtbl.find_exn context.Context.nodes id in
+              let node = Context.node context id in
               match PS.Node.get node with
               | PS.Node.Struct struct_def ->
                   (PS.Node.Struct.data_word_count_get struct_def,
@@ -1382,7 +1382,7 @@ let generate_list_constant ~context ~scope ~node_id ~list_name list_def =
         ]
     | Enum enum_def ->
       let enum_id = PS.Type.Enum.type_id_get enum_def in
-      let enum_node = Hashtbl.find_exn context.Context.nodes enum_id in
+      let enum_node = Context.node context enum_id in
         let unique_module_name =
           GenCommon.make_unique_enum_module_name ~context enum_node
         in [
@@ -1448,7 +1448,7 @@ let generate_constant ~context ~scope ~node ~node_name const_def =
         match PS.Type.get const_type with
         | PS.Type.Enum enum_def ->
             let enum_id = PS.Type.Enum.type_id_get enum_def in
-            Hashtbl.find_exn context.Context.nodes enum_id
+            Context.node context enum_id
         | _ ->
             failwith "Decoded non-enum node where enum node was expected."
       in
@@ -1615,8 +1615,8 @@ and generate_methods ~context ~scope ~nested_modules ~mode ~node_name interface_
             [
               sprintf "method %s : (%s, %s) RPC.Capability.method_t = RPC.Untyped.bind_method x ~interface_id ~method_id:%d"
                 (Method.ocaml_name m)
-                (Method.(payload_type Params) ~mode m)
-                (Method.(payload_type Results) ~mode m)
+                (Method.(payload_type Params) ~context ~scope ~mode m)
+                (Method.(payload_type Results) ~context ~scope ~mode m)
                 (Method.id m);
             ]
           )
@@ -1644,8 +1644,8 @@ and generate_methods ~context ~scope ~nested_modules ~mode ~node_name interface_
         List.map methods ~f:(fun m ->
             sprintf "method %s : (%s, %s) RPC.Service.method_t"
               (Method.ocaml_name m)
-              (Method.(payload_type Params) ~mode m)
-              (Method.(payload_type Results) ~mode m)
+              (Method.(payload_type Params) ~context ~scope ~mode m)
+              (Method.(payload_type Results) ~context ~scope ~mode m)
           )
       in
       let dispatch_body =
@@ -1683,23 +1683,13 @@ and generate_node
     ~(node_name : string)
     (node : PS.Node.t)
 : string list =
-  let node_id = PS.Node.id_get node in
   let generate_nested_modules () =
-    match Topsort.topological_sort context.Context.nodes
-            (GenCommon.children_of ~context node) with
-    | Some child_nodes ->
-        List.concat_map child_nodes ~f:(fun child ->
-          let child_name = GenCommon.get_unqualified_name ~parent:node ~child in
-          let child_node_id = PS.Node.id_get child in
-          generate_node ~suppress_module_wrapper:false ~context
-            ~scope:(child_node_id :: scope) ~mode ~node_name:child_name child)
-    | None ->
-        let error_msg = sprintf
-          "The children of node %s (%s) have a cyclic dependency."
-          (Uint64.to_string node_id)
-          (PS.Node.display_name_get node)
-        in
-        failwith error_msg
+    let child_nodes = GenCommon.children_of ~context node in
+    List.concat_map child_nodes ~f:(fun child ->
+        let child_name = GenCommon.get_unqualified_name ~parent:node ~child in
+        let child_node_id = PS.Node.id_get child in
+        generate_node ~suppress_module_wrapper:false ~context
+          ~scope:(child_node_id :: scope) ~mode ~node_name:child_name child)
   in
   match PS.Node.get node with
   | PS.Node.File ->
