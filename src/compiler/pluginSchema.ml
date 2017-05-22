@@ -1008,6 +1008,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
   let invalid_msg = Capnp.Message.invalid_msg
 
   module RA_ = struct
+    open Capnp
     open Capnp.Runtime
     (******************************************************************************
      * capnp-ocaml
@@ -2696,6 +2697,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
 
   end
   module BA_ = struct
+    open Capnp
     open Capnp.Runtime
     module NM = MessageWrapper
     (******************************************************************************

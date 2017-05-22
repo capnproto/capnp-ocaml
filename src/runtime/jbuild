@@ -1,0 +1,10 @@
+(jbuild_version 1)
+
+(library (
+  (name capnp)
+  (public_name capnp)
+  (synopsis "Runtime support library for capnp-ocaml")
+  (libraries (core_kernel uint ocplib-endian res extunix))
+  (flags (:standard -w -50-27-6-34-32-53-33))
+  (ocamlopt_flags (:standard -O3 -inline 1000))
+))

@@ -421,15 +421,16 @@ subdirectories may be helpful to look at.
 
 Installation
 ------------
-capnp-ocaml requires OCaml >= 4.01.
+capnp-ocaml requires OCaml >= 4.02.
 
 You should be able to install capnp-ocaml with
 http://opam.ocaml.org[OPAM] using using `opam install capnp`.
 
-If you prefer to compile manually, you will need OMake, Findlib, and OCaml
+If you prefer to compile manually, you will need jbuilder, Findlib, and OCaml
 packages `core_kernel`, `extunix`, `uint`, `ocplib-endian`, and `res`.
-Run `omake` to build both the compiler and the runtime library, and then use
-`omake install` to copy them into appropriate places within your filesystem.
+Run `jbuilder build` to build both the compiler and the runtime library,
+and then use `jbuilder install` to copy them into appropriate places within your
+filesystem.
 
 Contact
 -------
@@ -460,3 +461,5 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+Some of the `.capnp` schema files are imported from the Cap'n Proto repository
+and have their own license (at the top of each file).

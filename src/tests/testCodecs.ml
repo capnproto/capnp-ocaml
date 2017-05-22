@@ -198,8 +198,8 @@ let test_random_serialize_deserialize ctx =
     | Result.Ok decoded_message ->
         let () = assert (Codecs.FramedStream.bytes_available ser_fragments =
           (String.length trailing_data)) in
-        (Message.BytesMessage.Message.to_storage m) =
-          (Message.BytesMessage.Message.to_storage decoded_message)
+        (Capnp.Message.BytesMessage.Message.to_storage m) =
+          (Capnp.Message.BytesMessage.Message.to_storage decoded_message)
     | Result.Error _ ->
         assert false)
 
@@ -213,8 +213,8 @@ let test_random_serialize_deserialize_packed ctx =
     let () = fragment packed (Codecs.FramedStream.add_fragment pack_fragments) in
     match Codecs.FramedStream.get_next_frame pack_fragments with
     | Result.Ok decoded_message ->
-        (Message.BytesMessage.Message.to_storage m) =
-          (Message.BytesMessage.Message.to_storage decoded_message)
+        (Capnp.Message.BytesMessage.Message.to_storage m) =
+          (Capnp.Message.BytesMessage.Message.to_storage decoded_message)
     | Result.Error _ ->
         assert false)
 
@@ -224,9 +224,4 @@ let random_serialize_suite =
     "serialize_deserialize_message" >:: test_random_serialize_deserialize;
     "serialize_deserialize_packed_message" >:: test_random_serialize_deserialize_packed;
   ]
-
-
-let () = run_test_tt_main packing_suite
-let () = run_test_tt_main random_packing_suite
-let () = run_test_tt_main random_serialize_suite
 

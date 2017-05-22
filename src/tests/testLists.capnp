@@ -27,7 +27,7 @@
 
 @0xfc014463ebb6551b;
 
-using Test = import "/capnp/test.capnp";
+using Test = import "test.capnp";
 
 struct VoidList {
   a @0 : List(Void);
