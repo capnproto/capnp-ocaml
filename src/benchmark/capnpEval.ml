@@ -1,10 +1,5 @@
 
-module E :
-  Eval.S with type 'cap message_t = 'cap Capnp.BytesMessage.Message.t
-= struct
-  module MessageWrapper = Capnp.BytesMessage
-  INCLUDE "eval_defun.ml"
-end
+module E = Eval.Make(Capnp.BytesMessage)
 
 open Core_kernel.Std
 
