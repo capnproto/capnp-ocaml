@@ -5,7 +5,6 @@ OCAML_LIBS += ../runtime/libcapnp
 COMP_MODULES =            \
   c2b2b                   \
   defaults                \
-  includes                \
   genCommon               \
   genModules              \
   genSignatures           \
@@ -22,15 +21,10 @@ else
   TOPLEVEL_INCLUDE = $(EMPTY)
   export
 
-includes.ml: make_includes.ml ../runtime/common-inc.ml \
-../runtime/reader-inc.ml ../runtime/builder-inc.ml
-	ocaml $(TOPLEVEL_INCLUDE) make_includes.ml
-
 
 PROGRAM = capnpc-ocaml
 
 OCAMLDEP_MODULES_ENABLED = false
-LocalOCamlGeneratedFiles(includes.ml)
 OCamlProgram($(PROGRAM), $(COMP_MODULES))
 
 .DEFAULT: $(PROGRAM)$(EXE)
@@ -39,7 +33,7 @@ OCamlProgram($(PROGRAM), $(COMP_MODULES))
 
 compiler-clean:
 	rm -f $(PROGRAM)$(EXE) $(PROGRAM).opt $(PROGRAM).byte \
-	    includes.ml *.cmi *.cmo *.cmx *.cma *.cmxa *.cmxs *.a *.o
+	    *.cmi *.cmo *.cmx *.cma *.cmxa *.cmxs *.a *.o
 
 compiler-distclean: compiler-clean
 	rm -f *.omc
