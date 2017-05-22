@@ -1,8 +1,10 @@
 #!/usr/bin/env python
-import subprocess, os, csv, time
+import subprocess, os, csv, time, sys
+my_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
+os.chdir(my_dir)
 
-#subprocess.check_call(["omake", "clean", "bench-clean"])
-subprocess.check_call(["omake", "carsales", "catrank", "eval"])
+subprocess.check_call(["jbuilder", "build", "--dev", "carsales", "catrank", "eval"])
+bin_dir = os.path.join(my_dir, '../../_build/default/src/benchmark')
 
 switch = subprocess.check_output(["opam", "sw", "show"]).strip()
 
@@ -22,7 +24,7 @@ def run(cmd, base_iters, scale):
     iters = int(base_iters * scale)
     cmd = cmd + [str(iters)]
     t0 = time.time()
-    throughput = int(subprocess.check_output(cmd))
+    throughput = int(subprocess.check_output(cmd, cwd = bin_dir))
     t1 = time.time()
     t = t1 - t0
     rate = throughput / t

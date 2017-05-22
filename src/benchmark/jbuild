@@ -1,0 +1,43 @@
+(jbuild_version 1)
+
+(executable
+ ((name main)
+  (libraries (capnp fast_rand core))
+  (flags (:standard -w -27-53-55-3-35))
+  (ocamlopt_flags (:standard -O3 -inline 2000))
+))
+
+(rule
+ ((targets (carsales))
+  (deps (main.exe))
+  (action (run ln main.exe ${@}))))
+
+(rule
+ ((targets (catrank))
+  (deps (main.exe))
+  (action (run ln main.exe ${@}))))
+
+(rule
+ ((targets (eval))
+  (deps (main.exe))
+  (action (run ln main.exe ${@}))))
+
+(rule
+ ((targets (carsales.ml carsales.mli))
+  (deps (carsales.capnp ../compiler/main.exe))
+  (action  (run capnpc -o ../compiler/main.exe ${<}))))
+
+(rule
+ ((targets (catrank.ml catrank.mli))
+  (deps (catrank.capnp ../compiler/main.exe))
+  (action  (run capnpc -o ../compiler/main.exe ${<}))))
+
+(rule
+ ((targets (eval.ml eval.mli))
+  (deps (eval.capnp ../compiler/main.exe))
+  (action  (run capnpc -o ../compiler/main.exe ${<}))))
+
+(alias
+ ((name benchmarks)
+  (deps (carsales catrank eval))
+))

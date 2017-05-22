@@ -1,0 +1,32 @@
+(jbuild_version 1)
+
+(executable
+ ((name run_tests)
+  (libraries (capnp oUnit))
+  (flags (:standard -w -27-53))
+))
+
+(rule
+ ((targets (test.ml test.mli))
+  (deps (test.capnp ../compiler/main.exe))
+  (action  (run capnpc -o ../compiler/main.exe ${<}))))
+
+(rule
+ ((targets (test_import.ml test_import.mli))
+  (deps (test-import.capnp ../compiler/main.exe))
+  (action  (run capnpc -o ../compiler/main.exe ${<}))))
+
+(rule
+ ((targets (c2b2b.ml c2b2b.mli))
+  (deps (c++.capnp ../compiler/main.exe))
+  (action  (run capnpc -o ../compiler/main.exe ${<}))))
+
+(rule
+ ((targets (testLists.ml testLists.mli))
+  (deps (testLists.capnp ../compiler/main.exe))
+  (action  (run capnpc -o ../compiler/main.exe ${<}))))
+
+(alias
+ ((name    runtest)
+  (deps    (run_tests.bc))
+  (action  (run ${<}))))

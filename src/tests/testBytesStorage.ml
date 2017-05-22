@@ -496,13 +496,3 @@ let int64_suite =
 
 
 
-let () = run_test_tt_main uint8_suite
-let () = run_test_tt_main uint16_suite
-let () = run_test_tt_main uint32_suite
-let () = run_test_tt_main uint64_suite
-let () = run_test_tt_main int8_suite
-let () = run_test_tt_main int16_suite
-let () = run_test_tt_main int32_suite
-let () = run_test_tt_main int64_suite
-
-

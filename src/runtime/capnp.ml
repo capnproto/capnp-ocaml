@@ -27,12 +27,27 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
-module MessageSig   = CapnpRuntime.MessageSig
-module Message      = CapnpRuntime.Message
-module Array        = CapnpRuntime.CArray
-module BytesStorage = CapnpRuntime.BytesStorage
-module BytesMessage = CapnpRuntime.Message.BytesMessage
-module Codecs       = CapnpRuntime.Codecs
-module IO           = CapnpRuntime.IO
-module RPC          = CapnpRuntime.RPC
-module Runtime      = CapnpRuntime
+module MessageSig   = MessageSig
+module Message      = Message
+module Array        = CArray
+module BytesStorage = BytesStorage
+module BytesMessage = Message.BytesMessage
+module Codecs       = Codecs
+module IO           = IO
+module RPC          = RPC
+module Runtime = struct
+  module BuilderInc      = BuilderInc
+  module BuilderOps      = BuilderOps
+  module Codecs          = Codecs
+  module FarPointer      = FarPointer
+  module FragmentBuffer  = FragmentBuffer
+  module InnerArray      = InnerArray
+  module ListPointer     = ListPointer
+  module ListStorageType = ListStorageType
+  module OtherPointer    = OtherPointer
+  module Packing         = Packing
+  module Pointer         = Pointer
+  module ReaderInc       = ReaderInc
+  module StructPointer   = StructPointer
+  module Util            = Util
+end

@@ -59,7 +59,4 @@ let decode_signed_suite =
     "random negative" >:: t4;
   ]
 
-let () = run_test_tt_main encode_signed_suite
-let () = run_test_tt_main decode_signed_suite
-
 
