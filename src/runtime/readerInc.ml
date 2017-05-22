@@ -37,7 +37,7 @@ open Core_kernel.Std
 let sizeof_uint64 = 8
 
 module RC = struct
-  INCLUDE "common-inc.ml"
+  INCLUDE "commonInc.ml"
 end
 include RC
 

@@ -55,16 +55,16 @@ end
 module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
   module ROC = struct
     module MessageWrapper = ROM
-    INCLUDE "common-inc.ml"
+    INCLUDE "commonInc.ml"
   end
   module RWC = struct
     module MessageWrapper = RWM
-    INCLUDE "common-inc.ml"
+    INCLUDE "commonInc.ml"
   end
 
   module RReader = struct
     module MessageWrapper = RWM
-    INCLUDE "reader-inc.ml"
+    INCLUDE "readerInc.ml"
   end
 
 

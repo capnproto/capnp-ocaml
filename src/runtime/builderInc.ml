@@ -49,7 +49,7 @@ module DM = Message.BytesMessage
 
 module NC = struct
   module MessageWrapper = NM
-  INCLUDE "common-inc.ml"
+  INCLUDE "commonInc.ml"
 end
 
 (* DefaultsCopier will provide algorithms for making deep copies of default
