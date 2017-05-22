@@ -1,7 +1,7 @@
 
 module CamlBytes = Bytes
 
-module CR = Catrank.Make(Capnp.BytesMessage)
+module CR = Catrank.Make[@inlined](Capnp.BytesMessage)
 
 open Core_kernel.Std
 

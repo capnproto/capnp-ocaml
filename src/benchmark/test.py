@@ -6,7 +6,7 @@ subprocess.check_call(["omake", "carsales", "catrank", "eval"])
 
 switch = subprocess.check_output(["opam", "sw", "show"]).strip()
 
-print "Current switich: %s" % switch
+print "Current switch: %s" % switch
 
 baseline = {
         ('./carsales', 'pipe', 'none'): 67433620.95888832,
