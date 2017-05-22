@@ -145,7 +145,7 @@ let mod_footer = [
 let mod_functor_footer = [
   "end [@@inline]";
   "";
-  "module Make(M:Capnp.MessageSig.S) = MakeRPC(M)(Capnp.RPC.None(M))";
+  "module Make(M:Capnp.MessageSig.S) = MakeRPC[@inlined](M)[@inlined](Capnp.RPC.None(M)) [@@inline]";
 ]
 
 
