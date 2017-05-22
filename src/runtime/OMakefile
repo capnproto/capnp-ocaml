@@ -1,4 +1,10 @@
-OCAMLFINDFLAGS += -syntax camlp4o
+Camlp4o(module) =
+    section
+        OCAMLFINDFLAGS += -syntax camlp4o
+        $(module).cmi:
+        $(module).cmo:
+        $(module).o:
+        $(module).cmx:
 
 RUNTIME_MODULES =   \
   builderOps        \
@@ -47,6 +53,8 @@ OCamlLibrary(libcapnp, capnp capnpRuntime)
 
 OCamlPackage(capnpRuntime, $(RUNTIME_MODULES))
 OCAMLFLAGS += -for-pack CapnpRuntime
+
+Camlp4o(builderOps)
 
 .PHONY: runtime-clean runtime-distclean runtime-install runtime-uninstall
 
