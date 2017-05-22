@@ -1,5 +1,5 @@
 
-module CS = Carsales.Make(Capnp.BytesMessage)
+module CS = Carsales.Make[@inlined](Capnp.BytesMessage)
 
 module TestCase = struct
   type request_reader_t   = CS.Reader.ParkingLot.t

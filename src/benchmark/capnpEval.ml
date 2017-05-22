@@ -1,5 +1,5 @@
 
-module E = Eval.Make(Capnp.BytesMessage)
+module E = Eval.Make[@inlined](Capnp.BytesMessage)
 
 open Core_kernel.Std
 

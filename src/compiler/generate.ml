@@ -138,7 +138,7 @@ let mod_footer = [
 ]
 
 let mod_functor_footer = [
-  "end";
+  "end [@@inline]";
   "";
 ]
 
