@@ -368,9 +368,9 @@ You will need to
 http://kentonv.github.io/capnproto/install.html[install the Cap\'n Proto compiler].
 Once the Cap\'n Proto compiler and capnp-ocaml are both installed, you should be
 able to use `capnp compile -o ocaml yourSchemaFile.capnp` in order to generate
-`yourSchemaFile.mli` and `yourSchemaFile.ml` (as well as `yourSchemaFile_defun.ml`,
-referenced below).  These modules will link against OCaml packages
-`core_kernel`, `extunix`, `uint`, `ocplib-endian`, `res`, and of course `capnp`.
+`yourSchemaFile.mli` and `yourSchemaFile.ml`.  These modules will link against
+OCaml packages `core_kernel`, `extunix`, `uint`, `ocplib-endian`, `res`, and of
+course `capnp`.
 
 Instantiating the Modules
 -------------------------
@@ -395,28 +395,21 @@ let root_struct = YSF.Builder.Foo.init_root () in
 (* ... *)
 --------------------------------------------------------------------------------
 
-Defunctorized Module Instantiation
-----------------------------------
+Performance
+-----------
 For certain applications, the overhead associated with OCaml functors may
-be problematic. The functors may be eliminated by directly including the
-generated accessor code, at the cost of increased compile time. The code
-generator plugin emits `*_defun.ml` files intended for this use case:
+be problematic. The functors may be eliminated by compiling with an flambda
+build of the OCaml compiler (e.g. `opam switch 4.04.1+flambda`) and using the
+`@inlined` annotation, like this:
+
 [source,ocaml]
 --------------------------------------------------------------------------------
-module YSF :
-  YourSchemaFile.S with type 'cap message_t = 'cap Capnp.BytesMessage.Message.t
-= struct
-  module MessageWrapper = Capnp.BytesMessage
-  INCLUDE "yourSchemaFile_defun.ml"
-end
-
-let root_struct = YSF.Builder.Foo.init_root () in
-(* ... *)
+module YSF = YourSchemaFile.Make[@inlined](Capnp.BytesMessage)
 --------------------------------------------------------------------------------
 
-The `INCLUDE` directive is a standard `camlp4` syntax extension provided by
-the `camlp4.macro` package.
-
+You can use the `ocamlopt -inlining-report` option to check that the code has
+been inlined. It may also be a good idea to compile with `-O3` if you care
+about speed.
 
 I Need to See an Example
 ------------------------

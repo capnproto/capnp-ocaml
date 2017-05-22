@@ -151,10 +151,6 @@ let mli_filename filename =
   let module_name = GenCommon.make_legal_module_name filename in
   String.uncapitalize (module_name ^ ".mli")
 
-let ml_defun_filename filename =
-  let module_name = GenCommon.make_legal_module_name filename in
-  String.uncapitalize (module_name ^ "_defun.ml")
-
 
 let string_of_lines lines =
   (String.concat ~sep:"\n" lines) ^ "\n"
@@ -270,28 +266,16 @@ let compile
         mod_shared_content @
         mod_functor_footer)
     in
-    let mod_defun_content =
-      string_of_lines ( [
-        "  module CamlBytes = Bytes";
-        "  type ro = Capnp.Message.ro";
-        "  type rw = Capnp.Message.rw";
-      ] @
-      mod_shared_content)
-    in
     let () = Out_channel.with_file (mli_filename requested_filename)
         ~f:(fun chan -> Out_channel.output_string chan sig_file_content)
     in
     let () = Out_channel.with_file (ml_filename requested_filename)
         ~f:(fun chan -> Out_channel.output_string chan mod_file_content)
     in
-    let () = Out_channel.with_file (ml_defun_filename requested_filename)
-        ~f:(fun chan -> Out_channel.output_string chan mod_defun_content)
-    in
-    let () = Printf.printf "%s --> %s %s %s\n"
+    let () = Printf.printf "%s --> %s %s\n"
         requested_filename
         (mli_filename requested_filename)
         (ml_filename requested_filename)
-        (ml_defun_filename requested_filename)
     in
     ())
 
