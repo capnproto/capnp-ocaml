@@ -69,7 +69,6 @@ module Make (Storage : MessageStorage.S) = struct
 
   module Message = struct
     type storage_t = Storage.t
-    type -'cap segment_t = Storage.t
 
     type storage_descr_t = {
       segment : storage_t;
@@ -81,12 +80,6 @@ module Make (Storage : MessageStorage.S) = struct
     let create size =
       let segment = Storage.alloc (Util.round_up_mult_8 size) in
       Res.Array.create 1 {segment; bytes_consumed = 0}
-
-    (** [add_segment m size] allocates a new segment of [size] bytes and appends
-        it to the message, raising an exception if storage cannot be allocated. *)
-    let add_segment m size =
-      let new_segment = Storage.alloc (Util.round_up_mult_8 size) in
-      Res.Array.add_one m {segment = new_segment; bytes_consumed = 0}
 
     let release m =
       let () = Res.Array.iter (fun descr -> Storage.release descr.segment) m in

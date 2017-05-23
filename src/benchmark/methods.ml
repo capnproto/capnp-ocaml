@@ -65,7 +65,7 @@ module Benchmark
       CountingOutputStream.throughput = 0;
     } in
     let out_context = CountingOutputStream.wrap_write_context ~compression out_stream in
-    for i = 0 to iters - 1 do
+    for _i = 0 to iters - 1 do
       let (request, expectation) = TestCase.setup_request () in
       let req_message = RequestBuilder.to_message request in
       IO.WriteContext.write_message out_context req_message;
@@ -169,7 +169,7 @@ module Benchmark
       CountingOutputStream.throughput = 0;
     } in
     let out_context = CountingOutputStream.wrap_write_context ~compression out_stream in
-    for i = 0 to iters - 1 do
+    for _i = 0 to iters - 1 do
       match IO.ReadContext.read_message in_context with
       | Some req_message ->
           let request = RequestReader.of_message req_message in
@@ -187,7 +187,7 @@ module Benchmark
      happens synchronously in one process, and no serialization takes place. *)
   let pass_by_object ~(iters : int) : int =
     let object_size_counter = ref 0 in
-    for i = 0 to iters - 1 do
+    for _i = 0 to iters - 1 do
       let (req_builder, expectation) = TestCase.setup_request () in
       let resp_builder = TestCase.handle_request
           (RequestReader.of_builder req_builder)
@@ -212,7 +212,7 @@ module Benchmark
    from objects to strings and back, in both directions. *)
   let pass_by_bytes ~(compression : Codecs.compression_t) ~(iters : int) =
     let throughput = ref 0 in
-    for i = 0 to iters - 1 do
+    for _i = 0 to iters - 1 do
       let (req_builder, expectation) = TestCase.setup_request () in
       let flattened_request =
         let req_message = RequestBuilder.to_message req_builder in

@@ -1,6 +1,8 @@
 type ro = Capnp.Message.ro
 type rw = Capnp.Message.rw
 
+[@@@ocaml.warning "-A"]
+
 module type S = sig
   type 'cap message_t
 

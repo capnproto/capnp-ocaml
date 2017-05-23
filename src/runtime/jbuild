@@ -5,6 +5,6 @@
   (public_name capnp)
   (synopsis "Runtime support library for capnp-ocaml")
   (libraries (core_kernel uint ocplib-endian res extunix))
-  (flags (:standard -w -50-27-6-34-32-53-33))
+  (flags (:standard -w -50-53))
   (ocamlopt_flags (:standard -O3 -inline 1000))
 ))

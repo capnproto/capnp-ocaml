@@ -138,7 +138,7 @@ let generate_one_field_accessors ~context ~scope ~mode field
               field_name
               (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp); ];
         ]
-      | Interface iface_descr ->
+      | Interface _ ->
         let cap_type =
           GenCommon.type_name ~context ~mode:Mode.Reader ~scope_mode:mode scope tp
         in [
@@ -323,7 +323,7 @@ let generate_struct_node ?uq_name ~context ~scope ~nested_modules
     let selector =
       match mode with
       | Mode.Reader  -> (function Getter _ -> true | Setter _ -> false)
-      | Mode.Builder -> (fun x -> true)
+      | Mode.Builder -> (fun _ -> true)
     in
     generate_accessors ~context ~scope ~mode ~f:selector non_union_fields
   in
@@ -494,7 +494,7 @@ let rec generate_node
         (GenCommon.type_name ~context ~mode:Mode.Reader ~scope_mode:mode
            scope (Const.type_get const_def));
     ]
-  | Annotation annot_def ->
+  | Annotation _ ->
       generate_nested_modules ()
   | Undefined x ->
       failwith (sprintf "Unknown Node union discriminant %u" x)

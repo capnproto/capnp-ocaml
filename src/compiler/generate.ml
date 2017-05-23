@@ -170,7 +170,7 @@ let calculate_positions ~nodes ~requested_file_node =
     Hashtbl.Poly.add_exn positions ~key:id ~data:!pos;
     pos := succ !pos;
     let children =
-      GenCommon.child_ids_of ~nodes node
+      GenCommon.child_ids_of node
       |> List.map ~f:(Hashtbl.Poly.find_exn nodes)
     in
     List.iter children ~f:scan
@@ -213,12 +213,11 @@ let compile
     in
     let sig_unique_types = List.rev_map
         (GenCommon.collect_unique_types ~context requested_file_node)
-        ~f:(fun (name, tp) -> "  type " ^ name)
+        ~f:(fun (name, _tp) -> "  type " ^ name)
     in
     let sig_unique_enums =
       GenCommon.apply_indent ~indent:"  "
-        (GenCommon.collect_unique_enums ~is_sig:true ~context
-           ~node_name:requested_filename requested_file_node)
+        (GenCommon.collect_unique_enums ~is_sig:true ~context requested_file_node)
     in
     let mod_unique_types = (List.rev_map
         (GenCommon.collect_unique_types ~context requested_file_node)
@@ -226,8 +225,7 @@ let compile
     in
     let mod_unique_enums =
       GenCommon.apply_indent ~indent:"  "
-        (GenCommon.collect_unique_enums ~is_sig:false ~context
-           ~node_name:requested_filename requested_file_node)
+        (GenCommon.collect_unique_enums ~is_sig:false ~context requested_file_node)
     in
     let sig_s =
       (sig_s_header ~context) @

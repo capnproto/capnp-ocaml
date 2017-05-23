@@ -238,7 +238,7 @@ let rec generate_list_element_decoder ~context ~scope list_def =
         "    get_enum_list (Some struct_storage) 0)";
         "in";
       ]
-  | Interface iface_def ->
+  | Interface _ ->
       failwith "not implemented"
   | AnyPointer ->
       failwith "not implemented"
@@ -779,7 +779,6 @@ let generate_one_field_accessors ~context ~node_id ~scope
         discriminant_value (discr_ofs * 2)
   in
   let (getters, setters) =
-    let open PS.Field in
     begin match PS.Field.get field with
     | PS.Field.Group group ->
         let getters = [ "let " ^ field_name ^ "_get x = x" ] in
@@ -1067,7 +1066,7 @@ let generate_one_field_accessors ~context ~node_id ~scope
               match pointer_slice_opt with
               | Some pointer_slice ->
                   begin match ReaderApi.deref_list_pointer pointer_slice with
-                  | Some default_storage ->
+                  | Some _default_storage ->
                       let ident = Defaults.make_ident node_id field_name in
                       begin match mode with
                       | Mode.Reader ->
@@ -1116,7 +1115,7 @@ let generate_one_field_accessors ~context ~node_id ~scope
               match pointer_slice_opt with
               | Some pointer_slice ->
                   begin match ReaderApi.deref_struct_pointer pointer_slice with
-                  | Some default_storage ->
+                  | Some _ ->
                       let ident = Defaults.make_ident node_id field_name in
                       (" ~default:" ^ (Defaults.reader_string_of_ident ident),
                        " ~default:" ^ (Defaults.builder_string_of_ident ident))
@@ -1188,7 +1187,7 @@ let generate_one_field_accessors ~context ~node_id ~scope
                 field_ofs;
             ] in
             (getters, setters)
-        | (PS.Type.Interface iface_def, PS.Value.Interface) ->
+        | (PS.Type.Interface _, PS.Value.Interface) ->
             let obj_magic =
               if GenCommon.uses_imported_abstract_type ~context tp then
                 "Obj.magic "
@@ -1475,7 +1474,7 @@ let generate_constant ~context ~scope ~node ~node_name const_def =
           (Defaults.reader_string_of_ident (Defaults.make_ident node_id name)) ]
   | (Type.Interface _, Value.Interface) ->
       failwith "Interface constants are not yet implemented."
-  | (Type.AnyPointer, Value.AnyPointer pointer) ->
+  | (Type.AnyPointer, Value.AnyPointer _) ->
       failwith "AnyPointer constants are not yet implemented."
   | (Type.Undefined x, _) ->
       failwith (sprintf "Unknown Value union discriminant %u." x)
@@ -1738,7 +1737,7 @@ and generate_node
       "let " ^ (GenCommon.underscore_name node_name) ^ " =";
     ] @ (apply_indent ~indent:"  "
           (generate_constant ~context ~scope ~node ~node_name const_def))
-  | PS.Node.Annotation annot_def ->
+  | PS.Node.Annotation _ ->
       generate_nested_modules ()
   | PS.Node.Undefined x ->
       failwith (sprintf "Unknown Node union discriminant %u" x)
@@ -1746,14 +1745,13 @@ and generate_node
 
 (* Update the default-value context with default values associated with
    the specified struct. *)
-let update_defaults_context_struct ~context ~defaults_context ~node ~struct_def =
+let update_defaults_context_struct ~defaults_context ~node ~struct_def =
   let fields = PS.Node.Struct.fields_get struct_def in
   C.Array.iter fields ~f:(fun field ->
     let field_name = GenCommon.underscore_name (PS.Field.name_get field) in
     let node_id = PS.Node.id_get node in
-    let open PS.Field in
     match PS.Field.get field with
-    | PS.Field.Group group ->
+    | PS.Field.Group _ ->
         ()
     | PS.Field.Slot slot ->
         let tp = PS.Field.Slot.type_get slot in
@@ -1807,7 +1805,7 @@ let update_defaults_context_struct ~context ~defaults_context ~node ~struct_def 
 
 (* Update the default-value context with default values associated with
    the specified constant. *)
-let update_defaults_context_constant ~context ~defaults_context
+let update_defaults_context_constant ~defaults_context
     ~node ~node_name ~const_def =
   let node_id = PS.Node.id_get node in
   let name = GenCommon.underscore_name node_name in
@@ -1880,12 +1878,12 @@ let rec build_defaults_context
   in
   match PS.Node.get node with
   | PS.Node.Struct struct_def ->
-      let () = update_defaults_context_struct ~context
+      let () = update_defaults_context_struct
           ~defaults_context:ctx ~node ~struct_def
       in
       ctx
   | PS.Node.Const const_def ->
-      let () = update_defaults_context_constant ~context
+      let () = update_defaults_context_constant
           ~defaults_context:ctx ~node ~node_name ~const_def
       in
       ctx

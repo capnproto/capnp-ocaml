@@ -3,7 +3,7 @@
 (executable
  ((name main)
   (libraries (capnp fast_rand core))
-  (flags (:standard -w -27-53-55-3-35))
+  (flags (:standard -w -53-55))
   (ocamlopt_flags (:standard -O3 -inline 2000))
 ))
 

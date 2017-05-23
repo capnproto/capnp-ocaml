@@ -149,7 +149,6 @@ let underscore_name (camelcase_name : string) : string =
 
 
 let child_ids_of
-    ~(nodes : (Uint64.t, PS.Node.t) Hashtbl.t)
     (parent : PS.Node.t)
   : Uint64.t list =
   let nested_nodes =
@@ -172,7 +171,7 @@ let children_of
     ~(context : Context.codegen_context_t)
     (parent : PS.Node.t)
 : PS.Node.t list =
-  let node_ids = child_ids_of ~nodes:context.Context.nodes parent in
+  let node_ids = child_ids_of parent in
   List.map node_ids ~f:(Context.node context)
 
 (* The name of a node is not encoded in that node, it is encoded in the parent.
@@ -271,7 +270,7 @@ let get_scope_relative_name ~context (scope_stack : Uint64.t list) node
   : string =
   let rec pop_components components scope =
     match components, scope with
-    | ( (component_name, component_scope_id) ::
+    | ( (_component_name, component_scope_id) ::
           other_components, scope_id :: scope_ids) ->
         if uint64_equal component_scope_id scope_id then
           pop_components other_components scope_ids
@@ -342,7 +341,7 @@ let is_node_naming_collision ~context ~scope node =
         false
       else
         Hashtbl.fold context.Context.nodes ~init:false
-          ~f:(fun ~key:id ~data:other_node found ->
+          ~f:(fun ~key:_ ~data:other_node found ->
             if found then
               true
             else
@@ -356,7 +355,7 @@ let is_node_naming_collision ~context ~scope node =
 
 
 (* Find the import which provides the specified node, if any. *)
-let rec find_import_providing_node ~context node : Context.import_t option =
+let find_import_providing_node ~context node : Context.import_t option =
   let rec loop_node_scope n =
     let scope_id = PS.Node.scope_id_get n in
     if scope_id = Uint64.zero then
@@ -728,7 +727,7 @@ let generate_union_type ~context ~(mode : Mode.t) scope fields =
         begin match PS.Type.get field_type with
         | PS.Type.Void ->
             ("  | " ^ field_name) :: acc
-        | PS.Type.Interface interface_def ->
+        | PS.Type.Interface _ ->
             (sprintf "  | %s of %s RPC.Payload.index option"
              field_name
              (type_name ~context ~mode ~scope_mode:mode scope field_type))
@@ -846,18 +845,18 @@ let method_types ~context interface_def =
   let methods = PS.Node.Interface.methods_get_list interface_def in
   List.map methods ~f:(fun method_def ->
       let method_name = PS.Method.name_get method_def in
-      let make_auto ~name struct_id =
+      let make_auto struct_id =
         let struct_node = Context.node context struct_id in
         if PS.Node.scope_id_get struct_node = Uint64.zero then (
           match PS.Node.get struct_node with
-          | PS.Node.Struct struct_def ->
+          | PS.Node.Struct _ ->
             method_param_types ~method_name ~context struct_node
           | _ ->
             failf "Method payload %s is not a struct!" (PS.Node.display_name_get struct_node)
         ) else []
       in
-      let params = make_auto ~name:"Params" @@ PS.Method.param_struct_type_get method_def in
-      let result = make_auto ~name:"Results" @@ PS.Method.result_struct_type_get method_def in
+      let params = make_auto @@ PS.Method.param_struct_type_get method_def in
+      let result = make_auto @@ PS.Method.result_struct_type_get method_def in
       params @ result
     )
   |> List.concat
@@ -900,12 +899,10 @@ let rec collect_unique_types ?acc ~context node =
 
 (* Recurse through the schema, emitting uniquely-named modules for
    all enum types. *)
-let rec collect_unique_enums ?(toplevel = true) ~is_sig ~context ~node_name node =
+let rec collect_unique_enums ?(toplevel = true) ~is_sig ~context node =
   let child_decls = List.concat_map (children_of ~context node)
       ~f:(fun child_node ->
-        let child_name = get_unqualified_name ~parent:node ~child:child_node in
-        collect_unique_enums ~toplevel:false ~is_sig ~context
-          ~node_name:child_name child_node)
+        collect_unique_enums ~toplevel:false ~is_sig ~context child_node)
   in
   let parent_decl =
     match PS.Node.get node with

@@ -91,7 +91,7 @@ let str_slice ?(start : int option) ?(stop : int option) (s : string)
     | Some x -> norm s x
     | None   -> String.length s
   in
-  String.sub s real_start (real_stop - real_start)
+  String.sub s ~pos:real_start ~len:(real_stop - real_start)
 
 
 let int_of_int32_exn : int32 -> int =

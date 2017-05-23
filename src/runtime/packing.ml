@@ -209,7 +209,7 @@ let bits_set_lookup =
     in
     loop 0 0
   in
-  let table = Array.create 256 0 in
+  let table = Array.create ~len:256 0 in
   for i = 0 to Array.length table - 1 do
     table.(i) <- count_bits i
   done;

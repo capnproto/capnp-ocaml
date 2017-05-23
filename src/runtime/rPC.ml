@@ -124,8 +124,8 @@ module None (M : MessageSig.S) = struct
     let capability_field `No_RPC_struct _ = `No_RPC_cap
     let local _ = `No_RPC_cap
     let cap_index x = x
-    let unknown_interface ~interface_id req = failwith "Unknown interface"
-    let unknown_method ~interface_id ~method_id req = failwith "Unknown method"
+    let unknown_interface ~interface_id:_ _req = failwith "Unknown interface"
+    let unknown_method ~interface_id:_ ~method_id:_ _req = failwith "Unknown method"
   end
 
   module Service = struct

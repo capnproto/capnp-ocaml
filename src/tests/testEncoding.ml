@@ -448,7 +448,7 @@ module Builder_check_test_defaults =
   Check_test_message(BuilderTestDefaults)(BuilderTestAllTypes)
 
 
-let test_encode_decode ctx =
+let test_encode_decode _ctx =
   let builder = T.Builder.TestAllTypes.init_root () in
   let () = init_test_message builder in
   let () = Builder_check_test_message.f builder in
@@ -456,14 +456,14 @@ let test_encode_decode ctx =
   Reader_check_test_message.f reader
 
 
-let test_decode_defaults ctx =
+let test_decode_defaults _ctx =
   let null_root = Bytes.of_string "\x00\x00\x00\x00\x00\x00\x00\x00" in
   let message = BM.Message.readonly (BM.Message.of_storage [ null_root ]) in
   let reader = T.Reader.TestDefaults.of_message message in
   Reader_check_test_defaults.f reader
 
 
-let test_init_defaults ctx =
+let test_init_defaults _ctx =
   let null_root = Bytes.of_string "\x00\x00\x00\x00\x00\x00\x00\x00" in
   let message = BM.Message.of_storage [ null_root ] in
   let builder = T.Builder.TestDefaults.of_message message in
@@ -475,7 +475,7 @@ let test_init_defaults ctx =
   Reader_check_test_defaults.f reader
 
 
-let test_union_encoding ctx =
+let test_union_encoding _ctx =
   let open T.Builder.TestUnion in
   let root = init_root () in
   let union0 = union0_get root in
@@ -519,7 +519,7 @@ let init_union (setter : T.Builder.TestUnion.t -> 'a) =
    bit_offset)
 
 
-let test_union_layout ctx =
+let test_union_layout _ctx =
   let open T.Builder.TestUnion in
   assert_equal ([ 0; 0; 0; 0 ], None)
     (init_union (fun b -> Union0.u0f0s0_set (union0_get b)));
@@ -615,7 +615,7 @@ let test_union_layout ctx =
     (init_union (fun b -> Union3.u3f0s64_set (union3_get b) 1L))
 
 
-let test_unnamed_union_encoding ctx =
+let test_unnamed_union_encoding _ctx =
   let module R = T.Reader.TestUnnamedUnion in
   let module B = T.Builder.TestUnnamedUnion in
   let root = B.init_root () in
@@ -630,7 +630,7 @@ let test_unnamed_union_encoding ctx =
   assert_equal (R.Foo 123) (R.get (B.to_reader root))
 
 
-let test_groups ctx =
+let test_groups _ctx =
   let open T.Builder.TestGroups in
   let root = init_root () in
   let () =
@@ -669,7 +669,7 @@ let test_groups ctx =
   ()
 
 
-let test_interleaved_groups ctx =
+let test_interleaved_groups _ctx =
   let module B = T.Builder.TestInterleavedGroups in
   let module R = T.Reader.TestInterleavedGroups in
   let root = B.init_root () in
@@ -748,7 +748,7 @@ let test_interleaved_groups ctx =
   ()
 
 
-let test_union_defaults ctx =
+let test_union_defaults _ctx =
   let module B = T.Builder.TestUnionDefaults in
   let module R = T.Reader.TestUnionDefaults in
   let reader = R.of_builder (B.init_root ()) in
@@ -1136,7 +1136,7 @@ module Builder_check_test_list =
   Check_test_list(BuilderTestLists)(BuilderTestAllTypes)
 
 
-let test_list_defaults ctx =
+let test_list_defaults _ctx =
   let root = T.Builder.TestListDefaults.init_root () in
   let lists = T.Builder.TestListDefaults.lists_get root in
   Reader_check_test_list.f (T.Reader.TestLists.of_builder lists);
@@ -1144,7 +1144,7 @@ let test_list_defaults ctx =
   Reader_check_test_list.f (T.Reader.TestLists.of_builder lists)
 
 
-let test_build_list_defaults ctx =
+let test_build_list_defaults _ctx =
   let root = T.Builder.TestLists.init_root () in
   let () = init_list_defaults root in
   Reader_check_test_list.f (T.Reader.TestLists.of_builder root);
@@ -1152,7 +1152,7 @@ let test_build_list_defaults ctx =
   Reader_check_test_list.f (T.Reader.TestLists.of_builder root)
 
 
-let test_upgrade_struct_in_builder ctx =
+let test_upgrade_struct_in_builder _ctx =
   let old_reader, message =
     let open T.Builder.TestOldVersion in
     let root = init_root () in
@@ -1295,7 +1295,7 @@ let check_upgraded_list message expected_data expected_pointers =
   ()
 
 
-let test_upgrade_list_in_builder ctx =
+let test_upgrade_list_in_builder _ctx =
   let () =
     let root = TL.Builder.VoidList.init_root () in
     let (_ : (_, _, _) Capnp.Array.t) =
@@ -1425,7 +1425,7 @@ let test_upgrade_list_in_builder ctx =
   ()
 
 
-let test_nested_types_encoding ctx =
+let test_nested_types_encoding _ctx =
   let open T.Reader.TestNestedTypes in
   let reader = of_builder (T.Builder.TestNestedTypes.init_root ()) in
   assert_equal NestedEnum.Bar (outer_nested_enum_get reader);
@@ -1438,7 +1438,7 @@ let test_nested_types_encoding ctx =
     (NestedStruct.inner_nested_enum_get nested)
 
 
-let test_imports ctx =
+let test_imports _ctx =
   let () =
     let root = TI.Builder.TestImport.init_root () in
     let () = init_test_message (TI.Builder.TestImport.field_init root) in
@@ -1447,7 +1447,7 @@ let test_imports ctx =
   in
   ()
 
-let test_constants ctx =
+let test_constants _ctx =
   let open T.Reader.TestConstants in
   assert_equal () void_const;
   assert_equal true bool_const;
@@ -1561,7 +1561,7 @@ let test_constants ctx =
     [ T.Reader.TestEnum.Foo; T.Reader.TestEnum.Garply ]
 
 
-let test_global_constants ctx =
+let test_global_constants _ctx =
   let open T.Reader.TestAllTypes in
   assert_equal (Uint32.of_int 12345) T.Reader.global_int;
   assert_equal "foobar" T.Reader.global_text;
@@ -1582,7 +1582,7 @@ let test_global_constants ctx =
   assert_equal "structlist 3" (text_field_get (Capnp.Array.get list_reader 2))
 
 
-let test_int_accessors ctx =
+let test_int_accessors _ctx =
   let module R = T.Reader.TestAllTypes in
   let module B = T.Builder.TestAllTypes in
   let root  = B.init_root () in
@@ -1626,7 +1626,7 @@ let test_int_accessors ctx =
   assert_raises_invalid_arg (fun () -> B.u_int64_field_set_int_exn root (-1))
 
 
-let test_any_pointers ctx =
+let test_any_pointers _ctx =
   let root  = T.Builder.TestAnyPointer.init_root () in
   let ptr = T.Builder.TestAnyPointer.any_pointer_field_get root in
   let child = T.Builder.TestSturdyRefHostId.init_pointer ptr in
