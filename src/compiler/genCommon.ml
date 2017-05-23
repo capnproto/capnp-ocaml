@@ -136,7 +136,7 @@ let children_of
 : PS.Node.t list =
   let open PS.Node in
   let parent_id = id_get parent in
-  Hashtbl.fold context.Context.nodes ~init:[] ~f:(fun ~key:id ~data:node acc ->
+  Hashtbl.fold context.Context.nodes ~init:[] ~f:(fun ~key:_id ~data:node acc ->
     if uint64_equal parent_id (scope_id_get node) then
       node :: acc
     else
@@ -239,7 +239,7 @@ let get_scope_relative_name ~context (scope_stack : Uint64.t list) node
   : string =
   let rec pop_components components scope =
     match components, scope with
-    | ( (component_name, component_scope_id) ::
+    | ( (_component_name, component_scope_id) ::
           other_components, scope_id :: scope_ids) ->
         if uint64_equal component_scope_id scope_id then
           pop_components other_components scope_ids
@@ -265,7 +265,7 @@ let make_unique_enum_module_name ~context enum_node =
 
 let make_unique_typename ~context ~(mode : Mode.t) node =
   match PS.Node.get node with
-  | PS.Node.Enum enum_def ->
+  | PS.Node.Enum _ ->
       (* Enums don't have unique type names, they have unique module names.  This
          allows us to use the same enum constructor names without name collisions. *)
       let unique_module_name = make_unique_enum_module_name ~context node in
@@ -300,7 +300,7 @@ let is_node_naming_collision ~context ~scope node =
         false
       else
         Hashtbl.fold context.Context.nodes ~init:false
-          ~f:(fun ~key:id ~data:other_node found ->
+          ~f:(fun ~key:_ ~data:other_node found ->
             if found then
               true
             else
@@ -314,7 +314,7 @@ let is_node_naming_collision ~context ~scope node =
 
 
 (* Find the import which provides the specified node, if any. *)
-let rec find_import_providing_node ~context node : Context.import_t option =
+let find_import_providing_node ~context node : Context.import_t option =
   let rec loop_node_scope n =
     let scope_id = PS.Node.scope_id_get n in
     if scope_id = Uint64.zero then
@@ -803,12 +803,10 @@ let rec collect_unique_types ?acc ~context node =
 
 (* Recurse through the schema, emitting uniquely-named modules for
    all enum types. *)
-let rec collect_unique_enums ?(toplevel = true) ~is_sig ~context ~node_name node =
+let rec collect_unique_enums ?(toplevel = true) ~is_sig ~context node =
   let child_decls = List.concat_map (children_of ~context node)
       ~f:(fun child_node ->
-        let child_name = get_unqualified_name ~parent:node ~child:child_node in
-        collect_unique_enums ~toplevel:false ~is_sig ~context
-          ~node_name:child_name child_node)
+        collect_unique_enums ~toplevel:false ~is_sig ~context child_node)
   in
   let parent_decl =
     match PS.Node.get node with

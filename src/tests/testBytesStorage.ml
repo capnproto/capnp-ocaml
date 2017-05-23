@@ -51,38 +51,38 @@ let uint8_suite =
     SM.Slice.start      = 0;
     SM.Slice.len        = SM.Message.total_size short_msg;
   } in
-  let t0 ctx = assert_equal (SM.Slice.get_uint8 short_slice 0) 0x11 in
-  let t1 ctx = assert_equal (SM.Slice.get_uint8 short_slice 7) 0x88 in
-  let t2 ctx = assert_equal (SM.Slice.get_uint8 short_slice 1) 0x00 in
-  let t3 ctx = assert_equal (SM.Slice.get_uint8 short_slice 2) 0xff in
-  let t4 ctx = assert_raises
+  let t0 _ctx = assert_equal (SM.Slice.get_uint8 short_slice 0) 0x11 in
+  let t1 _ctx = assert_equal (SM.Slice.get_uint8 short_slice 7) 0x88 in
+  let t2 _ctx = assert_equal (SM.Slice.get_uint8 short_slice 1) 0x00 in
+  let t3 _ctx = assert_equal (SM.Slice.get_uint8 short_slice 2) 0xff in
+  let t4 _ctx = assert_raises
       (Invalid_argument "Slice.get_uint8")
       (fun () -> SM.Slice.get_uint8 short_slice (-1))
   in
-  let t5 ctx = assert_raises
+  let t5 _ctx = assert_raises
       (Invalid_argument "Slice.get_uint8")
       (fun () -> SM.Slice.get_uint8 short_slice 8)
   in
-  let t6 ctx = assert_raises
+  let t6 _ctx = assert_raises
       (Invalid_argument "Slice.set_uint8")
       (fun () -> SM.Slice.set_uint8 short_slice (-1) 0xaa)
   in
-  let t7 ctx = assert_raises
+  let t7 _ctx = assert_raises
       (Invalid_argument "Slice.set_uint8")
       (fun () -> SM.Slice.set_uint8 short_slice 8 0xaa)
   in
-  let t8 ctx =
+  let t8 _ctx =
     let () = SM.Slice.set_uint8 short_slice 0 0x00 in
     assert_equal (SM.Slice.get_uint8 short_slice 0) 0x00
   in
-  let t9 ctx =
+  let t9 _ctx =
     let () = SM.Slice.set_uint8 short_slice 7 0xff in
     assert_equal (SM.Slice.get_uint8 short_slice 7) 0xff
   in
-  let t10 ctx = assert_raises_invalid_arg
+  let t10 _ctx = assert_raises_invalid_arg
       (fun () -> SM.Slice.set_uint8 short_slice 0 (-1))
   in
-  let t11 ctx = assert_raises_invalid_arg
+  let t11 _ctx = assert_raises_invalid_arg
       (fun () -> SM.Slice.set_uint8 short_slice 0 0x100)
   in
   "slice_uint8" >::: [
@@ -112,38 +112,38 @@ let uint16_suite =
     SM.Slice.start      = 0;
     SM.Slice.len        = SM.Message.total_size short_msg;
   } in
-  let t0 ctx = assert_equal (SM.Slice.get_uint16 short_slice 0) 0x0011 in
-  let t1 ctx = assert_equal (SM.Slice.get_uint16 short_slice 6) 0x8877 in
-  let t2 ctx = assert_equal (SM.Slice.get_uint16 short_slice 1) 0x0000 in
-  let t3 ctx = assert_equal (SM.Slice.get_uint16 short_slice 3) 0xffff in
-  let t4 ctx = assert_raises
+  let t0 _ctx = assert_equal (SM.Slice.get_uint16 short_slice 0) 0x0011 in
+  let t1 _ctx = assert_equal (SM.Slice.get_uint16 short_slice 6) 0x8877 in
+  let t2 _ctx = assert_equal (SM.Slice.get_uint16 short_slice 1) 0x0000 in
+  let t3 _ctx = assert_equal (SM.Slice.get_uint16 short_slice 3) 0xffff in
+  let t4 _ctx = assert_raises
       (Invalid_argument "Slice.get_uint16")
       (fun () -> SM.Slice.get_uint16 short_slice (-1))
   in
-  let t5 ctx = assert_raises
+  let t5 _ctx = assert_raises
       (Invalid_argument "Slice.get_uint16")
       (fun () -> SM.Slice.get_uint16 short_slice 7)
   in
-  let t6 ctx = assert_raises
+  let t6 _ctx = assert_raises
       (Invalid_argument "Slice.set_uint16")
       (fun () -> SM.Slice.set_uint16 short_slice (-1) 0xaaaa)
   in
-  let t7 ctx = assert_raises
+  let t7 _ctx = assert_raises
       (Invalid_argument "Slice.set_uint16")
       (fun () -> SM.Slice.set_uint16 short_slice 7 0xaaaa)
   in
-  let t8 ctx =
+  let t8 _ctx =
     let () = SM.Slice.set_uint16 short_slice 0 0x0000 in
     assert_equal (SM.Slice.get_uint16 short_slice 0) 0x0000
   in
-  let t9 ctx =
+  let t9 _ctx =
     let () = SM.Slice.set_uint16 short_slice 6 0xffff in
     assert_equal (SM.Slice.get_uint16 short_slice 6) 0xffff
   in
-  let t10 ctx = assert_raises_invalid_arg
+  let t10 _ctx = assert_raises_invalid_arg
       (fun () -> SM.Slice.set_uint16 short_slice 0 (-1))
   in
-  let t11 ctx = assert_raises_invalid_arg
+  let t11 _ctx = assert_raises_invalid_arg
       (fun () -> SM.Slice.set_uint16 short_slice 0 0x10000)
   in
   "slice_uint16" >::: [
@@ -173,33 +173,33 @@ let uint32_suite =
     SM.Slice.start      = 0;
     SM.Slice.len        = SM.Message.total_size short_msg;
   } in
-  let t0 ctx = assert_equal (SM.Slice.get_uint32 short_slice 0)
+  let t0 _ctx = assert_equal (SM.Slice.get_uint32 short_slice 0)
       (Uint32.of_string "0x44332211")
   in
-  let t1 ctx = assert_equal (SM.Slice.get_uint32 short_slice 4)
+  let t1 _ctx = assert_equal (SM.Slice.get_uint32 short_slice 4)
       (Uint32.of_string "0x88776655")
   in
-  let t2 ctx = assert_raises
+  let t2 _ctx = assert_raises
       (Invalid_argument "Slice.get_uint32")
       (fun () -> SM.Slice.get_uint32 short_slice (-1))
   in
-  let t3 ctx = assert_raises
+  let t3 _ctx = assert_raises
       (Invalid_argument "Slice.get_uint32")
       (fun () -> SM.Slice.get_uint32 short_slice 5)
   in
-  let t4 ctx = assert_raises
+  let t4 _ctx = assert_raises
       (Invalid_argument "Slice.set_uint32")
       (fun () -> SM.Slice.set_uint32 short_slice (-1) Uint32.zero)
   in
-  let t5 ctx = assert_raises
+  let t5 _ctx = assert_raises
       (Invalid_argument "Slice.set_uint32")
       (fun () -> SM.Slice.set_uint32 short_slice 5 Uint32.zero)
   in
-  let t6 ctx =
+  let t6 _ctx =
     let () = SM.Slice.set_uint32 short_slice 4 Uint32.min_int in
     assert_equal (SM.Slice.get_uint32 short_slice 4) Uint32.min_int
   in
-  let t7 ctx =
+  let t7 _ctx =
     let () = SM.Slice.set_uint32 short_slice 0 Uint32.max_int in
     assert_equal (SM.Slice.get_uint32 short_slice 0) Uint32.max_int
   in
@@ -228,33 +228,33 @@ let uint64_suite =
     SM.Slice.start      = 0;
     SM.Slice.len        = SM.Message.total_size short_msg;
   } in
-  let t0 ctx = assert_equal (SM.Slice.get_uint64 short_slice 0)
+  let t0 _ctx = assert_equal (SM.Slice.get_uint64 short_slice 0)
       (Uint64.of_string "0x8877665544332211")
   in
-  let t1 ctx = assert_equal (SM.Slice.get_uint64 short_slice 8)
+  let t1 _ctx = assert_equal (SM.Slice.get_uint64 short_slice 8)
       (Uint64.of_string "0xa5ffeeddccbbaa99")
   in
-  let t2 ctx = assert_raises
+  let t2 _ctx = assert_raises
       (Invalid_argument "Slice.get_uint64")
       (fun () -> SM.Slice.get_uint64 short_slice (-1))
   in
-  let t3 ctx = assert_raises
+  let t3 _ctx = assert_raises
       (Invalid_argument "Slice.get_uint64")
       (fun () -> SM.Slice.get_uint64 short_slice 9)
   in
-  let t4 ctx = assert_raises
+  let t4 _ctx = assert_raises
       (Invalid_argument "Slice.set_uint64")
       (fun () -> SM.Slice.set_uint64 short_slice (-1) Uint64.zero)
   in
-  let t5 ctx = assert_raises
+  let t5 _ctx = assert_raises
       (Invalid_argument "Slice.set_uint64")
       (fun () -> SM.Slice.set_uint64 short_slice 9 Uint64.zero)
   in
-  let t6 ctx =
+  let t6 _ctx =
     let () = SM.Slice.set_uint64 short_slice 8 Uint64.min_int in
     assert_equal (SM.Slice.get_uint64 short_slice 8) Uint64.min_int
   in
-  let t7 ctx =
+  let t7 _ctx =
     let () = SM.Slice.set_uint64 short_slice 0 Uint64.max_int in
     assert_equal (SM.Slice.get_uint64 short_slice 0) Uint64.max_int
   in
@@ -281,38 +281,38 @@ let int8_suite =
     SM.Slice.start      = 0;
     SM.Slice.len        = SM.Message.total_size short_msg;
   } in
-  let t0 ctx = assert_equal (SM.Slice.get_int8 short_slice 0) 0x11 in
-  let t1 ctx = assert_equal (SM.Slice.get_int8 short_slice 7) (-0x78) in
-  let t2 ctx = assert_equal (SM.Slice.get_int8 short_slice 1) 0x00 in
-  let t3 ctx = assert_equal (SM.Slice.get_int8 short_slice 2) (-0x01) in
-  let t4 ctx = assert_raises
+  let t0 _ctx = assert_equal (SM.Slice.get_int8 short_slice 0) 0x11 in
+  let t1 _ctx = assert_equal (SM.Slice.get_int8 short_slice 7) (-0x78) in
+  let t2 _ctx = assert_equal (SM.Slice.get_int8 short_slice 1) 0x00 in
+  let t3 _ctx = assert_equal (SM.Slice.get_int8 short_slice 2) (-0x01) in
+  let t4 _ctx = assert_raises
       (Invalid_argument "Slice.get_int8")
       (fun () -> SM.Slice.get_int8 short_slice (-1))
   in
-  let t5 ctx = assert_raises
+  let t5 _ctx = assert_raises
       (Invalid_argument "Slice.get_int8")
       (fun () -> SM.Slice.get_int8 short_slice 8)
   in
-  let t6 ctx = assert_raises
+  let t6 _ctx = assert_raises
       (Invalid_argument "Slice.set_int8")
       (fun () -> SM.Slice.set_int8 short_slice (-1) 0x0a)
   in
-  let t7 ctx = assert_raises
+  let t7 _ctx = assert_raises
       (Invalid_argument "Slice.set_int8")
       (fun () -> SM.Slice.set_int8 short_slice 8 0x0a)
   in
-  let t8 ctx =
+  let t8 _ctx =
     let () = SM.Slice.set_int8 short_slice 0 (-128) in
     assert_equal (SM.Slice.get_int8 short_slice 0) (-128)
   in
-  let t9 ctx =
+  let t9 _ctx =
     let () = SM.Slice.set_int8 short_slice 7 127 in
     assert_equal (SM.Slice.get_int8 short_slice 7) 127
   in
-  let t10 ctx = assert_raises_invalid_arg
+  let t10 _ctx = assert_raises_invalid_arg
       (fun () -> SM.Slice.set_int8 short_slice 0 (-129))
   in
-  let t11 ctx = assert_raises_invalid_arg
+  let t11 _ctx = assert_raises_invalid_arg
       (fun () -> SM.Slice.set_int8 short_slice 0 128)
   in
   "slice_int8" >::: [
@@ -341,38 +341,38 @@ let int16_suite =
     SM.Slice.start      = 0;
     SM.Slice.len        = SM.Message.total_size short_msg;
   } in
-  let t0 ctx = assert_equal (SM.Slice.get_int16 short_slice 0) 0x11 in
-  let t1 ctx = assert_equal (SM.Slice.get_int16 short_slice 6) (-0x7789) in
-  let t2 ctx = assert_equal (SM.Slice.get_int16 short_slice 1) 0x0000 in
-  let t3 ctx = assert_equal (SM.Slice.get_int16 short_slice 3) (-0x0001) in
-  let t4 ctx = assert_raises
+  let t0 _ctx = assert_equal (SM.Slice.get_int16 short_slice 0) 0x11 in
+  let t1 _ctx = assert_equal (SM.Slice.get_int16 short_slice 6) (-0x7789) in
+  let t2 _ctx = assert_equal (SM.Slice.get_int16 short_slice 1) 0x0000 in
+  let t3 _ctx = assert_equal (SM.Slice.get_int16 short_slice 3) (-0x0001) in
+  let t4 _ctx = assert_raises
       (Invalid_argument "Slice.get_int16")
       (fun () -> SM.Slice.get_int16 short_slice (-1))
   in
-  let t5 ctx = assert_raises
+  let t5 _ctx = assert_raises
       (Invalid_argument "Slice.get_int16")
       (fun () -> SM.Slice.get_int16 short_slice 7)
   in
-  let t6 ctx = assert_raises
+  let t6 _ctx = assert_raises
       (Invalid_argument "Slice.set_int16")
       (fun () -> SM.Slice.set_int16 short_slice (-1) 0x0a)
   in
-  let t7 ctx = assert_raises
+  let t7 _ctx = assert_raises
       (Invalid_argument "Slice.set_int16")
       (fun () -> SM.Slice.set_int16 short_slice 7 0x0a)
   in
-  let t8 ctx =
+  let t8 _ctx =
     let () = SM.Slice.set_int16 short_slice 0 (-32768) in
     assert_equal (SM.Slice.get_int16 short_slice 0) (-32768)
   in
-  let t9 ctx =
+  let t9 _ctx =
     let () = SM.Slice.set_int16 short_slice 6 32767 in
     assert_equal (SM.Slice.get_int16 short_slice 6) 32767
   in
-  let t10 ctx = assert_raises_invalid_arg
+  let t10 _ctx = assert_raises_invalid_arg
       (fun () -> SM.Slice.set_int16 short_slice 0 (-32769))
   in
-  let t11 ctx = assert_raises_invalid_arg
+  let t11 _ctx = assert_raises_invalid_arg
       (fun () -> SM.Slice.set_int16 short_slice 0 32768)
   in
   "slice_int16" >::: [
@@ -402,29 +402,29 @@ let int32_suite =
     SM.Slice.start      = 0;
     SM.Slice.len        = SM.Message.total_size short_msg;
   } in
-  let t0 ctx = assert_equal (SM.Slice.get_int32 short_slice 0) 0x44332211l in
-  let t1 ctx = assert_equal (SM.Slice.get_int32 short_slice 4) (-0x778899abl) in
-  let t2 ctx = assert_raises
+  let t0 _ctx = assert_equal (SM.Slice.get_int32 short_slice 0) 0x44332211l in
+  let t1 _ctx = assert_equal (SM.Slice.get_int32 short_slice 4) (-0x778899abl) in
+  let t2 _ctx = assert_raises
       (Invalid_argument "Slice.get_int32")
       (fun () -> SM.Slice.get_int32 short_slice (-1))
   in
-  let t3 ctx = assert_raises
+  let t3 _ctx = assert_raises
       (Invalid_argument "Slice.get_int32")
       (fun () -> SM.Slice.get_int32 short_slice 5)
   in
-  let t4 ctx = assert_raises
+  let t4 _ctx = assert_raises
       (Invalid_argument "Slice.set_int32")
       (fun () -> SM.Slice.set_int32 short_slice (-1) Int32.zero)
   in
-  let t5 ctx = assert_raises
+  let t5 _ctx = assert_raises
       (Invalid_argument "Slice.set_int32")
       (fun () -> SM.Slice.set_int32 short_slice 5 Int32.zero)
   in
-  let t6 ctx =
+  let t6 _ctx =
     let () = SM.Slice.set_int32 short_slice 4 Int32.max_int in
     assert_equal (SM.Slice.get_int32 short_slice 4) Int32.max_int
   in
-  let t7 ctx =
+  let t7 _ctx =
     let () = SM.Slice.set_int32 short_slice 0 Int32.min_int in
     assert_equal (SM.Slice.get_int32 short_slice 0) Int32.min_int
   in
@@ -453,33 +453,33 @@ let int64_suite =
     SM.Slice.start      = 0;
     SM.Slice.len        = SM.Message.total_size short_msg;
   } in
-  let t0 ctx = assert_equal (SM.Slice.get_int64 short_slice 0)
+  let t0 _ctx = assert_equal (SM.Slice.get_int64 short_slice 0)
       0x5a77665544332211L
   in
-  let t1 ctx = assert_equal (SM.Slice.get_int64 short_slice 8)
+  let t1 _ctx = assert_equal (SM.Slice.get_int64 short_slice 8)
       (-0x5a00112233445567L)
   in
-  let t2 ctx = assert_raises
+  let t2 _ctx = assert_raises
       (Invalid_argument "Slice.get_int64")
       (fun () -> SM.Slice.get_int64 short_slice (-1))
   in
-  let t3 ctx = assert_raises
+  let t3 _ctx = assert_raises
       (Invalid_argument "Slice.get_int64")
       (fun () -> SM.Slice.get_int64 short_slice 9)
   in
-  let t4 ctx = assert_raises
+  let t4 _ctx = assert_raises
       (Invalid_argument "Slice.set_int64")
       (fun () -> SM.Slice.set_int64 short_slice (-1) Int64.zero)
   in
-  let t5 ctx = assert_raises
+  let t5 _ctx = assert_raises
       (Invalid_argument "Slice.set_int64")
       (fun () -> SM.Slice.set_int64 short_slice 9 Int64.zero)
   in
-  let t6 ctx =
+  let t6 _ctx =
     let () = SM.Slice.set_int64 short_slice 8 Int64.min_int in
     assert_equal (SM.Slice.get_int64 short_slice 8) Int64.min_int
   in
-  let t7 ctx =
+  let t7 _ctx =
     let () = SM.Slice.set_int64 short_slice 0 Int64.max_int in
     assert_equal (SM.Slice.get_int64 short_slice 0) Int64.max_int
   in

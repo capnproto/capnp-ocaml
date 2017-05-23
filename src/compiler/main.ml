@@ -51,7 +51,7 @@ let main () : int =
         begin try
           let () = Generate.compile request in
           ExitCode.success
-        with (Failure msg) as e ->
+        with (Failure _) as e ->
           let bs = Exn.backtrace () in
           let es = Exn.to_string e in
           let () = prerr_endline es in

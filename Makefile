@@ -1,8 +1,8 @@
-all:
-	jbuilder build --dev
-
 test:
-	jbuilder runtest --dev
+	jbuilder build --dev @install @runtest @src/benchmark/benchmarks
+
+build:
+	jbuilder build --dev
 
 clean:
 	rm -rf _build

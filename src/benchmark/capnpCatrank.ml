@@ -24,7 +24,7 @@ module TestCase = struct
   (* For this workload, calling into glibc 'strstr' significantly outperforms
      the KMP algorithm found in Core_string. *)
   external _string_contains : string -> string -> bool =
-    "capnp_bench_string_contains" "noalloc"
+    "capnp_bench_string_contains" [@@noalloc]
   let string_contains ~haystack ~needle = _string_contains haystack needle
 
 
@@ -59,7 +59,7 @@ module TestCase = struct
       let snippet = Buffer.create (40 * 6) in
       Buffer.add_char snippet ' ';
       let prefix = FastRand.int 20 in
-      for j = 0 to prefix - 1 do
+      for _j = 0 to prefix - 1 do
         let word_index = FastRand.int (Array.length words) in
         Buffer.add_string snippet words.(word_index)
       done;
@@ -70,7 +70,7 @@ module TestCase = struct
         Buffer.add_string snippet "dog ";
 
       let suffix = FastRand.int 20 in
-      for j = 0 to suffix - 1 do
+      for _j = 0 to suffix - 1 do
         let word_index = FastRand.int (Array.length words) in
         Buffer.add_string snippet words.(word_index)
       done;

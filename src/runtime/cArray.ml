@@ -63,10 +63,10 @@ let foldi_right a ~f ~init =
   loop init (len - 1)
 
 let fold a ~init ~f =
-  foldi a ~init ~f:(fun i acc x -> f acc x)
+  foldi a ~init ~f:(fun _i acc x -> f acc x)
 
 let fold_right a ~f ~init =
-  foldi_right a ~f:(fun i x acc -> f x acc) ~init
+  foldi_right a ~f:(fun _i x acc -> f x acc) ~init
 
 let mem ?equal a x =
   let len = length a in
@@ -162,7 +162,7 @@ let to_list a =
   List.init (length a) ~f:(fun i -> get a i)
 
 let to_array a =
-  Core_kernel.Std.Array.init (length a) (fun i -> get a i)
+  Core_kernel.Std.Array.init (length a) ~f:(fun i -> get a i)
 
 let set_list a lst =
   let () = init a (List.length lst) in
@@ -173,7 +173,7 @@ let set_array a arr =
   Array.iteri arr ~f:(fun i x -> set a i x)
 
 let map_array a ~f =
-  Core_kernel.Std.Array.init (length a) (fun i -> f (get a i))
+  Core_kernel.Std.Array.init (length a) ~f:(fun i -> f (get a i))
 
 let map_list a ~f =
   List.init (length a) ~f:(fun i -> f (get a i))

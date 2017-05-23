@@ -382,7 +382,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
     | ListStorageType.Empty ->
         begin match decoders with
         | ListDecoders.Empty decode ->
-            let ro_get_unsafe_void ls i = decode () in {
+            let ro_get_unsafe_void _ls _i = decode () in {
               InnerArray.length;
               InnerArray.init = InnerArray.invalid_init;
               InnerArray.get_unsafe = ro_get_unsafe_void;
@@ -532,7 +532,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
         in
         begin match decoders with
         | ListDecoders.Empty decode ->
-            let ro_get_unsafe_composite_void ls i = decode () in {
+            let ro_get_unsafe_composite_void _ls _i = decode () in {
               InnerArray.length;
               InnerArray.init = InnerArray.invalid_init;
               InnerArray.get_unsafe = ro_get_unsafe_composite_void;
@@ -619,8 +619,8 @@ module Make (MessageWrapper : MessageSig.S) = struct
     | ListStorageType.Empty ->
         begin match codecs with
         | ListCodecs.Empty (decode, encode) ->
-            let rw_get_unsafe_void ls i = decode () in
-            let rw_set_unsafe_void ls i v = encode v in {
+            let rw_get_unsafe_void _ls _i = decode () in
+            let rw_set_unsafe_void _ls _i v = encode v in {
               InnerArray.length;
               InnerArray.init;
               InnerArray.get_unsafe = rw_get_unsafe_void;
@@ -802,8 +802,8 @@ module Make (MessageWrapper : MessageSig.S) = struct
         in
         begin match codecs with
         | ListCodecs.Empty (decode, encode) ->
-            let rw_get_unsafe_composite_void ls i = decode () in
-            let rw_set_unsafe_composite_void ls i v = encode v in {
+            let rw_get_unsafe_composite_void _ls _i = decode () in
+            let rw_set_unsafe_composite_void _ls _i v = encode v in {
               InnerArray.length;
               InnerArray.init;
               InnerArray.get_unsafe = rw_get_unsafe_composite_void;
@@ -954,7 +954,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
     let storage_type = list_storage.ListStorage.storage_type in
     match list_storage.ListStorage.storage_type with
     | ListStorageType.Empty ->
-        let make_struct_of_list_index_void i =
+        let make_struct_of_list_index_void _i =
           let slice = {
             storage with
             Slice.start = storage.Slice.start;

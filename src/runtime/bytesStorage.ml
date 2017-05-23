@@ -37,7 +37,7 @@ module Bytes = CamlBytes
 type t = Bytes.t
 
 let alloc size = Bytes.make size '\x00'
-let release x = ()
+let release _ = ()
 
 let length = Bytes.length
 
