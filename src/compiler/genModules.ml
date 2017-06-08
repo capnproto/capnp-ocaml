@@ -40,7 +40,7 @@ module C         = Capnp
 module ReaderApi = struct
   open Capnp.Runtime
   module MessageWrapper = GenCommon.M
-  INCLUDE "readerInc.ml"
+  include ReaderInc.Make(MessageWrapper)
 end
 
 let sprintf = Printf.sprintf

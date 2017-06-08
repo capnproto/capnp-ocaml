@@ -427,7 +427,7 @@ You should be able to install capnp-ocaml with
 http://opam.ocaml.org[OPAM] using using `opam install capnp`.
 
 If you prefer to compile manually, you will need OMake, Findlib, and OCaml
-packages `core_kernel`, `extunix`, `uint`, `ocplib-endian`, `res`, and `camlp4`.
+packages `core_kernel`, `extunix`, `uint`, `ocplib-endian`, and `res`.
 Run `omake` to build both the compiler and the runtime library, and then use
 `omake install` to copy them into appropriate places within your filesystem.
 

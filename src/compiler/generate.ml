@@ -97,15 +97,7 @@ let mod_functor_header = [
 let mod_header ~context = [
   "  let invalid_msg = Capnp.Message.invalid_msg";
   "";
-  "  module RA_ = struct";
-  "    open Capnp.Runtime"; ] @
-    (GenCommon.apply_indent ~indent:"    " Includes.reader_api) @ [
-  "  end";
-  "  module BA_ = struct";
-  "    open Capnp.Runtime";
-  "    module NM = MessageWrapper"; ] @
-    (GenCommon.apply_indent ~indent:"    " Includes.builder_api) @ [
-  "  end";
+  "  include CapnpRuntime.BuilderInc.Make[@inlined](MessageWrapper)";
   "";
   "  type 'cap message_t = 'cap MessageWrapper.Message.t";
   ""; ] @ (List.concat_map context.Context.imports ~f:(fun import -> [

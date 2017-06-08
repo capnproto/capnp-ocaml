@@ -53,19 +53,9 @@ end
    Most of the builder operations are tied to the RWM types.  The exceptional
    cases are functions that make a copy from a source to a destination. *)
 module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
-  module ROC = struct
-    module MessageWrapper = ROM
-    INCLUDE "commonInc.ml"
-  end
-  module RWC = struct
-    module MessageWrapper = RWM
-    INCLUDE "commonInc.ml"
-  end
-
-  module RReader = struct
-    module MessageWrapper = RWM
-    INCLUDE "readerInc.ml"
-  end
+  module ROC = CommonInc.Make[@inlined](ROM)
+  module RWC = CommonInc.Make[@inlined](RWM)
+  module RReader = ReaderInc.Make[@inlined](RWM)
 
 
   (* Given storage for a struct, get the pointer bytes for the given

@@ -13,8 +13,7 @@ OCAMLPACKS[] =  \
   extunix       \
   uint          \
   res           \
-  ocplib-endian \
-  camlp4.macro
+  ocplib-endian
 
 NATIVE_ENABLED = true
 BYTE_ENABLED   = true
