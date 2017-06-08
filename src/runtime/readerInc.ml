@@ -32,8 +32,6 @@
    reading from truncated structs both lead to default data being returned. *)
 
 
-open Core_kernel.Std
-
 let sizeof_uint64 = 8
 
 open Message
@@ -243,7 +241,7 @@ module Make (MessageWrapper : RPC.S) = struct
         let data = struct_storage.StructStorage.data in
         if byte_ofs + 3 < data.Slice.len then
           let numeric = Slice.get_int32 data byte_ofs in
-          Int32.bit_xor numeric default
+          Int32.logxor numeric default
         else
           default
     | None ->
@@ -259,7 +257,7 @@ module Make (MessageWrapper : RPC.S) = struct
         let data = struct_storage.StructStorage.data in
         if byte_ofs + 7 < data.Slice.len then
           let numeric = Slice.get_int64 data byte_ofs in
-          Int64.bit_xor numeric default
+          Int64.logxor numeric default
         else
           default
     | None ->
@@ -345,7 +343,7 @@ module Make (MessageWrapper : RPC.S) = struct
       | None ->
           Int32.zero
     in
-    let bits = Int32.bit_xor numeric default_bits in
+    let bits = Int32.logxor numeric default_bits in
     Int32.float_of_bits bits
 
   let get_float64
@@ -364,7 +362,7 @@ module Make (MessageWrapper : RPC.S) = struct
       | None ->
           Int64.zero
     in
-    let bits = Int64.bit_xor numeric default_bits in
+    let bits = Int64.logxor numeric default_bits in
     Int64.float_of_bits bits
 
 

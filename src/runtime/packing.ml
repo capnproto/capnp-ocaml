@@ -27,11 +27,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
-(* Workaround for missing Caml.Bytes in Core 112.35.00 *)
-module CamlBytes = Bytes
-
-open Core_kernel.Std
-module Bytes = CamlBytes
 
 let count_zeros ~start ~stop s =
   let sum = ref 0 in
@@ -140,7 +135,7 @@ and pack_loop_bytes ~input ~ofs ~buffers =
     end
   in
 
-  let () = Bytes.unsafe_set buffers.tagged_bytes 0 (Char.unsafe_of_int !tag_byte) in
+  let () = Bytes.unsafe_set buffers.tagged_bytes 0 (Char.unsafe_chr !tag_byte) in
   let () = Buffer.add_substring buffers.output_buf
     (Bytes.unsafe_to_string buffers.tagged_bytes) 0 !output_count
   in
@@ -158,7 +153,7 @@ and pack_loop_zero_words ~input ~ofs ~count ~buffers =
   let () = assert (ofs <= String.length input) in
   if ofs + 8 > String.length input || count = 0xff ||
      count_zeros ~start:ofs ~stop:(ofs + 8) input <> 8 then
-    let () = Buffer.add_char buffers.output_buf (Char.of_int_exn count) in
+    let () = Buffer.add_char buffers.output_buf (Char.chr count) in
     pack_loop_words ~input ~ofs ~buffers
   else
     pack_loop_zero_words ~input ~ofs:(ofs + 8) ~count:(count + 1) ~buffers
@@ -170,7 +165,7 @@ and pack_loop_zero_words ~input ~ofs ~count ~buffers =
 and pack_loop_literal_words ~input ~ofs ~buffers ~count =
   let () = assert (ofs <= String.length input) in
   if ofs + 8 > String.length input || count = 0xff then
-    let () = Buffer.add_char buffers.output_buf (Char.of_int_exn count) in
+    let () = Buffer.add_char buffers.output_buf (Char.chr count) in
     let () = Buffer.add_buffer buffers.output_buf buffers.lit_buf in
     pack_loop_words ~input ~ofs ~buffers
   else
@@ -179,7 +174,7 @@ and pack_loop_literal_words ~input ~ofs ~buffers ~count =
       let () = Buffer.add_substring buffers.lit_buf input ofs 8 in
       pack_loop_literal_words ~input ~ofs:(ofs + 8) ~buffers ~count:(count + 1)
     else
-      let () = Buffer.add_char buffers.output_buf (Char.of_int_exn count) in
+      let () = Buffer.add_char buffers.output_buf (Char.chr count) in
       let () = Buffer.add_buffer buffers.output_buf buffers.lit_buf in
       pack_loop_words ~input ~ofs ~buffers
 
@@ -209,7 +204,7 @@ let bits_set_lookup =
     in
     loop 0 0
   in
-  let table = Array.create ~len:256 0 in
+  let table = Array.make 256 0 in
   for i = 0 to Array.length table - 1 do
     table.(i) <- count_bits i
   done;
@@ -266,7 +261,7 @@ and unpack_zeros ~packed ~unpacked ~buf ~ofs ~mixed_context =
   (* Tag byte is followed by a count byte specifying number of zero words - 1 *)
   let required_byte_count = 2 in
   if String.length buf - ofs >= required_byte_count then
-    let zero_word_count = 1 + (Char.to_int buf.[ofs + 1]) in
+    let zero_word_count = 1 + (Char.code buf.[ofs + 1]) in
     let zeros = String.make (zero_word_count * 8) '\x00' in
     let () = FragmentBuffer.add_fragment unpacked zeros in
     unpack_decode_tag ~packed ~unpacked ~buf ~ofs:(ofs + 2) ~mixed_context
@@ -281,7 +276,7 @@ and unpack_literal_bytes ~packed ~unpacked ~buf ~ofs ~mixed_context =
   let required_byte_count = 10 in
   if String.length buf - ofs >= required_byte_count then
     (* The count byte specifies number of literal words to copy *)
-    let extra_bytes_required = 8 * (Char.to_int buf.[ofs + 9]) in
+    let extra_bytes_required = 8 * (Char.code buf.[ofs + 9]) in
     let required_byte_count' = required_byte_count + extra_bytes_required in
     if String.length buf - ofs >= required_byte_count' then
       let first_literal_word =
@@ -305,7 +300,7 @@ and unpack_literal_bytes ~packed ~unpacked ~buf ~ofs ~mixed_context =
 
 and unpack_mixed_bytes ~packed ~unpacked ~buf ~ofs ~mixed_context ~tag =
   (* Tag byte is followed by one literal byte for every bit set *)
-  let c_int = Char.to_int tag in
+  let c_int = Char.code tag in
   let literal_bytes_required = bits_set c_int in
   let required_byte_count = 1 + literal_bytes_required in
   if String.length buf - ofs >= required_byte_count then begin

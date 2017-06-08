@@ -28,8 +28,6 @@
  ******************************************************************************)
 
 
-module Caml  = Core_kernel.Caml
-
 type landing_pad_t =
   | NormalPointer
   | TaggedFarPointer
@@ -66,9 +64,9 @@ let decode (pointer64 : Int64.t) : t =
   if Sys.word_size = 64 then
     let segment_id =
       let id64 = Int64.shift_right_logical pointer64 segment_shift in
-      Caml.Int64.to_int id64
+      Int64.to_int id64
     in
-    let pointer = Caml.Int64.to_int pointer64 in
+    let pointer = Int64.to_int pointer64 in
     let landing_pad =
       if (pointer land landing_pad_type_mask_int) = 0 then
         NormalPointer
@@ -90,7 +88,7 @@ let decode (pointer64 : Int64.t) : t =
       if Int64.compare id64 max64 > 0 then
         Message.invalid_msg "far pointer contains segment ID larger than OCaml max_int"
       else
-        Caml.Int64.to_int id64
+        Int64.to_int id64
     in
     let landing_pad =
       let masked = Int64.logand pointer64 landing_pad_type_mask in
@@ -102,7 +100,7 @@ let decode (pointer64 : Int64.t) : t =
     let offset =
       let masked = Int64.logand pointer64 offset_mask in
       let offset64 = Int64.shift_right_logical masked offset_shift in
-      Caml.Int64.to_int offset64
+      Int64.to_int offset64
     in {
       landing_pad;
       offset;

@@ -34,8 +34,6 @@
    pointer will cause struct storage to be immediately allocated if that pointer
    was null). *)
 
-open Core_kernel.Std
-
 type ro = Message.ro
 type rw = Message.rw
 let invalid_msg = Message.invalid_msg
@@ -276,7 +274,7 @@ module Make (NM : RPC.S) = struct
         : int32 =
       let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_int32 data byte_ofs in
-      Int32.bit_xor numeric default
+      Int32.logxor numeric default
 
     let get_int64
         ~(default : int64)
@@ -285,7 +283,7 @@ module Make (NM : RPC.S) = struct
       : int64 =
       let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_int64 data byte_ofs in
-      Int64.bit_xor numeric default
+      Int64.logxor numeric default
 
     let get_uint8
         ~(default : int)
@@ -330,7 +328,7 @@ module Make (NM : RPC.S) = struct
       : float =
       let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_int32 data byte_ofs in
-      let bits = Int32.bit_xor numeric default_bits in
+      let bits = Int32.logxor numeric default_bits in
       Int32.float_of_bits bits
 
     let get_float64
@@ -340,7 +338,7 @@ module Make (NM : RPC.S) = struct
       : float =
       let data = struct_storage.NM.StructStorage.data in
       let numeric = NM.Slice.get_int64 data byte_ofs in
-      let bits = Int64.bit_xor numeric default_bits in
+      let bits = Int64.logxor numeric default_bits in
       Int64.float_of_bits bits
 
 
@@ -404,7 +402,7 @@ module Make (NM : RPC.S) = struct
       : unit =
       let data = struct_storage.NM.StructStorage.data in
       let () = set_opt_discriminant data discr in
-      NM.Slice.set_int32 data byte_ofs (Int32.bit_xor value default)
+      NM.Slice.set_int32 data byte_ofs (Int32.logxor value default)
 
     let set_int64
         ?(discr : Discr.t option)
@@ -415,7 +413,7 @@ module Make (NM : RPC.S) = struct
       : unit =
       let data = struct_storage.NM.StructStorage.data in
       let () = set_opt_discriminant data discr in
-      NM.Slice.set_int64 data byte_ofs (Int64.bit_xor value default)
+      NM.Slice.set_int64 data byte_ofs (Int64.logxor value default)
 
     let set_uint8
         ?(discr : Discr.t option)
@@ -471,7 +469,7 @@ module Make (NM : RPC.S) = struct
       let data = struct_storage.NM.StructStorage.data in
       let () = set_opt_discriminant data discr in
       NM.Slice.set_int32 data byte_ofs
-        (Int32.bit_xor (Int32.bits_of_float value) default_bits)
+        (Int32.logxor (Int32.bits_of_float value) default_bits)
 
     let set_float64
         ?(discr : Discr.t option)
@@ -483,7 +481,7 @@ module Make (NM : RPC.S) = struct
       let data = struct_storage.NM.StructStorage.data in
       let () = set_opt_discriminant data discr in
       NM.Slice.set_int64 data byte_ofs
-        (Int64.bit_xor (Int64.bits_of_float value) default_bits)
+        (Int64.logxor (Int64.bits_of_float value) default_bits)
 
 
     (*******************************************************************************

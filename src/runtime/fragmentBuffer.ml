@@ -27,11 +27,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
-(* Workaround for missing Caml.Bytes in Core 112.35.00 *)
-module CamlBytes = Bytes
 
-open Core_kernel.Std
-module Bytes = CamlBytes
+module Deque = Core_kernel.Deque
 
 
 type t = {
