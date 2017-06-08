@@ -28,7 +28,6 @@
  ******************************************************************************)
 
 
-module Int64 = Core_kernel.Core_int64
 module Caml  = Core_kernel.Caml
 
 type landing_pad_t =
@@ -94,14 +93,14 @@ let decode (pointer64 : Int64.t) : t =
         Caml.Int64.to_int id64
     in
     let landing_pad =
-      let masked = Int64.bit_and pointer64 landing_pad_type_mask in
+      let masked = Int64.logand pointer64 landing_pad_type_mask in
       if Int64.compare masked Int64.zero = 0 then
         NormalPointer
       else
         TaggedFarPointer
     in
     let offset =
-      let masked = Int64.bit_and pointer64 offset_mask in
+      let masked = Int64.logand pointer64 offset_mask in
       let offset64 = Int64.shift_right_logical masked offset_shift in
       Caml.Int64.to_int offset64
     in {
@@ -137,8 +136,8 @@ let encode (storage_descr : t) : Int64.t =
     let offset64 = Int64.of_int storage_descr.offset in
     let segment64 = Int64.of_int storage_descr.segment_id in
     tag_val_far |>
-    Int64.bit_or (Int64.shift_left type64 landing_pad_type_shift) |>
-    Int64.bit_or (Int64.shift_left offset64 offset_shift) |>
-    Int64.bit_or (Int64.shift_left segment64 segment_shift)
+    Int64.logor (Int64.shift_left type64 landing_pad_type_shift) |>
+    Int64.logor (Int64.shift_left offset64 offset_shift) |>
+    Int64.logor (Int64.shift_left segment64 segment_shift)
 
 

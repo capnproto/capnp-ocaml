@@ -36,14 +36,14 @@ module Bytes = CamlBytes
 
 type t = {
   (** String fragments stored in FIFO order *)
-  fragments : string Dequeue.t;
+  fragments : string Deque.t;
 
   (** Total byte count of the fragments *)
   mutable fragments_size : int;
 }
 
 let empty () = {
-  fragments = Dequeue.create ();
+  fragments = Deque.create ();
   fragments_size = 0;
 }
 
@@ -52,7 +52,7 @@ let add_fragment stream fragment =
   if len = 0 then
     ()
   else
-    let () = Dequeue.enqueue_back stream.fragments fragment in
+    let () = Deque.enqueue_back stream.fragments fragment in
     stream.fragments_size <- stream.fragments_size + len
 
 let of_string s =
@@ -71,7 +71,7 @@ let remove_exact stream size =
       let ofs = ref 0 in
       while !ofs < size do
         let bytes_remaining = size - !ofs in
-        let fragment = Dequeue.dequeue_front_exn stream.fragments in
+        let fragment = Deque.dequeue_front_exn stream.fragments in
         let bytes_from_fragment = min bytes_remaining (String.length fragment) in
         Bytes.blit
           (Bytes.unsafe_of_string fragment) 0
@@ -79,7 +79,7 @@ let remove_exact stream size =
           bytes_from_fragment;
         begin if bytes_from_fragment < String.length fragment then
           let remainder = Util.str_slice ~start:bytes_from_fragment fragment in
-          Dequeue.enqueue_front stream.fragments remainder
+          Deque.enqueue_front stream.fragments remainder
         end;
         ofs := !ofs + bytes_from_fragment;
       done;
@@ -93,7 +93,7 @@ let remove_at_least stream size =
   else begin
     let buffer = Buffer.create size in
     while Buffer.length buffer < size do
-      Buffer.add_string buffer (Dequeue.dequeue_front_exn stream.fragments)
+      Buffer.add_string buffer (Deque.dequeue_front_exn stream.fragments)
     done;
     stream.fragments_size <- stream.fragments_size - (Buffer.length buffer);
     Some (Buffer.contents buffer)
@@ -102,7 +102,7 @@ let remove_at_least stream size =
 let peek_exact stream size =
   match remove_exact stream size with
   | Some bytes ->
-      let () = Dequeue.enqueue_front stream.fragments bytes in
+      let () = Deque.enqueue_front stream.fragments bytes in
       let () = stream.fragments_size <- stream.fragments_size + size in
       Some bytes
   | None ->
@@ -113,7 +113,7 @@ let unremove stream bytes =
   if len = 0 then
     ()
   else
-    let () = Dequeue.enqueue_front stream.fragments bytes in
+    let () = Deque.enqueue_front stream.fragments bytes in
     stream.fragments_size <- stream.fragments_size + len
 
 

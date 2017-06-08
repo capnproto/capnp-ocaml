@@ -16,8 +16,7 @@ remove: [["env" "PREFIX=%{prefix}%" "omake" "uninstall"]]
 depends: [
   "omake"
   "ocamlfind" {>= "1.5.1"}
-  "core_kernel"
-  "sexplib" {< "v0.9.0"}
+  "core_kernel" {>= "112.24.00"}
   "extunix"
   "ocplib-endian" {>= "0.7"}
   "res"

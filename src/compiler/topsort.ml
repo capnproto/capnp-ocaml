@@ -83,7 +83,7 @@ let register_reference ~parentage_table ~edges ~referrer ~referee : unit =
       else
         begin match Hashtbl.find edges parent_referee with
         | Some referrer_list ->
-            if List.mem referrer_list referrer then
+            if List.mem ~equal:GenCommon.uint64_equal referrer_list referrer then
               (* This reference is already present *)
               ()
             else
@@ -199,7 +199,7 @@ let build_reference_graph
 
 let dump_reference_graph reference_graph =
   let () = Printf.printf "reference graph:\n" in
-  Hashtbl.iter reference_graph ~f:(fun ~key ~data ->
+  Hashtbl.iteri reference_graph ~f:(fun ~key ~data ->
     let () = Printf.printf "  key: %s\n" (Uint64.to_string key) in
     List.iter data
       ~f:(fun x -> Printf.printf "    data: %s\n" (Uint64.to_string x)))
