@@ -28,7 +28,6 @@
  ******************************************************************************)
 
 
-module Int64 = Core_kernel.Core_int64
 module Caml  = Core_kernel.Caml
 
 type t =
@@ -43,8 +42,8 @@ let index_shift = 32
 let index_mask  = Int64.shift_left 0xffffffffL index_shift
 
 let decode (pointer64 : Int64.t) : t =
-  if Int64.compare (Int64.bit_and pointer64 b_mask) Int64.zero = 0 then
-    let shifted_index = Int64.bit_and pointer64 index_mask in
+  if Int64.compare (Int64.logand pointer64 b_mask) Int64.zero = 0 then
+    let shifted_index = Int64.logand pointer64 index_mask in
     let index64 = Int64.shift_right_logical shifted_index index_shift in
     let index32 = Caml.Int64.to_int32 index64 in
     Capability (Uint32.of_int32 index32)
@@ -57,6 +56,6 @@ let encode (descr : t) : Int64.t =
       let index32 = Uint32.to_int32 index in
       let index64 = Int64.of_int32 index32 in
       let shifted_index = Int64.shift_left index64 index_shift in
-      Int64.bit_or shifted_index tag_val_other
+      Int64.logor shifted_index tag_val_other
 
 

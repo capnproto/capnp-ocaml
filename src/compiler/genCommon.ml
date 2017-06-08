@@ -77,7 +77,7 @@ let apply_indent ~(indent : string) (lines : string list) : string list =
 (* Mangle a name so that it doesn't collide with any of the names in the list. *)
 let mangle_ident (ident : string) (idents : string list) =
   let rec loop mangled =
-    if List.mem idents mangled then
+    if List.mem ~equal:String.equal idents mangled then
       loop (mangled ^ "_")
     else
       mangled
@@ -516,7 +516,7 @@ let filter_interesting_imports ~context root_node : Context.codegen_context_t =
 let make_disambiguated_type_name ~context ~(mode : Mode.t) ~(scope_mode : Mode.t)
     ~scope ~tp node =
   let node_id = PS.Node.id_get node in
-  if List.mem scope node_id then
+  if List.mem ~equal:uint64_equal scope node_id then
     (* The node of interest is a parent node of the node being generated.
        this is a case where an unambiguous type is emitted. *)
     make_unique_typename ~context ~mode node

@@ -28,7 +28,6 @@
  ******************************************************************************)
 
 
-module Int64 = Core_kernel.Core_int64
 module Caml  = Core_kernel.Caml
 
 type t = {
@@ -79,13 +78,13 @@ let decode (pointer64 : Int64.t) : t =
     }
   else
     let offset =
-      let masked     = Int64.bit_and pointer64 offset_mask in
+      let masked     = Int64.logand pointer64 offset_mask in
       let offset64   = Int64.shift_right_logical masked offset_shift in
       let offset_int = Caml.Int64.to_int offset64 in
       Util.decode_signed 30 offset_int
     in
     let data_size =
-      let masked = Int64.bit_and pointer64 data_size_mask in
+      let masked = Int64.logand pointer64 data_size_mask in
       let size64 = Int64.shift_right_logical masked data_size_shift in
       Caml.Int64.to_int size64
     in {
@@ -113,8 +112,8 @@ let encode (storage_descr : t) : Int64.t =
     let data_size64 = Int64.of_int storage_descr.data_words in
     let ptr_size64 = Int64.of_int storage_descr.pointer_words in
     tag_val_struct |>
-    Int64.bit_or (Int64.shift_left offset64 offset_shift) |>
-    Int64.bit_or (Int64.shift_left data_size64 data_size_shift) |>
-    Int64.bit_or (Int64.shift_left ptr_size64 pointers_size_shift)
+    Int64.logor (Int64.shift_left offset64 offset_shift) |>
+    Int64.logor (Int64.shift_left data_size64 data_size_shift) |>
+    Int64.logor (Int64.shift_left ptr_size64 pointers_size_shift)
 
 
