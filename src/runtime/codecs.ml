@@ -27,11 +27,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
-(* Workaround for missing Caml.Bytes in Core 112.35.00 *)
-module CamlBytes = Bytes
 
-open Core_kernel.Std
-module Bytes = CamlBytes
+module Result = Core_kernel.Result
 
 
 type compression_t = [ `None | `Packing ]
@@ -106,7 +103,7 @@ module UncompStream = struct
             Util.int_of_uint32_exn (BytesStorage.get_uint32 bytes_header 0)
           in
           let () =
-            if segment_count > (Int.max_value / 4) - 2 then
+            if segment_count > (max_int / 4) - 2 then
               Util.out_of_int_range "Uint32.to_int"
           in
           let segment_count = segment_count + 1 in
@@ -143,7 +140,7 @@ module UncompStream = struct
     if segments_decoded = segment_count then
       let () = stream.decoder_state <- IncompleteHeader in
       let string_segments = Res.Array.to_list incomplete_frame.complete_segments in
-      let bytes_segments = List.map string_segments ~f:Bytes.unsafe_of_string in
+      let bytes_segments = ListLabels.map string_segments ~f:Bytes.unsafe_of_string in
       Result.Ok (Message.BytesMessage.Message.of_storage bytes_segments)
     else
       let () = assert (segments_decoded < segment_count) in
@@ -253,7 +250,7 @@ end
 
 let make_header segment_descrs : string =
   let buf = Buffer.create 8 in
-  let () = List.iter segment_descrs ~f:(fun descr ->
+  let () = ListLabels.iter segment_descrs ~f:(fun descr ->
       let size_buf = Bytes.create 4 in
       let seg_len = descr.Message.BytesMessage.Message.bytes_consumed in
       let () = assert ((seg_len mod 8) = 0) in
@@ -285,7 +282,7 @@ let rec serialize_fold message ~compression ~init ~f =
   match compression with
   | `None ->
       let header = make_header segment_descrs in
-      List.fold_left segment_descrs ~init:(f init header) ~f:(fun acc descr ->
+      ListLabels.fold_left segment_descrs ~init:(f init header) ~f:(fun acc descr ->
         let open Message.BytesMessage in
         let seg =
           if descr.Message.bytes_consumed = Bytes.length descr.Message.segment then
@@ -317,7 +314,7 @@ let rec serialize ~compression message =
         (Bytes.unsafe_of_string header) 0
         buf 0
         header_size;
-      let (_ : int) = List.fold_left segment_descrs ~init:header_size
+      let (_ : int) = ListLabels.fold_left segment_descrs ~init:header_size
           ~f:(fun pos descr ->
             let open Message.BytesMessage in
             Bytes.blit
