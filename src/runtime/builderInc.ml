@@ -1074,7 +1074,7 @@ module Make (NM : MessageSig.S) = struct
         ?(discr : Discr.t option)
         (struct_storage : rw NM.StructStorage.t)
         (pointer_word : int)
-        (value : 'cap NM.Slice.t)
+        (value : 'cap NM.Slice.t option)
       : rw NM.Slice.t =
       let pointers = struct_storage.NM.StructStorage.pointers in
       let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
@@ -1087,7 +1087,12 @@ module Make (NM : MessageSig.S) = struct
         NM.Slice.len   = sizeof_uint64;
       } in
       let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
-      let () = BOps.deep_copy_pointer ~src:value ~dest:pointer_bytes in
+      let () = BOps.deep_zero_pointer pointer_bytes in
+      let () =
+        match value with
+        | Some value -> BOps.deep_copy_pointer ~src:value ~dest:pointer_bytes
+        | None -> ()
+      in
       pointer_bytes
 
     let set_interface
@@ -1107,6 +1112,7 @@ module Make (NM : MessageSig.S) = struct
         NM.Slice.len   = sizeof_uint64;
       } in
       let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
+      let () = BOps.deep_zero_pointer pointer_bytes in
       match value with
       | Some index ->
           NM.Slice.set_int64 pointer_bytes 0
