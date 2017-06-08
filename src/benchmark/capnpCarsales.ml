@@ -1,10 +1,5 @@
 
-module CS :
-  Carsales.S with type 'cap message_t = 'cap Capnp.BytesMessage.Message.t
-= struct
-  module MessageWrapper = Capnp.BytesMessage
-  INCLUDE "carsales_defun.ml"
-end
+module CS = Carsales.Make[@inlined](Capnp.BytesMessage)
 
 module TestCase = struct
   type request_reader_t   = CS.Reader.ParkingLot.t

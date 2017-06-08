@@ -1,12 +1,7 @@
 
 module CamlBytes = Bytes
 
-module CR :
-  Catrank.S with type 'cap message_t = 'cap Capnp.BytesMessage.Message.t
-= struct
-  module MessageWrapper = Capnp.BytesMessage
-  INCLUDE "catrank_defun.ml"
-end
+module CR = Catrank.Make[@inlined](Capnp.BytesMessage)
 
 open Core_kernel.Std
 

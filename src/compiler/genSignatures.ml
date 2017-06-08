@@ -157,6 +157,10 @@ let generate_one_field_accessors ~context ~scope ~mode field
               field_name
               (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp)
               (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp);
+            sprintf "val %s_set_reader : t -> %s -> %s"
+              field_name
+              (GenCommon.type_name ~context ~mode:Mode.Reader ~scope_mode:mode scope tp)
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp);
             sprintf "val %s_set_interface : t -> Uint32.t option -> unit"
               field_name ];
         ]
