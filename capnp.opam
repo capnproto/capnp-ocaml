@@ -12,7 +12,6 @@ build-test: ["jbuilder" "build" "@runtest" "@src/benchmark/benchmarks"]
 
 depends: [
   "jbuilder" {build}
-  "ocamlfind" {>= "1.5.1"}
   "core_kernel" {>= "112.24.00"}
   "extunix"
   "ocplib-endian" {>= "0.7"}
