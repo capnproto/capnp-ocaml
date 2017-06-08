@@ -1,6 +1,7 @@
-OCAMLFINDFLAGS += -syntax camlp4o
-
 RUNTIME_MODULES =   \
+  commonInc         \
+  readerInc         \
+  builderInc        \
   builderOps        \
   bytesStorage      \
   cArray            \

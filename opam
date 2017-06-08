@@ -22,7 +22,6 @@ depends: [
   "ocplib-endian" {>= "0.7"}
   "res"
   "uint"
-  "camlp4"
 ]
 depexts: [
   [["debian"] ["capnproto"]]

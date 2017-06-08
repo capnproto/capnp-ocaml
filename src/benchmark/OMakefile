@@ -1,19 +1,8 @@
+OCAMLOPTFLAGS += -inlining-report -O3
 OCAMLINCLUDES += ../runtime
 OCAML_LIBS += ../runtime/libcapnp
 OCAML_CLIBS = libfastrand
 OCAMLPACKS += core
-
-Camlp4o(module) =
-    section
-        OCAMLFINDFLAGS += -syntax camlp4o
-        $(module).cmi:
-        $(module).cmo:
-        $(module).o:
-        $(module).cmx:
-
-Camlp4o(capnpCarsales)
-Camlp4o(capnpCatrank)
-Camlp4o(capnpEval)
 
 GENERATED = \
   c2b2b.mli \
