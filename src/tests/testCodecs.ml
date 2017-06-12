@@ -41,32 +41,32 @@ let expect_packs_to unpacked packed =
 
 
 let packing_suite =
-  let t0 ctx = expect_packs_to "" "" in
-  let t1 ctx = expect_packs_to
+  let t0 _ctx = expect_packs_to "" "" in
+  let t1 _ctx = expect_packs_to
       "\x00\x00\x00\x00\x00\x00\x00\x00"
       "\x00\x00"
   in
-  let t2 ctx = expect_packs_to
+  let t2 _ctx = expect_packs_to
       "\x00\x00\x0c\x00\x00\x22\x00\x00"
       "\x24\x0c\x22"
   in
-  let t3 ctx = expect_packs_to
+  let t3 _ctx = expect_packs_to
       "\x01\x03\x02\x04\x05\x07\x06\x08"
       "\xff\x01\x03\x02\x04\x05\x07\x06\x08\x00"
   in
-  let t4 ctx = expect_packs_to
+  let t4 _ctx = expect_packs_to
       "\x00\x00\x00\x00\x00\x00\x00\x00\x01\x03\x02\x04\x05\x07\x06\x08"
       "\x00\x00\xff\x01\x03\x02\x04\x05\x07\x06\x08\x00"
   in
-  let t5 ctx = expect_packs_to
+  let t5 _ctx = expect_packs_to
       "\x00\x00\x0c\x00\x00\x22\x00\x00\x01\x03\x02\x04\x05\x07\x06\x08"
       "\x24\x0c\x22\xff\x01\x03\x02\x04\x05\x07\x06\x08\x00"
   in
-  let t6 ctx = expect_packs_to
+  let t6 _ctx = expect_packs_to
       "\x01\x03\x02\x04\x05\x07\x06\x08\x08\x06\x07\x04\x05\x02\x03\x01"
       "\xff\x01\x03\x02\x04\x05\x07\x06\x08\x01\x08\x06\x07\x04\x05\x02\x03\x01"
   in
-  let t7 ctx = expect_packs_to
+  let t7 _ctx = expect_packs_to
       "\x01\x02\x03\x04\x05\x06\x07\x08\
        \x01\x02\x03\x04\x05\x06\x07\x08\
        \x01\x02\x03\x04\x05\x06\x07\x08\
@@ -78,7 +78,7 @@ let packing_suite =
        \x01\x02\x03\x04\x05\x06\x07\x08\
        \xd6\x02\x04\x09\x05\x01"
   in
-  let t8 ctx = expect_packs_to
+  let t8 _ctx = expect_packs_to
       "\x01\x02\x03\x04\x05\x06\x07\x08\
        \x01\x02\x03\x04\x05\x06\x07\x08\
        \x06\x02\x04\x03\x09\x00\x05\x01\
@@ -90,7 +90,7 @@ let packing_suite =
        \x01\x02\x03\x04\x05\x06\x07\x08\
        \xd6\x02\x04\x09\x05\x01"
   in
-  let t9 ctx = expect_packs_to
+  let t9 _ctx = expect_packs_to
       "\x08\x00\x64\x06\x00\x01\x01\x02\
        \x00\x00\x00\x00\x00\x00\x00\x00\
        \x00\x00\x00\x00\x00\x00\x00\x00\
@@ -132,7 +132,7 @@ let laws_exn name trials gen fn =
       if not (fn x) then failwith name
     )
 
-let test_random_pack_unpack ctx =
+let test_random_pack_unpack _ctx =
   laws_exn "unpack(pack(x)) = x" 2000 capnp_string_gen (fun s ->
     let packed = Capnp.Runtime.Packing.pack_string s in
     let unpacked = Capnp.Runtime.Packing.unpack_string packed in
@@ -152,7 +152,7 @@ let fragment (s : string) (add_fragment : string -> unit) =
   loop 0
 
 
-let test_random_pack_unpack_fragmented ctx =
+let test_random_pack_unpack_fragmented _ctx =
   laws_exn "unpack(fragment(pack(x))) = x" 2000 capnp_string_gen (fun s ->
     let open Capnp.Runtime in
     let packed = Packing.pack_string s in
@@ -186,7 +186,7 @@ let message_gen =
   List.gen' ~length:(`Between_inclusive (1, 25)) segment_gen
   >>| Capnp.BytesMessage.Message.of_storage
 
-let test_random_serialize_deserialize ctx =
+let test_random_serialize_deserialize _ctx =
   laws_exn "deserialize(fragment(serialize(x))) = x"
       2000 (Quickcheck.Generator.tuple2 message_gen capnp_string_gen) (fun (m, trailing_data) ->
     let open Capnp.Runtime in
@@ -204,7 +204,7 @@ let test_random_serialize_deserialize ctx =
         assert false)
 
 
-let test_random_serialize_deserialize_packed ctx =
+let test_random_serialize_deserialize_packed _ctx =
   laws_exn "deserialize_unpack(fragment(serialize_pack(x))) = x"
       2000 message_gen (fun m ->
     let open Capnp.Runtime in

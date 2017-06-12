@@ -655,7 +655,6 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
               let total_words = Util.ceil_ratio total_bytes sizeof_uint64 in
               copy_by_value total_words
           | ListStorageType.Pointer ->
-              let open RWM.ListStorage in
               for i = 0 to src.ROM.ListStorage.num_elements - 1 do
                 let src_pointer =
                   let open ROM.ListStorage in {

@@ -31,11 +31,11 @@ open OUnit2
 
 let encode_signed_suite =
   let open Capnp.Runtime.Util in
-  let t0 ctx = assert_equal (encode_signed 17 0) 0 in
-  let t1 ctx = assert_equal (encode_signed 17 0xffff) 0xffff in
-  let t2 ctx = assert_equal (encode_signed 17 (-0x10000)) 0x10000 in
-  let t3 ctx = assert_equal (encode_signed 17 0x1234) 0x1234 in
-  let t4 ctx = assert_equal (encode_signed 17 (-0x1234)) 0x1edcc in
+  let t0 _ctx = assert_equal (encode_signed 17 0) 0 in
+  let t1 _ctx = assert_equal (encode_signed 17 0xffff) 0xffff in
+  let t2 _ctx = assert_equal (encode_signed 17 (-0x10000)) 0x10000 in
+  let t3 _ctx = assert_equal (encode_signed 17 0x1234) 0x1234 in
+  let t4 _ctx = assert_equal (encode_signed 17 (-0x1234)) 0x1edcc in
   "encode_signed" >::: [
     "zero" >:: t0;
     "max" >:: t1;
@@ -46,11 +46,11 @@ let encode_signed_suite =
 
 let decode_signed_suite =
   let open Capnp.Runtime.Util in
-  let t0 ctx = assert_equal (decode_signed 17 0) 0 in
-  let t1 ctx = assert_equal (decode_signed 17 0xffff) 0xffff in
-  let t2 ctx = assert_equal (decode_signed 17 0x10000) (-0x10000) in
-  let t3 ctx = assert_equal (decode_signed 17 0x1234) 0x1234 in
-  let t4 ctx = assert_equal (decode_signed 17 0x1edcc) (-0x1234) in
+  let t0 _ctx = assert_equal (decode_signed 17 0) 0 in
+  let t1 _ctx = assert_equal (decode_signed 17 0xffff) 0xffff in
+  let t2 _ctx = assert_equal (decode_signed 17 0x10000) (-0x10000) in
+  let t3 _ctx = assert_equal (decode_signed 17 0x1234) 0x1234 in
+  let t4 _ctx = assert_equal (decode_signed 17 0x1edcc) (-0x1234) in
   "decode_signed" >::: [
     "zero" >:: t0;
     "max" >:: t1;

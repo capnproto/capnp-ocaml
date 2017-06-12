@@ -110,7 +110,6 @@ let add_struct defaults ident struct_storage =
 
 
 let add_list defaults ident list_storage =
-  let open M.ListStorage in
   let list_copy = Copier.deep_copy_list ~src:list_storage
       ~dest_message:defaults.message ()
   in
@@ -134,11 +133,11 @@ let emit_literal_seg (segment : string) (wrap : int) : string list =
   let rec loop line_start line_end =
     let () = assert (line_end  <= String.length literal) in
     if line_end = String.length literal then
-      let last_line = String.sub literal line_start (line_end - line_start) in
+      let last_line = String.sub literal ~pos:line_start ~len:(line_end - line_start) in
       let () = Res.Array.add_one lines (last_line ^ "\";") in
       Res.Array.to_list lines
     else if literal.[line_end - 1] <> '\\' then
-      let line = String.sub literal line_start (line_end - line_start) in
+      let line = String.sub literal ~pos:line_start ~len:(line_end - line_start) in
       let () = Res.Array.add_one lines (line ^ "\\") in
       loop line_end (min (line_end + wrap) (String.length literal))
     else
@@ -279,7 +278,7 @@ let emit_instantiate_reader_message () = [
 
 
 let emit_instantiate_reader_structs struct_array =
-  Res.Array.fold_left (fun acc (ident, struct_storage) -> [
+  Res.Array.fold_left (fun acc (ident, _struct_storage) -> [
       "let " ^ (reader_string_of_ident ident) ^ " =";
       "  let data_words =";
       "    let def = " ^ (builder_string_of_ident ident) ^ " in";
@@ -301,7 +300,7 @@ let emit_instantiate_reader_structs struct_array =
 
 
 let emit_instantiate_reader_lists list_array =
-  Res.Array.fold_left (fun acc (ident, list_storage) -> [
+  Res.Array.fold_left (fun acc (ident, _list_storage) -> [
       "let " ^ (reader_string_of_ident ident) ^ " =";
       "  DefaultsCopier_.RWC.ListStorage.readonly";
       "    (DefaultsCopier_.deep_copy_list ~src:" ^ (builder_string_of_ident ident);
@@ -310,21 +309,6 @@ let emit_instantiate_reader_lists list_array =
     ] @ acc)
     []
     list_array
-
-
-let emit_instantiate_reader_pointers pointer_array =
-  Res.Array.fold_left (fun acc (ident, pointer_bytes) -> [
-      "let " ^ (reader_string_of_ident ident) ^ " =";
-      "  DefaultsMessage_.Slice.readonly";
-      "    (let dest = DefaultsMessage_.Slice.alloc 8 in";
-      "    let () = DefaultsCopier_.deep_copy_pointer ~src:" ^
-        (builder_string_of_ident ident);
-      "      ~dest";
-      "    in dest)";
-      "";
-    ] @ acc)
-    []
-    pointer_array
 
 
 let gen_reader_defaults defaults =

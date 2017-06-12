@@ -301,7 +301,7 @@ let generate_struct_node ~context ~scope ~nested_modules
     let selector =
       match mode with
       | Mode.Reader  -> (function Getter _ -> true | Setter _ -> false)
-      | Mode.Builder -> (fun x -> true)
+      | Mode.Builder -> (fun _ -> true)
     in
     generate_accessors ~context ~scope ~mode ~f:selector non_union_fields
   in
@@ -405,7 +405,7 @@ let rec generate_node
         [ "module " ^ node_name ^ " : sig" ] @
           (apply_indent ~indent:"  " body) @
           [ "end" ]
-  | Interface iface_def ->
+  | Interface _ ->
       let body = generate_nested_modules () in
       if suppress_module_wrapper then
         body
@@ -419,7 +419,7 @@ let rec generate_node
         (GenCommon.type_name ~context ~mode:Mode.Reader ~scope_mode:mode
            scope (Const.type_get const_def));
     ]
-  | Annotation annot_def ->
+  | Annotation _ ->
       generate_nested_modules ()
   | Undefined x ->
       failwith (sprintf "Unknown Node union discriminant %u" x)

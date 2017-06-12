@@ -1,5 +1,7 @@
 open Capnp
 
+[@@@ocaml.warning "-A"]
+
 type ro = Capnp.Message.ro
 type rw = Capnp.Message.rw
 

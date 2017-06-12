@@ -69,9 +69,9 @@ let init x n =
 
 let to_storage x = x.storage
 
-let invalid_get_unsafe a i = assert false
+let invalid_get_unsafe _a _i = assert false
 
-let invalid_set_unsafe a i v = assert false
+let invalid_set_unsafe _a _i _v = assert false
 
-let invalid_init n = assert false
+let invalid_init _n = assert false
 
