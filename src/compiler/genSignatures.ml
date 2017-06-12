@@ -61,7 +61,7 @@ let generate_one_field_accessors ~context ~scope ~mode field
   match PS.Field.get field with
   | PS.Field.Group group ->
       let group_id = PS.Field.Group.type_id_get group in
-      let group_node = Hashtbl.find_exn context.Context.nodes group_id in
+      let group_node = Context.node context group_id in
       let group_name =
         GenCommon.get_scope_relative_name ~context scope group_node
       in [
@@ -360,21 +360,12 @@ let rec generate_node
   let open PS.Node in
   let node_id = id_get node in
   let generate_nested_modules () =
-    match Topsort.topological_sort context.Context.nodes
-            (GenCommon.children_of ~context node) with
-    | Some child_nodes ->
-        List.concat_map child_nodes ~f:(fun child ->
-          let child_name = GenCommon.get_unqualified_name ~parent:node ~child in
-          let child_node_id = id_get child in
-          generate_node ~suppress_module_wrapper:false ~context
-            ~scope:(child_node_id :: scope) ~mode ~node_name:child_name child)
-    | None ->
-        let error_msg = sprintf
-          "The children of node %s (%s) have a cyclic dependency."
-          (Uint64.to_string node_id)
-          (display_name_get node)
-        in
-        failwith error_msg
+    let child_nodes = GenCommon.children_of ~context node in
+    List.concat_map child_nodes ~f:(fun child ->
+        let child_name = GenCommon.get_unqualified_name ~parent:node ~child in
+        let child_node_id = id_get child in
+        generate_node ~suppress_module_wrapper:false ~context
+          ~scope:(child_node_id :: scope) ~mode ~node_name:child_name child)
   in
   match get node with
   | File ->

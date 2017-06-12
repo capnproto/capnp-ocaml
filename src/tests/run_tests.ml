@@ -17,3 +17,4 @@ let () = run_test_tt_main TestCodecs.random_serialize_suite
 
 let () = run_test_tt_main TestMisc.encode_signed_suite
 let () = run_test_tt_main TestMisc.decode_signed_suite
+let () = run_test_tt_main TestMisc.cycle_suite

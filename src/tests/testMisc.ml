@@ -29,6 +29,8 @@
 
 open OUnit2
 
+module TestCycles = TestCycles.Make(Capnp.BytesMessage)
+
 let encode_signed_suite =
   let open Capnp.Runtime.Util in
   let t0 _ctx = assert_equal (encode_signed 17 0) 0 in
@@ -59,4 +61,18 @@ let decode_signed_suite =
     "random negative" >:: t4;
   ]
 
-
+let cycle_suite =
+  let open TestCycles in
+  let t0 _ctx =
+    let root = Builder.Foo.init_root () in
+    let bar = Builder.Foo.bar_init root in
+    let foo2 = Builder.Bar.foo_init bar in
+    Builder.Foo.x_set foo2 42l;
+    let root = Builder.Foo.to_reader root in
+    let bar = Reader.Foo.bar_get root in
+    let foo = Reader.Bar.foo_get bar in
+    OUnit2.assert_equal (Reader.Foo.x_get foo) (Builder.Foo.x_get foo2);
+  in
+  "cycles" >::: [
+    "simple" >:: t0;
+  ]
