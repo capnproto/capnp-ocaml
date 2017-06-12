@@ -1,3 +1,7 @@
+(* -*- tuareg -*- *)
+
+let config = {|
+
 (jbuild_version 1)
 
 (library (
@@ -6,5 +10,17 @@
   (synopsis "Runtime support library for capnp-ocaml")
   (libraries (core_kernel uint ocplib-endian res extunix))
   (flags (:standard -w -50-27-6-34-32-53-33))
-  (ocamlopt_flags (:standard -O3 -inline 1000))
+  (ocamlopt_flags (:standard # -inline 1000))
 ))
+
+|}
+
+let () =
+  let hash = String.index config '#' in
+  let opt = if Jbuild_plugin.V1.ocaml_version >= "4.03" then "-O3" else "" in
+  let config =
+    String.sub config 0 hash ^
+    opt ^
+    String.sub config (hash + 1) (String.length config - hash - 1)
+  in
+  Jbuild_plugin.V1.send config

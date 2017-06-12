@@ -6,5 +6,4 @@
   (c_names (fast_rand))
   (c_flags (:standard -O3))
   (flags (:standard -w -3))
-  (ocamlopt_flags (:standard -O3))
 ))
