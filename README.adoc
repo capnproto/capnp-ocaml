@@ -5,7 +5,9 @@ This is an http://ocaml.org[OCaml] code generator plugin for the
 http://kentonv.github.io/capnproto[Cap\'n Proto] serialization framework.
 
 This plugin is roughly feature-complete for the Cap\'n Proto basic serialization.
-The RPC feature set is not supported at this time.
+
+It can also be used for RPC with a suitable RPC library, e.g.
+https://github.com/mirage/capnp-rpc[capnp-rpc].
 
 Design Notes
 ------------
@@ -221,6 +223,11 @@ val foo_init : t -> Foo.t
     @raise Message.Invalid_message if the message is ill-formatted *)
 val foo_get : t -> Foo.t
 
+(** [foo_get_pipelined s] is a reference to the field [foo] in the
+     (possibly not yet received) struct [t]. Only available in the Reader
+     section. *)
+val foo_get_pipelined : t RPC.StructRef.t -> Foo.t RPC.StructRef.t
+
 (** [foo_set_reader s v] sets the content of field [foo] by making a deep
     copy of the Reader-typed structure.
 
@@ -345,6 +352,22 @@ val of_message : 'cap message_t -> t
     a read-only interface.  (Found only in the Reader module.) *)
 val of_builder : Builder.Bar.t -> Reader.Bar.t
 
+(** [of_pointer p] parses the struct pointed to by [p].
+    This is useful when dealing with AnyPointer fields.
+
+    @return a reference to the content of the struct
+
+    @raise Message.Invalid_message if the message is ill-formatted *)
+val of_pointer : pointer_t -> t
+
+(** [of_payload p] parses the struct pointed to by [p]'s contents pointer.
+    This is useful when dealing with RPC messages.
+
+    @return a reference to the content of the struct
+
+    @raise Message.Invalid_message if the message is ill-formatted *)
+val of_payload : t RPC.Payload.t -> t
+
 (** [to_reader b] converts a read/write reference to the struct into
     a read-only interface.  (Found only in the Builder module.) *)
 val to_reader : Builder.Bar.t -> Reader.Bar.t
@@ -357,10 +380,106 @@ val to_reader : Builder.Bar.t -> Reader.Bar.t
     @return a reference to the content of the root struct *)
 val init_root : ?message_size:int -> unit -> Bar.t
 
+(** [init_pointer p]
+    initializes an instance of this struct type inside [p]'s message
+    and updates [p] to point to the new struct. This is useful when
+    dealing with AnyPointer fields.
+
+    @return a reference to the content of the struct *)
+val init_pointer : pointer_t -> t
+
 (** [to_message s] retrieves the underlying message which is used as
     the backing store for struct [s]. *)
 val to_message : t -> rw message_t
 --------------------------------------------------------------------------------
+
+Interfaces
+~~~~~~~~~~
+
+A struct field `foo` which is of interface type will result in generation of
+the following accessors:
+[source,ocaml]
+--------------------------------------------------------------------------------
+(* Assuming that field foo contains interfaces of type Foo... *)
+
+(** [foo_get t] is the index in the payload's CapDescriptor table of the
+    Foo capability. *)
+val foo_get : t -> Foo.t RPC.Payload.index option
+
+(** [foo_get_pipelined t] is a capability that can be used to invoke methods
+    on the object in the [foo] field of [t], which might not have arrived yet. *)
+val foo_get_pipelined : t RPC.StructRef.t -> Foo.t RPC.Capability.t
+
+(** [foo_set t i] sets the field to refer to index [i] in the payload's
+    CapDescriptor table, which contains a Foo capability. *)
+val foo_set : t -> Foo.t RPC.Payload.index option -> unit
+--------------------------------------------------------------------------------
+
+Each interface `Foo` generates a module `Foo`. There will be submodules for any
+implicit structs needed for the method arguments and results:
+
+[source,ocaml]
+--------------------------------------------------------------------------------
+module Reader : sig
+  module Foo : sig
+    type t
+    module MyMethod_params : sig
+      type t
+      val arg1_get : t -> string
+      val of_payload : t RPC.Payload.t -> t
+      [...]
+    end
+    module MyMethod_results : sig
+      type t
+      val result_get : t -> string
+      val of_payload : t RPC.Payload.t -> t
+      [...]
+    end
+    class client : t RPC.Capability.t -> object
+      method myMethod : (MyMethod_params.builder_t, MyMethod_results.t) RPC.Capability.method_t
+    end
+  end
+end
+--------------------------------------------------------------------------------
+
+[source,ocaml]
+--------------------------------------------------------------------------------
+module Builder : sig
+  module Foo : sig
+    module MyMethod_params : sig
+      type t
+      val arg1_set : t -> string -> unit
+      [...]
+    end
+    module MyMethod_results : sig
+      type t
+      val result_set : t -> string -> unit
+      [...]
+    end
+    class type service = object
+      method myMethod : (MyMethod_params.reader_t, MyMethod_results.t) RPC.Service.method_t
+    end
+    val local : #service -> t RPC.Capability.t
+  end
+end
+--------------------------------------------------------------------------------
+
+The generated `client` proxy class for each interface maps each method to the
+method ID. Consult your RPC library's documentation for information about how
+to call the method. For example, an RPC implementation can define `method_t`
+to be a function that takes a request and returns a response, allowing you to
+call the method directly (e.g. `client#read request`), or it might define a method
+to be an abstract type, used as e.g. `RPC.call client#read request`.
+
+The generated `service` class should be implemented by your code to provide a service.
+Use the `local` function to export your service as a capability.
+
+Note that clients will want to use the Builder struct for the parameters and the
+Reader for results, while service implementions will use Reader for parameters
+and Builder for results.
+
+Inheritance is not currently supported.
+
 
 Generating Code
 ---------------

@@ -139,11 +139,24 @@ let generate_one_field_accessors ~context ~scope ~mode field
               field_name
               (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp); ];
         ]
-      | Interface _ -> [
-          Getter [
-            "val " ^ field_name ^ "_get : t -> Uint32.t option"; ];
+      | Interface _ ->
+        let cap_type =
+          GenCommon.type_name ~context ~mode:Mode.Reader ~scope_mode:mode scope tp
+        in [
+          Getter ([
+            sprintf "val %s_get : t -> %s RPC.Payload.index option"
+              field_name cap_type
+          ] @ (
+                if mode = Mode.Reader then (
+                  [
+                    sprintf "val %s_get_pipelined : t RPC.StructRef.t -> %s RPC.Capability.t"
+                      field_name cap_type
+                  ]
+                ) else []
+          ));
           Setter [
-            "val " ^ field_name ^ "_set : t -> Uint32.t option -> unit"; ];
+            sprintf "val %s_set : t -> %s RPC.Payload.index option -> unit"
+              field_name cap_type; ];
         ]
       | AnyPointer -> [
           Getter [
@@ -218,10 +231,17 @@ let generate_one_field_accessors ~context ~scope ~mode field
       | Struct _ -> [
           Getter [
             "val has_" ^ field_name ^ " : t -> bool"; ];
-          Getter [
+          Getter ([
             sprintf "val %s_get : t -> %s"
               field_name
-              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp); ];
+              (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp);
+          ] @ (
+            if mode = Mode.Reader then [
+              sprintf "val %s_get_pipelined : t RPC.StructRef.t -> %s RPC.StructRef.t"
+                field_name
+                (GenCommon.type_name ~context ~mode ~scope_mode:mode scope tp);
+            ] else []
+          ));
           Setter [
             sprintf "val %s_set_reader : t -> %s -> %s"
               field_name
@@ -273,8 +293,11 @@ let generate_accessors ~context ~scope ~mode
  * stack of scope IDs corresponding to this lexical context, and is used to figure
  * out what module prefixes are required to properly qualify a type.
  *
+ * For structs without parents (e.g. auto-generated method parameters), [uqname] must be
+ * supplied.
+ *
  * Raises: Failure if the children of this node contain a cycle. *)
-let generate_struct_node ~context ~scope ~nested_modules
+let generate_struct_node ?uq_name ~context ~scope ~nested_modules
     ~mode ~node struct_def : string list =
   let unsorted_fields =
     C.Array.to_list (PS.Node.Struct.fields_get struct_def)
@@ -305,10 +328,10 @@ let generate_struct_node ~context ~scope ~nested_modules
     in
     generate_accessors ~context ~scope ~mode ~f:selector non_union_fields
   in
-  let unique_reader = GenCommon.make_unique_typename ~mode:Mode.Reader
+  let unique_reader = GenCommon.make_unique_typename ?uq_name ~mode:Mode.Reader
       ~context node
   in
-  let unique_builder = GenCommon.make_unique_typename ~mode:Mode.Builder
+  let unique_builder = GenCommon.make_unique_typename ?uq_name ~mode:Mode.Builder
       ~context node
   in
   let header =
@@ -328,6 +351,7 @@ let generate_struct_node ~context ~scope ~nested_modules
         "val of_message : 'cap message_t -> t";
         "val of_builder : builder_t -> t";
         "val of_pointer : pointer_t -> t";
+        "val of_payload : t RPC.Payload.t -> t";
       ]
     | Mode.Builder -> [
         "val of_message : rw message_t -> t";
@@ -343,6 +367,58 @@ let generate_struct_node ~context ~scope ~nested_modules
     non_union_accessors @
     footer
 
+let generate_methods ~context ~scope ~nested_modules ~mode interface_def : string list =
+  let module Method = GenCommon.Method in
+  let methods = Method.methods_of_interface ~context interface_def in
+  (* todo: superclasses *)
+  let make_auto m phase =
+    match Method.auto_struct phase m with
+    | `Existing _ -> []
+    | `Auto (struct_node, struct_def, mod_name) ->
+      let uq_name = Method.capnp_name m in
+      let body = generate_struct_node
+          ~uq_name ~context ~scope ~nested_modules:[] ~mode ~node:struct_node struct_def
+      in
+      [ "module " ^ mod_name ^ " : sig" ] @
+      (apply_indent ~indent:"  " body) @
+      [ "end" ]
+  in
+  let structs =
+    List.map methods ~f:(fun m ->
+        make_auto m Method.Params @
+        make_auto m Method.Results
+      )
+    |> List.concat
+  in
+  match mode with
+  | Mode.Reader ->
+    let client =
+      List.map methods ~f:(fun m ->
+          let params = Method.(payload_type Params) ~context ~scope ~mode m in
+          let results = Method.(payload_type Results) ~context ~scope ~mode m in
+          sprintf "val %s_method : (t, %s, %s) RPC.Capability.method_t" (Method.ocaml_name m) params results
+        )
+    in
+    nested_modules @ structs @ client
+  | Mode.Builder ->
+    let server =
+      let body =
+        List.map methods ~f:(fun m ->
+            sprintf "method virtual %s_impl : (%s, %s) RPC.Service.method_t"
+              (Method.ocaml_name m)
+              (Method.(payload_type Params) ~context ~scope ~mode m)
+              (Method.(payload_type Results) ~context ~scope ~mode m)
+          )
+      in
+      [ "class virtual service : object";
+        "  inherit RPC.Untyped.generic_service";
+      ] @
+      (apply_indent ~indent:"  " body) @
+      [ "end";
+        "val local : #service -> t RPC.Capability.t";
+      ]
+    in
+    nested_modules @ structs @ server
 
 (* Generate the OCaml type signature corresponding to a node.  [scope] is
  * a stack of scope IDs corresponding to this lexical context, and is used to figure out
@@ -396,8 +472,14 @@ let rec generate_node
         [ "module " ^ node_name ^ " : sig" ] @
           (apply_indent ~indent:"  " body) @
           [ "end" ]
-  | Interface _ ->
-      let body = generate_nested_modules () in
+  | Interface iface_def ->
+      let nested_modules = generate_nested_modules () in
+      let unique_reader = GenCommon.make_unique_typename ~context ~mode:Mode.Reader node in
+      let body = [
+        "type t = " ^ unique_reader;
+        "val interface_id : Uint64.t";
+      ] @ generate_methods ~context ~scope ~nested_modules ~mode iface_def
+      in
       if suppress_module_wrapper then
         body
       else
