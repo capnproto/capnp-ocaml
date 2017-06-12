@@ -1667,5 +1667,3 @@ let encoding_suite =
     "test any pointers" >:: test_any_pointers;
   ]
 
-let () = run_test_tt_main encoding_suite
-

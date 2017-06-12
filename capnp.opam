@@ -6,23 +6,20 @@ bug-reports: "https://github.com/pelzlpj/capnp-ocaml/issues"
 dev-repo: "https://github.com/pelzlpj/capnp-ocaml.git"
 author: "Paul Pelzl <pelzlpj@gmail.com>"
 maintainer: "Paul Pelzl <pelzlpj@gmail.com>"
-build: [["env" "PREFIX=%{prefix}%" "omake"]]
-build-test: [
-  ["env" "PREFIX=%{prefix}%" "omake" "src/tests/run-tests"]
-  [ocaml "./src/tests/run-tests.run"]
-]
-install: [["env" "PREFIX=%{prefix}%" "omake" "install"]]
-remove: [["env" "PREFIX=%{prefix}%" "omake" "uninstall"]]
+
+build: ["jbuilder" "build" "-p" name "-j" jobs]
+build-test: ["jbuilder" "build" "@runtest" "@src/benchmark/benchmarks"]
+
 depends: [
-  "omake"
-  "ocamlfind" {>= "1.5.1"}
+  "jbuilder" {build}
   "core_kernel" {>= "112.24.00"}
   "extunix"
   "ocplib-endian" {>= "0.7"}
   "res"
   "uint"
+  "core" {test}
 ]
 depexts: [
-  [["debian"] ["capnproto"]]
+  [["debian"] ["capnproto" "libcapnp-dev"]]
 ]
 available: [ ocaml-version >= "4.02.0" ]

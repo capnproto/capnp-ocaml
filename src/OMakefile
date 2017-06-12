@@ -1,7 +1,0 @@
-.SUBDIRS: runtime compiler tests benchmark
-
-.PHONY: src-distclean
-
-src-distclean:
-	rm -f *.omc
-

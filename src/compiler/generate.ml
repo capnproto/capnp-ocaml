@@ -97,7 +97,7 @@ let mod_functor_header = [
 let mod_header ~context = [
   "  let invalid_msg = Capnp.Message.invalid_msg";
   "";
-  "  include CapnpRuntime.BuilderInc.Make[@inlined](MessageWrapper)";
+  "  include Capnp.Runtime.BuilderInc.Make[@inlined](MessageWrapper)";
   "";
   "  type 'cap message_t = 'cap MessageWrapper.Message.t";
   ""; ] @ (List.concat_map context.Context.imports ~f:(fun import -> [
