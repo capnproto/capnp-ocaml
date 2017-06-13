@@ -148,6 +148,22 @@ let string_of_lines lines =
   (String.concat ~sep:"\n" lines) ^ "\n"
 
 
+let calculate_positions ~nodes ~requested_file_node =
+  let positions = Hashtbl.Poly.create ~size:(Hashtbl.Poly.length nodes) () in
+  let pos = ref 0 in
+  let rec scan node =
+    let id = PS.Node.id_get node in
+    Hashtbl.Poly.add_exn positions ~key:id ~data:!pos;
+    pos := succ !pos;
+    let children =
+      GenCommon.child_ids_of node
+      |> List.map ~f:(Hashtbl.Poly.find_exn nodes)
+    in
+    List.iter children ~f:scan
+  in
+  scan requested_file_node;
+  positions
+
 let compile
     (request : PS.CodeGeneratorRequest.t)
   : unit =
@@ -174,8 +190,9 @@ let compile
           })
     in
     let context_unfiltered = {
-      Context.nodes   = nodes_table;
-      Context.imports = imports;
+      Context.nodes     = nodes_table;
+      Context.imports   = imports;
+      Context.positions = calculate_positions ~nodes:nodes_table ~requested_file_node;
     } in
     let context = GenCommon.filter_interesting_imports
         ~context:context_unfiltered requested_file_node

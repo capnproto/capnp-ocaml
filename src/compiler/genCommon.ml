@@ -36,6 +36,7 @@ module PS  = PS_.Reader
 module C   = Capnp
 
 let sprintf = Printf.sprintf
+let failf msg = Format.ksprintf failwith msg
 let uint64_equal = C.Runtime.Util.uint64_equal
 
 
@@ -55,9 +56,20 @@ module Context = struct
     (* Table of all nodes found in the code generation request *)
     nodes : (Uint64.t, PS.Node.t) Hashtbl.t;
 
+    (* Position in output order. *)
+    positions : (Uint64.t, int) Hashtbl.t;
+
     (* List of imports associated with the module to be generated *)
     imports : import_t list;
   }
+
+  let node t id =
+    match Hashtbl.find t.nodes id with
+    | None -> failf "Node with ID %s not found" (Uint64.to_string id)
+    | Some x -> x
+
+  let position t id =
+    Hashtbl.find t.positions id
 end
 
 
@@ -130,18 +142,31 @@ let underscore_name (camelcase_name : string) : string =
   String.concat ~sep:"" (List.rev rev_chars)
 
 
+let child_ids_of
+    (parent : PS.Node.t)
+  : Uint64.t list =
+  let nested_nodes =
+    PS.Node.nested_nodes_get_list parent
+    |> List.map ~f:PS.Node.NestedNode.id_get
+  in
+  match PS.Node.get parent with
+  | PS.Node.Struct s ->
+    let fields = PS.Node.Struct.fields_get_list s in
+    let groups = List.filter_map fields ~f:(fun field ->
+        match PS.Field.get field with
+        | PS.Field.Group g -> Some (PS.Field.Group.type_id_get g)
+        | _ -> None
+      )
+    in
+    groups @ nested_nodes
+  | _ -> nested_nodes
+
 let children_of
     ~(context : Context.codegen_context_t)
     (parent : PS.Node.t)
 : PS.Node.t list =
-  let open PS.Node in
-  let parent_id = id_get parent in
-  Hashtbl.fold context.Context.nodes ~init:[] ~f:(fun ~key:_id ~data:node acc ->
-    if uint64_equal parent_id (scope_id_get node) then
-      node :: acc
-    else
-      acc)
-
+  let node_ids = child_ids_of parent in
+  List.map node_ids ~f:(Context.node context)
 
 (* The name of a node is not encoded in that node, it is encoded in the parent.
  * So we have to implement a little search logic to get a programmatic name for
@@ -218,7 +243,7 @@ let get_fully_qualified_name_components ~context node
     if uint64_equal scope_id Uint64.zero then
       acc
     else
-      let parent = Hashtbl.find_exn context.Context.nodes scope_id in
+      let parent = Context.node context scope_id in
       let node_name = get_unqualified_name ~parent ~child:curr_node in
       let node_id = id_get curr_node in
       loop ((node_name, node_id) :: acc) parent
@@ -255,8 +280,7 @@ let get_scope_relative_name ~context (scope_stack : Uint64.t list) node
 
 let make_unique_enum_module_name ~context enum_node =
   let uq_name = get_unqualified_name
-      ~parent:(Hashtbl.find_exn context.Context.nodes
-          (PS.Node.scope_id_get enum_node))
+      ~parent:(Context.node context (PS.Node.scope_id_get enum_node))
       ~child:enum_node
   in
   let node_id = PS.Node.id_get enum_node in
@@ -270,6 +294,15 @@ let make_unique_typename ~context ~(mode : Mode.t) node =
          allows us to use the same enum constructor names without name collisions. *)
       let unique_module_name = make_unique_enum_module_name ~context node in
       unique_module_name ^ ".t"
+  | PS.Node.Interface _ ->
+      (* Interfaces don't have separate builder types. *)
+      let uq_name =
+        get_unqualified_name
+          ~parent:(Context.node context (PS.Node.scope_id_get node))
+          ~child:node
+      in
+      let node_id = PS.Node.id_get node in
+      sprintf "interface_t_%s_%s" uq_name (Uint64.to_string node_id)
   | _ ->
       let t_str =
         match mode with
@@ -277,9 +310,8 @@ let make_unique_typename ~context ~(mode : Mode.t) node =
         | Mode.Builder -> "builder_t"
       in
       let uq_name = get_unqualified_name
-          ~parent:(Hashtbl.find_exn context.Context.nodes
-              (PS.Node.scope_id_get node))
-          ~child:node
+                    ~parent:(Context.node context (PS.Node.scope_id_get node))
+                    ~child:node
       in
       let node_id = PS.Node.id_get node in
       sprintf "%s_%s_%s" t_str uq_name (Uint64.to_string node_id)
@@ -328,7 +360,7 @@ let find_import_providing_node ~context node : Context.import_t option =
       | Some import ->
           Some import
       | None ->
-          let parent = Hashtbl.find_exn context.Context.nodes scope_id in
+          let parent = Context.node context scope_id in
           loop_node_scope parent
   in
   loop_node_scope node
@@ -345,7 +377,7 @@ let rec union_imports_for_struct_fields ~visited_node_ids ~import_ids ~context
     | PS.Field.Group group ->
         let contained_type_id = PS.Field.Group.type_id_get group in
         let contained_type_node =
-          Hashtbl.find_exn context.Context.nodes contained_type_id
+          Context.node context contained_type_id
         in
         begin match find_import_providing_node ~context contained_type_node with
         | Some import -> Hashtbl.set import_ids ~key:import.Context.id ~data:()
@@ -385,7 +417,7 @@ and union_imports_for_type ~visited_node_ids ~import_ids ~context (tp : PS.Type.
       let struct_id = Struct.type_id_get struct_descr in
       begin match Hashtbl.add visited_node_ids ~key:struct_id ~data:() with
       | `Ok ->
-          let struct_node = Hashtbl.find_exn context.Context.nodes struct_id in
+          let struct_node = Context.node context struct_id in
           let () = begin match PS.Node.get struct_node with
           | PS.Node.Struct struct_descr ->
               union_imports_for_struct_fields ~visited_node_ids ~import_ids
@@ -403,7 +435,7 @@ and union_imports_for_type ~visited_node_ids ~import_ids ~context (tp : PS.Type.
   | Interface iface_descr ->
       (* FIXME: flesh this out when interfaces are properly supported *)
       let iface_id = Interface.type_id_get iface_descr in
-      let iface_node = Hashtbl.find_exn context.Context.nodes iface_id in
+      let iface_node = Context.node context iface_id in
       begin match find_import_providing_node ~context iface_node with
       | Some import -> Hashtbl.set import_ids ~key:import.Context.id ~data:()
       | None -> ()
@@ -516,7 +548,23 @@ let filter_interesting_imports ~context root_node : Context.codegen_context_t =
 let make_disambiguated_type_name ~context ~(mode : Mode.t) ~(scope_mode : Mode.t)
     ~scope ~tp node =
   let node_id = PS.Node.id_get node in
-  if List.mem ~equal:uint64_equal scope node_id then
+  let scope_position =
+    match scope with
+    | [] -> 0
+    | x :: _ ->
+      match Context.position context x with
+      | None -> assert false
+      | Some x -> x
+  in
+  let target_position =
+    match Context.position context node_id with
+    | Some y -> y
+    | None -> -1   (* Import *)
+  in
+  if target_position > scope_position then
+    (* The target is defined later in the file. Emit an unambiguous type. *)
+    make_unique_typename ~context ~mode node
+  else if List.mem ~equal:uint64_equal scope node_id then
     (* The node of interest is a parent node of the node being generated.
        this is a case where an unambiguous type is emitted. *)
     make_unique_typename ~context ~mode node
@@ -534,12 +582,12 @@ let make_disambiguated_type_name ~context ~(mode : Mode.t) ~(scope_mode : Mode.t
     | None ->
         let module_name = get_scope_relative_name ~context scope node in
         let t_str =
-          match PS.Type.get tp with
-          | PS.Type.Enum _ ->
-              (* Enum types are identical across reader and builder, no need
+          match tp with
+          | `Enum | `Interface ->
+              (* Enum and interface types are identical across reader and builder, no need
                  to distinguish between them *)
               ".t"
-          | _ ->
+          | `Struct ->
               begin match (mode, scope_mode) with
               | (Mode.Reader, Mode.Reader)
               | (Mode.Builder, Mode.Builder) ->
@@ -580,14 +628,14 @@ let rec uses_imported_abstract_type ~context (tp : PS.Type.t) : bool =
       uses_imported_abstract_type ~context contained_type
   | Struct struct_descr ->
       let struct_id = Struct.type_id_get struct_descr in
-      let struct_node = Hashtbl.find_exn context.Context.nodes struct_id in
+      let struct_node = Context.node context struct_id in
       begin match find_import_providing_node ~context struct_node with
       | Some _ -> true
       | None -> false
       end
   | Interface iface_descr ->
       let iface_id = Interface.type_id_get iface_descr in
-      let iface_node = Hashtbl.find_exn context.Context.nodes iface_id in
+      let iface_node = Context.node context iface_id in
       begin match find_import_providing_node ~context iface_node with
       | Some _ -> true
       | None -> false
@@ -634,19 +682,19 @@ let rec type_name ~context ~(mode : Mode.t) ~(scope_mode : Mode.t)
         end
   | Enum enum_descr ->
       let enum_id = Enum.type_id_get enum_descr in
-      let enum_node = Hashtbl.find_exn context.Context.nodes enum_id in
+      let enum_node = Context.node context enum_id in
       make_disambiguated_type_name ~context ~mode ~scope_mode
-        ~scope ~tp enum_node
+        ~scope ~tp:`Enum enum_node
   | Struct struct_descr ->
       let struct_id = Struct.type_id_get struct_descr in
-      let struct_node = Hashtbl.find_exn context.Context.nodes struct_id in
+      let struct_node = Context.node context struct_id in
       make_disambiguated_type_name ~context ~mode ~scope_mode
-        ~scope ~tp struct_node
+        ~scope ~tp:`Struct struct_node
   | Interface iface_descr ->
       let iface_id = Interface.type_id_get iface_descr in
-      let iface_node = Hashtbl.find_exn context.Context.nodes iface_id in
+      let iface_node = Context.node context iface_id in
       make_disambiguated_type_name ~context ~mode ~scope_mode
-        ~scope ~tp iface_node
+        ~scope ~tp:`Interface iface_node
   | AnyPointer ->
       begin match (mode, scope_mode) with
       | (Mode.Reader, Mode.Reader)
@@ -679,7 +727,7 @@ let generate_union_type ~context ~(mode : Mode.t) scope fields =
     | Group group ->
         let group_type_name =
           let group_id = Group.type_id_get group in
-          let group_node = Hashtbl.find_exn context.Context.nodes group_id in
+          let group_node = Context.node context group_id in
           let group_module_name =
             get_scope_relative_name ~context scope group_node
           in
@@ -786,8 +834,7 @@ let rec collect_unique_types ?acc ~context node =
   | PS.Node.Annotation _
   | PS.Node.Enum _ ->
       names
-  | PS.Node.Struct _
-  | PS.Node.Interface _ ->
+  | PS.Node.Struct _ ->
       let reader_name = make_unique_typename ~context
           ~mode:Mode.Reader node
       in
@@ -797,6 +844,10 @@ let rec collect_unique_types ?acc ~context node =
       in
       let builder_type = "rw MessageWrapper.StructStorage.t" in
       (builder_name, builder_type) :: (reader_name, reader_type) :: names
+  | PS.Node.Interface _ ->
+      let interface_name = make_unique_typename ~context ~mode:Mode.Reader node in
+      let interface_type = "int option" in
+      (interface_name, interface_type) :: names
   | PS.Node.Undefined x ->
       failwith (sprintf "Unknown Node union discriminant %u" x)
 

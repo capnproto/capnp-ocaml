@@ -26,6 +26,11 @@
   (deps (testLists.capnp ../compiler/main.exe))
   (action  (run capnpc -o ../compiler/main.exe ${<}))))
 
+(rule
+ ((targets (testCycles.ml testCycles.mli))
+  (deps (testCycles.capnp ../compiler/main.exe))
+  (action  (run capnpc -o ../compiler/main.exe ${<}))))
+
 (alias
  ((name    runtest)
   (deps    (run_tests.bc))
