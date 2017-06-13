@@ -392,16 +392,11 @@ let generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
   match mode with
   | Mode.Reader ->
     let client =
-      let methods =
-        List.map methods ~f:(fun m ->
-            let params = Method.(payload_type Params) ~context ~scope ~mode m in
-            let results = Method.(payload_type Results) ~context ~scope ~mode m in
-            sprintf "method %s : (%s, %s) RPC.Capability.method_t" (Method.ocaml_name m) params results
-          )
-      in
-      [ "class client : t RPC.Capability.t -> object" ] @
-      (apply_indent ~indent:"  " methods) @
-      [ "end" ]
+      List.map methods ~f:(fun m ->
+          let params = Method.(payload_type Params) ~context ~scope ~mode m in
+          let results = Method.(payload_type Results) ~context ~scope ~mode m in
+          sprintf "val %s_method : (t, %s, %s) RPC.Capability.method_t" (Method.ocaml_name m) params results
+        )
     in
     nested_modules @ structs @ client
   | Mode.Builder ->

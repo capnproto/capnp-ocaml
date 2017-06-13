@@ -1612,7 +1612,7 @@ and generate_methods ~context ~scope ~nested_modules ~mode ~node_name interface_
       let body =
         List.map methods ~f:(fun m ->
             [
-              sprintf "method %s : (%s, %s) RPC.Capability.method_t = RPC.Untyped.bind_method x ~interface_id ~method_id:%d"
+              sprintf "let %s_method : (t, %s, %s) RPC.Capability.method_t = RPC.Untyped.define_method ~interface_id ~method_id:%d"
                 (Method.ocaml_name m)
                 (Method.(payload_type Params) ~context ~scope ~mode m)
                 (Method.(payload_type Results) ~context ~scope ~mode m)
@@ -1626,9 +1626,8 @@ and generate_methods ~context ~scope ~nested_modules ~mode ~node_name interface_
             sprintf "| %d -> Some %S" (Method.id m) (Method.capnp_name m)
           )
       in
-      [ "class client x = object" ] @
-      (apply_indent ~indent:"  " body) @
-      [ "end";
+      body @
+      [
         "let method_name = function";
       ] @ apply_indent ~indent:"  " method_printers @ [
         "  | _ -> None";

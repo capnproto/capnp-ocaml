@@ -29,9 +29,9 @@ module type S = sig
     type 'a t
 
     (** A method on some instance, as seen by the client application code.
-        This is typically an [('a t, interface_id, method_id)] tuple.
+        This is typically an [(interface_id, method_id)] tuple.
         Used in the generated client classes. *)
-    type ('a, 'b) method_t
+    type ('obj, 'request, 'response) method_t
   end
 
   module Untyped : sig
@@ -59,11 +59,8 @@ module type S = sig
         same type for the dispatch function. *)
     val abstract_method : ('a, 'b) Service.method_t -> abstract_method_t
 
-    (** [bind_method t ~interface_id ~method_id] represents a reference to
-        the [(interface_id, method_id)] method of [t]. Used to implement the
-        methods in the generated client classes. *)
-    val bind_method : _ Capability.t -> interface_id:Uint64.t -> method_id:int ->
-      ('a, 'b) Capability.method_t
+    (** [define_method ~interface_id ~method_id] creates a typed [method_t]. *)
+    val define_method : interface_id:Uint64.t -> method_id:int -> ('obj, 'a, 'b) Capability.method_t
 
     (** [struct_field t i] is a reference to the struct found at pointer index [i]
         within the struct [t]. Used to implement the "_pipelined" accessors. *)
@@ -103,7 +100,7 @@ module None (M : MessageSig.S) = struct
 
   module Capability = struct
     type 'a t = untyped_cap
-    type ('a, 'b) method_t = Uint64.t * int
+    type ('obj, 'a, 'b) method_t = Uint64.t * int
   end
 
   module Payload = struct
@@ -115,7 +112,7 @@ module None (M : MessageSig.S) = struct
     type pointer_r = Message.ro M.Slice.t option
     type abstract_method_t = untyped_payload -> untyped_struct
 
-    let bind_method `No_RPC_cap ~interface_id ~method_id = (interface_id, method_id)
+    let define_method ~interface_id ~method_id = (interface_id, method_id)
     let content_of_payload `No_RPC_payload = None
 
     let abstract_method x = x
