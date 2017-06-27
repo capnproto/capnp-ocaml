@@ -403,13 +403,15 @@ let generate_methods ~context ~scope ~nested_modules ~mode interface_def : strin
     let server =
       let body =
         List.map methods ~f:(fun m ->
-            sprintf "method %s : (%s, %s) RPC.Service.method_t"
+            sprintf "method virtual %s_impl : (%s, %s) RPC.Service.method_t"
               (Method.ocaml_name m)
               (Method.(payload_type Params) ~context ~scope ~mode m)
               (Method.(payload_type Results) ~context ~scope ~mode m)
           )
       in
-      [ "class type service = object" ] @
+      [ "class virtual service : object";
+        "  inherit RPC.Untyped.generic_service";
+      ] @
       (apply_indent ~indent:"  " body) @
       [ "end";
         "val local : #service -> t RPC.Capability.t";

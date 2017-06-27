@@ -1640,7 +1640,7 @@ and generate_methods ~context ~scope ~nested_modules ~mode ~node_name interface_
     let service =
       let body =
         List.map methods ~f:(fun m ->
-            sprintf "method %s : (%s, %s) RPC.Service.method_t"
+            sprintf "method virtual %s_impl : (%s, %s) RPC.Service.method_t"
               (Method.ocaml_name m)
               (Method.(payload_type Params) ~context ~scope ~mode m)
               (Method.(payload_type Results) ~context ~scope ~mode m)
@@ -1648,21 +1648,24 @@ and generate_methods ~context ~scope ~nested_modules ~mode ~node_name interface_
       in
       let dispatch_body =
         List.map methods ~f:(fun m ->
-            sprintf "| %d -> RPC.Untyped.abstract_method service#%s"
+            sprintf "| %d -> RPC.Untyped.abstract_method self#%s_impl"
               (Method.id m)
               (Method.ocaml_name m)
           )
       in
-      [ "class type service = object" ] @
-      (apply_indent ~indent:"  " body) @
-      [ "end";
-        "let local (service:#service) =";
-        "  RPC.Untyped.local (fun ~interface_id:i ~method_id ->";
+      [ "class virtual service = object (self)";
+        "  method release = ()";
+        "  method dispatch ~interface_id:i ~method_id =";
         "    if i <> interface_id then RPC.Untyped.unknown_interface ~interface_id";
         "    else match method_id with";
       ] @ apply_indent ~indent:"    " dispatch_body @
       [ "    | x -> RPC.Untyped.unknown_method ~interface_id ~method_id";
-        "  )";
+        sprintf "  method pp f = Format.pp_print_string f %S" node_name;
+      ] @
+      (apply_indent ~indent:"  " body) @
+      [ "end";
+        "let local (service:#service) =";
+        "  RPC.Untyped.local service";
       ]
     in
     nested_modules @ structs @ service

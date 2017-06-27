@@ -70,11 +70,23 @@ module type S = sig
         within the struct [t]. Used to implement the "_pipelined" accessors. *)
     val capability_field : 'a StructRef.t -> int -> 'b Capability.t
 
-    (** [local dispatch] is a capability reference to a local service implemented by [dispatch].
+    class type generic_service = object
+      method dispatch : interface_id:Uint64.t -> method_id:int -> abstract_method_t
+      (** Look up a method by ID. The schema compiler generates an implementation of this
+          that dispatches to the typed methods of the interface. *)
+
+      method release : unit
+      (** Called when the service's ref-count drops to zero.
+          Implementations that hold other capabilities should override this to release them in turn. *)
+
+      method pp : Format.formatter -> unit
+      (** Used to identify the service in log messages.
+          The schema compiler generates a default that displays the service's name. *)
+    end
+
+    (** [local service] is a capability reference to a local service implemented by [service#dispatch].
         Used in the generated dispatch functions. *)
-    val local :
-      (interface_id:Uint64.t -> method_id:int -> abstract_method_t) ->
-      'a Capability.t
+    val local : #generic_service -> 'a Capability.t
 
     (** Used in the generated code to record the type of a CapDescriptor index. *)
     val cap_index : Uint32.t option -> 'a Payload.index option
@@ -123,6 +135,12 @@ module None (M : MessageSig.S) = struct
     let cap_index x = x
     let unknown_interface ~interface_id:_ _req = failwith "Unknown interface"
     let unknown_method ~interface_id:_ ~method_id:_ _req = failwith "Unknown method"
+
+    class type generic_service = object
+      method dispatch : interface_id:Uint64.t -> method_id:int -> abstract_method_t
+      method release : unit
+      method pp : Format.formatter -> unit
+    end
   end
 
   module Service = struct
