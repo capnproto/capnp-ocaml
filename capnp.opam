@@ -18,6 +18,7 @@ depends: [
   "res"
   "uint"
   "core" {test}
+  "ounit" {test}
 ]
 depexts: [
   [["debian"] ["capnproto" "libcapnp-dev"]]
