@@ -45,6 +45,8 @@ let sig_s_header ~context = [
   "";
   "module type S = sig";
   "  type 'cap message_t";
+  "  type 'a reader_t";
+  "  type 'a builder_t";
   "  module RPC : Capnp.RPC.S";
   "";
 ] @ (List.concat_map context.Context.imports ~f:(fun import -> [
@@ -105,6 +107,8 @@ let mod_functor_header = [
   "  ) = struct";
   "  module CamlBytes = Bytes";
   "  module RPC = RPC";
+  "  type 'a reader_t = ro MessageWrapper.StructStorage.t option";
+  "  type 'a builder_t = rw MessageWrapper.StructStorage.t";
 ]
 
 let mod_header ~context = [
@@ -213,7 +217,10 @@ let compile
     in
     let sig_unique_types = List.rev_map
         (GenCommon.collect_unique_types ~context requested_file_node)
-        ~f:(fun (name, _tp) -> "  type " ^ name)
+        ~f:(function
+            | name, (`Abstract | `Private _) -> "  type " ^ name
+            | name, `Public tp -> "  type " ^ name ^ " = " ^ tp
+          )
     in
     let sig_unique_enums =
       GenCommon.apply_indent ~indent:"  "
@@ -221,7 +228,10 @@ let compile
     in
     let mod_unique_types = (List.rev_map
         (GenCommon.collect_unique_types ~context requested_file_node)
-        ~f:(fun (name, tp) -> "  type " ^ name ^ " = " ^ tp)) @ [""]
+        ~f:(function
+            | name, `Abstract -> "  type " ^ name
+            | name, (`Private tp | `Public tp) -> "  type " ^ name ^ " = " ^ tp
+          )) @ [""]
     in
     let mod_unique_enums =
       GenCommon.apply_indent ~indent:"  "

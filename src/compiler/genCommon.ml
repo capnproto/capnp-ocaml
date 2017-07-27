@@ -830,13 +830,18 @@ let generate_enum_sig ?unique_module_name enum_def =
 
 
 let method_param_types ~method_name:uq_name ~context node =
+  let struct_name =
+    let node_id = PS.Node.id_get node in
+    sprintf "struct_%s_%s" uq_name (Uint64.to_string node_id)
+  in
   let reader_name = make_unique_typename ~uq_name ~context ~mode:Mode.Reader node in
   let builder_name = make_unique_typename ~uq_name ~context ~mode:Mode.Builder node in
-  let reader_type = "ro MessageWrapper.StructStorage.t option" in
-  let builder_type = "rw MessageWrapper.StructStorage.t" in
+  let reader_type = struct_name ^ " reader_t" in
+  let builder_type = struct_name ^ " builder_t" in
   [
-    (builder_name, builder_type);
-    (reader_name, reader_type);
+    (builder_name, `Public builder_type);
+    (reader_name, `Public reader_type);
+    (struct_name, `Abstract);
   ]
 
 
@@ -879,18 +884,27 @@ let rec collect_unique_types ?acc ~context node =
   | PS.Node.Enum _ ->
       names
   | PS.Node.Struct _ ->
+      let struct_name =
+        let uq_name = get_unqualified_name
+          ~parent:(Context.node context (PS.Node.scope_id_get node))
+          ~child:node
+        in
+        let node_id = PS.Node.id_get node in
+        sprintf "struct_%s_%s" uq_name (Uint64.to_string node_id)
+      in
       let reader_name = make_unique_typename ~context
           ~mode:Mode.Reader node
       in
-      let reader_type = "ro MessageWrapper.StructStorage.t option" in
       let builder_name = make_unique_typename ~context
           ~mode:Mode.Builder node
       in
-      let builder_type = "rw MessageWrapper.StructStorage.t" in
-      (builder_name, builder_type) :: (reader_name, reader_type) :: names
+      let struct_type = `Abstract in
+      let reader_type = `Public (struct_name ^ " reader_t") in
+      let builder_type = `Public (struct_name ^ " builder_t") in
+      (builder_name, builder_type) :: (reader_name, reader_type) :: (struct_name, struct_type) :: names
   | PS.Node.Interface interface_def ->
       let interface_name = make_unique_typename ~context ~mode:Mode.Reader node in
-      let interface_type = "unit RPC.Payload.index option" in
+      let interface_type = `Private "unit RPC.Payload.index option" in
       (interface_name, interface_type) :: method_types ~context interface_def @ names
   | PS.Node.Undefined x ->
       failwith (sprintf "Unknown Node union discriminant %u" x)
