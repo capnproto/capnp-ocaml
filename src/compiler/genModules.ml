@@ -240,7 +240,7 @@ let rec generate_list_element_decoder ~context ~scope list_def =
       ]
   | Interface _ ->
       failwith "not implemented"
-  | AnyPointer ->
+  | AnyPointer _ ->
       failwith "not implemented"
   | Undefined x ->
        failwith (sprintf "Unknown Type union discriminant %d" x)
@@ -380,7 +380,7 @@ let rec generate_list_element_codecs ~context ~scope list_def =
       ]
   | Interface _ ->
       failwith "not implemented"
-  | AnyPointer ->
+  | AnyPointer _ ->
       failwith "not implemented"
   | Undefined x ->
        failwith (sprintf "Unknown Type union discriminant %d" x)
@@ -517,7 +517,7 @@ let generate_list_getters ~context ~scope ~list_type ~mode
         "let " ^ field_name ^
           "_get x = failwith \"not implemented (type iface)\"";
         ]
-    | AnyPointer -> [
+    | AnyPointer _ -> [
         "let " ^ field_name ^
           "_get x = failwith \"not implemented (type anyptr)\"";
         ]
@@ -643,7 +643,7 @@ let generate_list_setters ~context ~scope ~list_type
         "let " ^ field_name ^
           "_set x v = failwith \"not implemented (type iface)\"";
         ]
-    | AnyPointer -> [
+    | AnyPointer _ -> [
         "let " ^ field_name ^
           "_set x v = failwith \"not implemented (type anyptr)\"";
         ]
@@ -732,7 +732,7 @@ let rec generate_clear_group_fields_rev ~acc ~context ~group_id =
               | PS.Type.List _
               | PS.Type.Struct _
               | PS.Type.Interface _
-              | PS.Type.AnyPointer -> [
+              | PS.Type.AnyPointer _ -> [
                   "let () =";
                   "  let ptr = {";
                   "    pointers with";
@@ -1200,7 +1200,7 @@ let generate_one_field_accessors ~context ~node_id ~scope
                 obj_magic;
             ] in
             (getters, setters)
-        | (PS.Type.AnyPointer, PS.Value.AnyPointer pointer_slice_opt) ->
+        | (PS.Type.AnyPointer _, PS.Value.AnyPointer pointer_slice_opt) ->
             let reader_default_str, builder_default_str =
               match pointer_slice_opt with
               | Some pointer_bytes ->
@@ -1263,7 +1263,7 @@ let generate_one_field_accessors ~context ~node_id ~scope
         | (PS.Type.Enum _, _)
         | (PS.Type.Struct _, _)
         | (PS.Type.Interface _, _)
-        | (PS.Type.AnyPointer, _) ->
+        | (PS.Type.AnyPointer _, _) ->
             let err_msg = sprintf
                 "The default value for field \"%s\" has an unexpected type."
                 field_name
@@ -1385,7 +1385,7 @@ let generate_list_constant ~context ~scope ~node_id ~list_name list_def =
         ]
     | Interface _ ->
         failwith "not implemented"
-    | AnyPointer ->
+    | AnyPointer _ ->
         failwith "not implemented"
     | Undefined x ->
         failwith (sprintf "Unknown Type union discriminant %d" x)
@@ -1466,7 +1466,7 @@ let generate_constant ~context ~scope ~node ~node_name const_def =
           (Defaults.reader_string_of_ident (Defaults.make_ident node_id name)) ]
   | (Type.Interface _, Value.Interface) ->
       failwith "Interface constants are not yet implemented."
-  | (Type.AnyPointer, Value.AnyPointer _) ->
+  | (Type.AnyPointer _, Value.AnyPointer _) ->
       failwith "AnyPointer constants are not yet implemented."
   | (Type.Undefined x, _) ->
       failwith (sprintf "Unknown Value union discriminant %u." x)
@@ -1489,7 +1489,7 @@ let generate_constant ~context ~scope ~node ~node_name const_def =
   | (Type.Enum _, _)
   | (Type.Struct _, _)
   | (Type.Interface _, _)
-  | (Type.AnyPointer, _) ->
+  | (Type.AnyPointer _, _) ->
       let err_msg = sprintf
           "The value provided for the constant with name \"%s\" has \
            an unexpected type."
@@ -1682,7 +1682,7 @@ let update_defaults_context_struct ~defaults_context ~node ~struct_def =
             | None ->
                 ()
             end
-        | (PS.Type.AnyPointer, PS.Value.AnyPointer pointer_slice_opt) ->
+        | (PS.Type.AnyPointer _, PS.Value.AnyPointer pointer_slice_opt) ->
             begin match pointer_slice_opt with
             | Some pointer_slice ->
                 begin match ReaderApi.decode_pointer pointer_slice with

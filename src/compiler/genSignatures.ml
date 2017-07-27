@@ -145,7 +145,7 @@ let generate_one_field_accessors ~context ~scope ~mode field
           Setter [
             "val " ^ field_name ^ "_set : t -> Uint32.t option -> unit"; ];
         ]
-      | AnyPointer -> [
+      | AnyPointer _ -> [
           Getter [
             sprintf "val %s_get : t -> %s"
               field_name
