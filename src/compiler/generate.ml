@@ -52,7 +52,9 @@ let sig_s_header ~context = [
 ] @ (List.concat_map context.Context.imports ~f:(fun import -> [
       "  module " ^ import.Context.schema_name ^ " : " ^
         import.Context.module_name ^ ".S with";
-      "    type 'cap message_t = 'cap message_t";
+      "    type 'cap message_t = 'cap message_t and";
+      "    type 'a reader = 'a reader and";
+      "    type 'a builder = 'a builder";
       "";
     ]))
 
