@@ -310,8 +310,8 @@ let make_unique_typename ?uq_name ~context ~(mode : Mode.t) node =
   | _ ->
       let t_str =
         match mode with
-        | Mode.Reader  -> "reader_t"
-        | Mode.Builder -> "builder_t"
+        | Mode.Reader  -> "reader"
+        | Mode.Builder -> "builder"
       in
       let uq_name =
         match uq_name with
@@ -321,7 +321,7 @@ let make_unique_typename ?uq_name ~context ~(mode : Mode.t) node =
                     ~child:node
       in
       let node_id = PS.Node.id_get node in
-      sprintf "%s_%s_%s" t_str uq_name (Uint64.to_string node_id)
+      sprintf "struct_%s_%s %s" uq_name (Uint64.to_string node_id) t_str
 
 
 (* Determines whether a simple name for [node], as given by
@@ -829,18 +829,12 @@ let generate_enum_sig ?unique_module_name enum_def =
   header @ variants
 
 
-let method_param_types ~method_name:uq_name ~context node =
+let method_param_types ~method_name:uq_name node =
   let struct_name =
     let node_id = PS.Node.id_get node in
     sprintf "struct_%s_%s" uq_name (Uint64.to_string node_id)
   in
-  let reader_name = make_unique_typename ~uq_name ~context ~mode:Mode.Reader node in
-  let builder_name = make_unique_typename ~uq_name ~context ~mode:Mode.Builder node in
-  let reader_type = struct_name ^ " reader_t" in
-  let builder_type = struct_name ^ " builder_t" in
   [
-    (builder_name, `Public builder_type);
-    (reader_name, `Public reader_type);
     (struct_name, `Abstract);
   ]
 
@@ -854,7 +848,7 @@ let method_types ~context interface_def =
         if PS.Node.scope_id_get struct_node = Uint64.zero then (
           match PS.Node.get struct_node with
           | PS.Node.Struct _ ->
-            method_param_types ~method_name ~context struct_node
+            method_param_types ~method_name struct_node
           | _ ->
             failf "Method payload %s is not a struct!" (PS.Node.display_name_get struct_node)
         ) else []
@@ -892,16 +886,8 @@ let rec collect_unique_types ?acc ~context node =
         let node_id = PS.Node.id_get node in
         sprintf "struct_%s_%s" uq_name (Uint64.to_string node_id)
       in
-      let reader_name = make_unique_typename ~context
-          ~mode:Mode.Reader node
-      in
-      let builder_name = make_unique_typename ~context
-          ~mode:Mode.Builder node
-      in
       let struct_type = `Abstract in
-      let reader_type = `Public (struct_name ^ " reader_t") in
-      let builder_type = `Public (struct_name ^ " builder_t") in
-      (builder_name, builder_type) :: (reader_name, reader_type) :: (struct_name, struct_type) :: names
+      (struct_name, struct_type) :: names
   | PS.Node.Interface interface_def ->
       let interface_name = make_unique_typename ~context ~mode:Mode.Reader node in
       let interface_type = `Private "unit RPC.Payload.index option" in

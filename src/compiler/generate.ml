@@ -45,8 +45,8 @@ let sig_s_header ~context = [
   "";
   "module type S = sig";
   "  type 'cap message_t";
-  "  type 'a reader_t";
-  "  type 'a builder_t";
+  "  type 'a reader";
+  "  type 'a builder";
   "  module RPC : Capnp.RPC.S";
   "";
 ] @ (List.concat_map context.Context.imports ~f:(fun import -> [
@@ -107,8 +107,8 @@ let mod_functor_header = [
   "  ) = struct";
   "  module CamlBytes = Bytes";
   "  module RPC = RPC";
-  "  type 'a reader_t = ro MessageWrapper.StructStorage.t option";
-  "  type 'a builder_t = rw MessageWrapper.StructStorage.t";
+  "  type 'a reader = ro MessageWrapper.StructStorage.t option";
+  "  type 'a builder = rw MessageWrapper.StructStorage.t";
 ]
 
 let mod_header ~context = [
