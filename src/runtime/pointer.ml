@@ -43,4 +43,22 @@ type t =
   | Far    of FarPointer.t
   | Other  of OtherPointer.t
 
-
+let decode (pointer64 : int64) : t =
+  if Util.is_int64_zero pointer64 then
+    Null
+  else
+    let pointer_int = Int64.to_int pointer64 in
+    let tag = pointer_int land Bitfield.tag_mask in
+    (* OCaml won't match an int against let-bound variables,
+       only against constants. *)
+    match tag with
+    | 0x0 ->  (* Bitfield.tag_val_struct *)
+        Struct (StructPointer.decode pointer64)
+    | 0x1 ->  (* Bitfield.tag_val_list *)
+        List (ListPointer.decode pointer64)
+    | 0x2 ->  (* Bitfield.tag_val_far *)
+        Far (FarPointer.decode pointer64)
+    | 0x3 ->  (* Bitfield.tag_val_other *)
+        Other (OtherPointer.decode pointer64)
+    | _ ->
+        assert false
