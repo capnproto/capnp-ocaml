@@ -407,7 +407,7 @@ and union_imports_for_type ~visited_node_ids ~import_ids ~context (tp : PS.Type.
   | Text
   | Data
   | Enum _
-  | AnyPointer -> ()
+  | AnyPointer _ -> ()
   | List list_descr ->
       let contained_type = List.element_type_get list_descr in
       union_imports_for_type ~visited_node_ids ~import_ids ~context contained_type
@@ -622,7 +622,7 @@ let rec uses_imported_abstract_type ~context (tp : PS.Type.t) : bool =
   | Text       -> false
   | Data       -> false
   | Enum _     -> false
-  | AnyPointer -> false
+  | AnyPointer _ -> false
   | List list_descr ->
       let contained_type = List.element_type_get list_descr in
       uses_imported_abstract_type ~context contained_type
@@ -695,7 +695,7 @@ let rec type_name ~context ~(mode : Mode.t) ~(scope_mode : Mode.t)
       let iface_node = Context.node context iface_id in
       make_disambiguated_type_name ~context ~mode ~scope_mode
         ~scope ~tp:`Interface iface_node
-  | AnyPointer ->
+  | AnyPointer _ ->
       begin match (mode, scope_mode) with
       | (Mode.Reader, Mode.Reader)
       | (Mode.Builder, Mode.Builder) ->

@@ -9,7 +9,7 @@ let config = {|
   (public_name capnp)
   (synopsis "Runtime support library for capnp-ocaml")
   (libraries (core_kernel uint ocplib-endian res extunix))
-  (flags (:standard -w -50-53))
+  (flags (:standard -w -50-53-55))
   (ocamlopt_flags (:standard # -inline 1000))
 ))
 
