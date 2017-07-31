@@ -835,19 +835,28 @@ let rec collect_unique_types ?acc ~context node =
   | PS.Node.Enum _ ->
       names
   | PS.Node.Struct _ ->
+      let struct_name =
+        let uq_name =
+          get_unqualified_name
+            ~parent:(Context.node context (PS.Node.scope_id_get node))
+            ~child:node
+        in
+        let node_id = PS.Node.id_get node in
+        sprintf "struct_%s_%s" uq_name (Uint64.to_string node_id)
+      in
       let reader_name = make_unique_typename ~context
           ~mode:Mode.Reader node
       in
-      let reader_type = "ro MessageWrapper.StructStorage.t option" in
       let builder_name = make_unique_typename ~context
           ~mode:Mode.Builder node
       in
-      let builder_type = "rw MessageWrapper.StructStorage.t" in
-      (builder_name, builder_type) :: (reader_name, reader_type) :: names
+      (builder_name, `Public (struct_name ^ " builder_t")) ::
+      (reader_name, `Public (struct_name ^ " reader_t")) ::
+      (struct_name, `Abstract) ::
+      names
   | PS.Node.Interface _ ->
       let interface_name = make_unique_typename ~context ~mode:Mode.Reader node in
-      let interface_type = "int option" in
-      (interface_name, interface_type) :: names
+      (interface_name, `Abstract) :: names
   | PS.Node.Undefined x ->
       failwith (sprintf "Unknown Node union discriminant %u" x)
 
