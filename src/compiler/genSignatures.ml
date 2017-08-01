@@ -327,7 +327,6 @@ let generate_struct_node ~context ~scope ~nested_modules
     | Mode.Reader -> [
         "val of_message : 'cap message_t -> t";
         "val of_builder : builder_t -> t";
-        "val of_pointer : pointer_t -> t";
       ]
     | Mode.Builder -> [
         "val of_message : rw message_t -> t";

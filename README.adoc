@@ -5,7 +5,8 @@ This is an http://ocaml.org[OCaml] code generator plugin for the
 http://kentonv.github.io/capnproto[Cap\'n Proto] serialization framework.
 
 This plugin is roughly feature-complete for the Cap\'n Proto basic serialization.
-The RPC feature set is not supported at this time.
+
+For RPC support, see <https://github.com/mirage/capnp-rpc>.
 
 Design Notes
 ------------

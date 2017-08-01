@@ -1,76 +1,112 @@
 [@@@ocaml.warning "-27-32-37-60"]
+
 type ro = Capnp.Message.ro
 type rw = Capnp.Message.rw
 
 module type S = sig
   type 'cap message_t
+  type 'a reader_t
+  type 'a builder_t
 
-  type reader_t_Import_12560611460656617445
-  type builder_t_Import_12560611460656617445
-  type reader_t_RequestedFile_14981803260258615394
-  type builder_t_RequestedFile_14981803260258615394
-  type reader_t_CodeGeneratorRequest_13818529054586492878
-  type builder_t_CodeGeneratorRequest_13818529054586492878
-  type reader_t_CapnpVersion_15590670654532458851
-  type builder_t_CapnpVersion_15590670654532458851
-  type reader_t_Annotation_17422339044421236034
-  type builder_t_Annotation_17422339044421236034
-  type reader_t_Value_14853958794117909659
-  type builder_t_Value_14853958794117909659
-  type reader_t_Binding_14439610327179913212
-  type builder_t_Binding_14439610327179913212
-  type reader_t_Scope_12382423449155627977
-  type builder_t_Scope_12382423449155627977
-  type reader_t_Brand_10391024731148337707
-  type builder_t_Brand_10391024731148337707
-  type reader_t_ImplicitMethodParameter_13470206089842057844
-  type builder_t_ImplicitMethodParameter_13470206089842057844
-  type reader_t_Parameter_11372142272178113157
-  type builder_t_Parameter_11372142272178113157
-  type reader_t_Unconstrained_10248890354574636630
-  type builder_t_Unconstrained_10248890354574636630
-  type reader_t_AnyPointer_14003731834718800369
-  type builder_t_AnyPointer_14003731834718800369
-  type reader_t_Interface_17116997365232503999
-  type builder_t_Interface_17116997365232503999
-  type reader_t_Struct_12410354185295152851
-  type builder_t_Struct_12410354185295152851
-  type reader_t_Enum_11389172934837766057
-  type builder_t_Enum_11389172934837766057
-  type reader_t_List_9792858745991129751
-  type builder_t_List_9792858745991129751
-  type reader_t_Type_15020482145304562784
-  type builder_t_Type_15020482145304562784
-  type reader_t_Method_10736806783679155584
-  type builder_t_Method_10736806783679155584
-  type reader_t_Superclass_12220001500510083064
-  type builder_t_Superclass_12220001500510083064
-  type reader_t_Enumerant_10919677598968879693
-  type builder_t_Enumerant_10919677598968879693
-  type reader_t_Ordinal_13515537513213004774
-  type builder_t_Ordinal_13515537513213004774
-  type reader_t_Group_14626792032033250577
-  type builder_t_Group_14626792032033250577
-  type reader_t_Slot_14133145859926553711
-  type builder_t_Slot_14133145859926553711
-  type reader_t_Field_11145653318641710175
-  type builder_t_Field_11145653318641710175
-  type reader_t_NestedNode_16050641862814319170
-  type builder_t_NestedNode_16050641862814319170
-  type reader_t_Parameter_13353766412138554289
-  type builder_t_Parameter_13353766412138554289
-  type reader_t_Annotation_17011813041836786320
-  type builder_t_Annotation_17011813041836786320
-  type reader_t_Const_12793219851699983392
-  type builder_t_Const_12793219851699983392
-  type reader_t_Interface_16728431493453586831
-  type builder_t_Interface_16728431493453586831
-  type reader_t_Enum_13063450714778629528
-  type builder_t_Enum_13063450714778629528
-  type reader_t_Struct_11430331134483579957
-  type builder_t_Struct_11430331134483579957
-  type reader_t_Node_16610026722781537303
-  type builder_t_Node_16610026722781537303
+  type struct_Import_12560611460656617445
+  type reader_t_Import_12560611460656617445 = struct_Import_12560611460656617445 reader_t
+  type builder_t_Import_12560611460656617445 = struct_Import_12560611460656617445 builder_t
+  type struct_RequestedFile_14981803260258615394
+  type reader_t_RequestedFile_14981803260258615394 = struct_RequestedFile_14981803260258615394 reader_t
+  type builder_t_RequestedFile_14981803260258615394 = struct_RequestedFile_14981803260258615394 builder_t
+  type struct_CodeGeneratorRequest_13818529054586492878
+  type reader_t_CodeGeneratorRequest_13818529054586492878 = struct_CodeGeneratorRequest_13818529054586492878 reader_t
+  type builder_t_CodeGeneratorRequest_13818529054586492878 = struct_CodeGeneratorRequest_13818529054586492878 builder_t
+  type struct_CapnpVersion_15590670654532458851
+  type reader_t_CapnpVersion_15590670654532458851 = struct_CapnpVersion_15590670654532458851 reader_t
+  type builder_t_CapnpVersion_15590670654532458851 = struct_CapnpVersion_15590670654532458851 builder_t
+  type struct_Annotation_17422339044421236034
+  type reader_t_Annotation_17422339044421236034 = struct_Annotation_17422339044421236034 reader_t
+  type builder_t_Annotation_17422339044421236034 = struct_Annotation_17422339044421236034 builder_t
+  type struct_Value_14853958794117909659
+  type reader_t_Value_14853958794117909659 = struct_Value_14853958794117909659 reader_t
+  type builder_t_Value_14853958794117909659 = struct_Value_14853958794117909659 builder_t
+  type struct_Binding_14439610327179913212
+  type reader_t_Binding_14439610327179913212 = struct_Binding_14439610327179913212 reader_t
+  type builder_t_Binding_14439610327179913212 = struct_Binding_14439610327179913212 builder_t
+  type struct_Scope_12382423449155627977
+  type reader_t_Scope_12382423449155627977 = struct_Scope_12382423449155627977 reader_t
+  type builder_t_Scope_12382423449155627977 = struct_Scope_12382423449155627977 builder_t
+  type struct_Brand_10391024731148337707
+  type reader_t_Brand_10391024731148337707 = struct_Brand_10391024731148337707 reader_t
+  type builder_t_Brand_10391024731148337707 = struct_Brand_10391024731148337707 builder_t
+  type struct_ImplicitMethodParameter_13470206089842057844
+  type reader_t_ImplicitMethodParameter_13470206089842057844 = struct_ImplicitMethodParameter_13470206089842057844 reader_t
+  type builder_t_ImplicitMethodParameter_13470206089842057844 = struct_ImplicitMethodParameter_13470206089842057844 builder_t
+  type struct_Parameter_11372142272178113157
+  type reader_t_Parameter_11372142272178113157 = struct_Parameter_11372142272178113157 reader_t
+  type builder_t_Parameter_11372142272178113157 = struct_Parameter_11372142272178113157 builder_t
+  type struct_Unconstrained_10248890354574636630
+  type reader_t_Unconstrained_10248890354574636630 = struct_Unconstrained_10248890354574636630 reader_t
+  type builder_t_Unconstrained_10248890354574636630 = struct_Unconstrained_10248890354574636630 builder_t
+  type struct_AnyPointer_14003731834718800369
+  type reader_t_AnyPointer_14003731834718800369 = struct_AnyPointer_14003731834718800369 reader_t
+  type builder_t_AnyPointer_14003731834718800369 = struct_AnyPointer_14003731834718800369 builder_t
+  type struct_Interface_17116997365232503999
+  type reader_t_Interface_17116997365232503999 = struct_Interface_17116997365232503999 reader_t
+  type builder_t_Interface_17116997365232503999 = struct_Interface_17116997365232503999 builder_t
+  type struct_Struct_12410354185295152851
+  type reader_t_Struct_12410354185295152851 = struct_Struct_12410354185295152851 reader_t
+  type builder_t_Struct_12410354185295152851 = struct_Struct_12410354185295152851 builder_t
+  type struct_Enum_11389172934837766057
+  type reader_t_Enum_11389172934837766057 = struct_Enum_11389172934837766057 reader_t
+  type builder_t_Enum_11389172934837766057 = struct_Enum_11389172934837766057 builder_t
+  type struct_List_9792858745991129751
+  type reader_t_List_9792858745991129751 = struct_List_9792858745991129751 reader_t
+  type builder_t_List_9792858745991129751 = struct_List_9792858745991129751 builder_t
+  type struct_Type_15020482145304562784
+  type reader_t_Type_15020482145304562784 = struct_Type_15020482145304562784 reader_t
+  type builder_t_Type_15020482145304562784 = struct_Type_15020482145304562784 builder_t
+  type struct_Method_10736806783679155584
+  type reader_t_Method_10736806783679155584 = struct_Method_10736806783679155584 reader_t
+  type builder_t_Method_10736806783679155584 = struct_Method_10736806783679155584 builder_t
+  type struct_Superclass_12220001500510083064
+  type reader_t_Superclass_12220001500510083064 = struct_Superclass_12220001500510083064 reader_t
+  type builder_t_Superclass_12220001500510083064 = struct_Superclass_12220001500510083064 builder_t
+  type struct_Enumerant_10919677598968879693
+  type reader_t_Enumerant_10919677598968879693 = struct_Enumerant_10919677598968879693 reader_t
+  type builder_t_Enumerant_10919677598968879693 = struct_Enumerant_10919677598968879693 builder_t
+  type struct_Ordinal_13515537513213004774
+  type reader_t_Ordinal_13515537513213004774 = struct_Ordinal_13515537513213004774 reader_t
+  type builder_t_Ordinal_13515537513213004774 = struct_Ordinal_13515537513213004774 builder_t
+  type struct_Group_14626792032033250577
+  type reader_t_Group_14626792032033250577 = struct_Group_14626792032033250577 reader_t
+  type builder_t_Group_14626792032033250577 = struct_Group_14626792032033250577 builder_t
+  type struct_Slot_14133145859926553711
+  type reader_t_Slot_14133145859926553711 = struct_Slot_14133145859926553711 reader_t
+  type builder_t_Slot_14133145859926553711 = struct_Slot_14133145859926553711 builder_t
+  type struct_Field_11145653318641710175
+  type reader_t_Field_11145653318641710175 = struct_Field_11145653318641710175 reader_t
+  type builder_t_Field_11145653318641710175 = struct_Field_11145653318641710175 builder_t
+  type struct_NestedNode_16050641862814319170
+  type reader_t_NestedNode_16050641862814319170 = struct_NestedNode_16050641862814319170 reader_t
+  type builder_t_NestedNode_16050641862814319170 = struct_NestedNode_16050641862814319170 builder_t
+  type struct_Parameter_13353766412138554289
+  type reader_t_Parameter_13353766412138554289 = struct_Parameter_13353766412138554289 reader_t
+  type builder_t_Parameter_13353766412138554289 = struct_Parameter_13353766412138554289 builder_t
+  type struct_Annotation_17011813041836786320
+  type reader_t_Annotation_17011813041836786320 = struct_Annotation_17011813041836786320 reader_t
+  type builder_t_Annotation_17011813041836786320 = struct_Annotation_17011813041836786320 builder_t
+  type struct_Const_12793219851699983392
+  type reader_t_Const_12793219851699983392 = struct_Const_12793219851699983392 reader_t
+  type builder_t_Const_12793219851699983392 = struct_Const_12793219851699983392 builder_t
+  type struct_Interface_16728431493453586831
+  type reader_t_Interface_16728431493453586831 = struct_Interface_16728431493453586831 reader_t
+  type builder_t_Interface_16728431493453586831 = struct_Interface_16728431493453586831 builder_t
+  type struct_Enum_13063450714778629528
+  type reader_t_Enum_13063450714778629528 = struct_Enum_13063450714778629528 reader_t
+  type builder_t_Enum_13063450714778629528 = struct_Enum_13063450714778629528 builder_t
+  type struct_Struct_11430331134483579957
+  type reader_t_Struct_11430331134483579957 = struct_Struct_11430331134483579957 reader_t
+  type builder_t_Struct_11430331134483579957 = struct_Struct_11430331134483579957 builder_t
+  type struct_Node_16610026722781537303
+  type reader_t_Node_16610026722781537303 = struct_Node_16610026722781537303 reader_t
+  type builder_t_Node_16610026722781537303 = struct_Node_16610026722781537303 builder_t
   module ElementSize_15102134695616452902 : sig
     type t =
       | Empty
@@ -88,6 +124,7 @@ module type S = sig
     type array_t
     type builder_array_t
     type pointer_t
+    val of_pointer : pointer_t -> 'a reader_t
     module Node : sig
       type t = reader_t_Node_16610026722781537303
       type builder_t = builder_t_Node_16610026722781537303
@@ -107,7 +144,6 @@ module type S = sig
         val fields_get_array : t -> reader_t_Field_11145653318641710175 array
         val of_message : 'cap message_t -> t
         val of_builder : builder_t -> t
-        val of_pointer : pointer_t -> t
       end
       module Enum : sig
         type t = reader_t_Enum_13063450714778629528
@@ -118,7 +154,6 @@ module type S = sig
         val enumerants_get_array : t -> reader_t_Enumerant_10919677598968879693 array
         val of_message : 'cap message_t -> t
         val of_builder : builder_t -> t
-        val of_pointer : pointer_t -> t
       end
       module Interface : sig
         type t = reader_t_Interface_16728431493453586831
@@ -133,7 +168,6 @@ module type S = sig
         val superclasses_get_array : t -> reader_t_Superclass_12220001500510083064 array
         val of_message : 'cap message_t -> t
         val of_builder : builder_t -> t
-        val of_pointer : pointer_t -> t
       end
       module Const : sig
         type t = reader_t_Const_12793219851699983392
@@ -144,7 +178,6 @@ module type S = sig
         val value_get : t -> reader_t_Value_14853958794117909659
         val of_message : 'cap message_t -> t
         val of_builder : builder_t -> t
-        val of_pointer : pointer_t -> t
       end
       module Annotation : sig
         type t = reader_t_Annotation_17011813041836786320
@@ -165,7 +198,6 @@ module type S = sig
         val targets_annotation_get : t -> bool
         val of_message : 'cap message_t -> t
         val of_builder : builder_t -> t
-        val of_pointer : pointer_t -> t
       end
       module Parameter : sig
         type t = reader_t_Parameter_13353766412138554289
@@ -174,7 +206,6 @@ module type S = sig
         val name_get : t -> string
         val of_message : 'cap message_t -> t
         val of_builder : builder_t -> t
-        val of_pointer : pointer_t -> t
       end
       module NestedNode : sig
         type t = reader_t_NestedNode_16050641862814319170
@@ -185,7 +216,6 @@ module type S = sig
         val id_get_int_exn : t -> int
         val of_message : 'cap message_t -> t
         val of_builder : builder_t -> t
-        val of_pointer : pointer_t -> t
       end
       type unnamed_union_t =
         | File
@@ -219,7 +249,6 @@ module type S = sig
       val annotations_get_array : t -> reader_t_Annotation_17422339044421236034 array
       val of_message : 'cap message_t -> t
       val of_builder : builder_t -> t
-      val of_pointer : pointer_t -> t
     end
     module Field : sig
       type t = reader_t_Field_11145653318641710175
@@ -236,7 +265,6 @@ module type S = sig
         val had_explicit_default_get : t -> bool
         val of_message : 'cap message_t -> t
         val of_builder : builder_t -> t
-        val of_pointer : pointer_t -> t
       end
       module Group : sig
         type t = reader_t_Group_14626792032033250577
@@ -245,7 +273,6 @@ module type S = sig
         val type_id_get_int_exn : t -> int
         val of_message : 'cap message_t -> t
         val of_builder : builder_t -> t
-        val of_pointer : pointer_t -> t
       end
       module Ordinal : sig
         type t = reader_t_Ordinal_13515537513213004774
@@ -257,7 +284,6 @@ module type S = sig
         val get : t -> unnamed_union_t
         val of_message : 'cap message_t -> t
         val of_builder : builder_t -> t
-        val of_pointer : pointer_t -> t
       end
       val no_discriminant : int
       type unnamed_union_t =
@@ -276,7 +302,6 @@ module type S = sig
       val ordinal_get : t -> Ordinal.t
       val of_message : 'cap message_t -> t
       val of_builder : builder_t -> t
-      val of_pointer : pointer_t -> t
     end
     module Enumerant : sig
       type t = reader_t_Enumerant_10919677598968879693
@@ -290,7 +315,6 @@ module type S = sig
       val annotations_get_array : t -> reader_t_Annotation_17422339044421236034 array
       val of_message : 'cap message_t -> t
       val of_builder : builder_t -> t
-      val of_pointer : pointer_t -> t
     end
     module Superclass : sig
       type t = reader_t_Superclass_12220001500510083064
@@ -301,7 +325,6 @@ module type S = sig
       val brand_get : t -> reader_t_Brand_10391024731148337707
       val of_message : 'cap message_t -> t
       val of_builder : builder_t -> t
-      val of_pointer : pointer_t -> t
     end
     module Method : sig
       type t = reader_t_Method_10736806783679155584
@@ -327,7 +350,6 @@ module type S = sig
       val annotations_get_array : t -> reader_t_Annotation_17422339044421236034 array
       val of_message : 'cap message_t -> t
       val of_builder : builder_t -> t
-      val of_pointer : pointer_t -> t
     end
     module Type : sig
       type t = reader_t_Type_15020482145304562784
@@ -339,7 +361,6 @@ module type S = sig
         val element_type_get : t -> reader_t_Type_15020482145304562784
         val of_message : 'cap message_t -> t
         val of_builder : builder_t -> t
-        val of_pointer : pointer_t -> t
       end
       module Enum : sig
         type t = reader_t_Enum_11389172934837766057
@@ -350,7 +371,6 @@ module type S = sig
         val brand_get : t -> reader_t_Brand_10391024731148337707
         val of_message : 'cap message_t -> t
         val of_builder : builder_t -> t
-        val of_pointer : pointer_t -> t
       end
       module Struct : sig
         type t = reader_t_Struct_12410354185295152851
@@ -361,7 +381,6 @@ module type S = sig
         val brand_get : t -> reader_t_Brand_10391024731148337707
         val of_message : 'cap message_t -> t
         val of_builder : builder_t -> t
-        val of_pointer : pointer_t -> t
       end
       module Interface : sig
         type t = reader_t_Interface_17116997365232503999
@@ -372,7 +391,6 @@ module type S = sig
         val brand_get : t -> reader_t_Brand_10391024731148337707
         val of_message : 'cap message_t -> t
         val of_builder : builder_t -> t
-        val of_pointer : pointer_t -> t
       end
       module AnyPointer : sig
         type t = reader_t_AnyPointer_14003731834718800369
@@ -389,7 +407,6 @@ module type S = sig
           val get : t -> unnamed_union_t
           val of_message : 'cap message_t -> t
           val of_builder : builder_t -> t
-          val of_pointer : pointer_t -> t
         end
         module Parameter : sig
           type t = reader_t_Parameter_11372142272178113157
@@ -399,7 +416,6 @@ module type S = sig
           val parameter_index_get : t -> int
           val of_message : 'cap message_t -> t
           val of_builder : builder_t -> t
-          val of_pointer : pointer_t -> t
         end
         module ImplicitMethodParameter : sig
           type t = reader_t_ImplicitMethodParameter_13470206089842057844
@@ -407,7 +423,6 @@ module type S = sig
           val parameter_index_get : t -> int
           val of_message : 'cap message_t -> t
           val of_builder : builder_t -> t
-          val of_pointer : pointer_t -> t
         end
         type unnamed_union_t =
           | Unconstrained of Unconstrained.t
@@ -417,7 +432,6 @@ module type S = sig
         val get : t -> unnamed_union_t
         val of_message : 'cap message_t -> t
         val of_builder : builder_t -> t
-        val of_pointer : pointer_t -> t
       end
       type unnamed_union_t =
         | Void
@@ -443,7 +457,6 @@ module type S = sig
       val get : t -> unnamed_union_t
       val of_message : 'cap message_t -> t
       val of_builder : builder_t -> t
-      val of_pointer : pointer_t -> t
     end
     module Brand : sig
       type t = reader_t_Brand_10391024731148337707
@@ -460,7 +473,6 @@ module type S = sig
         val scope_id_get_int_exn : t -> int
         val of_message : 'cap message_t -> t
         val of_builder : builder_t -> t
-        val of_pointer : pointer_t -> t
       end
       module Binding : sig
         type t = reader_t_Binding_14439610327179913212
@@ -472,7 +484,6 @@ module type S = sig
         val get : t -> unnamed_union_t
         val of_message : 'cap message_t -> t
         val of_builder : builder_t -> t
-        val of_pointer : pointer_t -> t
       end
       val has_scopes : t -> bool
       val scopes_get : t -> (ro, reader_t_Scope_12382423449155627977, array_t) Capnp.Array.t
@@ -480,7 +491,6 @@ module type S = sig
       val scopes_get_array : t -> reader_t_Scope_12382423449155627977 array
       val of_message : 'cap message_t -> t
       val of_builder : builder_t -> t
-      val of_pointer : pointer_t -> t
     end
     module Value : sig
       type t = reader_t_Value_14853958794117909659
@@ -509,7 +519,6 @@ module type S = sig
       val get : t -> unnamed_union_t
       val of_message : 'cap message_t -> t
       val of_builder : builder_t -> t
-      val of_pointer : pointer_t -> t
     end
     module Annotation : sig
       type t = reader_t_Annotation_17422339044421236034
@@ -522,7 +531,6 @@ module type S = sig
       val value_get : t -> Value.t
       val of_message : 'cap message_t -> t
       val of_builder : builder_t -> t
-      val of_pointer : pointer_t -> t
     end
     module ElementSize : sig
       type t = ElementSize_15102134695616452902.t =
@@ -544,7 +552,6 @@ module type S = sig
       val micro_get : t -> int
       val of_message : 'cap message_t -> t
       val of_builder : builder_t -> t
-      val of_pointer : pointer_t -> t
     end
     module CodeGeneratorRequest : sig
       type t = reader_t_CodeGeneratorRequest_13818529054586492878
@@ -561,7 +568,6 @@ module type S = sig
           val name_get : t -> string
           val of_message : 'cap message_t -> t
           val of_builder : builder_t -> t
-          val of_pointer : pointer_t -> t
         end
         val id_get : t -> Uint64.t
         val id_get_int_exn : t -> int
@@ -573,7 +579,6 @@ module type S = sig
         val imports_get_array : t -> reader_t_Import_12560611460656617445 array
         val of_message : 'cap message_t -> t
         val of_builder : builder_t -> t
-        val of_pointer : pointer_t -> t
       end
       val has_capnp_version : t -> bool
       val capnp_version_get : t -> CapnpVersion.t
@@ -587,7 +592,6 @@ module type S = sig
       val requested_files_get_array : t -> reader_t_RequestedFile_14981803260258615394 array
       val of_message : 'cap message_t -> t
       val of_builder : builder_t -> t
-      val of_pointer : pointer_t -> t
     end
   end
 
@@ -1419,6 +1423,8 @@ module type S = sig
 end
 
 module Make (MessageWrapper : Capnp.MessageSig.S) = struct
+  type 'a reader_t = ro MessageWrapper.StructStorage.t option
+  type 'a builder_t = rw MessageWrapper.StructStorage.t
   module CamlBytes = Bytes
   module DefaultsMessage_ = Capnp.BytesMessage
 
@@ -1436,72 +1442,105 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
 
   type 'cap message_t = 'cap MessageWrapper.Message.t
 
-  type reader_t_Import_12560611460656617445 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Import_12560611460656617445 = rw MessageWrapper.StructStorage.t
-  type reader_t_RequestedFile_14981803260258615394 = ro MessageWrapper.StructStorage.t option
-  type builder_t_RequestedFile_14981803260258615394 = rw MessageWrapper.StructStorage.t
-  type reader_t_CodeGeneratorRequest_13818529054586492878 = ro MessageWrapper.StructStorage.t option
-  type builder_t_CodeGeneratorRequest_13818529054586492878 = rw MessageWrapper.StructStorage.t
-  type reader_t_CapnpVersion_15590670654532458851 = ro MessageWrapper.StructStorage.t option
-  type builder_t_CapnpVersion_15590670654532458851 = rw MessageWrapper.StructStorage.t
-  type reader_t_Annotation_17422339044421236034 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Annotation_17422339044421236034 = rw MessageWrapper.StructStorage.t
-  type reader_t_Value_14853958794117909659 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Value_14853958794117909659 = rw MessageWrapper.StructStorage.t
-  type reader_t_Binding_14439610327179913212 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Binding_14439610327179913212 = rw MessageWrapper.StructStorage.t
-  type reader_t_Scope_12382423449155627977 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Scope_12382423449155627977 = rw MessageWrapper.StructStorage.t
-  type reader_t_Brand_10391024731148337707 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Brand_10391024731148337707 = rw MessageWrapper.StructStorage.t
-  type reader_t_ImplicitMethodParameter_13470206089842057844 = ro MessageWrapper.StructStorage.t option
-  type builder_t_ImplicitMethodParameter_13470206089842057844 = rw MessageWrapper.StructStorage.t
-  type reader_t_Parameter_11372142272178113157 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Parameter_11372142272178113157 = rw MessageWrapper.StructStorage.t
-  type reader_t_Unconstrained_10248890354574636630 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Unconstrained_10248890354574636630 = rw MessageWrapper.StructStorage.t
-  type reader_t_AnyPointer_14003731834718800369 = ro MessageWrapper.StructStorage.t option
-  type builder_t_AnyPointer_14003731834718800369 = rw MessageWrapper.StructStorage.t
-  type reader_t_Interface_17116997365232503999 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Interface_17116997365232503999 = rw MessageWrapper.StructStorage.t
-  type reader_t_Struct_12410354185295152851 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Struct_12410354185295152851 = rw MessageWrapper.StructStorage.t
-  type reader_t_Enum_11389172934837766057 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Enum_11389172934837766057 = rw MessageWrapper.StructStorage.t
-  type reader_t_List_9792858745991129751 = ro MessageWrapper.StructStorage.t option
-  type builder_t_List_9792858745991129751 = rw MessageWrapper.StructStorage.t
-  type reader_t_Type_15020482145304562784 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Type_15020482145304562784 = rw MessageWrapper.StructStorage.t
-  type reader_t_Method_10736806783679155584 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Method_10736806783679155584 = rw MessageWrapper.StructStorage.t
-  type reader_t_Superclass_12220001500510083064 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Superclass_12220001500510083064 = rw MessageWrapper.StructStorage.t
-  type reader_t_Enumerant_10919677598968879693 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Enumerant_10919677598968879693 = rw MessageWrapper.StructStorage.t
-  type reader_t_Ordinal_13515537513213004774 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Ordinal_13515537513213004774 = rw MessageWrapper.StructStorage.t
-  type reader_t_Group_14626792032033250577 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Group_14626792032033250577 = rw MessageWrapper.StructStorage.t
-  type reader_t_Slot_14133145859926553711 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Slot_14133145859926553711 = rw MessageWrapper.StructStorage.t
-  type reader_t_Field_11145653318641710175 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Field_11145653318641710175 = rw MessageWrapper.StructStorage.t
-  type reader_t_NestedNode_16050641862814319170 = ro MessageWrapper.StructStorage.t option
-  type builder_t_NestedNode_16050641862814319170 = rw MessageWrapper.StructStorage.t
-  type reader_t_Parameter_13353766412138554289 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Parameter_13353766412138554289 = rw MessageWrapper.StructStorage.t
-  type reader_t_Annotation_17011813041836786320 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Annotation_17011813041836786320 = rw MessageWrapper.StructStorage.t
-  type reader_t_Const_12793219851699983392 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Const_12793219851699983392 = rw MessageWrapper.StructStorage.t
-  type reader_t_Interface_16728431493453586831 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Interface_16728431493453586831 = rw MessageWrapper.StructStorage.t
-  type reader_t_Enum_13063450714778629528 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Enum_13063450714778629528 = rw MessageWrapper.StructStorage.t
-  type reader_t_Struct_11430331134483579957 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Struct_11430331134483579957 = rw MessageWrapper.StructStorage.t
-  type reader_t_Node_16610026722781537303 = ro MessageWrapper.StructStorage.t option
-  type builder_t_Node_16610026722781537303 = rw MessageWrapper.StructStorage.t
+  type struct_Import_12560611460656617445
+  type reader_t_Import_12560611460656617445 = struct_Import_12560611460656617445 reader_t
+  type builder_t_Import_12560611460656617445 = struct_Import_12560611460656617445 builder_t
+  type struct_RequestedFile_14981803260258615394
+  type reader_t_RequestedFile_14981803260258615394 = struct_RequestedFile_14981803260258615394 reader_t
+  type builder_t_RequestedFile_14981803260258615394 = struct_RequestedFile_14981803260258615394 builder_t
+  type struct_CodeGeneratorRequest_13818529054586492878
+  type reader_t_CodeGeneratorRequest_13818529054586492878 = struct_CodeGeneratorRequest_13818529054586492878 reader_t
+  type builder_t_CodeGeneratorRequest_13818529054586492878 = struct_CodeGeneratorRequest_13818529054586492878 builder_t
+  type struct_CapnpVersion_15590670654532458851
+  type reader_t_CapnpVersion_15590670654532458851 = struct_CapnpVersion_15590670654532458851 reader_t
+  type builder_t_CapnpVersion_15590670654532458851 = struct_CapnpVersion_15590670654532458851 builder_t
+  type struct_Annotation_17422339044421236034
+  type reader_t_Annotation_17422339044421236034 = struct_Annotation_17422339044421236034 reader_t
+  type builder_t_Annotation_17422339044421236034 = struct_Annotation_17422339044421236034 builder_t
+  type struct_Value_14853958794117909659
+  type reader_t_Value_14853958794117909659 = struct_Value_14853958794117909659 reader_t
+  type builder_t_Value_14853958794117909659 = struct_Value_14853958794117909659 builder_t
+  type struct_Binding_14439610327179913212
+  type reader_t_Binding_14439610327179913212 = struct_Binding_14439610327179913212 reader_t
+  type builder_t_Binding_14439610327179913212 = struct_Binding_14439610327179913212 builder_t
+  type struct_Scope_12382423449155627977
+  type reader_t_Scope_12382423449155627977 = struct_Scope_12382423449155627977 reader_t
+  type builder_t_Scope_12382423449155627977 = struct_Scope_12382423449155627977 builder_t
+  type struct_Brand_10391024731148337707
+  type reader_t_Brand_10391024731148337707 = struct_Brand_10391024731148337707 reader_t
+  type builder_t_Brand_10391024731148337707 = struct_Brand_10391024731148337707 builder_t
+  type struct_ImplicitMethodParameter_13470206089842057844
+  type reader_t_ImplicitMethodParameter_13470206089842057844 = struct_ImplicitMethodParameter_13470206089842057844 reader_t
+  type builder_t_ImplicitMethodParameter_13470206089842057844 = struct_ImplicitMethodParameter_13470206089842057844 builder_t
+  type struct_Parameter_11372142272178113157
+  type reader_t_Parameter_11372142272178113157 = struct_Parameter_11372142272178113157 reader_t
+  type builder_t_Parameter_11372142272178113157 = struct_Parameter_11372142272178113157 builder_t
+  type struct_Unconstrained_10248890354574636630
+  type reader_t_Unconstrained_10248890354574636630 = struct_Unconstrained_10248890354574636630 reader_t
+  type builder_t_Unconstrained_10248890354574636630 = struct_Unconstrained_10248890354574636630 builder_t
+  type struct_AnyPointer_14003731834718800369
+  type reader_t_AnyPointer_14003731834718800369 = struct_AnyPointer_14003731834718800369 reader_t
+  type builder_t_AnyPointer_14003731834718800369 = struct_AnyPointer_14003731834718800369 builder_t
+  type struct_Interface_17116997365232503999
+  type reader_t_Interface_17116997365232503999 = struct_Interface_17116997365232503999 reader_t
+  type builder_t_Interface_17116997365232503999 = struct_Interface_17116997365232503999 builder_t
+  type struct_Struct_12410354185295152851
+  type reader_t_Struct_12410354185295152851 = struct_Struct_12410354185295152851 reader_t
+  type builder_t_Struct_12410354185295152851 = struct_Struct_12410354185295152851 builder_t
+  type struct_Enum_11389172934837766057
+  type reader_t_Enum_11389172934837766057 = struct_Enum_11389172934837766057 reader_t
+  type builder_t_Enum_11389172934837766057 = struct_Enum_11389172934837766057 builder_t
+  type struct_List_9792858745991129751
+  type reader_t_List_9792858745991129751 = struct_List_9792858745991129751 reader_t
+  type builder_t_List_9792858745991129751 = struct_List_9792858745991129751 builder_t
+  type struct_Type_15020482145304562784
+  type reader_t_Type_15020482145304562784 = struct_Type_15020482145304562784 reader_t
+  type builder_t_Type_15020482145304562784 = struct_Type_15020482145304562784 builder_t
+  type struct_Method_10736806783679155584
+  type reader_t_Method_10736806783679155584 = struct_Method_10736806783679155584 reader_t
+  type builder_t_Method_10736806783679155584 = struct_Method_10736806783679155584 builder_t
+  type struct_Superclass_12220001500510083064
+  type reader_t_Superclass_12220001500510083064 = struct_Superclass_12220001500510083064 reader_t
+  type builder_t_Superclass_12220001500510083064 = struct_Superclass_12220001500510083064 builder_t
+  type struct_Enumerant_10919677598968879693
+  type reader_t_Enumerant_10919677598968879693 = struct_Enumerant_10919677598968879693 reader_t
+  type builder_t_Enumerant_10919677598968879693 = struct_Enumerant_10919677598968879693 builder_t
+  type struct_Ordinal_13515537513213004774
+  type reader_t_Ordinal_13515537513213004774 = struct_Ordinal_13515537513213004774 reader_t
+  type builder_t_Ordinal_13515537513213004774 = struct_Ordinal_13515537513213004774 builder_t
+  type struct_Group_14626792032033250577
+  type reader_t_Group_14626792032033250577 = struct_Group_14626792032033250577 reader_t
+  type builder_t_Group_14626792032033250577 = struct_Group_14626792032033250577 builder_t
+  type struct_Slot_14133145859926553711
+  type reader_t_Slot_14133145859926553711 = struct_Slot_14133145859926553711 reader_t
+  type builder_t_Slot_14133145859926553711 = struct_Slot_14133145859926553711 builder_t
+  type struct_Field_11145653318641710175
+  type reader_t_Field_11145653318641710175 = struct_Field_11145653318641710175 reader_t
+  type builder_t_Field_11145653318641710175 = struct_Field_11145653318641710175 builder_t
+  type struct_NestedNode_16050641862814319170
+  type reader_t_NestedNode_16050641862814319170 = struct_NestedNode_16050641862814319170 reader_t
+  type builder_t_NestedNode_16050641862814319170 = struct_NestedNode_16050641862814319170 builder_t
+  type struct_Parameter_13353766412138554289
+  type reader_t_Parameter_13353766412138554289 = struct_Parameter_13353766412138554289 reader_t
+  type builder_t_Parameter_13353766412138554289 = struct_Parameter_13353766412138554289 builder_t
+  type struct_Annotation_17011813041836786320
+  type reader_t_Annotation_17011813041836786320 = struct_Annotation_17011813041836786320 reader_t
+  type builder_t_Annotation_17011813041836786320 = struct_Annotation_17011813041836786320 builder_t
+  type struct_Const_12793219851699983392
+  type reader_t_Const_12793219851699983392 = struct_Const_12793219851699983392 reader_t
+  type builder_t_Const_12793219851699983392 = struct_Const_12793219851699983392 builder_t
+  type struct_Interface_16728431493453586831
+  type reader_t_Interface_16728431493453586831 = struct_Interface_16728431493453586831 reader_t
+  type builder_t_Interface_16728431493453586831 = struct_Interface_16728431493453586831 builder_t
+  type struct_Enum_13063450714778629528
+  type reader_t_Enum_13063450714778629528 = struct_Enum_13063450714778629528 reader_t
+  type builder_t_Enum_13063450714778629528 = struct_Enum_13063450714778629528 builder_t
+  type struct_Struct_11430331134483579957
+  type reader_t_Struct_11430331134483579957 = struct_Struct_11430331134483579957 reader_t
+  type builder_t_Struct_11430331134483579957 = struct_Struct_11430331134483579957 builder_t
+  type struct_Node_16610026722781537303
+  type reader_t_Node_16610026722781537303 = struct_Node_16610026722781537303 reader_t
+  type builder_t_Node_16610026722781537303 = struct_Node_16610026722781537303 builder_t
 
   module ElementSize_15102134695616452902 = struct
     type t =
@@ -1557,6 +1596,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
     type array_t = ro MessageWrapper.ListStorage.t
     type builder_array_t = rw MessageWrapper.ListStorage.t
     type pointer_t = ro MessageWrapper.Slice.t option
+    let of_pointer = RA_.deref_opt_struct_pointer
 
     module Node = struct
       type t = reader_t_Node_16610026722781537303
@@ -1589,7 +1629,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           Capnp.Array.to_array (fields_get x)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
-        let of_pointer = RA_.deref_opt_struct_pointer
       end
       module Enum = struct
         type t = reader_t_Enum_13063450714778629528
@@ -1604,7 +1643,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           Capnp.Array.to_array (enumerants_get x)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
-        let of_pointer = RA_.deref_opt_struct_pointer
       end
       module Interface = struct
         type t = reader_t_Interface_16728431493453586831
@@ -1627,7 +1665,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           Capnp.Array.to_array (superclasses_get x)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
-        let of_pointer = RA_.deref_opt_struct_pointer
       end
       module Const = struct
         type t = reader_t_Const_12793219851699983392
@@ -1642,7 +1679,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           (RA_.get_struct x 4)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
-        let of_pointer = RA_.deref_opt_struct_pointer
       end
       module Annotation = struct
         type t = reader_t_Annotation_17011813041836786320
@@ -1677,7 +1713,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           RA_.get_bit ~default:false x ~byte_ofs:15 ~bit_ofs:3
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
-        let of_pointer = RA_.deref_opt_struct_pointer
       end
       module Parameter = struct
         type t = reader_t_Parameter_13353766412138554289
@@ -1688,7 +1723,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           RA_.get_text ~default:"" x 0
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
-        let of_pointer = RA_.deref_opt_struct_pointer
       end
       module NestedNode = struct
         type t = reader_t_NestedNode_16050641862814319170
@@ -1703,7 +1737,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           Capnp.Runtime.Util.int_of_uint64_exn (id_get x)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
-        let of_pointer = RA_.deref_opt_struct_pointer
       end
       let file_get x = ()
       let struct_get x = x
@@ -1772,7 +1805,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         Capnp.Array.to_array (annotations_get x)
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       let of_builder x = Some (RA_.StructStorage.readonly x)
-      let of_pointer = RA_.deref_opt_struct_pointer
     end
     module Field = struct
       type t = reader_t_Field_11145653318641710175
@@ -1796,7 +1828,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           RA_.get_bit ~default:false x ~byte_ofs:16 ~bit_ofs:0
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
-        let of_pointer = RA_.deref_opt_struct_pointer
       end
       module Group = struct
         type t = reader_t_Group_14626792032033250577
@@ -1807,7 +1838,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           Capnp.Runtime.Util.int_of_uint64_exn (type_id_get x)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
-        let of_pointer = RA_.deref_opt_struct_pointer
       end
       module Ordinal = struct
         type t = reader_t_Ordinal_13515537513213004774
@@ -1826,7 +1856,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           | v -> Undefined v
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
-        let of_pointer = RA_.deref_opt_struct_pointer
       end
       let no_discriminant =
         65535
@@ -1860,7 +1889,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       let ordinal_get x = x
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       let of_builder x = Some (RA_.StructStorage.readonly x)
-      let of_pointer = RA_.deref_opt_struct_pointer
     end
     module Enumerant = struct
       type t = reader_t_Enumerant_10919677598968879693
@@ -1881,7 +1909,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         Capnp.Array.to_array (annotations_get x)
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       let of_builder x = Some (RA_.StructStorage.readonly x)
-      let of_pointer = RA_.deref_opt_struct_pointer
     end
     module Superclass = struct
       type t = reader_t_Superclass_12220001500510083064
@@ -1896,7 +1923,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         (RA_.get_struct x 0)
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       let of_builder x = Some (RA_.StructStorage.readonly x)
-      let of_pointer = RA_.deref_opt_struct_pointer
     end
     module Method = struct
       type t = reader_t_Method_10736806783679155584
@@ -1941,7 +1967,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         Capnp.Array.to_array (annotations_get x)
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       let of_builder x = Some (RA_.StructStorage.readonly x)
-      let of_pointer = RA_.deref_opt_struct_pointer
     end
     module Type = struct
       type t = reader_t_Type_15020482145304562784
@@ -1955,7 +1980,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           (RA_.get_struct x 0)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
-        let of_pointer = RA_.deref_opt_struct_pointer
       end
       module Enum = struct
         type t = reader_t_Enum_11389172934837766057
@@ -1970,7 +1994,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           (RA_.get_struct x 0)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
-        let of_pointer = RA_.deref_opt_struct_pointer
       end
       module Struct = struct
         type t = reader_t_Struct_12410354185295152851
@@ -1985,7 +2008,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           (RA_.get_struct x 0)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
-        let of_pointer = RA_.deref_opt_struct_pointer
       end
       module Interface = struct
         type t = reader_t_Interface_17116997365232503999
@@ -2000,7 +2022,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           (RA_.get_struct x 0)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
-        let of_pointer = RA_.deref_opt_struct_pointer
       end
       module AnyPointer = struct
         type t = reader_t_AnyPointer_14003731834718800369
@@ -2027,7 +2048,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
             | v -> Undefined v
           let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
           let of_builder x = Some (RA_.StructStorage.readonly x)
-          let of_pointer = RA_.deref_opt_struct_pointer
         end
         module Parameter = struct
           type t = reader_t_Parameter_11372142272178113157
@@ -2040,7 +2060,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
             RA_.get_uint16 ~default:0 x 10
           let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
           let of_builder x = Some (RA_.StructStorage.readonly x)
-          let of_pointer = RA_.deref_opt_struct_pointer
         end
         module ImplicitMethodParameter = struct
           type t = reader_t_ImplicitMethodParameter_13470206089842057844
@@ -2049,7 +2068,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
             RA_.get_uint16 ~default:0 x 10
           let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
           let of_builder x = Some (RA_.StructStorage.readonly x)
-          let of_pointer = RA_.deref_opt_struct_pointer
         end
         let unconstrained_get x = x
         let parameter_get x = x
@@ -2067,7 +2085,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           | v -> Undefined v
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
-        let of_pointer = RA_.deref_opt_struct_pointer
       end
       let void_get x = ()
       let bool_get x = ()
@@ -2133,7 +2150,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         | v -> Undefined v
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       let of_builder x = Some (RA_.StructStorage.readonly x)
-      let of_pointer = RA_.deref_opt_struct_pointer
     end
     module Brand = struct
       type t = reader_t_Brand_10391024731148337707
@@ -2165,7 +2181,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           Capnp.Runtime.Util.int_of_uint64_exn (scope_id_get x)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
-        let of_pointer = RA_.deref_opt_struct_pointer
       end
       module Binding = struct
         type t = reader_t_Binding_14439610327179913212
@@ -2186,7 +2201,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           | v -> Undefined v
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
-        let of_pointer = RA_.deref_opt_struct_pointer
       end
       let has_scopes x = 
         (RA_.has_field x 0)
@@ -2198,7 +2212,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         Capnp.Array.to_array (scopes_get x)
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       let of_builder x = Some (RA_.StructStorage.readonly x)
-      let of_pointer = RA_.deref_opt_struct_pointer
     end
     module Value = struct
       type t = reader_t_Value_14853958794117909659
@@ -2302,7 +2315,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         | v -> Undefined v
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       let of_builder x = Some (RA_.StructStorage.readonly x)
-      let of_pointer = RA_.deref_opt_struct_pointer
     end
     module Annotation = struct
       type t = reader_t_Annotation_17422339044421236034
@@ -2321,7 +2333,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         (RA_.get_struct x 0)
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       let of_builder x = Some (RA_.StructStorage.readonly x)
-      let of_pointer = RA_.deref_opt_struct_pointer
     end
     module ElementSize = struct
       type t = ElementSize_15102134695616452902.t =
@@ -2346,7 +2357,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         RA_.get_uint8 ~default:0 x 3
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       let of_builder x = Some (RA_.StructStorage.readonly x)
-      let of_pointer = RA_.deref_opt_struct_pointer
     end
     module CodeGeneratorRequest = struct
       type t = reader_t_CodeGeneratorRequest_13818529054586492878
@@ -2367,7 +2377,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
             RA_.get_text ~default:"" x 0
           let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
           let of_builder x = Some (RA_.StructStorage.readonly x)
-          let of_pointer = RA_.deref_opt_struct_pointer
         end
         let id_get x =
           RA_.get_uint64 ~default:Uint64.zero x 0
@@ -2387,7 +2396,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           Capnp.Array.to_array (imports_get x)
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
-        let of_pointer = RA_.deref_opt_struct_pointer
       end
       let has_capnp_version x = 
         (RA_.has_field x 2)
@@ -2411,7 +2419,6 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         Capnp.Array.to_array (requested_files_get x)
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       let of_builder x = Some (RA_.StructStorage.readonly x)
-      let of_pointer = RA_.deref_opt_struct_pointer
     end
   end
 

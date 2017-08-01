@@ -39,11 +39,14 @@ module Mode    = GenCommon.Mode
 
 let sig_s_header ~context = [
   "[@@@ocaml.warning \"-27-32-37-60\"]";
+  "";
   "type ro = Capnp.Message.ro";
   "type rw = Capnp.Message.rw";
   "";
   "module type S = sig";
   "  type 'cap message_t";
+  "  type 'a reader_t";
+  "  type 'a builder_t";
   "";
 ] @ (List.concat_map context.Context.imports ~f:(fun import -> [
       "  module " ^ import.Context.schema_name ^ " : " ^
@@ -58,6 +61,7 @@ let sig_s_reader_header = [
   "    type array_t";
   "    type builder_array_t";
   "    type pointer_t";
+  "    val of_pointer : pointer_t -> 'a reader_t";
 ]
 
 let sig_s_divide_reader_builder = [
@@ -91,6 +95,8 @@ let functor_sig ~context = [
 
 let mod_functor_header = [
   "module Make (MessageWrapper : Capnp.MessageSig.S) = struct";
+  "  type 'a reader_t = ro MessageWrapper.StructStorage.t option";
+  "  type 'a builder_t = rw MessageWrapper.StructStorage.t";
   "  module CamlBytes = Bytes";
 ]
 
@@ -112,6 +118,7 @@ let mod_reader_header = [
   "    type array_t = ro MessageWrapper.ListStorage.t";
   "    type builder_array_t = rw MessageWrapper.ListStorage.t";
   "    type pointer_t = ro MessageWrapper.Slice.t option";
+  "    let of_pointer = RA_.deref_opt_struct_pointer";
   "";
 ]
 
@@ -199,7 +206,10 @@ let compile
     in
     let sig_unique_types = List.rev_map
         (GenCommon.collect_unique_types ~context requested_file_node)
-        ~f:(fun (name, _tp) -> "  type " ^ name)
+        ~f:(function
+            | name, (`Hidden _ | `Abstract) -> "  type " ^ name
+            | name, `Public tp -> sprintf "  type %s = %s" name tp
+          )
     in
     let sig_unique_enums =
       GenCommon.apply_indent ~indent:"  "
@@ -207,7 +217,10 @@ let compile
     in
     let mod_unique_types = (List.rev_map
         (GenCommon.collect_unique_types ~context requested_file_node)
-        ~f:(fun (name, tp) -> "  type " ^ name ^ " = " ^ tp)) @ [""]
+        ~f:(function
+            | name, (`Hidden tp | `Public tp) -> "  type " ^ name ^ " = " ^ tp
+            | name, `Abstract -> "  type " ^ name
+          )) @ [""]
     in
     let mod_unique_enums =
       GenCommon.apply_indent ~indent:"  "
