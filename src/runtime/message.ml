@@ -351,6 +351,8 @@ module Make (Storage : MessageStorage.S) = struct
       data     = Slice.readonly struct_storage.data;
       pointers = Slice.readonly struct_storage.pointers;
     }
+
+    let v ~data ~pointers = { data; pointers }
   end
 
   module ListStorage = struct

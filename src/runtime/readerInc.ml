@@ -131,22 +131,24 @@ module Make (MessageWrapper : MessageSig.S) = struct
 
   let struct_list_decoders =
     let struct_decoders =
-      let bytes slice = Some {
-          StructStorage.data = slice;
-          StructStorage.pointers = {
-            slice with
-            Slice.start = Slice.get_end slice;
-            Slice.len   = 0;
-          };
-        }
+      let bytes slice = Some (
+          StructStorage.v
+            ~data:slice
+            ~pointers:{
+              slice with
+              Slice.start = Slice.get_end slice;
+              Slice.len   = 0;
+            };
+        )
       in
-      let pointer slice = Some {
-          StructStorage.data = {
-            slice with
-            Slice.len = 0;
-          };
-          StructStorage.pointers = slice;
-        }
+      let pointer slice = Some (
+          StructStorage.v
+            ~data:{
+              slice with
+              Slice.len = 0;
+            }
+            ~pointers:slice
+        )
       in
       let composite x = Some x in {
         ListDecoders.bytes;
@@ -677,4 +679,8 @@ module Make (MessageWrapper : MessageSig.S) = struct
           None
     | None ->
         None
+
+  let pointers_struct pointers =
+    let data = { pointers with Slice.len = 0 } in
+    StructStorage.v ~data ~pointers
 end [@@inline]

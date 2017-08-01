@@ -282,8 +282,9 @@ module type S = sig
   end
 
   module StructStorage : sig
-    type 'cap t = { data : 'cap Slice.t; pointers : 'cap Slice.t; }
+    type 'cap t = private { data : 'cap Slice.t; pointers : 'cap Slice.t; }
     val readonly : 'cap t -> ro t
+    val v : data:'cap Slice.t -> pointers:'cap Slice.t -> 'cap t
   end
 
   module ListStorage : sig

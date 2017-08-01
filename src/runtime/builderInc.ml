@@ -1380,5 +1380,8 @@ module Make (NM : MessageSig.S) = struct
       let _ = NM.Slice.alloc message sizeof_uint64 in
       get_root_struct message ~data_words ~pointer_words
 
+    let pointers_struct pointers =
+      let data = { pointers with NM.Slice.len = 0 } in
+      NM.StructStorage.v ~data ~pointers
   end
 end

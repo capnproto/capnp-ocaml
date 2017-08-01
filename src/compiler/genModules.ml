@@ -170,13 +170,7 @@ let rec generate_list_element_decoder ~context ~scope list_def =
   let make_terminal_decoder element_name = [
       "let decoders = RA_.ListDecoders.Pointer (fun slice ->";
       (* Not super efficient, but this shouldn't be a hot path very often... *)
-      "  let struct_storage = {";
-      "    RA_.StructStorage.data = {";
-      "      slice with";
-      "      RA_.Slice.len = 0;";
-      "    };";
-      "    RA_.StructStorage.pointers = slice;";
-      "  } in";
+      "  let struct_storage = RA_.pointers_struct slice in";
       "  RA_.get_" ^ element_name ^ "_list (Some struct_storage) 0)";
       "in";
     ]
@@ -207,13 +201,7 @@ let rec generate_list_element_decoder ~context ~scope list_def =
         "let decoders = RA_.ListDecoders.Pointer (fun slice ->";
       ] @ inner_decoder_decl @ [
         (* Not super efficient, but this shouldn't be a hot path very often... *)
-        "  let struct_storage = {";
-        "    RA_.StructStorage.data = {";
-        "      slice with";
-        "      RA_.Slice.len = 0;";
-        "    };";
-        "    RA_.StructStorage.pointers = slice;";
-        "  } in";
+        "  let struct_storage = RA_.pointers_struct slice in";
         "  RA_.get_list decoders (Some struct_storage) 0)";
         "in";
       ]
@@ -228,13 +216,7 @@ let rec generate_list_element_decoder ~context ~scope list_def =
       ] @ enum_getters @ [
         "  RA_.ListDecoders.Pointer (fun slice ->";
         (* Not super efficient, but this shouldn't be a hot path very often... *)
-        "    let struct_storage = {";
-        "      RA_.StructStorage.data = {";
-        "        slice with";
-        "        RA_.Slice.len = 0;";
-        "      };";
-        "      RA_.StructStorage.pointers = slice;";
-        "    } in";
+        "    let struct_storage = RA_.pointers_struct slice in";
         "    get_enum_list (Some struct_storage) 0)";
         "in";
       ]
@@ -254,23 +236,11 @@ let rec generate_list_element_codecs ~context ~scope list_def =
   let make_terminal_codecs element_name = [
       "let codecs =";
       "  let decode slice =";
-      "    let struct_storage = {";
-      "      BA_.NM.StructStorage.data = {";
-      "        slice with";
-      "        BA_.NM.Slice.len = 0;";
-      "      };";
-      "      BA_.NM.StructStorage.pointers = slice;";
-      "    } in";
+      "    let struct_storage = RA_.pointers_struct slice in";
       "    BA_.get_" ^ element_name ^ "_list struct_storage 0";
       "  in";
       "  let encode v slice =";
-      "    let struct_storage = {";
-      "      BA_.NM.StructStorage.data = {";
-      "        slice with";
-      "        BA_.NM.Slice.len = 0;";
-      "      };";
-      "      BA_.NM.StructStorage.pointers = slice;";
-      "    } in";
+      "    let struct_storage = RA_.pointers_struct slice in";
       "    let _ = BA_.set_" ^ element_name ^ "_list struct_storage 0 v in ()";
       "  in";
       "  BA_.NC.ListCodecs.Pointer (decode, encode)";
@@ -308,25 +278,13 @@ let rec generate_list_element_codecs ~context ~scope list_def =
       in [
         "let codecs =";
         "  let decode slice =";
-        "    let struct_storage = {";
-        "      BA_.NM.StructStorage.data = {";
-        "        slice with";
-        "        BA_.NM.Slice.len = 0;";
-        "      };";
-        "      BA_.NM.StructStorage.pointers = slice;";
-        "    } in";
+        "    let struct_storage = BA_.pointers_struct slice in";
         sprintf "    BA_.get_struct_list \
                  ~data_words:%u ~pointer_words:%u struct_storage 0"
           data_words pointer_words;
         "  in";
         "  let encode v slice =";
-        "    let struct_storage = {";
-        "      BA_.NM.StructStorage.data = {";
-        "        slice with";
-        "        BA_.NM.Slice.len = 0;";
-        "      };";
-        "      BA_.NM.StructStorage.pointers = slice;";
-        "    } in";
+        "    let struct_storage = BA_.pointers_struct slice in";
         sprintf "    let _ = BA_.set_struct_list \
                  ~data_words:%u ~pointer_words:%u struct_storage 0 v in ()"
           data_words pointer_words;
@@ -341,23 +299,11 @@ let rec generate_list_element_codecs ~context ~scope list_def =
       in [
         "let codecs ="; ] @ inner_codecs_decl @ [
         "  let decode slice =";
-        "    let struct_storage = {";
-        "      BA_.NM.StructStorage.data = {";
-        "        slice with";
-        "        BA_.NM.Slice.len = 0;";
-        "      };";
-        "      BA_.NM.StructStorage.pointers = slice;";
-        "    } in";
+        "    let struct_storage = BA_.pointers_struct slice in";
         "    BA_.get_list ~codecs struct_storage 0";
         "  in";
         "  let encode v slice =";
-        "    let struct_storage = {";
-        "      BA_.NM.StructStorage.data = {";
-        "        slice with";
-        "        BA_.NM.Slice.len = 0;";
-        "      };";
-        "      BA_.NM.StructStorage.pointers = slice;";
-        "    } in";
+        "    let struct_storage = BA_.pointers_struct slice in";
         "    BA_.set_list ~codecs struct_storage 0 v";
         "  in";
         "  BA_.NC.ListCodecs.Pointer (decode, encode)";

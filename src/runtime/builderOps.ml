@@ -90,10 +90,8 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
       storage with
       RWM.Slice.start = data.RWM.Slice.start + data.RWM.Slice.len;
       RWM.Slice.len   = pointer_words * sizeof_uint64;
-    } in {
-      RWM.StructStorage.data = data;
-      RWM.StructStorage.pointers = pointers;
-    }
+    } in
+    RWM.StructStorage.v ~data ~pointers
 
 
   (* Allocate storage for a list within the specified message. *)
@@ -682,31 +680,33 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
               in
               for i = 0 to src.ROM.ListStorage.num_elements - 1 do
                 let src_struct =
-                  let open ROM.ListStorage in {
-                  ROM.StructStorage.data = {
-                    src.storage with
-                    ROM.Slice.start = src_content_offset +
-                        (i * words_per_element * sizeof_uint64);
-                    ROM.Slice.len = data_words * sizeof_uint64;};
-                  ROM.StructStorage.pointers = {
-                    src.storage with
-                    ROM.Slice.start = src_content_offset +
-                        ((i * words_per_element) + data_words) * sizeof_uint64;
-                    ROM.Slice.len = pointer_words * sizeof_uint64;};
-                } in
+                  let open ROM.ListStorage in
+                  ROM.StructStorage.v
+                    ~data:{
+                      src.storage with
+                      ROM.Slice.start = src_content_offset +
+                                        (i * words_per_element * sizeof_uint64);
+                      ROM.Slice.len = data_words * sizeof_uint64;}
+                    ~pointers:{
+                      src.storage with
+                      ROM.Slice.start = src_content_offset +
+                                        ((i * words_per_element) + data_words) * sizeof_uint64;
+                      ROM.Slice.len = pointer_words * sizeof_uint64;}
+                in
                 let dest_struct =
-                  let open RWM.ListStorage in {
-                  RWM.StructStorage.data = {
-                    dest.storage with
-                    RWM.Slice.start = dest_content_offset +
-                        (i * words_per_element * sizeof_uint64);
-                    RWM.Slice.len = data_words * sizeof_uint64;};
-                  RWM.StructStorage.pointers = {
-                    dest.storage with
-                    RWM.Slice.start = dest_content_offset +
-                        ((i * words_per_element) + data_words) * sizeof_uint64;
-                    RWM.Slice.len = pointer_words * sizeof_uint64;};
-                } in
+                  let open RWM.ListStorage in
+                  RWM.StructStorage.v
+                    ~data:{
+                      dest.storage with
+                      RWM.Slice.start = dest_content_offset +
+                                        (i * words_per_element * sizeof_uint64);
+                      RWM.Slice.len = data_words * sizeof_uint64;}
+                    ~pointers:{
+                      dest.storage with
+                      RWM.Slice.start = dest_content_offset +
+                                        ((i * words_per_element) + data_words) * sizeof_uint64;
+                      RWM.Slice.len = pointer_words * sizeof_uint64;}
+                in
                 deep_copy_struct_to_dest ~src:src_struct ~dest:dest_struct
               done
         in
@@ -817,7 +817,7 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
               RWM.Slice.start = RWM.Slice.get_end data;
               RWM.Slice.len   = pointer_words * sizeof_uint64;
             } in
-            deep_zero_struct { RWM.StructStorage.data; RWM.StructStorage.pointers }
+            deep_zero_struct (RWM.StructStorage.v ~data ~pointers)
           done
         in
         (* Composite lists prefix the data with a tag word, so clean up
