@@ -64,13 +64,15 @@ module ListStorageType = Capnp.Runtime.ListStorageType
 
 let sizeof_uint64 = 8
 
+type abstract
+
 type t = {
   (* Message storage. *)
   message : Capnp.Message.rw M.Message.t;
 
   (* Array of structs which have been stored in the message, along with
      their unique identifiers. *)
-  structs : (string * Capnp.Message.rw M.StructStorage.t) Res.Array.t;
+  structs : (string * (Capnp.Message.rw, abstract) M.StructStorage.t) Res.Array.t;
 
   (* Array of lists which have been stored in the message, along with
      their unique identifiers. *)

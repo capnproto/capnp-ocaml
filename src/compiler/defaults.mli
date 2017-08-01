@@ -43,7 +43,7 @@ val create : unit -> t
 (** [add_struct defaults ident s] adds a deep copy of struct [s] to the
     defaults message, making it accessible under the specified identifier. *)
 val add_struct : t -> ident_t ->
-  Capnp.Message.ro GenCommon.M.StructStorage.t -> unit
+  (Capnp.Message.ro, _) GenCommon.M.StructStorage.t -> unit
 
 (** [add_list defaults ident lst] adds a deep copy of list [lst] to the
     defaults message, making it accessible under the specified identifier. *)

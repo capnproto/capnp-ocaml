@@ -62,7 +62,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
      corresponding struct storage descriptor.  Returns None if the pointer is
      null. *)
   let deref_struct_pointer (pointer_bytes : 'cap Slice.t)
-    : 'cap StructStorage.t option =
+    : ('cap, _) StructStorage.t option =
     match deref_pointer pointer_bytes with
     | Object.None ->
         None
@@ -150,7 +150,8 @@ module Make (MessageWrapper : MessageSig.S) = struct
             ~pointers:slice
         )
       in
-      let composite x = Some x in {
+      let composite x = Some (StructStorage.cast x) in
+      {
         ListDecoders.bytes;
         ListDecoders.pointer;
         ListDecoders.composite;
@@ -160,7 +161,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
 
 
   (* Locate the storage region corresponding to the root struct of a message. *)
-  let get_root_struct (m : 'cap Message.t) : 'cap StructStorage.t option =
+  let get_root_struct (m : 'cap Message.t) : ('cap, 'a) StructStorage.t option =
     let first_segment = Message.get_segment m 0 in
     if Segment.length first_segment < sizeof_uint64 then
       None
@@ -181,7 +182,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
 
   let get_bit
       ~(default : bool)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       ~(byte_ofs : int)
       ~(bit_ofs : int)
     : bool =
@@ -202,7 +203,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
 
   let get_int8
       ~(default : int)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (byte_ofs : int)
     : int =
     match struct_storage_opt with
@@ -218,7 +219,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
 
   let get_int16
       ~(default : int)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (byte_ofs : int)
     : int =
     match struct_storage_opt with
@@ -234,7 +235,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
 
   let get_int32
       ~(default : int32)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (byte_ofs : int)
     : int32 =
     match struct_storage_opt with
@@ -250,7 +251,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
 
   let get_int64
       ~(default : int64)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (byte_ofs : int)
     : int64 =
     match struct_storage_opt with
@@ -266,7 +267,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
 
   let get_uint8
       ~(default : int)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (byte_ofs : int)
     : int =
     match struct_storage_opt with
@@ -282,7 +283,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
 
   let get_uint16
       ~(default : int)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (byte_ofs : int)
     : int =
     match struct_storage_opt with
@@ -298,7 +299,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
 
   let get_uint32
       ~(default : Uint32.t)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (byte_ofs : int)
     : Uint32.t =
     match struct_storage_opt with
@@ -314,7 +315,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
 
   let get_uint64
       ~(default : Uint64.t)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (byte_ofs : int)
     : Uint64.t =
     match struct_storage_opt with
@@ -330,7 +331,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
 
   let get_float32
       ~(default_bits : int32)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (byte_ofs : int)
     : float =
     let numeric =
@@ -349,7 +350,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
 
   let get_float64
       ~(default_bits : int64)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (byte_ofs : int)
     : float =
     let numeric =
@@ -372,7 +373,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
    *******************************************************************************)
 
   let has_field
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
     : bool =
     match struct_storage_opt with
@@ -390,7 +391,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
 
   let get_text
       ~(default : string)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
     : string =
     match struct_storage_opt with
@@ -416,7 +417,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
 
   let get_blob
       ~(default : string)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
     : string =
     match struct_storage_opt with
@@ -443,7 +444,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
   let get_list
       ?(default : ro ListStorage.t option)
       (decoders : ('cap, 'a) ListDecoders.t)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
     : (ro, 'a, 'cap ListStorage.t) InnerArray.t =
     let make_default default' decoders' =
@@ -498,114 +499,114 @@ module Make (MessageWrapper : MessageSig.S) = struct
 
   let get_void_list
       ?(default : ro ListStorage.t option)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
     : (ro, unit, 'cap ListStorage.t) InnerArray.t =
     get_list ?default void_list_decoders struct_storage_opt pointer_word
 
   let get_bit_list
       ?(default : ro ListStorage.t option)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
     : (ro, bool, 'cap ListStorage.t) InnerArray.t =
     get_list ?default bit_list_decoders struct_storage_opt pointer_word
 
   let get_int8_list
       ?(default : ro ListStorage.t option)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
     : (ro, int, 'cap ListStorage.t) InnerArray.t =
     get_list ?default int8_list_decoders struct_storage_opt pointer_word
 
   let get_int16_list
       ?(default : ro ListStorage.t option)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
     : (ro, int, 'cap ListStorage.t) InnerArray.t =
     get_list ?default int16_list_decoders struct_storage_opt pointer_word
 
   let get_int32_list
       ?(default : ro ListStorage.t option)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
     : (ro, int32, 'cap ListStorage.t) InnerArray.t =
     get_list ?default int32_list_decoders struct_storage_opt pointer_word
 
   let get_int64_list
       ?(default : ro ListStorage.t option)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
     : (ro, int64, 'cap ListStorage.t) InnerArray.t =
     get_list ?default int64_list_decoders struct_storage_opt pointer_word
 
   let get_uint8_list
       ?(default : ro ListStorage.t option)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
     : (ro, int, 'cap ListStorage.t) InnerArray.t =
     get_list ?default uint8_list_decoders struct_storage_opt pointer_word
 
   let get_uint16_list
       ?(default : ro ListStorage.t option)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
     : (ro, int, 'cap ListStorage.t) InnerArray.t =
     get_list ?default uint16_list_decoders struct_storage_opt pointer_word
 
   let get_uint32_list
       ?(default : ro ListStorage.t option)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
     : (ro, Uint32.t, 'cap ListStorage.t) InnerArray.t =
     get_list ?default uint32_list_decoders struct_storage_opt pointer_word
 
   let get_uint64_list
       ?(default : ro ListStorage.t option)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
     : (ro, Uint64.t, 'cap ListStorage.t) InnerArray.t =
     get_list ?default uint64_list_decoders struct_storage_opt pointer_word
 
   let get_float32_list
       ?(default : ro ListStorage.t option)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
     : (ro, float, 'cap ListStorage.t) InnerArray.t =
     get_list ?default float32_list_decoders struct_storage_opt pointer_word
 
   let get_float64_list
       ?(default : ro ListStorage.t option)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
     : (ro, float, 'cap ListStorage.t) InnerArray.t =
     get_list ?default float64_list_decoders struct_storage_opt pointer_word
 
   let get_text_list
       ?(default : ro ListStorage.t option)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
     : (ro, string, 'cap ListStorage.t) InnerArray.t =
     get_list ?default text_list_decoders struct_storage_opt pointer_word
 
   let get_blob_list
       ?(default : ro ListStorage.t option)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
     : (ro, string, 'cap ListStorage.t) InnerArray.t =
     get_list ?default blob_list_decoders struct_storage_opt pointer_word
 
   let get_struct_list
       ?(default : ro ListStorage.t option)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
-    : (ro, 'cap StructStorage.t option, 'cap ListStorage.t) InnerArray.t =
+    : (ro, ('cap, _) StructStorage.t option, 'cap ListStorage.t) InnerArray.t =
     get_list ?default struct_list_decoders struct_storage_opt pointer_word
 
   let get_struct
-      ?(default : ro StructStorage.t option)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      ?(default : (ro, 'a) StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
-    : 'cap StructStorage.t option =
+    : ('cap, 'a) StructStorage.t option =
     match struct_storage_opt with
     | Some struct_storage ->
         let pointers = struct_storage.StructStorage.pointers in
@@ -629,7 +630,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
 
   let get_pointer
       ?(default: ro Slice.t option)
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
     : 'cap Slice.t option =
     match struct_storage_opt with
@@ -654,7 +655,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
         default
 
   let get_interface
-      (struct_storage_opt : 'cap StructStorage.t option)
+      (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
     : Uint32.t option =
     match struct_storage_opt with
@@ -683,4 +684,9 @@ module Make (MessageWrapper : MessageSig.S) = struct
   let pointers_struct pointers =
     let data = { pointers with Slice.len = 0 } in
     StructStorage.v ~data ~pointers
+
+  let cast_struct = function
+    | None -> None
+    | Some s -> Some (StructStorage.cast s)
+
 end [@@inline]

@@ -1423,8 +1423,8 @@ module type S = sig
 end
 
 module Make (MessageWrapper : Capnp.MessageSig.S) = struct
-  type 'a reader_t = ro MessageWrapper.StructStorage.t option
-  type 'a builder_t = rw MessageWrapper.StructStorage.t
+  type 'a reader_t = 'a MessageWrapper.StructStorage.reader_t
+  type 'a builder_t = 'a MessageWrapper.StructStorage.builder_t
   module CamlBytes = Bytes
   module DefaultsMessage_ = Capnp.BytesMessage
 
@@ -1739,11 +1739,11 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let of_builder x = Some (RA_.StructStorage.readonly x)
       end
       let file_get x = ()
-      let struct_get x = x
-      let enum_get x = x
-      let interface_get x = x
-      let const_get x = x
-      let annotation_get x = x
+      let struct_get x = RA_.cast_struct x
+      let enum_get x = RA_.cast_struct x
+      let interface_get x = RA_.cast_struct x
+      let const_get x = RA_.cast_struct x
+      let annotation_get x = RA_.cast_struct x
       type unnamed_union_t =
         | File
         | Struct of Struct.t
@@ -1857,10 +1857,10 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
       end
-      let no_discriminant =
+      let no_discriminant : int =
         65535
-      let slot_get x = x
-      let group_get x = x
+      let slot_get x = RA_.cast_struct x
+      let group_get x = RA_.cast_struct x
       type unnamed_union_t =
         | Slot of Slot.t
         | Group of Group.t
@@ -1886,7 +1886,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         Capnp.Array.to_array (annotations_get x)
       let discriminant_value_get x =
         RA_.get_uint16 ~default:65535 x 2
-      let ordinal_get x = x
+      let ordinal_get x = RA_.cast_struct x
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       let of_builder x = Some (RA_.StructStorage.readonly x)
     end
@@ -2069,9 +2069,9 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
           let of_builder x = Some (RA_.StructStorage.readonly x)
         end
-        let unconstrained_get x = x
-        let parameter_get x = x
-        let implicit_method_parameter_get x = x
+        let unconstrained_get x = RA_.cast_struct x
+        let parameter_get x = RA_.cast_struct x
+        let implicit_method_parameter_get x = RA_.cast_struct x
         type unnamed_union_t =
           | Unconstrained of Unconstrained.t
           | Parameter of Parameter.t
@@ -2100,11 +2100,11 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       let float64_get x = ()
       let text_get x = ()
       let data_get x = ()
-      let list_get x = x
-      let enum_get x = x
-      let struct_get x = x
-      let interface_get x = x
-      let any_pointer_get x = x
+      let list_get x = RA_.cast_struct x
+      let enum_get x = RA_.cast_struct x
+      let struct_get x = RA_.cast_struct x
+      let interface_get x = RA_.cast_struct x
+      let any_pointer_get x = RA_.cast_struct x
       type unnamed_union_t =
         | Void
         | Bool
@@ -2717,7 +2717,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       let file_get x = ()
       let file_set x =
         BA_.set_void ~discr:{BA_.Discr.value=0; BA_.Discr.byte_ofs=12} x
-      let struct_get x = x
+      let struct_get x = BA_.cast_struct x
       let struct_init x =
         let data = x.BA_.NM.StructStorage.data in
         let pointers = x.BA_.NM.StructStorage.pointers in
@@ -2741,8 +2741,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let () = BA_.BOps.deep_zero_pointer ptr in
           MessageWrapper.Slice.set_int64 ptr 0 0L
         in
-        x
-      let enum_get x = x
+        BA_.cast_struct x
+      let enum_get x = BA_.cast_struct x
       let enum_init x =
         let data = x.BA_.NM.StructStorage.data in
         let pointers = x.BA_.NM.StructStorage.pointers in
@@ -2760,8 +2760,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let () = BA_.BOps.deep_zero_pointer ptr in
           MessageWrapper.Slice.set_int64 ptr 0 0L
         in
-        x
-      let interface_get x = x
+        BA_.cast_struct x
+      let interface_get x = BA_.cast_struct x
       let interface_init x =
         let data = x.BA_.NM.StructStorage.data in
         let pointers = x.BA_.NM.StructStorage.pointers in
@@ -2788,8 +2788,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let () = BA_.BOps.deep_zero_pointer ptr in
           MessageWrapper.Slice.set_int64 ptr 0 0L
         in
-        x
-      let const_get x = x
+        BA_.cast_struct x
+      let const_get x = BA_.cast_struct x
       let const_init x =
         let data = x.BA_.NM.StructStorage.data in
         let pointers = x.BA_.NM.StructStorage.pointers in
@@ -2816,8 +2816,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let () = BA_.BOps.deep_zero_pointer ptr in
           MessageWrapper.Slice.set_int64 ptr 0 0L
         in
-        x
-      let annotation_get x = x
+        BA_.cast_struct x
+      let annotation_get x = BA_.cast_struct x
       let annotation_init x =
         let data = x.BA_.NM.StructStorage.data in
         let pointers = x.BA_.NM.StructStorage.pointers in
@@ -2847,7 +2847,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let () = BA_.set_bit ~default:false x ~byte_ofs:15 ~bit_ofs:1 false in
         let () = BA_.set_bit ~default:false x ~byte_ofs:15 ~bit_ofs:2 false in
         let () = BA_.set_bit ~default:false x ~byte_ofs:15 ~bit_ofs:3 false in
-        x
+        BA_.cast_struct x
       type unnamed_union_t =
         | File
         | Struct of Struct.t
@@ -3054,9 +3054,9 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let init_pointer ptr =
           BA_.init_struct_pointer ptr ~data_words:3 ~pointer_words:4
       end
-      let no_discriminant =
+      let no_discriminant : int =
         65535
-      let slot_get x = x
+      let slot_get x = BA_.cast_struct x
       let slot_init x =
         let data = x.BA_.NM.StructStorage.data in
         let pointers = x.BA_.NM.StructStorage.pointers in
@@ -3085,8 +3085,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           MessageWrapper.Slice.set_int64 ptr 0 0L
         in
         let () = BA_.set_bit ~default:false x ~byte_ofs:16 ~bit_ofs:0 false in
-        x
-      let group_get x = x
+        BA_.cast_struct x
+      let group_get x = BA_.cast_struct x
       let group_init x =
         let data = x.BA_.NM.StructStorage.data in
         let pointers = x.BA_.NM.StructStorage.pointers in
@@ -3096,7 +3096,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           (Some {BA_.Discr.value=1; BA_.Discr.byte_ofs=8})
         in
         let () = BA_.set_int64 ~default:0L x 16 0L in
-        x
+        BA_.cast_struct x
       type unnamed_union_t =
         | Slot of Slot.t
         | Group of Group.t
@@ -3140,7 +3140,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         BA_.get_uint16 ~default:65535 x 2
       let discriminant_value_set_exn x v =
         BA_.set_uint16 ~default:65535 x 2 v
-      let ordinal_get x = x
+      let ordinal_get x = BA_.cast_struct x
       let ordinal_init x =
         let data = x.BA_.NM.StructStorage.data in
         let pointers = x.BA_.NM.StructStorage.pointers in
@@ -3148,7 +3148,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let () = ignore pointers in
         let () = BA_.set_int16 ~default:0 x 10 0 in
         let () = BA_.set_int16 ~default:0 x 12 0 in
-        x
+        BA_.cast_struct x
       let of_message x = BA_.get_root_struct ~data_words:3 ~pointer_words:4 x
       let to_message x = x.BA_.NM.StructStorage.data.MessageWrapper.Slice.msg
       let to_reader x = Some (RA_.StructStorage.readonly x)
@@ -3505,7 +3505,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let init_pointer ptr =
             BA_.init_struct_pointer ptr ~data_words:3 ~pointer_words:1
         end
-        let unconstrained_get x = x
+        let unconstrained_get x = BA_.cast_struct x
         let unconstrained_init x =
           let data = x.BA_.NM.StructStorage.data in
           let pointers = x.BA_.NM.StructStorage.pointers in
@@ -3515,8 +3515,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
             (Some {BA_.Discr.value=0; BA_.Discr.byte_ofs=8})
           in
           let () = BA_.set_int16 ~default:0 x 10 0 in
-          x
-        let parameter_get x = x
+          BA_.cast_struct x
+        let parameter_get x = BA_.cast_struct x
         let parameter_init x =
           let data = x.BA_.NM.StructStorage.data in
           let pointers = x.BA_.NM.StructStorage.pointers in
@@ -3527,8 +3527,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           in
           let () = BA_.set_int64 ~default:0L x 16 0L in
           let () = BA_.set_int16 ~default:0 x 10 0 in
-          x
-        let implicit_method_parameter_get x = x
+          BA_.cast_struct x
+        let implicit_method_parameter_get x = BA_.cast_struct x
         let implicit_method_parameter_init x =
           let data = x.BA_.NM.StructStorage.data in
           let pointers = x.BA_.NM.StructStorage.pointers in
@@ -3538,7 +3538,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
             (Some {BA_.Discr.value=2; BA_.Discr.byte_ofs=8})
           in
           let () = BA_.set_int16 ~default:0 x 10 0 in
-          x
+          BA_.cast_struct x
         type unnamed_union_t =
           | Unconstrained of Unconstrained.t
           | Parameter of Parameter.t
@@ -3600,7 +3600,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
       let data_get x = ()
       let data_set x =
         BA_.set_void ~discr:{BA_.Discr.value=13; BA_.Discr.byte_ofs=0} x
-      let list_get x = x
+      let list_get x = BA_.cast_struct x
       let list_init x =
         let data = x.BA_.NM.StructStorage.data in
         let pointers = x.BA_.NM.StructStorage.pointers in
@@ -3618,8 +3618,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let () = BA_.BOps.deep_zero_pointer ptr in
           MessageWrapper.Slice.set_int64 ptr 0 0L
         in
-        x
-      let enum_get x = x
+        BA_.cast_struct x
+      let enum_get x = BA_.cast_struct x
       let enum_init x =
         let data = x.BA_.NM.StructStorage.data in
         let pointers = x.BA_.NM.StructStorage.pointers in
@@ -3638,8 +3638,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let () = BA_.BOps.deep_zero_pointer ptr in
           MessageWrapper.Slice.set_int64 ptr 0 0L
         in
-        x
-      let struct_get x = x
+        BA_.cast_struct x
+      let struct_get x = BA_.cast_struct x
       let struct_init x =
         let data = x.BA_.NM.StructStorage.data in
         let pointers = x.BA_.NM.StructStorage.pointers in
@@ -3658,8 +3658,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let () = BA_.BOps.deep_zero_pointer ptr in
           MessageWrapper.Slice.set_int64 ptr 0 0L
         in
-        x
-      let interface_get x = x
+        BA_.cast_struct x
+      let interface_get x = BA_.cast_struct x
       let interface_init x =
         let data = x.BA_.NM.StructStorage.data in
         let pointers = x.BA_.NM.StructStorage.pointers in
@@ -3678,8 +3678,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           let () = BA_.BOps.deep_zero_pointer ptr in
           MessageWrapper.Slice.set_int64 ptr 0 0L
         in
-        x
-      let any_pointer_get x = x
+        BA_.cast_struct x
+      let any_pointer_get x = BA_.cast_struct x
       let any_pointer_init x =
         let data = x.BA_.NM.StructStorage.data in
         let pointers = x.BA_.NM.StructStorage.pointers in
@@ -3693,7 +3693,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         let () = BA_.set_int64 ~default:0L x 16 0L in
         let () = BA_.set_int16 ~default:0 x 10 0 in
         let () = BA_.set_int16 ~default:0 x 10 0 in
-        x
+        BA_.cast_struct x
       type unnamed_union_t =
         | Void
         | Bool

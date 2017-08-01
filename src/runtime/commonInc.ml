@@ -64,7 +64,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
 
   (** Get the range of bytes associated with a pointer stored in a struct. *)
   let ss_get_pointer
-      (struct_storage : 'cap StructStorage.t)
+      (struct_storage : ('cap, 'a) StructStorage.t)
       (word : int)           (* Struct-relative pointer index *)
     : 'cap Slice.t option =  (* Returns None if storage is too small for this word *)
     let pointers = struct_storage.StructStorage.pointers in
@@ -208,7 +208,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
   let rec deref_far_pointer
       (far_pointer : FarPointer.t)
       (message : 'cap Message.t)
-    : 'cap Object.t =
+    : ('cap, 'a) Object.t =
     let open FarPointer in
     match far_pointer.landing_pad with
     | NormalPointer ->
@@ -272,7 +272,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
 
   (* Given a range of eight bytes which represent a pointer, get the object which
      the pointer points to. *)
-  and deref_pointer (pointer_bytes : 'cap Slice.t) : 'cap Object.t =
+  and deref_pointer (pointer_bytes : 'cap Slice.t) : ('cap, 'a) Object.t =
     let pointer64 = Slice.get_int64 pointer_bytes 0 in
     if Util.is_int64_zero pointer64 then
       Object.None
@@ -327,7 +327,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
     type ('cap, 'a) struct_decoders_t = {
       bytes     : 'cap Slice.t -> 'a;
       pointer   : 'cap Slice.t -> 'a;
-      composite : 'cap StructStorage.t -> 'a;
+      composite : 'b. ('cap, 'b) StructStorage.t -> 'a;
     }
 
     type ('cap, 'a) t =
@@ -346,7 +346,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
     type 'a struct_codecs_t = {
       bytes     : (rw Slice.t -> 'a) * ('a -> rw Slice.t -> unit);
       pointer   : (rw Slice.t -> 'a) * ('a -> rw Slice.t -> unit);
-      composite : (rw StructStorage.t -> 'a) * ('a -> rw StructStorage.t -> unit);
+      composite : 'b. ((rw, 'b) StructStorage.t -> 'a) * ('a -> (rw, 'b) StructStorage.t -> unit);
     }
 
     type 'a t =

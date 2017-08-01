@@ -236,11 +236,11 @@ let rec generate_list_element_codecs ~context ~scope list_def =
   let make_terminal_codecs element_name = [
       "let codecs =";
       "  let decode slice =";
-      "    let struct_storage = RA_.pointers_struct slice in";
+      "    let struct_storage = BA_.pointers_struct slice in";
       "    BA_.get_" ^ element_name ^ "_list struct_storage 0";
       "  in";
       "  let encode v slice =";
-      "    let struct_storage = RA_.pointers_struct slice in";
+      "    let struct_storage = BA_.pointers_struct slice in";
       "    let _ = BA_.set_" ^ element_name ^ "_list struct_storage 0 v in ()";
       "  in";
       "  BA_.NC.ListCodecs.Pointer (decode, encode)";
@@ -723,7 +723,7 @@ let generate_one_field_accessors ~context ~node_id ~scope
   let (getters, setters) =
     begin match PS.Field.get field with
     | PS.Field.Group group ->
-        let getters = [ "let " ^ field_name ^ "_get x = x" ] in
+        let getters = [ sprintf "let %s_get x = %s.cast_struct x" field_name api_module ] in
         let setters =
           let clear_fields =
             apply_indent ~indent:"  "
@@ -750,7 +750,7 @@ let generate_one_field_accessors ~context ~node_id ~scope
             "  let () = ignore pointers in"; ] @
             set_discriminant @
             clear_fields @
-            [ "  x" ]
+            [ sprintf "  %s.cast_struct x" api_module ]
         in
         (getters, setters)
     | PS.Field.Slot slot ->
@@ -1578,7 +1578,11 @@ and generate_node
           (apply_indent ~indent:"  " body) @
           [ "end" ]
   | PS.Node.Const const_def -> [
-      "let " ^ (GenCommon.underscore_name node_name) ^ " =";
+      let typ =
+        PS.Node.Const.type_get const_def
+        |> GenCommon.type_name ~context ~mode:Mode.Reader ~scope_mode:mode scope
+      in
+      sprintf "let %s : %s =" (GenCommon.underscore_name node_name) typ
     ] @ (apply_indent ~indent:"  "
           (generate_constant ~context ~scope ~node ~node_name const_def))
   | PS.Node.Annotation _ ->

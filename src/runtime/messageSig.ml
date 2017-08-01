@@ -282,9 +282,16 @@ module type S = sig
   end
 
   module StructStorage : sig
-    type 'cap t = private { data : 'cap Slice.t; pointers : 'cap Slice.t; }
-    val readonly : 'cap t -> ro t
-    val v : data:'cap Slice.t -> pointers:'cap Slice.t -> 'cap t
+    (* Note: ['a] is marked covariant here just because it makes casting easier in some places. *)
+    type ('cap, +'a) t = private { data : 'cap Slice.t; pointers : 'cap Slice.t; }
+    val readonly : ('cap, 'a) t -> (ro, 'a) t
+    val v : data:'cap Slice.t -> pointers:'cap Slice.t -> ('cap, 'a) t
+    val cast : ('cap, 'a) t -> ('cap, 'b) t
+
+    type 'a reader_t = (ro, 'a) t option
+    type 'a builder_t = (rw, 'a) t
+
+    val cast_reader : 'a reader_t -> 'b reader_t
   end
 
   module ListStorage : sig
@@ -297,10 +304,10 @@ module type S = sig
   end
 
   module Object : sig
-    type 'cap t =
+    type ('cap, 'a) t =
       | None
       | List of 'cap ListStorage.t
-      | Struct of 'cap StructStorage.t
+      | Struct of ('cap, 'a) StructStorage.t
       | Capability of Uint32.t
   end
 end

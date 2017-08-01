@@ -61,7 +61,7 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
   (* Given storage for a struct, get the pointer bytes for the given
      struct-relative pointer index. *)
   let get_struct_pointer
-      (struct_storage : 'cap RWM.StructStorage.t)
+      (struct_storage : ('cap, _) RWM.StructStorage.t)
       (pointer_word : int)
     : 'cap RWM.Slice.t =
     let pointers = struct_storage.RWM.StructStorage.pointers in
@@ -81,7 +81,7 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
       (message : rw RWM.Message.t)
       ~(data_words : int)
       ~(pointer_words : int)
-    : rw RWM.StructStorage.t =
+    : (rw, 'a) RWM.StructStorage.t =
     let storage = RWM.Slice.alloc message
       ((data_words + pointer_words) * sizeof_uint64)
     in
@@ -277,7 +277,7 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
      storage. *)
   let init_normal_struct_pointer
       (pointer_bytes : rw RWM.Slice.t)
-      (struct_storage : 'cap RWM.StructStorage.t)
+      (struct_storage : ('cap, _) RWM.StructStorage.t)
     : unit =
     let () = assert (struct_storage.RWM.StructStorage.data.RWM.Slice.segment_id =
       pointer_bytes.RWM.Slice.segment_id)
@@ -298,7 +298,7 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
      struct storage. *)
   let init_struct_pointer
       (pointer_bytes : rw RWM.Slice.t)
-      (struct_storage : 'cap RWM.StructStorage.t)
+      (struct_storage : ('cap, _) RWM.StructStorage.t)
     : unit =
     if struct_storage.RWM.StructStorage.data.RWM.Slice.segment_id =
         pointer_bytes.RWM.Slice.segment_id then
@@ -351,8 +351,8 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
      is a shallow copy; the data section is copied in bitwise fashion,
      and the pointers are copied using [shallow_copy_pointer]. *)
   let shallow_copy_struct
-      ~(src : 'cap RWM.StructStorage.t)
-      ~(dest : rw RWM.StructStorage.t)
+      ~(src : ('cap, _) RWM.StructStorage.t)
+      ~(dest : (rw, _) RWM.StructStorage.t)
     : unit =
     let open RWM.StructStorage in
     let data_copy_size =
@@ -453,7 +453,7 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
 
   (* Set a struct to all-zeros.  Pointers are not followed. *)
   let shallow_zero_out_struct
-      (struct_storage : rw RWM.StructStorage.t)
+      (struct_storage : (rw, _) RWM.StructStorage.t)
     : unit =
     let open RWM.StructStorage in
     RWM.Slice.zero_out struct_storage.data
@@ -471,10 +471,10 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
      Returns: new struct descriptor (possibly the same as the old one). *)
   let upgrade_struct
       (pointer_bytes : rw RWM.Slice.t)
-      (orig : rw RWM.StructStorage.t)
+      (orig : (rw, _) RWM.StructStorage.t)
       ~(data_words : int)
       ~(pointer_words : int)
-    : rw RWM.StructStorage.t =
+    : (rw, _) RWM.StructStorage.t =
     let open RWM.StructStorage in
     if orig.data.RWM.Slice.len < data_words * sizeof_uint64 ||
        orig.pointers.RWM.Slice.len < pointer_words * sizeof_uint64 then
@@ -496,11 +496,11 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
      if the struct has a smaller layout (i.e. from an older protocol version),
      then a new struct is allocated and the data is copied over. *)
   let deref_struct_pointer
-      ~(create_default : rw RWM.Message.t -> rw RWM.StructStorage.t)
+      ~(create_default : rw RWM.Message.t -> (rw, 'a) RWM.StructStorage.t)
       ~(data_words : int)
       ~(pointer_words : int)
       (pointer_bytes : rw RWM.Slice.t)
-    : rw RWM.StructStorage.t =
+    : (rw, 'a) RWM.StructStorage.t =
     match RReader.deref_struct_pointer pointer_bytes with
     | None ->
         let struct_storage = create_default pointer_bytes.RWM.Slice.msg in
@@ -549,11 +549,11 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
      during a schema upgrade).
   *)
   and deep_copy_struct
-      ~(src : 'cap ROM.StructStorage.t)
+      ~(src : ('cap, _) ROM.StructStorage.t)
       ~(dest_message : rw RWM.Message.t)
       ~(data_words : int)
       ~(pointer_words : int)
-    : rw RWM.StructStorage.t =
+    : (rw, _) RWM.StructStorage.t =
     let src_data_words    = src.ROM.StructStorage.data.ROM.Slice.len / sizeof_uint64 in
     let src_pointer_words = src.ROM.StructStorage.pointers.ROM.Slice.len / sizeof_uint64 in
     let dest_data_words    = max data_words src_data_words in
@@ -566,8 +566,8 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
 
   (* As [deep_copy_struct], but the destination is already allocated. *)
   and deep_copy_struct_to_dest
-      ~(src : 'cap ROM.StructStorage.t)
-      ~(dest : rw RWM.StructStorage.t)
+      ~(src : ('cap, _) ROM.StructStorage.t)
+      ~(dest : (rw, _) RWM.StructStorage.t)
     : unit =
     let data_bytes = min
         src.ROM.StructStorage.data.ROM.Slice.len
@@ -830,7 +830,7 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
         RWM.Slice.zero_out content_slice ~pos:0 ~len:content_slice.RWM.Slice.len
 
   and deep_zero_struct
-    (struct_storage : rw RWM.StructStorage.t)
+    (struct_storage : (rw, _) RWM.StructStorage.t)
     : unit =
     let open RWM.StructStorage in
     let pointer_words =
