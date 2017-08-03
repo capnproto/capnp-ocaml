@@ -44,15 +44,15 @@ let sig_s_header ~context = [
   "type rw = Capnp.Message.rw";
   "";
   "module type S = sig";
-  "  type 'cap message_t";
-  "  type 'a reader_t";
-  "  type 'a builder_t";
   "  module RPC : Capnp.RPC.S";
+  "  type 'cap message_t = 'cap RPC.MessageWrapper.Message.t";
+  "  type 'a reader_t = 'a RPC.MessageWrapper.StructStorage.reader_t";
+  "  type 'a builder_t = 'a RPC.MessageWrapper.StructStorage.builder_t";
   "";
 ] @ (List.concat_map context.Context.imports ~f:(fun import -> [
       "  module " ^ import.Context.schema_name ^ " : " ^
         import.Context.module_name ^ ".S with";
-      "    type 'cap message_t = 'cap message_t";
+      "    module RPC = RPC";
       "";
     ]))
 
@@ -61,7 +61,7 @@ let sig_s_reader_header = [
   "  module Reader : sig";
   "    type array_t";
   "    type builder_array_t";
-  "    type pointer_t";
+  "    type pointer_t = ro RPC.MessageWrapper.Slice.t option";
   "    val of_pointer : pointer_t -> 'a reader_t";
   "    val with_attachments : Capnp.MessageSig.attachments -> 'a reader_t -> 'a reader_t";
   "    val get_attachments : 'a reader_t -> Capnp.MessageSig.attachments";
@@ -73,7 +73,7 @@ let sig_s_divide_reader_builder = [
   "  module Builder : sig";
   "    type array_t = Reader.builder_array_t";
   "    type reader_array_t = Reader.array_t";
-  "    type pointer_t";
+  "    type pointer_t = rw RPC.MessageWrapper.Slice.t";
   "    val with_attachments : Capnp.MessageSig.attachments -> 'a builder_t -> 'a builder_t";
   "    val get_attachments : 'a builder_t -> Capnp.MessageSig.attachments";
 ]
@@ -86,36 +86,23 @@ let sig_s_footer = [
 
 
 let functor_sig ~context = [
-  "module MakeRPC";
-  "  (MessageWrapper : Capnp.MessageSig.S)";
-  "  (RPC : Capnp.RPC.S with";
-  "    type 'a Untyped.reader_t = 'a MessageWrapper.StructStorage.reader_t";
-  "  ) :";
-  "  (S with type 'cap message_t = 'cap MessageWrapper.Message.t";
-  "    and type Reader.pointer_t = ro MessageWrapper.Slice.t option";
-  "    and type Builder.pointer_t = rw MessageWrapper.Slice.t";
-  "    and type 'a reader_t = 'a MessageWrapper.StructStorage.reader_t";
-  "    and type 'a builder_t = 'a MessageWrapper.StructStorage.builder_t";
-  "    and module RPC = RPC"; ] @
+  "module MakeRPC (RPC : Capnp.RPC.S) :";
+  "  (S with module RPC = RPC"; ] @
   (List.concat_map context.Context.imports ~f:(fun import -> [
         "    and module " ^ import.Context.schema_name ^ " = " ^
-          import.Context.module_name ^ ".Make(MessageWrapper)";
+          import.Context.module_name ^ ".MakeRPC(RPC)";
   ])) @ [
   ")";
   "";
-  "module Make(M : Capnp.MessageSig.S) : module type of MakeRPC(M)(Capnp.RPC.None(M))";
+  "module Make(M : Capnp.MessageSig.S) : module type of MakeRPC(Capnp.RPC.None(M))";
 ]
 
 let mod_functor_header = [
-  "module MakeRPC";
-  "  (MessageWrapper : Capnp.MessageSig.S)";
-  "  (RPC : Capnp.RPC.S with";
-  "    type 'a Untyped.reader_t = 'a MessageWrapper.StructStorage.reader_t";
-  "  ) = struct";
+  "module MakeRPC (RPC : Capnp.RPC.S) = struct";
+  "  module MessageWrapper = RPC.MessageWrapper";
   "  type 'a reader_t = 'a MessageWrapper.StructStorage.reader_t";
   "  type 'a builder_t = 'a MessageWrapper.StructStorage.builder_t";
   "  module CamlBytes = Bytes";
-  "  module RPC = RPC";
 ]
 
 let mod_header ~context = [
@@ -126,7 +113,7 @@ let mod_header ~context = [
   "  type 'cap message_t = 'cap MessageWrapper.Message.t";
   ""; ] @ (List.concat_map context.Context.imports ~f:(fun import -> [
       "  module " ^ import.Context.schema_name ^ " = " ^
-          import.Context.module_name ^ ".Make(MessageWrapper)";
+          import.Context.module_name ^ ".MakeRPC(RPC)";
       "";
     ]))
 
@@ -163,9 +150,10 @@ let mod_footer = [
 ]
 
 let mod_functor_footer = [
+  "  module RPC = RPC";
   "end [@@inline]";
   "";
-  "module Make(M:Capnp.MessageSig.S) = MakeRPC[@inlined](M)[@inlined](Capnp.RPC.None(M)) [@@inline]";
+  "module Make(M:Capnp.MessageSig.S) = MakeRPC[@inlined](Capnp.RPC.None(M)) [@@inline]";
 ]
 
 
