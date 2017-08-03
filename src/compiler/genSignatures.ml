@@ -271,9 +271,7 @@ let generate_accessors ~context ~scope ~mode
 
 (* Generate the OCaml type signature corresponding to a struct definition.  [scope] is a
  * stack of scope IDs corresponding to this lexical context, and is used to figure
- * out what module prefixes are required to properly qualify a type.
- *
- * Raises: Failure if the children of this node contain a cycle. *)
+ * out what module prefixes are required to properly qualify a type. *)
 let generate_struct_node ~context ~scope ~nested_modules
     ~mode ~node struct_def : string list =
   let unsorted_fields =
@@ -305,33 +303,28 @@ let generate_struct_node ~context ~scope ~nested_modules
     in
     generate_accessors ~context ~scope ~mode ~f:selector non_union_fields
   in
-  let unique_reader = GenCommon.make_unique_typename ~mode:Mode.Reader
-      ~context node
-  in
-  let unique_builder = GenCommon.make_unique_typename ~mode:Mode.Builder
-      ~context node
-  in
+  let unique_struct = GenCommon.make_unique_typename ~context node in
   let header =
     match mode with
     | Mode.Reader -> [
-        "type t = " ^ unique_reader;
-        "type builder_t = " ^ unique_builder;
+        "type struct_t = " ^ unique_struct;
+        "type t = struct_t reader_t";
       ]
     | Mode.Builder -> [
-        "type t = " ^ unique_builder;
-        "type reader_t = " ^ unique_reader;
+        "type struct_t = " ^ unique_struct;
+        "type t = struct_t builder_t";
       ]
   in
   let footer =
     match mode with
     | Mode.Reader -> [
         "val of_message : 'cap message_t -> t";
-        "val of_builder : builder_t -> t";
+        "val of_builder : struct_t builder_t -> t";
       ]
     | Mode.Builder -> [
         "val of_message : rw message_t -> t";
         "val to_message : t -> rw message_t";
-        "val to_reader : t -> reader_t";
+        "val to_reader : t -> struct_t reader_t";
         "val init_root : ?message_size:int -> unit -> t";
         "val init_pointer : pointer_t -> t";
       ]

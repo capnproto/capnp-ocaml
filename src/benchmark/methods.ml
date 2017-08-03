@@ -5,6 +5,7 @@ open Core.Std
 module IO = Capnp.IO
 module Codecs = Capnp.Codecs
 
+let message_of_builder = Capnp.BytesMessage.StructStorage.message_of_builder
 
 (* This is a wrapper for writing to a file descriptor and simultaneously
    counting the number of bytes written. *)
@@ -41,14 +42,8 @@ end
 
 module Benchmark
     (TestCase : TestCaseSig.TEST_CASE)
-    (RequestReader : TestCaseSig.READER
-     with type t = TestCase.request_reader_t
-      and type builder_t = TestCase.request_builder_t)
-    (RequestBuilder : TestCaseSig.BUILDER with type t = TestCase.request_builder_t)
-    (ResponseReader : TestCaseSig.READER
-     with type t = TestCase.response_reader_t
-      and type builder_t = TestCase.response_builder_t)
-    (ResponseBuilder : TestCaseSig.BUILDER with type t = TestCase.response_builder_t)
+    (RequestReader : TestCaseSig.READER with type struct_t = TestCase.request_t)
+    (ResponseReader : TestCaseSig.READER with type struct_t = TestCase.response_t)
     : BENCHMARK_SIG
 = struct
 
@@ -68,7 +63,7 @@ module Benchmark
     let out_context = CountingOutputStream.wrap_write_context ~compression out_stream in
     for _i = 0 to iters - 1 do
       let (request, expectation) = TestCase.setup_request () in
-      let req_message = RequestBuilder.to_message request in
+      let req_message = message_of_builder request in
       IO.WriteContext.write_message out_context req_message;
       match IO.ReadContext.read_message in_context with
       | Some resp_message ->
@@ -146,7 +141,7 @@ module Benchmark
            GC pressure. *)
         else if Queue.length expectations < 4 then begin
           let (request, expect) = TestCase.setup_request () in
-          let req_message = RequestBuilder.to_message request in
+          let req_message = message_of_builder request in
           IO.WriteContext.enqueue_message out_context req_message;
           Queue.enqueue expectations expect;
           num_sent := !num_sent + 1
@@ -175,7 +170,7 @@ module Benchmark
       | Some req_message ->
           let request = RequestReader.of_message req_message in
           let response = TestCase.handle_request request in
-          let resp_message = ResponseBuilder.to_message response in
+          let resp_message = message_of_builder response in
           IO.WriteContext.write_message out_context resp_message
       | None ->
           failwith "EOF before all messages were read."
@@ -191,18 +186,18 @@ module Benchmark
     for _i = 0 to iters - 1 do
       let (req_builder, expectation) = TestCase.setup_request () in
       let resp_builder = TestCase.handle_request
-          (RequestReader.of_builder req_builder)
+          (Capnp.BytesMessage.StructStorage.reader_of_builder req_builder)
       in
-      if not (TestCase.check_response (ResponseReader.of_builder resp_builder)
+      if not (TestCase.check_response (Capnp.BytesMessage.StructStorage.reader_of_builder resp_builder)
             expectation) then
         failwith "incorrect response."
       else
         ();
       object_size_counter := !object_size_counter +
         (Capnp.BytesMessage.Message.total_size
-           (RequestBuilder.to_message req_builder)) +
+           (message_of_builder req_builder)) +
         (Capnp.BytesMessage.Message.total_size
-           (ResponseBuilder.to_message resp_builder))
+           (message_of_builder resp_builder))
     done;
     !object_size_counter
 
@@ -216,7 +211,7 @@ module Benchmark
     for _i = 0 to iters - 1 do
       let (req_builder, expectation) = TestCase.setup_request () in
       let flattened_request =
-        let req_message = RequestBuilder.to_message req_builder in
+        let req_message = message_of_builder req_builder in
         Codecs.serialize ~compression req_message
       in
       throughput := !throughput + (String.length flattened_request);
@@ -230,7 +225,7 @@ module Benchmark
             let resp_builder = TestCase.handle_request
                 (RequestReader.of_message req_message)
             in
-            let resp_message = ResponseBuilder.to_message resp_builder in
+            let resp_message = message_of_builder resp_builder in
             Codecs.serialize ~compression resp_message
         | Result.Error _ ->
             failwith "failed to decode complete request."

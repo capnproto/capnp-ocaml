@@ -206,23 +206,9 @@ let compile
     let context = GenCommon.filter_interesting_imports
         ~context:context_unfiltered requested_file_node
     in
-    let sig_unique_types = List.rev_map
-        (GenCommon.collect_unique_types ~context requested_file_node)
-        ~f:(function
-            | name, (`Hidden _ | `Abstract) -> "  type " ^ name
-            | name, `Public tp -> sprintf "  type %s = %s" name tp
-          )
-    in
     let sig_unique_enums =
       GenCommon.apply_indent ~indent:"  "
         (GenCommon.collect_unique_enums ~is_sig:true ~context requested_file_node)
-    in
-    let mod_unique_types = (List.rev_map
-        (GenCommon.collect_unique_types ~context requested_file_node)
-        ~f:(function
-            | name, (`Hidden tp | `Public tp) -> "  type " ^ name ^ " = " ^ tp
-            | name, `Abstract -> "  type " ^ name
-          )) @ [""]
     in
     let mod_unique_enums =
       GenCommon.apply_indent ~indent:"  "
@@ -230,7 +216,6 @@ let compile
     in
     let sig_s =
       (sig_s_header ~context) @
-      sig_unique_types @
       sig_unique_enums @
       sig_s_reader_header @
       (GenCommon.apply_indent ~indent:"    "
@@ -272,7 +257,6 @@ let compile
       in
       builder_defaults @
       (mod_header ~context) @
-      mod_unique_types @
       mod_unique_enums @
       reader_defaults @
       mod_reader_header @

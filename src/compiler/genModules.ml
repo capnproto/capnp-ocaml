@@ -364,16 +364,10 @@ let generate_list_getters ~context ~scope ~list_type ~mode
     | Text     -> make_primitive_accessor "text"
     | Data     -> make_primitive_accessor "blob"
     | Struct struct_def ->
-        let obj_magic =
-          if GenCommon.uses_imported_abstract_type ~context list_type then
-            "Obj.magic "
-          else
-            ""
-        in
         begin match mode with
         | Mode.Reader -> [
-            "let " ^ field_name ^ "_get x = " ^ obj_magic;
-            sprintf "  (RA_.get_struct_list%s x %u)" default_str field_ofs;
+            "let " ^ field_name ^ "_get x = ";
+            sprintf "  RA_.get_struct_list%s x %u" default_str field_ofs;
           ]
         | Mode.Builder ->
             let data_words, pointer_words =
@@ -387,9 +381,9 @@ let generate_list_getters ~context ~scope ~list_type ~mode
                   failwith
                     "Decoded non-struct node where struct node was expected."
             in [
-              "let " ^ field_name ^ "_get x = " ^ obj_magic;
-              sprintf "  (BA_.get_struct_list%s ~data_words:%u \
-                       ~pointer_words:%u x %u)"
+              "let " ^ field_name ^ "_get x = ";
+              sprintf "  BA_.get_struct_list%s ~data_words:%u \
+                       ~pointer_words:%u x %u"
                 default_str
                 data_words
                 pointer_words
@@ -397,21 +391,15 @@ let generate_list_getters ~context ~scope ~list_type ~mode
             ]
         end
     | List list_def ->
-        let obj_magic =
-          if GenCommon.uses_imported_abstract_type ~context list_type then
-            "Obj.magic "
-          else
-            ""
-        in
         begin match mode with
         | Mode.Reader ->
             let decoder_declaration =
               apply_indent ~indent:"  "
                 (generate_list_element_decoder ~context ~scope list_def)
             in [
-              "let " ^ field_name ^ "_get x = " ^ obj_magic ^ "(";
+              "let " ^ field_name ^ "_get x =";
             ] @ decoder_declaration @ [
-              sprintf "  RA_.get_list%s decoders x %u)"
+              sprintf "  RA_.get_list%s decoders x %u"
                 default_str field_ofs;
             ]
         | Mode.Builder ->
@@ -419,11 +407,11 @@ let generate_list_getters ~context ~scope ~list_type ~mode
               apply_indent ~indent:"  "
                 (generate_list_element_codecs ~context ~scope list_def)
             in [
-              "let " ^ field_name ^ "_get x = " ^ obj_magic ^ "(";
+              "let " ^ field_name ^ "_get x =";
             ] @ codecs_declaration @ [
               sprintf "  BA_.get_list%s \
                        ~storage_type:Capnp.Runtime.ListStorageType.Pointer ~codecs \
-                       x %u)"
+                       x %u"
                 default_str field_ofs;
             ]
         end
@@ -505,12 +493,6 @@ let generate_list_setters ~context ~scope ~list_type
     | Text     -> make_primitive_setters "text"
     | Data     -> make_primitive_setters "blob"
     | Struct struct_def ->
-        let obj_magic =
-          if GenCommon.uses_imported_abstract_type ~context list_type then
-            "Obj.magic "
-          else
-            ""
-        in
         let data_words, pointer_words =
           let id = PS.Type.Struct.type_id_get struct_def in
           let node = Context.node context id in
@@ -522,41 +504,34 @@ let generate_list_setters ~context ~scope ~list_type
               failwith
                 "Decoded non-struct node where struct node was expected."
         in [
-          "let " ^ field_name ^ "_set x v = " ^ obj_magic;
-          sprintf "  (BA_.set_struct_list ~data_words:%u \
-                   ~pointer_words:%u %sx %u (%sv))"
+          "let " ^ field_name ^ "_set x v =";
+          sprintf "  BA_.set_struct_list ~data_words:%u \
+                   ~pointer_words:%u %sx %u v"
             data_words
             pointer_words
             discr_str
-            field_ofs
-            obj_magic;
-          "let " ^ field_name ^ "_init x n = " ^ obj_magic;
-          sprintf "  (BA_.init_struct_list ~data_words:%u \
-                   ~pointer_words:%u %sx %u n)"
+            field_ofs;
+          "let " ^ field_name ^ "_init x n =";
+          sprintf "  BA_.init_struct_list ~data_words:%u \
+                   ~pointer_words:%u %sx %u n"
             data_words
             pointer_words
             discr_str
             field_ofs;
         ]
     | List list_def ->
-        let obj_magic =
-          if GenCommon.uses_imported_abstract_type ~context list_type then
-            "Obj.magic "
-          else
-            ""
-        in
         let codecs_declaration =
           apply_indent ~indent:"  "
             (generate_list_element_codecs ~context ~scope list_def)
         in [
-          "let " ^ field_name ^ "_set x v = " ^ obj_magic ^ "(";
+          "let " ^ field_name ^ "_set x v =";
         ] @ codecs_declaration @ [
           "  BA_.set_list ~storage_type:Capnp.Runtime.ListStorageType.Pointer";
-          sprintf "    ~codecs %sx %u v)" discr_str field_ofs;
-          "let " ^ field_name ^ "_init x n = " ^ obj_magic ^ "(";
+          sprintf "    ~codecs %sx %u v" discr_str field_ofs;
+          "let " ^ field_name ^ "_init x n =";
         ] @ codecs_declaration @ [
           "  BA_.init_list ~storage_type:Capnp.Runtime.ListStorageType.Pointer";
-          sprintf "    ~codecs %sx %u n)" discr_str field_ofs;
+          sprintf "    ~codecs %sx %u n" discr_str field_ofs;
         ]
     | Enum enum_def ->
         let enum_id = Enum.type_id_get enum_def in
@@ -1023,15 +998,9 @@ let generate_one_field_accessors ~context ~node_id ~scope
                   ""
             in
             let list_type = PS.Type.List.element_type_get list_def in
-            let obj_magic =
-              if GenCommon.uses_imported_abstract_type ~context tp then
-                "Obj.magic "
-              else
-                ""
-            in
             let getters = [
-              "let has_" ^ field_name ^ " x = " ^ obj_magic;
-              sprintf "  (%s.has_field x %u)" api_module field_ofs;
+              "let has_" ^ field_name ^ " x =";
+              sprintf "  %s.has_field x %u" api_module field_ofs;
               ] @ (generate_list_getters ~context ~scope ~list_type
                 ~mode ~field_name ~field_ofs ~default_str)
             in
@@ -1078,25 +1047,19 @@ let generate_one_field_accessors ~context ~node_id ~scope
                   failwith
                     "Decoded non-struct node where struct node was expected."
             in
-            let obj_magic =
-              if GenCommon.uses_imported_abstract_type ~context tp then
-                "Obj.magic "
-              else
-                ""
-            in
             let getters =
               match mode with
               | Mode.Reader -> [
-                  "let has_" ^ field_name ^ " x = " ^ obj_magic;
-                  sprintf "  (RA_.has_field x %u)" field_ofs;
-                  "let " ^ field_name ^ "_get x = " ^ obj_magic;
-                  sprintf "  (RA_.get_struct%s x %u)" reader_default_str field_ofs;
+                  "let has_" ^ field_name ^ " x =";
+                  sprintf "  RA_.has_field x %u" field_ofs;
+                  "let " ^ field_name ^ "_get x =";
+                  sprintf "  RA_.get_struct%s x %u" reader_default_str field_ofs;
                 ]
               | Mode.Builder -> [
-                  "let has_" ^ field_name ^ " x = " ^ obj_magic;
-                  sprintf "  (BA_.has_field x %u)" field_ofs;
-                  "let " ^ field_name ^ "_get x = " ^ obj_magic;
-                  sprintf "  (BA_.get_struct%s ~data_words:%u ~pointer_words:%u x %u)"
+                  "let has_" ^ field_name ^ " x =";
+                  sprintf "  BA_.has_field x %u" field_ofs;
+                  "let " ^ field_name ^ "_get x =";
+                  sprintf "  BA_.get_struct%s ~data_words:%u ~pointer_words:%u x %u"
                     builder_default_str
                     data_words
                     pointer_words
@@ -1104,23 +1067,21 @@ let generate_one_field_accessors ~context ~node_id ~scope
                 ]
             in
             let setters = [
-              "let " ^ field_name ^ "_set_reader x v = " ^ obj_magic;
-              sprintf "  (BA_.set_struct ~data_words:%u ~pointer_words:%u %sx %u (%sv))"
+              "let " ^ field_name ^ "_set_reader x v =";
+              sprintf "  BA_.set_struct ~data_words:%u ~pointer_words:%u %sx %u v"
                 data_words
                 pointer_words
                 discr_str
-                field_ofs
-                obj_magic;
-              "let " ^ field_name ^ "_set_builder x v = " ^ obj_magic;
-              sprintf "  (BA_.set_struct ~data_words:%u ~pointer_words:%u \
-                       %sx %u (Some (%sv)))"
+                field_ofs;
+              "let " ^ field_name ^ "_set_builder x v =";
+              sprintf "  BA_.set_struct ~data_words:%u ~pointer_words:%u \
+                       %sx %u (Some v)"
                 data_words
                 pointer_words
                 discr_str
-                field_ofs
-                obj_magic;
-              "let " ^ field_name ^ "_init x = " ^ obj_magic;
-              sprintf "  (BA_.init_struct ~data_words:%u ~pointer_words:%u %sx %u)"
+                field_ofs;
+              "let " ^ field_name ^ "_init x =";
+              sprintf "  BA_.init_struct ~data_words:%u ~pointer_words:%u %sx %u"
                 data_words
                 pointer_words
                 discr_str
@@ -1128,22 +1089,15 @@ let generate_one_field_accessors ~context ~node_id ~scope
             ] in
             (getters, setters)
         | (PS.Type.Interface _, PS.Value.Interface) ->
-            let obj_magic =
-              if GenCommon.uses_imported_abstract_type ~context tp then
-                "Obj.magic "
-              else
-                ""
-            in
             let getters = [
-              "let " ^ field_name ^ "_get x = " ^ obj_magic;
-              sprintf "  (%s.get_interface x %u)" api_module field_ofs;
+              "let " ^ field_name ^ "_get x =";
+              sprintf "  %s.get_interface x %u" api_module field_ofs;
             ] in
             let setters = [
-              "let " ^ field_name ^ "_set x v = " ^ obj_magic;
-              sprintf "  (BA_.set_interface %sx %u (%sv))"
+              "let " ^ field_name ^ "_set x v =";
+              sprintf "  BA_.set_interface %sx %u v"
                 discr_str
-                field_ofs
-                obj_magic;
+                field_ofs;
             ] in
             (getters, setters)
         | (PS.Type.AnyPointer _, PS.Value.AnyPointer pointer_slice_opt) ->
@@ -1446,9 +1400,7 @@ let generate_constant ~context ~scope ~node ~node_name const_def =
 
 (* Generate the OCaml module corresponding to a struct definition.  [scope] is a
  * stack of scope IDs corresponding to this lexical context, and is used to figure
- * out what module prefixes are required to properly qualify a type.
- *
- * Raises: Failure if the children of this node contain a cycle. *)
+ * out what module prefixes are required to properly qualify a type. *)
 let rec generate_struct_node ~context ~scope ~nested_modules ~mode
     ~node struct_def =
   let unsorted_fields =
@@ -1471,21 +1423,16 @@ let rec generate_struct_node ~context ~scope ~nested_modules ~mode
   let non_union_accessors =
     generate_accessors ~context ~node ~scope ~mode struct_def non_union_fields
   in
-  let unique_reader = GenCommon.make_unique_typename ~mode:Mode.Reader
-      ~context node
-  in
-  let unique_builder = GenCommon.make_unique_typename ~mode:Mode.Builder
-      ~context node
-  in
+  let unique_struct = GenCommon.make_unique_typename ~context node in
   let header =
     match mode with
     | Mode.Reader -> [
-        "type t = " ^ unique_reader;
-        "type builder_t = " ^ unique_builder;
+        "type struct_t = " ^ unique_struct;
+        "type t = struct_t reader_t";
       ]
     | Mode.Builder -> [
-        "type t = " ^ unique_builder;
-        "type reader_t = " ^ unique_reader;
+        "type struct_t = " ^ unique_struct;
+        "type t = struct_t builder_t";
       ]
   in
   let footer =

@@ -2,11 +2,9 @@
 module CS = Carsales.Make[@inlined](Capnp.BytesMessage)
 
 module TestCase = struct
-  type request_reader_t   = CS.Reader.ParkingLot.t
-  type request_builder_t  = CS.Builder.ParkingLot.t
-  type response_reader_t  = CS.Reader.TotalValue.t
-  type response_builder_t = CS.Builder.TotalValue.t
-  type expectation_t      = int
+  type request_t     = CS.Reader.ParkingLot.struct_t
+  type response_t    = CS.Reader.TotalValue.struct_t
+  type expectation_t = int
 
   let makes = [| "Toyota"; "GM"; "Ford"; "Honda"; "Tesla" |]
   let models = [| "Camry"; "Prius"; "Volt"; "Accord"; "Leaf"; "Model S" |]
