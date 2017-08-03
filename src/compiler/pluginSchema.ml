@@ -1185,15 +1185,12 @@ module type S = sig
       val data_set : t -> string -> unit
       val list_set : t -> pointer_t -> pointer_t
       val list_set_reader : t -> Reader.pointer_t -> pointer_t
-      val list_set_interface : t -> Uint32.t option -> unit
       val enum_set_exn : t -> int -> unit
       val struct_set : t -> pointer_t -> pointer_t
       val struct_set_reader : t -> Reader.pointer_t -> pointer_t
-      val struct_set_interface : t -> Uint32.t option -> unit
       val interface_set : t -> unit
       val any_pointer_set : t -> pointer_t -> pointer_t
       val any_pointer_set_reader : t -> Reader.pointer_t -> pointer_t
-      val any_pointer_set_interface : t -> Uint32.t option -> unit
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
       val to_reader : t -> struct_t reader_t
@@ -2058,19 +2055,13 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         RA_.get_blob ~default:"" x 0
       let list_get x =
         RA_.get_pointer x 0
-      let list_get_interface x =
-        RA_.get_interface x 0
       let enum_get x =
         RA_.get_uint16 ~default:0 x 2
       let struct_get x =
         RA_.get_pointer x 0
-      let struct_get_interface x =
-        RA_.get_interface x 0
       let interface_get x = ()
       let any_pointer_get x =
         RA_.get_pointer x 0
-      let any_pointer_get_interface x =
-        RA_.get_interface x 0
       type unnamed_union_t =
         | Void
         | Bool of bool
@@ -3736,41 +3727,29 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         BA_.set_blob ~discr:{BA_.Discr.value=13; BA_.Discr.byte_ofs=0} x 0 v
       let list_get x =
         BA_.get_pointer x 0
-      let list_get_interface x =
-        BA_.get_interface x 0
       let list_set x v =
         BA_.set_pointer ~discr:{BA_.Discr.value=14; BA_.Discr.byte_ofs=0} x 0 (Some v)
       let list_set_reader x v =
         BA_.set_pointer ~discr:{BA_.Discr.value=14; BA_.Discr.byte_ofs=0} x 0 v
-      let list_set_interface x v =
-        BA_.set_interface ~discr:{BA_.Discr.value=14; BA_.Discr.byte_ofs=0} x 0 v
       let enum_get x =
         BA_.get_uint16 ~default:0 x 2
       let enum_set_exn x v =
         BA_.set_uint16 ~discr:{BA_.Discr.value=15; BA_.Discr.byte_ofs=0} ~default:0 x 2 v
       let struct_get x =
         BA_.get_pointer x 0
-      let struct_get_interface x =
-        BA_.get_interface x 0
       let struct_set x v =
         BA_.set_pointer ~discr:{BA_.Discr.value=16; BA_.Discr.byte_ofs=0} x 0 (Some v)
       let struct_set_reader x v =
         BA_.set_pointer ~discr:{BA_.Discr.value=16; BA_.Discr.byte_ofs=0} x 0 v
-      let struct_set_interface x v =
-        BA_.set_interface ~discr:{BA_.Discr.value=16; BA_.Discr.byte_ofs=0} x 0 v
       let interface_get x = ()
       let interface_set x =
         BA_.set_void ~discr:{BA_.Discr.value=17; BA_.Discr.byte_ofs=0} x
       let any_pointer_get x =
         BA_.get_pointer x 0
-      let any_pointer_get_interface x =
-        BA_.get_interface x 0
       let any_pointer_set x v =
         BA_.set_pointer ~discr:{BA_.Discr.value=18; BA_.Discr.byte_ofs=0} x 0 (Some v)
       let any_pointer_set_reader x v =
         BA_.set_pointer ~discr:{BA_.Discr.value=18; BA_.Discr.byte_ofs=0} x 0 v
-      let any_pointer_set_interface x v =
-        BA_.set_interface ~discr:{BA_.Discr.value=18; BA_.Discr.byte_ofs=0} x 0 v
       type unnamed_union_t =
         | Void
         | Bool of bool

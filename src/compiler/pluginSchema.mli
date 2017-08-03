@@ -1185,15 +1185,12 @@ module type S = sig
       val data_set : t -> string -> unit
       val list_set : t -> pointer_t -> pointer_t
       val list_set_reader : t -> Reader.pointer_t -> pointer_t
-      val list_set_interface : t -> Uint32.t option -> unit
       val enum_set_exn : t -> int -> unit
       val struct_set : t -> pointer_t -> pointer_t
       val struct_set_reader : t -> Reader.pointer_t -> pointer_t
-      val struct_set_interface : t -> Uint32.t option -> unit
       val interface_set : t -> unit
       val any_pointer_set : t -> pointer_t -> pointer_t
       val any_pointer_set_reader : t -> Reader.pointer_t -> pointer_t
-      val any_pointer_set_interface : t -> Uint32.t option -> unit
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
       val to_reader : t -> struct_t reader_t

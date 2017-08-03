@@ -1639,9 +1639,10 @@ let test_any_pointers _ctx =
   ignore (T.Builder.TestAnyPointer.any_pointer_field_set_reader root None);
   assert_equal ~printer:(fun f -> f) "" (T.Reader.TestSturdyRefHostId.host_get rchild);
   (* Interfaces *)
-  T.Builder.TestAnyPointer.any_pointer_field_set_interface root (Some (Uint32.of_int 42));
+  let index = Uint32.of_int 42 in
+  T.Builder.TestAnyPointer.any_pointer_field_set_interface root (Some index);
   let iface = T.Reader.TestAnyPointer.any_pointer_field_get_interface rroot in
-  assert_equal iface (Some (Uint32.of_int 42))
+  assert_equal iface (Some index)
 
 
 let encoding_suite =

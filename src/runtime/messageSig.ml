@@ -118,6 +118,15 @@ module type SEGMENT = sig
   val zero_out : rw t -> pos:int -> len:int -> unit
 end
 
+(** An RPC message can have an array of attached capabilities.
+    To avoid making the message layer depend on the RPC layer, we define this
+    as an open type, so that an RPC system can use whatever system it likes for
+    this. *)
+type attachments = ..
+
+(** This is the default attachment handler. *)
+type attachments += No_attachments
+
 module type MESSAGE = sig
   (** [storage_t] is the type of the underlying storage associated with
       this segment (e.g. "bytes"). *)
@@ -178,6 +187,19 @@ module type MESSAGE = sig
       returns the result of the application of [f].  If [f m] raises an exception,
       the exception will be propagated after a call to [release]. *)
   val with_message : 'cap t -> f:('cap t -> 'a) -> 'a
+
+  (** [set_attachments m attachments] sets the attachments handler for this message. *)
+  val set_attachments : 'cap t -> attachments -> unit
+
+  (** [with_attachments attachments m] is a message sharing the same storage as [m],
+      but with the given attachments. If [m] is mutable, it should not be used after
+      calling this. Effectively, [attachments] is a constructor argument, but it isn't
+      known until slightly after the message is constructed. *)
+  val with_attachments : attachments -> 'cap t -> 'cap t
+
+  (** [get_attachments m] returns the handler previously set by [get_attachments],
+      or [No_attachments] if no handler has been set. *)
+  val get_attachments : 'cap t -> attachments
 end
 
 module type SLICE = sig
@@ -285,6 +307,8 @@ module type S = sig
     (* Note: ['a] is marked covariant here just because it makes casting easier in some places. *)
     type ('cap, +'a) t = private { data : 'cap Slice.t; pointers : 'cap Slice.t; }
     val readonly : ('cap, 'a) t -> (ro, 'a) t
+    val with_attachments : attachments -> ('cap, 'a) t -> ('cap, 'a) t
+    val get_attachments : ('cap, 'a) t -> attachments
     val v : data:'cap Slice.t -> pointers:'cap Slice.t -> ('cap, 'a) t
     val cast : ('cap, 'a) t -> ('cap, 'b) t
 

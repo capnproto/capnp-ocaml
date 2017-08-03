@@ -563,10 +563,14 @@ let generate_list_setters ~context ~scope ~list_type
     | Interface _ -> [
         "let " ^ field_name ^
           "_set x v = failwith \"not implemented (type iface)\"";
+        "let " ^ field_name ^
+          "_init x n = failwith \"not implemented (type iface)\"";
         ]
     | AnyPointer _ -> [
         "let " ^ field_name ^
           "_set x v = failwith \"not implemented (type anyptr)\"";
+        "let " ^ field_name ^
+          "_init x n = failwith \"not implemented (type anyptr)\"";
         ]
     | Undefined x ->
          failwith (sprintf "Unknown Type union discriminant %d" x)
@@ -1054,6 +1058,8 @@ let generate_one_field_accessors ~context ~node_id ~scope
                   sprintf "  RA_.has_field x %u" field_ofs;
                   "let " ^ field_name ^ "_get x =";
                   sprintf "  RA_.get_struct%s x %u" reader_default_str field_ofs;
+                  "let " ^ field_name ^ "_get_pipelined x =";
+                  sprintf "  RPC.Untyped.struct_field x %u" field_ofs;
                 ]
               | Mode.Builder -> [
                   "let has_" ^ field_name ^ " x =";
@@ -1091,13 +1097,15 @@ let generate_one_field_accessors ~context ~node_id ~scope
         | (PS.Type.Interface _, PS.Value.Interface) ->
             let getters = [
               "let " ^ field_name ^ "_get x =";
-              sprintf "  %s.get_interface x %u" api_module field_ofs;
+              sprintf "  %s.get_interface RPC.Untyped.get_cap x %u" api_module field_ofs;
+              "let " ^ field_name ^ "_get_pipelined x = ";
+              sprintf "  RPC.Untyped.capability_field x %u" field_ofs;
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v =";
-              sprintf "  BA_.set_interface %sx %u v"
-                discr_str
-                field_ofs;
+              sprintf "  BA_.set_interface %sx %u v" discr_str field_ofs;
+              "    ~add_attachment:RPC.Untyped.add_cap";
+              "    ~clear_attachment:RPC.Untyped.clear_cap";
             ] in
             (getters, setters)
         | (PS.Type.AnyPointer _, PS.Value.AnyPointer pointer_slice_opt) ->
@@ -1122,7 +1130,7 @@ let generate_one_field_accessors ~context ~node_id ~scope
                  else builder_default_str)
                 field_ofs;
               "let " ^ field_name ^ "_get_interface x =";
-              sprintf "  %s.get_interface x %u"
+              sprintf "  %s.get_interface RPC.Untyped.get_cap x %u"
                 api_module
                 field_ofs;
             ] in
@@ -1139,6 +1147,8 @@ let generate_one_field_accessors ~context ~node_id ~scope
               sprintf "  BA_.set_interface %sx %u v"
                 discr_str
                 field_ofs;
+              "    ~add_attachment:RPC.Untyped.add_cap";
+              "    ~clear_attachment:RPC.Untyped.clear_cap";
             ] in
             (getters, setters)
         | (PS.Type.Undefined x, _) ->
@@ -1401,7 +1411,7 @@ let generate_constant ~context ~scope ~node ~node_name const_def =
 (* Generate the OCaml module corresponding to a struct definition.  [scope] is a
  * stack of scope IDs corresponding to this lexical context, and is used to figure
  * out what module prefixes are required to properly qualify a type. *)
-let rec generate_struct_node ~context ~scope ~nested_modules ~mode
+let rec generate_struct_node ?uq_name ~context ~scope ~nested_modules ~mode
     ~node struct_def =
   let unsorted_fields =
     C.Array.to_list (PS.Node.Struct.fields_get struct_def)
@@ -1423,7 +1433,7 @@ let rec generate_struct_node ~context ~scope ~nested_modules ~mode
   let non_union_accessors =
     generate_accessors ~context ~node ~scope ~mode struct_def non_union_fields
   in
-  let unique_struct = GenCommon.make_unique_typename ~context node in
+  let unique_struct = GenCommon.make_unique_typename ?uq_name ~context node in
   let header =
     match mode with
     | Mode.Reader -> [
@@ -1464,6 +1474,94 @@ let rec generate_struct_node ~context ~scope ~nested_modules ~mode
     union_accessors @
     non_union_accessors @
     footer
+
+
+and generate_methods ~context ~scope ~nested_modules ~mode ~node_name interface_def : string list =
+  (* todo: superclasses *)
+  let module Method = GenCommon.Method in
+  let methods = Method.methods_of_interface ~context interface_def in
+  let make_auto m phase =
+    match Method.auto_struct phase m with
+    | `Existing _ -> []
+    | `Auto (struct_node, struct_def, mod_name) ->
+      let uq_name = Method.capnp_name m in
+      let body = generate_struct_node
+          ~uq_name ~context ~scope ~nested_modules:[] ~mode ~node:struct_node struct_def
+      in
+      [ "module " ^ mod_name ^ " = struct" ] @
+      (apply_indent ~indent:"  " body) @
+      [ "end" ]
+  in
+  let structs =
+    List.map methods ~f:(fun m ->
+        make_auto m Method.Params @
+        make_auto m Method.Results
+      )
+    |> List.concat
+  in
+  match mode with
+  | Mode.Reader ->
+    let client =
+      let body =
+        List.map methods ~f:(fun m ->
+            [
+              sprintf "let %s_method : (t, %s, %s) RPC.Capability.method_t = RPC.Untyped.define_method ~interface_id ~method_id:%d"
+                (Method.ocaml_name m)
+                (Method.(payload_type Params) ~context ~scope ~mode m)
+                (Method.(payload_type Results) ~context ~scope ~mode m)
+                (Method.id m);
+            ]
+          )
+        |> List.concat
+      in
+      let method_printers =
+        List.map methods ~f:(fun m ->
+            sprintf "| %d -> Some %S" (Method.id m) (Method.capnp_name m)
+          )
+      in
+      body @
+      [
+        "let method_name = function";
+      ] @ apply_indent ~indent:"  " method_printers @ [
+        "  | _ -> None";
+        sprintf "let () = Capnp.RPC.Registry.register ~interface_id ~name:%S method_name"
+          node_name;
+      ]
+    in
+    nested_modules @ structs @ client
+  | Mode.Builder ->
+    let service =
+      let body =
+        List.map methods ~f:(fun m ->
+            sprintf "method virtual %s_impl : (%s, %s) RPC.Service.method_t"
+              (Method.ocaml_name m)
+              (Method.(payload_type Params) ~context ~scope ~mode m)
+              (Method.(payload_type Results) ~context ~scope ~mode m)
+          )
+      in
+      let dispatch_body =
+        List.map methods ~f:(fun m ->
+            sprintf "| %d -> RPC.Untyped.abstract_method self#%s_impl"
+              (Method.id m)
+              (Method.ocaml_name m)
+          )
+      in
+      [ "class virtual service = object (self)";
+        "  method release = ()";
+        "  method dispatch ~interface_id:i ~method_id =";
+        "    if i <> interface_id then RPC.Untyped.unknown_interface ~interface_id";
+        "    else match method_id with";
+      ] @ apply_indent ~indent:"    " dispatch_body @
+      [ "    | x -> RPC.Untyped.unknown_method ~interface_id ~method_id";
+        sprintf "  method pp f = Format.pp_print_string f %S" node_name;
+      ] @
+      (apply_indent ~indent:"  " body) @
+      [ "end";
+        "let local (service:#service) =";
+        "  RPC.Untyped.local service";
+      ]
+    in
+    nested_modules @ structs @ service
 
 
 (* Generate the OCaml module and type signature corresponding to a node.  [scope] is
@@ -1516,8 +1614,14 @@ and generate_node
         [ "module " ^ node_name ^ " = struct" ] @
           (apply_indent ~indent:"  " body) @
           [ "end" ]
-  | PS.Node.Interface _ ->
-      let body = generate_nested_modules () in
+  | PS.Node.Interface iface_def ->
+      let nested_modules = generate_nested_modules () in
+      let unique_reader = GenCommon.make_unique_typename ~context ~mode:Mode.Reader node in
+      let body = [
+        "type t = " ^ unique_reader;
+        sprintf "let interface_id = Uint64.of_string \"%s\"" (Uint64.to_string_hex (PS.Node.id_get node));
+      ] @ generate_methods ~context ~scope ~nested_modules ~mode ~node_name iface_def
+      in
       if suppress_module_wrapper then
         body
       else

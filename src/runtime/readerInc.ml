@@ -655,9 +655,10 @@ module Make (MessageWrapper : MessageSig.S) = struct
         default
 
   let get_interface
+      (get_attachment : MessageSig.attachments -> Uint32.t -> 'a)
       (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
-    : Uint32.t option =
+    : 'a option =
     match struct_storage_opt with
     | Some struct_storage ->
         let pointers = struct_storage.StructStorage.pointers in
@@ -673,7 +674,8 @@ module Make (MessageWrapper : MessageSig.S) = struct
           | Pointer.Null ->
               None
           | Pointer.Other (OtherPointer.Capability index) ->
-              Some index
+              let attachments = Message.get_attachments pointers.Slice.msg in
+              Some (get_attachment attachments index)
           | _ ->
               invalid_msg "decoded non-capability pointer where capability was expected"
         else
