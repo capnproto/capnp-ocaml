@@ -185,7 +185,7 @@ module Make (NM : MessageSig.S) = struct
         let dest = NC.struct_of_pointer_slice slice in
         BOps.deep_copy_struct_to_dest ~src:v ~dest
       in
-      let composite_decoder x = x in
+      let composite_decoder x = NC.StructStorage.cast x in
       let composite_encoder v dest = BOps.deep_copy_struct_to_dest ~src:v ~dest in
       NC.ListCodecs.Struct {
         NC.ListCodecs.bytes     = (bytes_decoder, bytes_encoder);
@@ -231,7 +231,7 @@ module Make (NM : MessageSig.S) = struct
        supplied, then the discriminant is also set as a side-effect. *)
     let get_data_region
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
       : rw NM.Slice.t =
       let data = struct_storage.NM.StructStorage.data in
       let () = set_opt_discriminant data discr in
@@ -239,7 +239,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_bit
        ~(default : bool)
-       (struct_storage : rw NM.StructStorage.t)
+       (struct_storage : (rw, _) NM.StructStorage.t)
        ~(byte_ofs : int)
        ~(bit_ofs : int)
       : bool =
@@ -253,7 +253,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_int8
         ~(default : int)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (byte_ofs : int)
       : int =
       let data = struct_storage.NM.StructStorage.data in
@@ -262,7 +262,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_int16
         ~(default : int)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (byte_ofs : int)
       : int =
       let data = struct_storage.NM.StructStorage.data in
@@ -271,7 +271,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_int32
         ~(default : int32)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (byte_ofs : int)
         : int32 =
       let data = struct_storage.NM.StructStorage.data in
@@ -280,7 +280,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_int64
         ~(default : int64)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (byte_ofs : int)
       : int64 =
       let data = struct_storage.NM.StructStorage.data in
@@ -289,7 +289,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_uint8
         ~(default : int)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (byte_ofs : int)
       : int =
       let data = struct_storage.NM.StructStorage.data in
@@ -298,7 +298,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_uint16
         ~(default : int)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (byte_ofs : int)
       : int =
       let data = struct_storage.NM.StructStorage.data in
@@ -307,7 +307,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_uint32
         ~(default : Uint32.t)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (byte_ofs : int)
       : Uint32.t =
       let data = struct_storage.NM.StructStorage.data in
@@ -316,7 +316,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_uint64
         ~(default : Uint64.t)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (byte_ofs : int)
       : Uint64.t =
       let data = struct_storage.NM.StructStorage.data in
@@ -325,7 +325,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_float32
         ~(default_bits : int32)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (byte_ofs : int)
       : float =
       let data = struct_storage.NM.StructStorage.data in
@@ -335,7 +335,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_float64
         ~(default_bits : int64)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (byte_ofs : int)
       : float =
       let data = struct_storage.NM.StructStorage.data in
@@ -350,7 +350,7 @@ module Make (NM : MessageSig.S) = struct
 
     let set_void
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
       : unit =
       let data = struct_storage.NM.StructStorage.data in
       set_opt_discriminant data discr
@@ -358,7 +358,7 @@ module Make (NM : MessageSig.S) = struct
     let set_bit
         ?(discr : Discr.t option)
         ~(default : bool)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         ~(byte_ofs : int)
         ~(bit_ofs : int)
         (value : bool)
@@ -376,7 +376,7 @@ module Make (NM : MessageSig.S) = struct
     let set_int8
         ?(discr : Discr.t option)
         ~(default : int)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (byte_ofs : int)
         (value : int)
       : unit =
@@ -387,7 +387,7 @@ module Make (NM : MessageSig.S) = struct
     let set_int16
         ?(discr : Discr.t option)
         ~(default : int)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (byte_ofs : int)
         (value : int)
       : unit =
@@ -398,7 +398,7 @@ module Make (NM : MessageSig.S) = struct
     let set_int32
         ?(discr : Discr.t option)
         ~(default : int32)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (byte_ofs : int)
         (value : int32)
       : unit =
@@ -409,7 +409,7 @@ module Make (NM : MessageSig.S) = struct
     let set_int64
         ?(discr : Discr.t option)
         ~(default : int64)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (byte_ofs : int)
         (value : int64)
       : unit =
@@ -420,7 +420,7 @@ module Make (NM : MessageSig.S) = struct
     let set_uint8
         ?(discr : Discr.t option)
         ~(default : int)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (byte_ofs : int)
         (value : int)
       : unit =
@@ -431,7 +431,7 @@ module Make (NM : MessageSig.S) = struct
     let set_uint16
         ?(discr : Discr.t option)
         ~(default : int)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (byte_ofs : int)
         (value : int)
       : unit =
@@ -442,7 +442,7 @@ module Make (NM : MessageSig.S) = struct
     let set_uint32
         ?(discr : Discr.t option)
         ~(default : Uint32.t)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (byte_ofs : int)
         (value : Uint32.t)
       : unit =
@@ -453,7 +453,7 @@ module Make (NM : MessageSig.S) = struct
     let set_uint64
         ?(discr : Discr.t option)
         ~(default : Uint64.t)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (byte_ofs : int)
         (value : Uint64.t)
       : unit =
@@ -464,7 +464,7 @@ module Make (NM : MessageSig.S) = struct
     let set_float32
         ?(discr : Discr.t option)
         ~(default_bits : int32)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (byte_ofs : int)
         (value : float)
       : unit =
@@ -476,7 +476,7 @@ module Make (NM : MessageSig.S) = struct
     let set_float64
         ?(discr : Discr.t option)
         ~(default_bits : int64)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (byte_ofs : int)
         (value : float)
       : unit =
@@ -491,7 +491,7 @@ module Make (NM : MessageSig.S) = struct
      *******************************************************************************)
 
     let has_field
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
       : bool =
       let pointers = struct_storage.NM.StructStorage.pointers in
@@ -504,7 +504,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_text
         ~(default : string)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
       : string =
       let pointers = struct_storage.NM.StructStorage.pointers in
@@ -528,7 +528,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_blob
         ~(default : string)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
       : string =
       let pointers = struct_storage.NM.StructStorage.pointers in
@@ -570,7 +570,7 @@ module Make (NM : MessageSig.S) = struct
         ?(default : ro DM.ListStorage.t option)
         ~(storage_type : ListStorageType.t)
         ~(codecs : 'a NC.ListCodecs.t)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
       : (rw, 'a, rw NM.ListStorage.t) InnerArray.t =
       let create_default message =
@@ -599,7 +599,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_void_list
         ?(default : ro DM.ListStorage.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
       : (rw, unit, rw NM.ListStorage.t) InnerArray.t =
       get_list ?default ~storage_type:ListStorageType.Empty
@@ -607,7 +607,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_bit_list
         ?(default : ro DM.ListStorage.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
       : (rw, bool, rw NM.ListStorage.t) InnerArray.t =
       get_list ?default ~storage_type:ListStorageType.Bit
@@ -615,7 +615,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_int8_list
         ?(default : ro DM.ListStorage.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
       : (rw, int, rw NM.ListStorage.t) InnerArray.t =
       get_list ?default ~storage_type:ListStorageType.Bytes1
@@ -623,7 +623,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_int16_list
         ?(default : ro DM.ListStorage.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
       : (rw, int, rw NM.ListStorage.t) InnerArray.t =
       get_list ?default ~storage_type:ListStorageType.Bytes2
@@ -631,7 +631,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_int32_list
         ?(default : ro DM.ListStorage.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
       : (rw, int32, rw NM.ListStorage.t) InnerArray.t =
       get_list ?default ~storage_type:ListStorageType.Bytes4
@@ -639,7 +639,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_int64_list
         ?(default : ro DM.ListStorage.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
       : (rw, int64, rw NM.ListStorage.t) InnerArray.t =
       get_list ?default ~storage_type:ListStorageType.Bytes8
@@ -647,7 +647,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_uint8_list
         ?(default : ro DM.ListStorage.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
       : (rw, int, rw NM.ListStorage.t) InnerArray.t =
       get_list ?default ~storage_type:ListStorageType.Bytes1
@@ -655,7 +655,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_uint16_list
         ?(default : ro DM.ListStorage.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
       : (rw, int, rw NM.ListStorage.t) InnerArray.t =
       get_list ?default ~storage_type:ListStorageType.Bytes2
@@ -663,7 +663,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_uint32_list
         ?(default : ro DM.ListStorage.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
       : (rw, Uint32.t, rw NM.ListStorage.t) InnerArray.t =
       get_list ?default ~storage_type:ListStorageType.Bytes4
@@ -671,7 +671,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_uint64_list
         ?(default : ro DM.ListStorage.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
       : (rw, Uint64.t, rw NM.ListStorage.t) InnerArray.t =
       get_list ?default ~storage_type:ListStorageType.Bytes8
@@ -679,7 +679,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_float32_list
         ?(default : ro DM.ListStorage.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
       : (rw, float, rw NM.ListStorage.t) InnerArray.t =
       get_list ?default ~storage_type:ListStorageType.Bytes4
@@ -687,7 +687,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_float64_list
         ?(default : ro DM.ListStorage.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
       : (rw, float, rw NM.ListStorage.t) InnerArray.t =
       get_list ?default ~storage_type:ListStorageType.Bytes8
@@ -695,7 +695,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_text_list
         ?(default : ro DM.ListStorage.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
       : (rw, string, rw NM.ListStorage.t) InnerArray.t =
       get_list ?default ~storage_type:ListStorageType.Pointer
@@ -703,7 +703,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_blob_list
         ?(default : ro DM.ListStorage.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
       : (rw, string, rw NM.ListStorage.t) InnerArray.t =
       get_list ?default ~storage_type:ListStorageType.Pointer
@@ -713,9 +713,9 @@ module Make (NM : MessageSig.S) = struct
         ?(default : ro DM.ListStorage.t option)
         ~(data_words : int)
         ~(pointer_words : int)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
-      : (rw, rw NM.StructStorage.t, rw NM.ListStorage.t) InnerArray.t =
+      : (rw, (rw, _) NM.StructStorage.t, rw NM.ListStorage.t) InnerArray.t =
       get_list ~struct_sizes:{
         BuilderOps.StructSizes.data_words;
         BuilderOps.StructSizes.pointer_words }
@@ -724,12 +724,12 @@ module Make (NM : MessageSig.S) = struct
         ~codecs:struct_list_codecs struct_storage pointer_word
 
     let get_struct
-        ?(default : ro DM.StructStorage.t option)
+        ?(default : (ro, 'a) DM.StructStorage.t option)
         ~(data_words : int)
         ~(pointer_words : int)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
-      : rw NM.StructStorage.t =
+      : (rw, 'a) NM.StructStorage.t =
       let create_default message =
         match default with
         | Some default_storage ->
@@ -752,7 +752,7 @@ module Make (NM : MessageSig.S) = struct
 
     let get_pointer
         ?(default : ro DM.Slice.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
       : rw NM.Slice.t =
       let pointers = struct_storage.NM.StructStorage.pointers in
@@ -780,7 +780,7 @@ module Make (NM : MessageSig.S) = struct
       pointer_bytes
 
     let get_interface
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
       : Uint32.t option =
       let pointers = struct_storage.NM.StructStorage.pointers in
@@ -808,7 +808,7 @@ module Make (NM : MessageSig.S) = struct
 
     let set_text
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (value : string)
       : unit =
@@ -832,7 +832,7 @@ module Make (NM : MessageSig.S) = struct
 
     let set_blob
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (value : string)
       : unit =
@@ -858,7 +858,7 @@ module Make (NM : MessageSig.S) = struct
         ?(struct_sizes : BuilderOps.StructSizes.t option)
         ~(storage_type : ListStorageType.t)
         ~(codecs : 'a NC.ListCodecs.t)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (value : 'cap NM.ListStorage.t option)
       : (rw, 'a, rw NM.ListStorage.t) InnerArray.t =
@@ -890,7 +890,7 @@ module Make (NM : MessageSig.S) = struct
         ?(struct_sizes : BuilderOps.StructSizes.t option)
         ~(storage_type : ListStorageType.t)
         ~(codecs : 'a NC.ListCodecs.t)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (value : ('cap1, 'a, 'cap2 NM.ListStorage.t) InnerArray.t)
       : (rw, 'a, rw NM.ListStorage.t) InnerArray.t =
@@ -900,7 +900,7 @@ module Make (NM : MessageSig.S) = struct
 
     let set_void_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (value : ('cap1, unit, 'cap2 NM.ListStorage.t) InnerArray.t)
       : (rw, unit, rw NM.ListStorage.t) InnerArray.t =
@@ -909,7 +909,7 @@ module Make (NM : MessageSig.S) = struct
 
     let set_bit_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (value : ('cap1, bool, 'cap2 NM.ListStorage.t) InnerArray.t)
       : (rw, bool, rw NM.ListStorage.t) InnerArray.t =
@@ -918,7 +918,7 @@ module Make (NM : MessageSig.S) = struct
 
     let set_int8_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (value : ('cap1, int, 'cap2 NM.ListStorage.t) InnerArray.t)
       : (rw, int, 'cap NM.ListStorage.t) InnerArray.t =
@@ -927,7 +927,7 @@ module Make (NM : MessageSig.S) = struct
 
     let set_int16_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (value : ('cap1, int, 'cap2 NM.ListStorage.t) InnerArray.t)
       : (rw, int, 'cap NM.ListStorage.t) InnerArray.t =
@@ -936,7 +936,7 @@ module Make (NM : MessageSig.S) = struct
 
     let set_int32_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (value : ('cap1, int32, 'cap NM.ListStorage.t) InnerArray.t)
       : (rw, int32, rw NM.ListStorage.t) InnerArray.t =
@@ -945,7 +945,7 @@ module Make (NM : MessageSig.S) = struct
 
     let set_int64_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (value : ('cap1, int64, 'cap2 NM.ListStorage.t) InnerArray.t)
       : (rw, int64, rw NM.ListStorage.t) InnerArray.t =
@@ -954,7 +954,7 @@ module Make (NM : MessageSig.S) = struct
 
     let set_uint8_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (value : ('cap1, int, 'cap2 NM.ListStorage.t) InnerArray.t)
       : (rw, int, rw NM.ListStorage.t) InnerArray.t =
@@ -963,7 +963,7 @@ module Make (NM : MessageSig.S) = struct
 
     let set_uint16_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (value : ('cap1, int, 'cap2 NM.ListStorage.t) InnerArray.t)
       : (rw, int, rw NM.ListStorage.t) InnerArray.t =
@@ -972,7 +972,7 @@ module Make (NM : MessageSig.S) = struct
 
     let set_uint32_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (value : ('cap1, Uint32.t, 'cap2 NM.ListStorage.t) InnerArray.t)
       : (rw, Uint32.t, rw NM.ListStorage.t) InnerArray.t =
@@ -981,7 +981,7 @@ module Make (NM : MessageSig.S) = struct
 
     let set_uint64_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (value : ('cap1, Uint64.t, 'cap2 NM.ListStorage.t) InnerArray.t)
       : (rw, Uint64.t, rw NM.ListStorage.t) InnerArray.t =
@@ -990,7 +990,7 @@ module Make (NM : MessageSig.S) = struct
 
     let set_float32_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (value : ('cap1, float, 'cap2 NM.ListStorage.t) InnerArray.t)
       : (rw, float, rw NM.ListStorage.t) InnerArray.t =
@@ -999,7 +999,7 @@ module Make (NM : MessageSig.S) = struct
 
     let set_float64_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (value : ('cap1, float, 'cap2 NM.ListStorage.t) InnerArray.t)
       : (rw, float, rw NM.ListStorage.t) InnerArray.t =
@@ -1008,7 +1008,7 @@ module Make (NM : MessageSig.S) = struct
 
     let set_text_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (value : ('cap1, string, 'cap2 NM.ListStorage.t) InnerArray.t)
       : (rw, string, rw NM.ListStorage.t) InnerArray.t =
@@ -1017,7 +1017,7 @@ module Make (NM : MessageSig.S) = struct
 
     let set_blob_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (value : ('cap1, string, 'cap2 NM.ListStorage.t) InnerArray.t)
       : (rw, string, rw NM.ListStorage.t) InnerArray.t =
@@ -1029,10 +1029,10 @@ module Make (NM : MessageSig.S) = struct
         ~(data_words : int)
         ~(pointer_words : int)
         (* FIXME: this won't allow assignment from Reader struct lists *)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
-        (value : ('cap1, 'cap2 NM.StructStorage.t, 'cap2 NM.ListStorage.t) InnerArray.t)
-      : (rw, rw NM.StructStorage.t, rw NM.ListStorage.t) InnerArray.t =
+        (value : ('cap1, ('cap2, _) NM.StructStorage.t, 'cap2 NM.ListStorage.t) InnerArray.t)
+      : (rw, (rw, _) NM.StructStorage.t, rw NM.ListStorage.t) InnerArray.t =
       set_list ?discr ~struct_sizes:{
         BuilderOps.StructSizes.data_words;
         BuilderOps.StructSizes.pointer_words }
@@ -1043,10 +1043,10 @@ module Make (NM : MessageSig.S) = struct
         ?(discr : Discr.t option)
         ~(data_words : int)
         ~(pointer_words : int)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
-        (value : 'cap NM.StructStorage.t option)
-      : rw NM.StructStorage.t =
+        (value : ('cap, 'a) NM.StructStorage.t option)
+      : (rw, 'a) NM.StructStorage.t =
       let pointers = struct_storage.NM.StructStorage.pointers in
       let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
       (* Struct should have already been upgraded to at least the
@@ -1072,7 +1072,7 @@ module Make (NM : MessageSig.S) = struct
 
     let set_pointer
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (value : 'cap NM.Slice.t option)
       : rw NM.Slice.t =
@@ -1097,7 +1097,7 @@ module Make (NM : MessageSig.S) = struct
 
     let set_interface
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (value : Uint32.t option)
       : unit =
@@ -1127,7 +1127,7 @@ module Make (NM : MessageSig.S) = struct
 
     let init_blob
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (num_elements : int)
       : unit =
@@ -1138,7 +1138,7 @@ module Make (NM : MessageSig.S) = struct
         ?(discr : Discr.t option)
         ~(storage_type : ListStorageType.t)
         ~(codecs : 'a NC.ListCodecs.t)
-        (struct_storage : 'cap NM.StructStorage.t)
+        (struct_storage : ('cap, _) NM.StructStorage.t)
         (pointer_word : int)
         (num_elements : int)
       : (rw, 'a, rw NM.ListStorage.t) InnerArray.t =
@@ -1159,7 +1159,7 @@ module Make (NM : MessageSig.S) = struct
 
     let init_void_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (num_elements : int)
       : (rw, unit, rw NM.ListStorage.t) InnerArray.t =
@@ -1168,7 +1168,7 @@ module Make (NM : MessageSig.S) = struct
 
     let init_bit_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (num_elements : int)
       : (rw, bool, rw NM.ListStorage.t) InnerArray.t =
@@ -1177,7 +1177,7 @@ module Make (NM : MessageSig.S) = struct
 
     let init_int8_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (num_elements : int)
       : (rw, int, rw NM.ListStorage.t) InnerArray.t =
@@ -1186,7 +1186,7 @@ module Make (NM : MessageSig.S) = struct
 
     let init_int16_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (num_elements : int)
       : (rw, int, rw NM.ListStorage.t) InnerArray.t =
@@ -1195,7 +1195,7 @@ module Make (NM : MessageSig.S) = struct
 
     let init_int32_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (num_elements : int)
       : (rw, int32, rw NM.ListStorage.t) InnerArray.t =
@@ -1204,7 +1204,7 @@ module Make (NM : MessageSig.S) = struct
 
     let init_int64_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (num_elements : int)
       : (rw, int64, rw NM.ListStorage.t) InnerArray.t =
@@ -1213,7 +1213,7 @@ module Make (NM : MessageSig.S) = struct
 
     let init_uint8_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (num_elements : int)
       : (rw, int, rw NM.ListStorage.t) InnerArray.t =
@@ -1222,7 +1222,7 @@ module Make (NM : MessageSig.S) = struct
 
     let init_uint16_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (num_elements : int)
       : (rw, int, rw NM.ListStorage.t) InnerArray.t =
@@ -1231,7 +1231,7 @@ module Make (NM : MessageSig.S) = struct
 
     let init_uint32_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (num_elements : int)
       : (rw, Uint32.t, rw NM.ListStorage.t) InnerArray.t =
@@ -1240,7 +1240,7 @@ module Make (NM : MessageSig.S) = struct
 
     let init_uint64_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (num_elements : int)
       : (rw, Uint64.t, rw NM.ListStorage.t) InnerArray.t =
@@ -1249,7 +1249,7 @@ module Make (NM : MessageSig.S) = struct
 
     let init_float32_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (num_elements : int)
       : (rw, float, rw NM.ListStorage.t) InnerArray.t =
@@ -1258,7 +1258,7 @@ module Make (NM : MessageSig.S) = struct
 
     let init_float64_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (num_elements : int)
       : (rw, float, rw NM.ListStorage.t) InnerArray.t =
@@ -1267,7 +1267,7 @@ module Make (NM : MessageSig.S) = struct
 
     let init_text_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (num_elements : int)
       : (rw, string, rw NM.ListStorage.t) InnerArray.t =
@@ -1276,7 +1276,7 @@ module Make (NM : MessageSig.S) = struct
 
     let init_blob_list
         ?(discr : Discr.t option)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (num_elements : int)
       : (rw, string, rw NM.ListStorage.t) InnerArray.t =
@@ -1287,10 +1287,10 @@ module Make (NM : MessageSig.S) = struct
         ?(discr : Discr.t option)
         ~(data_words : int)
         ~(pointer_words : int)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
         (num_elements : int)
-      : (rw, rw NM.StructStorage.t, rw NM.ListStorage.t) InnerArray.t =
+      : (rw, (rw, _) NM.StructStorage.t, rw NM.ListStorage.t) InnerArray.t =
       init_list ?discr ~storage_type:(
         ListStorageType.Composite (data_words, pointer_words))
         struct_storage pointer_word ~codecs:struct_list_codecs num_elements
@@ -1299,9 +1299,9 @@ module Make (NM : MessageSig.S) = struct
         ?(discr : Discr.t option)
         ~(data_words : int)
         ~(pointer_words : int)
-        (struct_storage : rw NM.StructStorage.t)
+        (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
-      : rw NM.StructStorage.t =
+      : (rw, _) NM.StructStorage.t =
       let pointers = struct_storage.NM.StructStorage.pointers in
       let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
       (* Struct should have already been upgraded to at least the
@@ -1324,7 +1324,7 @@ module Make (NM : MessageSig.S) = struct
         pointer_bytes
         ~(data_words : int)
         ~(pointer_words : int)
-      : rw NM.StructStorage.t =
+      : (rw, _) NM.StructStorage.t =
       let () = BOps.deep_zero_pointer pointer_bytes in
       let storage =
         BOps.alloc_struct_storage pointer_bytes.NM.Slice.msg ~data_words ~pointer_words
@@ -1338,7 +1338,7 @@ module Make (NM : MessageSig.S) = struct
         (m : rw NM.Message.t)
         ~(data_words : int)
         ~(pointer_words : int)
-      : rw NM.StructStorage.t =
+      : (rw, _) NM.StructStorage.t =
       let first_segment = NM.Message.get_segment m 0 in
       if NM.Segment.length first_segment < sizeof_uint64 then
         invalid_msg "message is too small to contain root struct pointer"
@@ -1365,7 +1365,7 @@ module Make (NM : MessageSig.S) = struct
         ~(data_words : int)
         ~(pointer_words : int)
         ()
-      : rw NM.StructStorage.t =
+      : (rw, _) NM.StructStorage.t =
       let act_message_size =
         let requested_size =
           match message_size with
@@ -1380,5 +1380,10 @@ module Make (NM : MessageSig.S) = struct
       let _ = NM.Slice.alloc message sizeof_uint64 in
       get_root_struct message ~data_words ~pointer_words
 
+    let pointers_struct pointers =
+      let data = { pointers with NM.Slice.len = 0 } in
+      NM.StructStorage.v ~data ~pointers
+
+    let cast_struct = NM.StructStorage.cast
   end
 end

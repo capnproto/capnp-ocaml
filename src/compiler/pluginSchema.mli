@@ -1426,5 +1426,7 @@ module Make (MessageWrapper : Capnp.MessageSig.S) :
   (S with type 'cap message_t = 'cap MessageWrapper.Message.t
     and type Reader.pointer_t = ro MessageWrapper.Slice.t option
     and type Builder.pointer_t = rw MessageWrapper.Slice.t
+    and type 'a reader_t = 'a MessageWrapper.StructStorage.reader_t
+    and type 'a builder_t = 'a MessageWrapper.StructStorage.builder_t
 )
 

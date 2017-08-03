@@ -342,15 +342,24 @@ module Make (Storage : MessageStorage.S) = struct
 
   module StructStorage = struct
     (** Storage associated with a cap'n proto struct. *)
-    type 'cap t = {
+    type ('cap, 'a) t = {
       data     : 'cap Slice.t;  (** Storage for struct fields stored by value *)
       pointers : 'cap Slice.t;  (** Storage for struct fields stored by reference *)
     }
 
-    let readonly (struct_storage : 'cap t) : ro t = {
+    let readonly (struct_storage : ('cap, 'a) t) : (ro, 'a) t = {
       data     = Slice.readonly struct_storage.data;
       pointers = Slice.readonly struct_storage.pointers;
     }
+
+    let v ~data ~pointers = { data; pointers }
+
+    let cast x = (x :> ('cap, 'a) t)
+
+    type 'a reader_t = (ro, 'a) t option
+    type 'a builder_t = (rw, 'a) t
+
+    let cast_reader x = (x :> 'a reader_t)
   end
 
   module ListStorage = struct
@@ -369,10 +378,10 @@ module Make (Storage : MessageStorage.S) = struct
   end
 
   module Object = struct
-    type 'cap t =
+    type ('cap, 'a) t =
       | None
       | List of 'cap ListStorage.t
-      | Struct of 'cap StructStorage.t
+      | Struct of ('cap, 'a) StructStorage.t
       | Capability of Uint32.t
   end
 

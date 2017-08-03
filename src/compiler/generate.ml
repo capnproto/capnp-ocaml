@@ -84,7 +84,9 @@ let functor_sig ~context = [
   "module Make (MessageWrapper : Capnp.MessageSig.S) :";
   "  (S with type 'cap message_t = 'cap MessageWrapper.Message.t";
   "    and type Reader.pointer_t = ro MessageWrapper.Slice.t option";
-  "    and type Builder.pointer_t = rw MessageWrapper.Slice.t"; ] @
+  "    and type Builder.pointer_t = rw MessageWrapper.Slice.t";
+  "    and type 'a reader_t = 'a MessageWrapper.StructStorage.reader_t";
+  "    and type 'a builder_t = 'a MessageWrapper.StructStorage.builder_t"; ] @
   (List.concat_map context.Context.imports ~f:(fun import -> [
         "    and module " ^ import.Context.schema_name ^ " = " ^
           import.Context.module_name ^ ".Make(MessageWrapper)";
@@ -95,8 +97,8 @@ let functor_sig ~context = [
 
 let mod_functor_header = [
   "module Make (MessageWrapper : Capnp.MessageSig.S) = struct";
-  "  type 'a reader_t = ro MessageWrapper.StructStorage.t option";
-  "  type 'a builder_t = rw MessageWrapper.StructStorage.t";
+  "  type 'a reader_t = 'a MessageWrapper.StructStorage.reader_t";
+  "  type 'a builder_t = 'a MessageWrapper.StructStorage.builder_t";
   "  module CamlBytes = Bytes";
 ]
 

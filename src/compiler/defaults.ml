@@ -64,13 +64,15 @@ module ListStorageType = Capnp.Runtime.ListStorageType
 
 let sizeof_uint64 = 8
 
+type abstract
+
 type t = {
   (* Message storage. *)
   message : Capnp.Message.rw M.Message.t;
 
   (* Array of structs which have been stored in the message, along with
      their unique identifiers. *)
-  structs : (string * Capnp.Message.rw M.StructStorage.t) Res.Array.t;
+  structs : (string * (Capnp.Message.rw, abstract) M.StructStorage.t) Res.Array.t;
 
   (* Array of lists which have been stored in the message, along with
      their unique identifiers. *)
@@ -178,28 +180,28 @@ let emit_instantiate_builder_structs struct_array : string list =
       "  let data_segment_id = " ^
         (Int.to_string struct_storage.data.M.Slice.segment_id) ^ " in";
       "  let pointers_segment_id = " ^
-        (Int.to_string struct_storage.pointers.M.Slice.segment_id) ^ " in {";
-      "  DefaultsMessage_.StructStorage.data = {";
-      "    DefaultsMessage_.Slice.msg = _builder_defaults_message;";
-      "    DefaultsMessage_.Slice.segment = DefaultsMessage_.Message.get_segment \
+        (Int.to_string struct_storage.pointers.M.Slice.segment_id) ^ " in";
+      "  DefaultsMessage_.StructStorage.v";
+      "    ~data:{";
+      "      DefaultsMessage_.Slice.msg = _builder_defaults_message;";
+      "      DefaultsMessage_.Slice.segment = DefaultsMessage_.Message.get_segment \
        _builder_defaults_message data_segment_id;";
-      "    DefaultsMessage_.Slice.segment_id = data_segment_id;";
-      "    DefaultsMessage_.Slice.start = " ^
+      "      DefaultsMessage_.Slice.segment_id = data_segment_id;";
+      "      DefaultsMessage_.Slice.start = " ^
         (Int.to_string struct_storage.data.M.Slice.start) ^ ";";
-      "    DefaultsMessage_.Slice.len = " ^
+      "      DefaultsMessage_.Slice.len = " ^
         (Int.to_string struct_storage.data.M.Slice.len) ^ ";";
-      "  };";
-      "  DefaultsMessage_.StructStorage.pointers = {";
-      "    DefaultsMessage_.Slice.msg = _builder_defaults_message;";
-      "    DefaultsMessage_.Slice.segment = DefaultsMessage_.Message.get_segment \
+      "    }";
+      "    ~pointers:{";
+      "      DefaultsMessage_.Slice.msg = _builder_defaults_message;";
+      "      DefaultsMessage_.Slice.segment = DefaultsMessage_.Message.get_segment \
        _builder_defaults_message pointers_segment_id;";
-      "    DefaultsMessage_.Slice.segment_id = pointers_segment_id;";
-      "    DefaultsMessage_.Slice.start = " ^
+      "      DefaultsMessage_.Slice.segment_id = pointers_segment_id;";
+      "      DefaultsMessage_.Slice.start = " ^
         (Int.to_string struct_storage.pointers.M.Slice.start) ^ ";";
-      "    DefaultsMessage_.Slice.len = " ^
+      "      DefaultsMessage_.Slice.len = " ^
         (Int.to_string struct_storage.pointers.M.Slice.len) ^ ";";
-      "  };";
-      "}";
+      "    }";
       "";
     ] @ acc)
     struct_array
