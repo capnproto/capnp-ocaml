@@ -360,6 +360,9 @@ module Make (Storage : MessageStorage.S) = struct
     type 'a builder_t = (rw, 'a) t
 
     let cast_reader x = (x :> 'a reader_t)
+
+    let reader_of_builder x = Some (readonly x)
+    let message_of_builder x = x.data.Slice.msg
   end
 
   module ListStorage = struct

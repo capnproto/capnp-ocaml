@@ -1,27 +1,16 @@
+open Capnp.BytesMessage.StructStorage
 
 module type TEST_CASE = sig
-  type request_reader_t
-  type request_builder_t
-  type response_reader_t
-  type response_builder_t
+  type request_t
+  type response_t
   type expectation_t
 
-  val setup_request : unit -> request_builder_t * expectation_t
-  val handle_request : request_reader_t -> response_builder_t
-  val check_response : response_reader_t -> expectation_t -> bool
+  val setup_request : unit -> request_t builder_t * expectation_t
+  val handle_request : request_t reader_t -> response_t builder_t
+  val check_response : response_t reader_t -> expectation_t -> bool
 end
 
 module type READER = sig
-  type t
-  type builder_t
-  val of_message : 'cap Capnp.BytesMessage.Message.t -> t
-  val of_builder : builder_t -> t
+  type struct_t
+  val of_message : 'cap Capnp.BytesMessage.Message.t -> struct_t reader_t
 end
-
-module type BUILDER = sig
-  type t
-  val to_message : t -> Capnp.Message.rw Capnp.BytesMessage.Message.t
-end
-
-
-

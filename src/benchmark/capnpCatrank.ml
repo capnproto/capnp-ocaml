@@ -6,11 +6,9 @@ module CR = Catrank.Make[@inlined](Capnp.BytesMessage)
 open Core_kernel.Std
 
 module TestCase = struct
-  type request_reader_t   = CR.Reader.SearchResultList.t
-  type request_builder_t  = CR.Builder.SearchResultList.t
-  type response_reader_t  = CR.Reader.SearchResultList.t
-  type response_builder_t = CR.Builder.SearchResultList.t
-  type expectation_t      = int
+  type request_t     = CR.Reader.SearchResultList.struct_t
+  type response_t    = CR.Reader.SearchResultList.struct_t
+  type expectation_t = int
 
   let url_prefix = "http://example.com/"
   let url_prefix_len = String.length url_prefix

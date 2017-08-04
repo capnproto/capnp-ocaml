@@ -28,18 +28,18 @@ let config = {|
 
 (rule
  ((targets (carsales.ml carsales.mli))
-  (deps (carsales.capnp ../compiler/main.exe))
-  (action  (run capnpc -o ../compiler/main.exe ${<}))))
+  (deps (carsales.capnp ../compiler/main.bc))
+  (action  (run capnpc -o ../compiler/main.bc ${<}))))
 
 (rule
  ((targets (catrank.ml catrank.mli))
-  (deps (catrank.capnp ../compiler/main.exe))
-  (action  (run capnpc -o ../compiler/main.exe ${<}))))
+  (deps (catrank.capnp ../compiler/main.bc))
+  (action  (run capnpc -o ../compiler/main.bc ${<}))))
 
 (rule
  ((targets (eval.ml eval.mli))
-  (deps (eval.capnp ../compiler/main.exe))
-  (action  (run capnpc -o ../compiler/main.exe ${<}))))
+  (deps (eval.capnp ../compiler/main.bc))
+  (action  (run capnpc -o ../compiler/main.bc ${<}))))
 
 (alias
  ((name benchmarks)

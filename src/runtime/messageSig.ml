@@ -291,6 +291,9 @@ module type S = sig
     type 'a reader_t = (ro, 'a) t option
     type 'a builder_t = (rw, 'a) t
 
+    val reader_of_builder : 'a builder_t -> 'a reader_t
+    val message_of_builder : _ builder_t -> rw Message.t
+
     val cast_reader : 'a reader_t -> 'b reader_t
   end
 

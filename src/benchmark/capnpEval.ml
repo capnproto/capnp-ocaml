@@ -4,11 +4,9 @@ module E = Eval.Make[@inlined](Capnp.BytesMessage)
 open Core_kernel.Std
 
 module TestCase = struct
-  type request_reader_t   = E.Reader.Expression.t
-  type request_builder_t  = E.Builder.Expression.t
-  type response_reader_t  = E.Reader.EvaluationResult.t
-  type response_builder_t = E.Builder.EvaluationResult.t
-  type expectation_t      = int
+  type request_t     = E.Reader.Expression.struct_t
+  type response_t    = E.Reader.EvaluationResult.struct_t
+  type expectation_t = int
 
   let operation_of_int v =
     match v with

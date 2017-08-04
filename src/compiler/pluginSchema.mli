@@ -8,105 +8,6 @@ module type S = sig
   type 'a reader_t
   type 'a builder_t
 
-  type struct_Import_12560611460656617445
-  type reader_t_Import_12560611460656617445 = struct_Import_12560611460656617445 reader_t
-  type builder_t_Import_12560611460656617445 = struct_Import_12560611460656617445 builder_t
-  type struct_RequestedFile_14981803260258615394
-  type reader_t_RequestedFile_14981803260258615394 = struct_RequestedFile_14981803260258615394 reader_t
-  type builder_t_RequestedFile_14981803260258615394 = struct_RequestedFile_14981803260258615394 builder_t
-  type struct_CodeGeneratorRequest_13818529054586492878
-  type reader_t_CodeGeneratorRequest_13818529054586492878 = struct_CodeGeneratorRequest_13818529054586492878 reader_t
-  type builder_t_CodeGeneratorRequest_13818529054586492878 = struct_CodeGeneratorRequest_13818529054586492878 builder_t
-  type struct_CapnpVersion_15590670654532458851
-  type reader_t_CapnpVersion_15590670654532458851 = struct_CapnpVersion_15590670654532458851 reader_t
-  type builder_t_CapnpVersion_15590670654532458851 = struct_CapnpVersion_15590670654532458851 builder_t
-  type struct_Annotation_17422339044421236034
-  type reader_t_Annotation_17422339044421236034 = struct_Annotation_17422339044421236034 reader_t
-  type builder_t_Annotation_17422339044421236034 = struct_Annotation_17422339044421236034 builder_t
-  type struct_Value_14853958794117909659
-  type reader_t_Value_14853958794117909659 = struct_Value_14853958794117909659 reader_t
-  type builder_t_Value_14853958794117909659 = struct_Value_14853958794117909659 builder_t
-  type struct_Binding_14439610327179913212
-  type reader_t_Binding_14439610327179913212 = struct_Binding_14439610327179913212 reader_t
-  type builder_t_Binding_14439610327179913212 = struct_Binding_14439610327179913212 builder_t
-  type struct_Scope_12382423449155627977
-  type reader_t_Scope_12382423449155627977 = struct_Scope_12382423449155627977 reader_t
-  type builder_t_Scope_12382423449155627977 = struct_Scope_12382423449155627977 builder_t
-  type struct_Brand_10391024731148337707
-  type reader_t_Brand_10391024731148337707 = struct_Brand_10391024731148337707 reader_t
-  type builder_t_Brand_10391024731148337707 = struct_Brand_10391024731148337707 builder_t
-  type struct_ImplicitMethodParameter_13470206089842057844
-  type reader_t_ImplicitMethodParameter_13470206089842057844 = struct_ImplicitMethodParameter_13470206089842057844 reader_t
-  type builder_t_ImplicitMethodParameter_13470206089842057844 = struct_ImplicitMethodParameter_13470206089842057844 builder_t
-  type struct_Parameter_11372142272178113157
-  type reader_t_Parameter_11372142272178113157 = struct_Parameter_11372142272178113157 reader_t
-  type builder_t_Parameter_11372142272178113157 = struct_Parameter_11372142272178113157 builder_t
-  type struct_Unconstrained_10248890354574636630
-  type reader_t_Unconstrained_10248890354574636630 = struct_Unconstrained_10248890354574636630 reader_t
-  type builder_t_Unconstrained_10248890354574636630 = struct_Unconstrained_10248890354574636630 builder_t
-  type struct_AnyPointer_14003731834718800369
-  type reader_t_AnyPointer_14003731834718800369 = struct_AnyPointer_14003731834718800369 reader_t
-  type builder_t_AnyPointer_14003731834718800369 = struct_AnyPointer_14003731834718800369 builder_t
-  type struct_Interface_17116997365232503999
-  type reader_t_Interface_17116997365232503999 = struct_Interface_17116997365232503999 reader_t
-  type builder_t_Interface_17116997365232503999 = struct_Interface_17116997365232503999 builder_t
-  type struct_Struct_12410354185295152851
-  type reader_t_Struct_12410354185295152851 = struct_Struct_12410354185295152851 reader_t
-  type builder_t_Struct_12410354185295152851 = struct_Struct_12410354185295152851 builder_t
-  type struct_Enum_11389172934837766057
-  type reader_t_Enum_11389172934837766057 = struct_Enum_11389172934837766057 reader_t
-  type builder_t_Enum_11389172934837766057 = struct_Enum_11389172934837766057 builder_t
-  type struct_List_9792858745991129751
-  type reader_t_List_9792858745991129751 = struct_List_9792858745991129751 reader_t
-  type builder_t_List_9792858745991129751 = struct_List_9792858745991129751 builder_t
-  type struct_Type_15020482145304562784
-  type reader_t_Type_15020482145304562784 = struct_Type_15020482145304562784 reader_t
-  type builder_t_Type_15020482145304562784 = struct_Type_15020482145304562784 builder_t
-  type struct_Method_10736806783679155584
-  type reader_t_Method_10736806783679155584 = struct_Method_10736806783679155584 reader_t
-  type builder_t_Method_10736806783679155584 = struct_Method_10736806783679155584 builder_t
-  type struct_Superclass_12220001500510083064
-  type reader_t_Superclass_12220001500510083064 = struct_Superclass_12220001500510083064 reader_t
-  type builder_t_Superclass_12220001500510083064 = struct_Superclass_12220001500510083064 builder_t
-  type struct_Enumerant_10919677598968879693
-  type reader_t_Enumerant_10919677598968879693 = struct_Enumerant_10919677598968879693 reader_t
-  type builder_t_Enumerant_10919677598968879693 = struct_Enumerant_10919677598968879693 builder_t
-  type struct_Ordinal_13515537513213004774
-  type reader_t_Ordinal_13515537513213004774 = struct_Ordinal_13515537513213004774 reader_t
-  type builder_t_Ordinal_13515537513213004774 = struct_Ordinal_13515537513213004774 builder_t
-  type struct_Group_14626792032033250577
-  type reader_t_Group_14626792032033250577 = struct_Group_14626792032033250577 reader_t
-  type builder_t_Group_14626792032033250577 = struct_Group_14626792032033250577 builder_t
-  type struct_Slot_14133145859926553711
-  type reader_t_Slot_14133145859926553711 = struct_Slot_14133145859926553711 reader_t
-  type builder_t_Slot_14133145859926553711 = struct_Slot_14133145859926553711 builder_t
-  type struct_Field_11145653318641710175
-  type reader_t_Field_11145653318641710175 = struct_Field_11145653318641710175 reader_t
-  type builder_t_Field_11145653318641710175 = struct_Field_11145653318641710175 builder_t
-  type struct_NestedNode_16050641862814319170
-  type reader_t_NestedNode_16050641862814319170 = struct_NestedNode_16050641862814319170 reader_t
-  type builder_t_NestedNode_16050641862814319170 = struct_NestedNode_16050641862814319170 builder_t
-  type struct_Parameter_13353766412138554289
-  type reader_t_Parameter_13353766412138554289 = struct_Parameter_13353766412138554289 reader_t
-  type builder_t_Parameter_13353766412138554289 = struct_Parameter_13353766412138554289 builder_t
-  type struct_Annotation_17011813041836786320
-  type reader_t_Annotation_17011813041836786320 = struct_Annotation_17011813041836786320 reader_t
-  type builder_t_Annotation_17011813041836786320 = struct_Annotation_17011813041836786320 builder_t
-  type struct_Const_12793219851699983392
-  type reader_t_Const_12793219851699983392 = struct_Const_12793219851699983392 reader_t
-  type builder_t_Const_12793219851699983392 = struct_Const_12793219851699983392 builder_t
-  type struct_Interface_16728431493453586831
-  type reader_t_Interface_16728431493453586831 = struct_Interface_16728431493453586831 reader_t
-  type builder_t_Interface_16728431493453586831 = struct_Interface_16728431493453586831 builder_t
-  type struct_Enum_13063450714778629528
-  type reader_t_Enum_13063450714778629528 = struct_Enum_13063450714778629528 reader_t
-  type builder_t_Enum_13063450714778629528 = struct_Enum_13063450714778629528 builder_t
-  type struct_Struct_11430331134483579957
-  type reader_t_Struct_11430331134483579957 = struct_Struct_11430331134483579957 reader_t
-  type builder_t_Struct_11430331134483579957 = struct_Struct_11430331134483579957 builder_t
-  type struct_Node_16610026722781537303
-  type reader_t_Node_16610026722781537303 = struct_Node_16610026722781537303 reader_t
-  type builder_t_Node_16610026722781537303 = struct_Node_16610026722781537303 builder_t
   module ElementSize_15102134695616452902 : sig
     type t =
       | Empty
@@ -126,11 +27,11 @@ module type S = sig
     type pointer_t
     val of_pointer : pointer_t -> 'a reader_t
     module Node : sig
-      type t = reader_t_Node_16610026722781537303
-      type builder_t = builder_t_Node_16610026722781537303
+      type struct_t = [`Node_e682ab4cf923a417]
+      type t = struct_t reader_t
       module Struct : sig
-        type t = reader_t_Struct_11430331134483579957
-        type builder_t = builder_t_Struct_11430331134483579957
+        type struct_t = [`Struct_9ea0b19b37fb4435]
+        type t = struct_t reader_t
         val data_word_count_get : t -> int
         val pointer_count_get : t -> int
         val preferred_list_encoding_get : t -> ElementSize_15102134695616452902.t
@@ -139,51 +40,51 @@ module type S = sig
         val discriminant_offset_get : t -> Uint32.t
         val discriminant_offset_get_int_exn : t -> int
         val has_fields : t -> bool
-        val fields_get : t -> (ro, reader_t_Field_11145653318641710175, array_t) Capnp.Array.t
-        val fields_get_list : t -> reader_t_Field_11145653318641710175 list
-        val fields_get_array : t -> reader_t_Field_11145653318641710175 array
+        val fields_get : t -> (ro, [`Field_9aad50a41f4af45f] reader_t, array_t) Capnp.Array.t
+        val fields_get_list : t -> [`Field_9aad50a41f4af45f] reader_t list
+        val fields_get_array : t -> [`Field_9aad50a41f4af45f] reader_t array
         val of_message : 'cap message_t -> t
-        val of_builder : builder_t -> t
+        val of_builder : struct_t builder_t -> t
       end
       module Enum : sig
-        type t = reader_t_Enum_13063450714778629528
-        type builder_t = builder_t_Enum_13063450714778629528
+        type struct_t = [`Enum_b54ab3364333f598]
+        type t = struct_t reader_t
         val has_enumerants : t -> bool
-        val enumerants_get : t -> (ro, reader_t_Enumerant_10919677598968879693, array_t) Capnp.Array.t
-        val enumerants_get_list : t -> reader_t_Enumerant_10919677598968879693 list
-        val enumerants_get_array : t -> reader_t_Enumerant_10919677598968879693 array
+        val enumerants_get : t -> (ro, [`Enumerant_978a7cebdc549a4d] reader_t, array_t) Capnp.Array.t
+        val enumerants_get_list : t -> [`Enumerant_978a7cebdc549a4d] reader_t list
+        val enumerants_get_array : t -> [`Enumerant_978a7cebdc549a4d] reader_t array
         val of_message : 'cap message_t -> t
-        val of_builder : builder_t -> t
+        val of_builder : struct_t builder_t -> t
       end
       module Interface : sig
-        type t = reader_t_Interface_16728431493453586831
-        type builder_t = builder_t_Interface_16728431493453586831
+        type struct_t = [`Interface_e82753cff0c2218f]
+        type t = struct_t reader_t
         val has_methods : t -> bool
-        val methods_get : t -> (ro, reader_t_Method_10736806783679155584, array_t) Capnp.Array.t
-        val methods_get_list : t -> reader_t_Method_10736806783679155584 list
-        val methods_get_array : t -> reader_t_Method_10736806783679155584 array
+        val methods_get : t -> (ro, [`Method_9500cce23b334d80] reader_t, array_t) Capnp.Array.t
+        val methods_get_list : t -> [`Method_9500cce23b334d80] reader_t list
+        val methods_get_array : t -> [`Method_9500cce23b334d80] reader_t array
         val has_superclasses : t -> bool
-        val superclasses_get : t -> (ro, reader_t_Superclass_12220001500510083064, array_t) Capnp.Array.t
-        val superclasses_get_list : t -> reader_t_Superclass_12220001500510083064 list
-        val superclasses_get_array : t -> reader_t_Superclass_12220001500510083064 array
+        val superclasses_get : t -> (ro, [`Superclass_a9962a9ed0a4d7f8] reader_t, array_t) Capnp.Array.t
+        val superclasses_get_list : t -> [`Superclass_a9962a9ed0a4d7f8] reader_t list
+        val superclasses_get_array : t -> [`Superclass_a9962a9ed0a4d7f8] reader_t array
         val of_message : 'cap message_t -> t
-        val of_builder : builder_t -> t
+        val of_builder : struct_t builder_t -> t
       end
       module Const : sig
-        type t = reader_t_Const_12793219851699983392
-        type builder_t = builder_t_Const_12793219851699983392
+        type struct_t = [`Const_b18aa5ac7a0d9420]
+        type t = struct_t reader_t
         val has_type : t -> bool
-        val type_get : t -> reader_t_Type_15020482145304562784
+        val type_get : t -> [`Type_d07378ede1f9cc60] reader_t
         val has_value : t -> bool
-        val value_get : t -> reader_t_Value_14853958794117909659
+        val value_get : t -> [`Value_ce23dcd2d7b00c9b] reader_t
         val of_message : 'cap message_t -> t
-        val of_builder : builder_t -> t
+        val of_builder : struct_t builder_t -> t
       end
       module Annotation : sig
-        type t = reader_t_Annotation_17011813041836786320
-        type builder_t = builder_t_Annotation_17011813041836786320
+        type struct_t = [`Annotation_ec1619d4400a0290]
+        type t = struct_t reader_t
         val has_type : t -> bool
-        val type_get : t -> reader_t_Type_15020482145304562784
+        val type_get : t -> [`Type_d07378ede1f9cc60] reader_t
         val targets_file_get : t -> bool
         val targets_const_get : t -> bool
         val targets_enum_get : t -> bool
@@ -197,25 +98,25 @@ module type S = sig
         val targets_param_get : t -> bool
         val targets_annotation_get : t -> bool
         val of_message : 'cap message_t -> t
-        val of_builder : builder_t -> t
+        val of_builder : struct_t builder_t -> t
       end
       module Parameter : sig
-        type t = reader_t_Parameter_13353766412138554289
-        type builder_t = builder_t_Parameter_13353766412138554289
+        type struct_t = [`Parameter_b9521bccf10fa3b1]
+        type t = struct_t reader_t
         val has_name : t -> bool
         val name_get : t -> string
         val of_message : 'cap message_t -> t
-        val of_builder : builder_t -> t
+        val of_builder : struct_t builder_t -> t
       end
       module NestedNode : sig
-        type t = reader_t_NestedNode_16050641862814319170
-        type builder_t = builder_t_NestedNode_16050641862814319170
+        type struct_t = [`NestedNode_debf55bbfa0fc242]
+        type t = struct_t reader_t
         val has_name : t -> bool
         val name_get : t -> string
         val id_get : t -> Uint64.t
         val id_get_int_exn : t -> int
         val of_message : 'cap message_t -> t
-        val of_builder : builder_t -> t
+        val of_builder : struct_t builder_t -> t
       end
       type unnamed_union_t =
         | File
@@ -235,55 +136,55 @@ module type S = sig
       val scope_id_get : t -> Uint64.t
       val scope_id_get_int_exn : t -> int
       val has_parameters : t -> bool
-      val parameters_get : t -> (ro, reader_t_Parameter_13353766412138554289, array_t) Capnp.Array.t
-      val parameters_get_list : t -> reader_t_Parameter_13353766412138554289 list
-      val parameters_get_array : t -> reader_t_Parameter_13353766412138554289 array
+      val parameters_get : t -> (ro, [`Parameter_b9521bccf10fa3b1] reader_t, array_t) Capnp.Array.t
+      val parameters_get_list : t -> [`Parameter_b9521bccf10fa3b1] reader_t list
+      val parameters_get_array : t -> [`Parameter_b9521bccf10fa3b1] reader_t array
       val is_generic_get : t -> bool
       val has_nested_nodes : t -> bool
-      val nested_nodes_get : t -> (ro, reader_t_NestedNode_16050641862814319170, array_t) Capnp.Array.t
-      val nested_nodes_get_list : t -> reader_t_NestedNode_16050641862814319170 list
-      val nested_nodes_get_array : t -> reader_t_NestedNode_16050641862814319170 array
+      val nested_nodes_get : t -> (ro, [`NestedNode_debf55bbfa0fc242] reader_t, array_t) Capnp.Array.t
+      val nested_nodes_get_list : t -> [`NestedNode_debf55bbfa0fc242] reader_t list
+      val nested_nodes_get_array : t -> [`NestedNode_debf55bbfa0fc242] reader_t array
       val has_annotations : t -> bool
-      val annotations_get : t -> (ro, reader_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
-      val annotations_get_list : t -> reader_t_Annotation_17422339044421236034 list
-      val annotations_get_array : t -> reader_t_Annotation_17422339044421236034 array
+      val annotations_get : t -> (ro, [`Annotation_f1c8950dab257542] reader_t, array_t) Capnp.Array.t
+      val annotations_get_list : t -> [`Annotation_f1c8950dab257542] reader_t list
+      val annotations_get_array : t -> [`Annotation_f1c8950dab257542] reader_t array
       val of_message : 'cap message_t -> t
-      val of_builder : builder_t -> t
+      val of_builder : struct_t builder_t -> t
     end
     module Field : sig
-      type t = reader_t_Field_11145653318641710175
-      type builder_t = builder_t_Field_11145653318641710175
+      type struct_t = [`Field_9aad50a41f4af45f]
+      type t = struct_t reader_t
       module Slot : sig
-        type t = reader_t_Slot_14133145859926553711
-        type builder_t = builder_t_Slot_14133145859926553711
+        type struct_t = [`Slot_c42305476bb4746f]
+        type t = struct_t reader_t
         val offset_get : t -> Uint32.t
         val offset_get_int_exn : t -> int
         val has_type : t -> bool
-        val type_get : t -> reader_t_Type_15020482145304562784
+        val type_get : t -> [`Type_d07378ede1f9cc60] reader_t
         val has_default_value : t -> bool
-        val default_value_get : t -> reader_t_Value_14853958794117909659
+        val default_value_get : t -> [`Value_ce23dcd2d7b00c9b] reader_t
         val had_explicit_default_get : t -> bool
         val of_message : 'cap message_t -> t
-        val of_builder : builder_t -> t
+        val of_builder : struct_t builder_t -> t
       end
       module Group : sig
-        type t = reader_t_Group_14626792032033250577
-        type builder_t = builder_t_Group_14626792032033250577
+        type struct_t = [`Group_cafccddb68db1d11]
+        type t = struct_t reader_t
         val type_id_get : t -> Uint64.t
         val type_id_get_int_exn : t -> int
         val of_message : 'cap message_t -> t
-        val of_builder : builder_t -> t
+        val of_builder : struct_t builder_t -> t
       end
       module Ordinal : sig
-        type t = reader_t_Ordinal_13515537513213004774
-        type builder_t = builder_t_Ordinal_13515537513213004774
+        type struct_t = [`Ordinal_bb90d5c287870be6]
+        type t = struct_t reader_t
         type unnamed_union_t =
           | Implicit
           | Explicit of int
           | Undefined of int
         val get : t -> unnamed_union_t
         val of_message : 'cap message_t -> t
-        val of_builder : builder_t -> t
+        val of_builder : struct_t builder_t -> t
       end
       val no_discriminant : int
       type unnamed_union_t =
@@ -295,40 +196,40 @@ module type S = sig
       val name_get : t -> string
       val code_order_get : t -> int
       val has_annotations : t -> bool
-      val annotations_get : t -> (ro, reader_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
-      val annotations_get_list : t -> reader_t_Annotation_17422339044421236034 list
-      val annotations_get_array : t -> reader_t_Annotation_17422339044421236034 array
+      val annotations_get : t -> (ro, [`Annotation_f1c8950dab257542] reader_t, array_t) Capnp.Array.t
+      val annotations_get_list : t -> [`Annotation_f1c8950dab257542] reader_t list
+      val annotations_get_array : t -> [`Annotation_f1c8950dab257542] reader_t array
       val discriminant_value_get : t -> int
       val ordinal_get : t -> Ordinal.t
       val of_message : 'cap message_t -> t
-      val of_builder : builder_t -> t
+      val of_builder : struct_t builder_t -> t
     end
     module Enumerant : sig
-      type t = reader_t_Enumerant_10919677598968879693
-      type builder_t = builder_t_Enumerant_10919677598968879693
+      type struct_t = [`Enumerant_978a7cebdc549a4d]
+      type t = struct_t reader_t
       val has_name : t -> bool
       val name_get : t -> string
       val code_order_get : t -> int
       val has_annotations : t -> bool
-      val annotations_get : t -> (ro, reader_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
-      val annotations_get_list : t -> reader_t_Annotation_17422339044421236034 list
-      val annotations_get_array : t -> reader_t_Annotation_17422339044421236034 array
+      val annotations_get : t -> (ro, [`Annotation_f1c8950dab257542] reader_t, array_t) Capnp.Array.t
+      val annotations_get_list : t -> [`Annotation_f1c8950dab257542] reader_t list
+      val annotations_get_array : t -> [`Annotation_f1c8950dab257542] reader_t array
       val of_message : 'cap message_t -> t
-      val of_builder : builder_t -> t
+      val of_builder : struct_t builder_t -> t
     end
     module Superclass : sig
-      type t = reader_t_Superclass_12220001500510083064
-      type builder_t = builder_t_Superclass_12220001500510083064
+      type struct_t = [`Superclass_a9962a9ed0a4d7f8]
+      type t = struct_t reader_t
       val id_get : t -> Uint64.t
       val id_get_int_exn : t -> int
       val has_brand : t -> bool
-      val brand_get : t -> reader_t_Brand_10391024731148337707
+      val brand_get : t -> [`Brand_903455f06065422b] reader_t
       val of_message : 'cap message_t -> t
-      val of_builder : builder_t -> t
+      val of_builder : struct_t builder_t -> t
     end
     module Method : sig
-      type t = reader_t_Method_10736806783679155584
-      type builder_t = builder_t_Method_10736806783679155584
+      type struct_t = [`Method_9500cce23b334d80]
+      type t = struct_t reader_t
       val has_name : t -> bool
       val name_get : t -> string
       val code_order_get : t -> int
@@ -339,65 +240,65 @@ module type S = sig
       val param_struct_type_get : t -> Uint64.t
       val param_struct_type_get_int_exn : t -> int
       val has_param_brand : t -> bool
-      val param_brand_get : t -> reader_t_Brand_10391024731148337707
+      val param_brand_get : t -> [`Brand_903455f06065422b] reader_t
       val result_struct_type_get : t -> Uint64.t
       val result_struct_type_get_int_exn : t -> int
       val has_result_brand : t -> bool
-      val result_brand_get : t -> reader_t_Brand_10391024731148337707
+      val result_brand_get : t -> [`Brand_903455f06065422b] reader_t
       val has_annotations : t -> bool
-      val annotations_get : t -> (ro, reader_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
-      val annotations_get_list : t -> reader_t_Annotation_17422339044421236034 list
-      val annotations_get_array : t -> reader_t_Annotation_17422339044421236034 array
+      val annotations_get : t -> (ro, [`Annotation_f1c8950dab257542] reader_t, array_t) Capnp.Array.t
+      val annotations_get_list : t -> [`Annotation_f1c8950dab257542] reader_t list
+      val annotations_get_array : t -> [`Annotation_f1c8950dab257542] reader_t array
       val of_message : 'cap message_t -> t
-      val of_builder : builder_t -> t
+      val of_builder : struct_t builder_t -> t
     end
     module Type : sig
-      type t = reader_t_Type_15020482145304562784
-      type builder_t = builder_t_Type_15020482145304562784
+      type struct_t = [`Type_d07378ede1f9cc60]
+      type t = struct_t reader_t
       module List : sig
-        type t = reader_t_List_9792858745991129751
-        type builder_t = builder_t_List_9792858745991129751
+        type struct_t = [`List_87e739250a60ea97]
+        type t = struct_t reader_t
         val has_element_type : t -> bool
-        val element_type_get : t -> reader_t_Type_15020482145304562784
+        val element_type_get : t -> [`Type_d07378ede1f9cc60] reader_t
         val of_message : 'cap message_t -> t
-        val of_builder : builder_t -> t
+        val of_builder : struct_t builder_t -> t
       end
       module Enum : sig
-        type t = reader_t_Enum_11389172934837766057
-        type builder_t = builder_t_Enum_11389172934837766057
+        type struct_t = [`Enum_9e0e78711a7f87a9]
+        type t = struct_t reader_t
         val type_id_get : t -> Uint64.t
         val type_id_get_int_exn : t -> int
         val has_brand : t -> bool
-        val brand_get : t -> reader_t_Brand_10391024731148337707
+        val brand_get : t -> [`Brand_903455f06065422b] reader_t
         val of_message : 'cap message_t -> t
-        val of_builder : builder_t -> t
+        val of_builder : struct_t builder_t -> t
       end
       module Struct : sig
-        type t = reader_t_Struct_12410354185295152851
-        type builder_t = builder_t_Struct_12410354185295152851
+        type struct_t = [`Struct_ac3a6f60ef4cc6d3]
+        type t = struct_t reader_t
         val type_id_get : t -> Uint64.t
         val type_id_get_int_exn : t -> int
         val has_brand : t -> bool
-        val brand_get : t -> reader_t_Brand_10391024731148337707
+        val brand_get : t -> [`Brand_903455f06065422b] reader_t
         val of_message : 'cap message_t -> t
-        val of_builder : builder_t -> t
+        val of_builder : struct_t builder_t -> t
       end
       module Interface : sig
-        type t = reader_t_Interface_17116997365232503999
-        type builder_t = builder_t_Interface_17116997365232503999
+        type struct_t = [`Interface_ed8bca69f7fb0cbf]
+        type t = struct_t reader_t
         val type_id_get : t -> Uint64.t
         val type_id_get_int_exn : t -> int
         val has_brand : t -> bool
-        val brand_get : t -> reader_t_Brand_10391024731148337707
+        val brand_get : t -> [`Brand_903455f06065422b] reader_t
         val of_message : 'cap message_t -> t
-        val of_builder : builder_t -> t
+        val of_builder : struct_t builder_t -> t
       end
       module AnyPointer : sig
-        type t = reader_t_AnyPointer_14003731834718800369
-        type builder_t = builder_t_AnyPointer_14003731834718800369
+        type struct_t = [`AnyPointer_c2573fe8a23e49f1]
+        type t = struct_t reader_t
         module Unconstrained : sig
-          type t = reader_t_Unconstrained_10248890354574636630
-          type builder_t = builder_t_Unconstrained_10248890354574636630
+          type struct_t = [`Unconstrained_8e3b5f79fe593656]
+          type t = struct_t reader_t
           type unnamed_union_t =
             | AnyKind
             | Struct
@@ -406,23 +307,23 @@ module type S = sig
             | Undefined of int
           val get : t -> unnamed_union_t
           val of_message : 'cap message_t -> t
-          val of_builder : builder_t -> t
+          val of_builder : struct_t builder_t -> t
         end
         module Parameter : sig
-          type t = reader_t_Parameter_11372142272178113157
-          type builder_t = builder_t_Parameter_11372142272178113157
+          type struct_t = [`Parameter_9dd1f724f4614a85]
+          type t = struct_t reader_t
           val scope_id_get : t -> Uint64.t
           val scope_id_get_int_exn : t -> int
           val parameter_index_get : t -> int
           val of_message : 'cap message_t -> t
-          val of_builder : builder_t -> t
+          val of_builder : struct_t builder_t -> t
         end
         module ImplicitMethodParameter : sig
-          type t = reader_t_ImplicitMethodParameter_13470206089842057844
-          type builder_t = builder_t_ImplicitMethodParameter_13470206089842057844
+          type struct_t = [`ImplicitMethodParameter_baefc9120c56e274]
+          type t = struct_t reader_t
           val parameter_index_get : t -> int
           val of_message : 'cap message_t -> t
-          val of_builder : builder_t -> t
+          val of_builder : struct_t builder_t -> t
         end
         type unnamed_union_t =
           | Unconstrained of Unconstrained.t
@@ -431,7 +332,7 @@ module type S = sig
           | Undefined of int
         val get : t -> unnamed_union_t
         val of_message : 'cap message_t -> t
-        val of_builder : builder_t -> t
+        val of_builder : struct_t builder_t -> t
       end
       type unnamed_union_t =
         | Void
@@ -456,45 +357,45 @@ module type S = sig
         | Undefined of int
       val get : t -> unnamed_union_t
       val of_message : 'cap message_t -> t
-      val of_builder : builder_t -> t
+      val of_builder : struct_t builder_t -> t
     end
     module Brand : sig
-      type t = reader_t_Brand_10391024731148337707
-      type builder_t = builder_t_Brand_10391024731148337707
+      type struct_t = [`Brand_903455f06065422b]
+      type t = struct_t reader_t
       module Scope : sig
-        type t = reader_t_Scope_12382423449155627977
-        type builder_t = builder_t_Scope_12382423449155627977
+        type struct_t = [`Scope_abd73485a9636bc9]
+        type t = struct_t reader_t
         type unnamed_union_t =
-          | Bind of (ro, reader_t_Binding_14439610327179913212, array_t) Capnp.Array.t
+          | Bind of (ro, [`Binding_c863cd16969ee7fc] reader_t, array_t) Capnp.Array.t
           | Inherit
           | Undefined of int
         val get : t -> unnamed_union_t
         val scope_id_get : t -> Uint64.t
         val scope_id_get_int_exn : t -> int
         val of_message : 'cap message_t -> t
-        val of_builder : builder_t -> t
+        val of_builder : struct_t builder_t -> t
       end
       module Binding : sig
-        type t = reader_t_Binding_14439610327179913212
-        type builder_t = builder_t_Binding_14439610327179913212
+        type struct_t = [`Binding_c863cd16969ee7fc]
+        type t = struct_t reader_t
         type unnamed_union_t =
           | Unbound
           | Type of Type.t
           | Undefined of int
         val get : t -> unnamed_union_t
         val of_message : 'cap message_t -> t
-        val of_builder : builder_t -> t
+        val of_builder : struct_t builder_t -> t
       end
       val has_scopes : t -> bool
-      val scopes_get : t -> (ro, reader_t_Scope_12382423449155627977, array_t) Capnp.Array.t
-      val scopes_get_list : t -> reader_t_Scope_12382423449155627977 list
-      val scopes_get_array : t -> reader_t_Scope_12382423449155627977 array
+      val scopes_get : t -> (ro, [`Scope_abd73485a9636bc9] reader_t, array_t) Capnp.Array.t
+      val scopes_get_list : t -> [`Scope_abd73485a9636bc9] reader_t list
+      val scopes_get_array : t -> [`Scope_abd73485a9636bc9] reader_t array
       val of_message : 'cap message_t -> t
-      val of_builder : builder_t -> t
+      val of_builder : struct_t builder_t -> t
     end
     module Value : sig
-      type t = reader_t_Value_14853958794117909659
-      type builder_t = builder_t_Value_14853958794117909659
+      type struct_t = [`Value_ce23dcd2d7b00c9b]
+      type t = struct_t reader_t
       type unnamed_union_t =
         | Void
         | Bool of bool
@@ -518,11 +419,11 @@ module type S = sig
         | Undefined of int
       val get : t -> unnamed_union_t
       val of_message : 'cap message_t -> t
-      val of_builder : builder_t -> t
+      val of_builder : struct_t builder_t -> t
     end
     module Annotation : sig
-      type t = reader_t_Annotation_17422339044421236034
-      type builder_t = builder_t_Annotation_17422339044421236034
+      type struct_t = [`Annotation_f1c8950dab257542]
+      type t = struct_t reader_t
       val id_get : t -> Uint64.t
       val id_get_int_exn : t -> int
       val has_brand : t -> bool
@@ -530,7 +431,7 @@ module type S = sig
       val has_value : t -> bool
       val value_get : t -> Value.t
       val of_message : 'cap message_t -> t
-      val of_builder : builder_t -> t
+      val of_builder : struct_t builder_t -> t
     end
     module ElementSize : sig
       type t = ElementSize_15102134695616452902.t =
@@ -545,40 +446,40 @@ module type S = sig
         | Undefined of int
     end
     module CapnpVersion : sig
-      type t = reader_t_CapnpVersion_15590670654532458851
-      type builder_t = builder_t_CapnpVersion_15590670654532458851
+      type struct_t = [`CapnpVersion_d85d305b7d839963]
+      type t = struct_t reader_t
       val major_get : t -> int
       val minor_get : t -> int
       val micro_get : t -> int
       val of_message : 'cap message_t -> t
-      val of_builder : builder_t -> t
+      val of_builder : struct_t builder_t -> t
     end
     module CodeGeneratorRequest : sig
-      type t = reader_t_CodeGeneratorRequest_13818529054586492878
-      type builder_t = builder_t_CodeGeneratorRequest_13818529054586492878
+      type struct_t = [`CodeGeneratorRequest_bfc546f6210ad7ce]
+      type t = struct_t reader_t
       module RequestedFile : sig
-        type t = reader_t_RequestedFile_14981803260258615394
-        type builder_t = builder_t_RequestedFile_14981803260258615394
+        type struct_t = [`RequestedFile_cfea0eb02e810062]
+        type t = struct_t reader_t
         module Import : sig
-          type t = reader_t_Import_12560611460656617445
-          type builder_t = builder_t_Import_12560611460656617445
+          type struct_t = [`Import_ae504193122357e5]
+          type t = struct_t reader_t
           val id_get : t -> Uint64.t
           val id_get_int_exn : t -> int
           val has_name : t -> bool
           val name_get : t -> string
           val of_message : 'cap message_t -> t
-          val of_builder : builder_t -> t
+          val of_builder : struct_t builder_t -> t
         end
         val id_get : t -> Uint64.t
         val id_get_int_exn : t -> int
         val has_filename : t -> bool
         val filename_get : t -> string
         val has_imports : t -> bool
-        val imports_get : t -> (ro, reader_t_Import_12560611460656617445, array_t) Capnp.Array.t
-        val imports_get_list : t -> reader_t_Import_12560611460656617445 list
-        val imports_get_array : t -> reader_t_Import_12560611460656617445 array
+        val imports_get : t -> (ro, [`Import_ae504193122357e5] reader_t, array_t) Capnp.Array.t
+        val imports_get_list : t -> [`Import_ae504193122357e5] reader_t list
+        val imports_get_array : t -> [`Import_ae504193122357e5] reader_t array
         val of_message : 'cap message_t -> t
-        val of_builder : builder_t -> t
+        val of_builder : struct_t builder_t -> t
       end
       val has_capnp_version : t -> bool
       val capnp_version_get : t -> CapnpVersion.t
@@ -587,11 +488,11 @@ module type S = sig
       val nodes_get_list : t -> Node.t list
       val nodes_get_array : t -> Node.t array
       val has_requested_files : t -> bool
-      val requested_files_get : t -> (ro, reader_t_RequestedFile_14981803260258615394, array_t) Capnp.Array.t
-      val requested_files_get_list : t -> reader_t_RequestedFile_14981803260258615394 list
-      val requested_files_get_array : t -> reader_t_RequestedFile_14981803260258615394 array
+      val requested_files_get : t -> (ro, [`RequestedFile_cfea0eb02e810062] reader_t, array_t) Capnp.Array.t
+      val requested_files_get_list : t -> [`RequestedFile_cfea0eb02e810062] reader_t list
+      val requested_files_get_array : t -> [`RequestedFile_cfea0eb02e810062] reader_t array
       val of_message : 'cap message_t -> t
-      val of_builder : builder_t -> t
+      val of_builder : struct_t builder_t -> t
     end
   end
 
@@ -600,11 +501,11 @@ module type S = sig
     type reader_array_t = Reader.array_t
     type pointer_t
     module Node : sig
-      type t = builder_t_Node_16610026722781537303
-      type reader_t = reader_t_Node_16610026722781537303
+      type struct_t = [`Node_e682ab4cf923a417]
+      type t = struct_t builder_t
       module Struct : sig
-        type t = builder_t_Struct_11430331134483579957
-        type reader_t = reader_t_Struct_11430331134483579957
+        type struct_t = [`Struct_9ea0b19b37fb4435]
+        type t = struct_t builder_t
         val data_word_count_get : t -> int
         val data_word_count_set_exn : t -> int -> unit
         val pointer_count_get : t -> int
@@ -621,88 +522,88 @@ module type S = sig
         val discriminant_offset_set : t -> Uint32.t -> unit
         val discriminant_offset_set_int_exn : t -> int -> unit
         val has_fields : t -> bool
-        val fields_get : t -> (rw, builder_t_Field_11145653318641710175, array_t) Capnp.Array.t
-        val fields_get_list : t -> builder_t_Field_11145653318641710175 list
-        val fields_get_array : t -> builder_t_Field_11145653318641710175 array
-        val fields_set : t -> (rw, builder_t_Field_11145653318641710175, array_t) Capnp.Array.t -> (rw, builder_t_Field_11145653318641710175, array_t) Capnp.Array.t
-        val fields_set_list : t -> builder_t_Field_11145653318641710175 list -> (rw, builder_t_Field_11145653318641710175, array_t) Capnp.Array.t
-        val fields_set_array : t -> builder_t_Field_11145653318641710175 array -> (rw, builder_t_Field_11145653318641710175, array_t) Capnp.Array.t
-        val fields_init : t -> int -> (rw, builder_t_Field_11145653318641710175, array_t) Capnp.Array.t
+        val fields_get : t -> (rw, [`Field_9aad50a41f4af45f] builder_t, array_t) Capnp.Array.t
+        val fields_get_list : t -> [`Field_9aad50a41f4af45f] builder_t list
+        val fields_get_array : t -> [`Field_9aad50a41f4af45f] builder_t array
+        val fields_set : t -> (rw, [`Field_9aad50a41f4af45f] builder_t, array_t) Capnp.Array.t -> (rw, [`Field_9aad50a41f4af45f] builder_t, array_t) Capnp.Array.t
+        val fields_set_list : t -> [`Field_9aad50a41f4af45f] builder_t list -> (rw, [`Field_9aad50a41f4af45f] builder_t, array_t) Capnp.Array.t
+        val fields_set_array : t -> [`Field_9aad50a41f4af45f] builder_t array -> (rw, [`Field_9aad50a41f4af45f] builder_t, array_t) Capnp.Array.t
+        val fields_init : t -> int -> (rw, [`Field_9aad50a41f4af45f] builder_t, array_t) Capnp.Array.t
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
-        val to_reader : t -> reader_t
+        val to_reader : t -> struct_t reader_t
         val init_root : ?message_size:int -> unit -> t
         val init_pointer : pointer_t -> t
       end
       module Enum : sig
-        type t = builder_t_Enum_13063450714778629528
-        type reader_t = reader_t_Enum_13063450714778629528
+        type struct_t = [`Enum_b54ab3364333f598]
+        type t = struct_t builder_t
         val has_enumerants : t -> bool
-        val enumerants_get : t -> (rw, builder_t_Enumerant_10919677598968879693, array_t) Capnp.Array.t
-        val enumerants_get_list : t -> builder_t_Enumerant_10919677598968879693 list
-        val enumerants_get_array : t -> builder_t_Enumerant_10919677598968879693 array
-        val enumerants_set : t -> (rw, builder_t_Enumerant_10919677598968879693, array_t) Capnp.Array.t -> (rw, builder_t_Enumerant_10919677598968879693, array_t) Capnp.Array.t
-        val enumerants_set_list : t -> builder_t_Enumerant_10919677598968879693 list -> (rw, builder_t_Enumerant_10919677598968879693, array_t) Capnp.Array.t
-        val enumerants_set_array : t -> builder_t_Enumerant_10919677598968879693 array -> (rw, builder_t_Enumerant_10919677598968879693, array_t) Capnp.Array.t
-        val enumerants_init : t -> int -> (rw, builder_t_Enumerant_10919677598968879693, array_t) Capnp.Array.t
+        val enumerants_get : t -> (rw, [`Enumerant_978a7cebdc549a4d] builder_t, array_t) Capnp.Array.t
+        val enumerants_get_list : t -> [`Enumerant_978a7cebdc549a4d] builder_t list
+        val enumerants_get_array : t -> [`Enumerant_978a7cebdc549a4d] builder_t array
+        val enumerants_set : t -> (rw, [`Enumerant_978a7cebdc549a4d] builder_t, array_t) Capnp.Array.t -> (rw, [`Enumerant_978a7cebdc549a4d] builder_t, array_t) Capnp.Array.t
+        val enumerants_set_list : t -> [`Enumerant_978a7cebdc549a4d] builder_t list -> (rw, [`Enumerant_978a7cebdc549a4d] builder_t, array_t) Capnp.Array.t
+        val enumerants_set_array : t -> [`Enumerant_978a7cebdc549a4d] builder_t array -> (rw, [`Enumerant_978a7cebdc549a4d] builder_t, array_t) Capnp.Array.t
+        val enumerants_init : t -> int -> (rw, [`Enumerant_978a7cebdc549a4d] builder_t, array_t) Capnp.Array.t
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
-        val to_reader : t -> reader_t
+        val to_reader : t -> struct_t reader_t
         val init_root : ?message_size:int -> unit -> t
         val init_pointer : pointer_t -> t
       end
       module Interface : sig
-        type t = builder_t_Interface_16728431493453586831
-        type reader_t = reader_t_Interface_16728431493453586831
+        type struct_t = [`Interface_e82753cff0c2218f]
+        type t = struct_t builder_t
         val has_methods : t -> bool
-        val methods_get : t -> (rw, builder_t_Method_10736806783679155584, array_t) Capnp.Array.t
-        val methods_get_list : t -> builder_t_Method_10736806783679155584 list
-        val methods_get_array : t -> builder_t_Method_10736806783679155584 array
-        val methods_set : t -> (rw, builder_t_Method_10736806783679155584, array_t) Capnp.Array.t -> (rw, builder_t_Method_10736806783679155584, array_t) Capnp.Array.t
-        val methods_set_list : t -> builder_t_Method_10736806783679155584 list -> (rw, builder_t_Method_10736806783679155584, array_t) Capnp.Array.t
-        val methods_set_array : t -> builder_t_Method_10736806783679155584 array -> (rw, builder_t_Method_10736806783679155584, array_t) Capnp.Array.t
-        val methods_init : t -> int -> (rw, builder_t_Method_10736806783679155584, array_t) Capnp.Array.t
+        val methods_get : t -> (rw, [`Method_9500cce23b334d80] builder_t, array_t) Capnp.Array.t
+        val methods_get_list : t -> [`Method_9500cce23b334d80] builder_t list
+        val methods_get_array : t -> [`Method_9500cce23b334d80] builder_t array
+        val methods_set : t -> (rw, [`Method_9500cce23b334d80] builder_t, array_t) Capnp.Array.t -> (rw, [`Method_9500cce23b334d80] builder_t, array_t) Capnp.Array.t
+        val methods_set_list : t -> [`Method_9500cce23b334d80] builder_t list -> (rw, [`Method_9500cce23b334d80] builder_t, array_t) Capnp.Array.t
+        val methods_set_array : t -> [`Method_9500cce23b334d80] builder_t array -> (rw, [`Method_9500cce23b334d80] builder_t, array_t) Capnp.Array.t
+        val methods_init : t -> int -> (rw, [`Method_9500cce23b334d80] builder_t, array_t) Capnp.Array.t
         val has_superclasses : t -> bool
-        val superclasses_get : t -> (rw, builder_t_Superclass_12220001500510083064, array_t) Capnp.Array.t
-        val superclasses_get_list : t -> builder_t_Superclass_12220001500510083064 list
-        val superclasses_get_array : t -> builder_t_Superclass_12220001500510083064 array
-        val superclasses_set : t -> (rw, builder_t_Superclass_12220001500510083064, array_t) Capnp.Array.t -> (rw, builder_t_Superclass_12220001500510083064, array_t) Capnp.Array.t
-        val superclasses_set_list : t -> builder_t_Superclass_12220001500510083064 list -> (rw, builder_t_Superclass_12220001500510083064, array_t) Capnp.Array.t
-        val superclasses_set_array : t -> builder_t_Superclass_12220001500510083064 array -> (rw, builder_t_Superclass_12220001500510083064, array_t) Capnp.Array.t
-        val superclasses_init : t -> int -> (rw, builder_t_Superclass_12220001500510083064, array_t) Capnp.Array.t
+        val superclasses_get : t -> (rw, [`Superclass_a9962a9ed0a4d7f8] builder_t, array_t) Capnp.Array.t
+        val superclasses_get_list : t -> [`Superclass_a9962a9ed0a4d7f8] builder_t list
+        val superclasses_get_array : t -> [`Superclass_a9962a9ed0a4d7f8] builder_t array
+        val superclasses_set : t -> (rw, [`Superclass_a9962a9ed0a4d7f8] builder_t, array_t) Capnp.Array.t -> (rw, [`Superclass_a9962a9ed0a4d7f8] builder_t, array_t) Capnp.Array.t
+        val superclasses_set_list : t -> [`Superclass_a9962a9ed0a4d7f8] builder_t list -> (rw, [`Superclass_a9962a9ed0a4d7f8] builder_t, array_t) Capnp.Array.t
+        val superclasses_set_array : t -> [`Superclass_a9962a9ed0a4d7f8] builder_t array -> (rw, [`Superclass_a9962a9ed0a4d7f8] builder_t, array_t) Capnp.Array.t
+        val superclasses_init : t -> int -> (rw, [`Superclass_a9962a9ed0a4d7f8] builder_t, array_t) Capnp.Array.t
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
-        val to_reader : t -> reader_t
+        val to_reader : t -> struct_t reader_t
         val init_root : ?message_size:int -> unit -> t
         val init_pointer : pointer_t -> t
       end
       module Const : sig
-        type t = builder_t_Const_12793219851699983392
-        type reader_t = reader_t_Const_12793219851699983392
+        type struct_t = [`Const_b18aa5ac7a0d9420]
+        type t = struct_t builder_t
         val has_type : t -> bool
-        val type_get : t -> builder_t_Type_15020482145304562784
-        val type_set_reader : t -> reader_t_Type_15020482145304562784 -> builder_t_Type_15020482145304562784
-        val type_set_builder : t -> builder_t_Type_15020482145304562784 -> builder_t_Type_15020482145304562784
-        val type_init : t -> builder_t_Type_15020482145304562784
+        val type_get : t -> [`Type_d07378ede1f9cc60] builder_t
+        val type_set_reader : t -> [`Type_d07378ede1f9cc60] reader_t -> [`Type_d07378ede1f9cc60] builder_t
+        val type_set_builder : t -> [`Type_d07378ede1f9cc60] builder_t -> [`Type_d07378ede1f9cc60] builder_t
+        val type_init : t -> [`Type_d07378ede1f9cc60] builder_t
         val has_value : t -> bool
-        val value_get : t -> builder_t_Value_14853958794117909659
-        val value_set_reader : t -> reader_t_Value_14853958794117909659 -> builder_t_Value_14853958794117909659
-        val value_set_builder : t -> builder_t_Value_14853958794117909659 -> builder_t_Value_14853958794117909659
-        val value_init : t -> builder_t_Value_14853958794117909659
+        val value_get : t -> [`Value_ce23dcd2d7b00c9b] builder_t
+        val value_set_reader : t -> [`Value_ce23dcd2d7b00c9b] reader_t -> [`Value_ce23dcd2d7b00c9b] builder_t
+        val value_set_builder : t -> [`Value_ce23dcd2d7b00c9b] builder_t -> [`Value_ce23dcd2d7b00c9b] builder_t
+        val value_init : t -> [`Value_ce23dcd2d7b00c9b] builder_t
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
-        val to_reader : t -> reader_t
+        val to_reader : t -> struct_t reader_t
         val init_root : ?message_size:int -> unit -> t
         val init_pointer : pointer_t -> t
       end
       module Annotation : sig
-        type t = builder_t_Annotation_17011813041836786320
-        type reader_t = reader_t_Annotation_17011813041836786320
+        type struct_t = [`Annotation_ec1619d4400a0290]
+        type t = struct_t builder_t
         val has_type : t -> bool
-        val type_get : t -> builder_t_Type_15020482145304562784
-        val type_set_reader : t -> reader_t_Type_15020482145304562784 -> builder_t_Type_15020482145304562784
-        val type_set_builder : t -> builder_t_Type_15020482145304562784 -> builder_t_Type_15020482145304562784
-        val type_init : t -> builder_t_Type_15020482145304562784
+        val type_get : t -> [`Type_d07378ede1f9cc60] builder_t
+        val type_set_reader : t -> [`Type_d07378ede1f9cc60] reader_t -> [`Type_d07378ede1f9cc60] builder_t
+        val type_set_builder : t -> [`Type_d07378ede1f9cc60] builder_t -> [`Type_d07378ede1f9cc60] builder_t
+        val type_init : t -> [`Type_d07378ede1f9cc60] builder_t
         val targets_file_get : t -> bool
         val targets_file_set : t -> bool -> unit
         val targets_const_get : t -> bool
@@ -729,25 +630,25 @@ module type S = sig
         val targets_annotation_set : t -> bool -> unit
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
-        val to_reader : t -> reader_t
+        val to_reader : t -> struct_t reader_t
         val init_root : ?message_size:int -> unit -> t
         val init_pointer : pointer_t -> t
       end
       module Parameter : sig
-        type t = builder_t_Parameter_13353766412138554289
-        type reader_t = reader_t_Parameter_13353766412138554289
+        type struct_t = [`Parameter_b9521bccf10fa3b1]
+        type t = struct_t builder_t
         val has_name : t -> bool
         val name_get : t -> string
         val name_set : t -> string -> unit
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
-        val to_reader : t -> reader_t
+        val to_reader : t -> struct_t reader_t
         val init_root : ?message_size:int -> unit -> t
         val init_pointer : pointer_t -> t
       end
       module NestedNode : sig
-        type t = builder_t_NestedNode_16050641862814319170
-        type reader_t = reader_t_NestedNode_16050641862814319170
+        type struct_t = [`NestedNode_debf55bbfa0fc242]
+        type t = struct_t builder_t
         val has_name : t -> bool
         val name_get : t -> string
         val name_set : t -> string -> unit
@@ -757,7 +658,7 @@ module type S = sig
         val id_set_int_exn : t -> int -> unit
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
-        val to_reader : t -> reader_t
+        val to_reader : t -> struct_t reader_t
         val init_root : ?message_size:int -> unit -> t
         val init_pointer : pointer_t -> t
       end
@@ -792,81 +693,81 @@ module type S = sig
       val scope_id_set : t -> Uint64.t -> unit
       val scope_id_set_int_exn : t -> int -> unit
       val has_parameters : t -> bool
-      val parameters_get : t -> (rw, builder_t_Parameter_13353766412138554289, array_t) Capnp.Array.t
-      val parameters_get_list : t -> builder_t_Parameter_13353766412138554289 list
-      val parameters_get_array : t -> builder_t_Parameter_13353766412138554289 array
-      val parameters_set : t -> (rw, builder_t_Parameter_13353766412138554289, array_t) Capnp.Array.t -> (rw, builder_t_Parameter_13353766412138554289, array_t) Capnp.Array.t
-      val parameters_set_list : t -> builder_t_Parameter_13353766412138554289 list -> (rw, builder_t_Parameter_13353766412138554289, array_t) Capnp.Array.t
-      val parameters_set_array : t -> builder_t_Parameter_13353766412138554289 array -> (rw, builder_t_Parameter_13353766412138554289, array_t) Capnp.Array.t
-      val parameters_init : t -> int -> (rw, builder_t_Parameter_13353766412138554289, array_t) Capnp.Array.t
+      val parameters_get : t -> (rw, [`Parameter_b9521bccf10fa3b1] builder_t, array_t) Capnp.Array.t
+      val parameters_get_list : t -> [`Parameter_b9521bccf10fa3b1] builder_t list
+      val parameters_get_array : t -> [`Parameter_b9521bccf10fa3b1] builder_t array
+      val parameters_set : t -> (rw, [`Parameter_b9521bccf10fa3b1] builder_t, array_t) Capnp.Array.t -> (rw, [`Parameter_b9521bccf10fa3b1] builder_t, array_t) Capnp.Array.t
+      val parameters_set_list : t -> [`Parameter_b9521bccf10fa3b1] builder_t list -> (rw, [`Parameter_b9521bccf10fa3b1] builder_t, array_t) Capnp.Array.t
+      val parameters_set_array : t -> [`Parameter_b9521bccf10fa3b1] builder_t array -> (rw, [`Parameter_b9521bccf10fa3b1] builder_t, array_t) Capnp.Array.t
+      val parameters_init : t -> int -> (rw, [`Parameter_b9521bccf10fa3b1] builder_t, array_t) Capnp.Array.t
       val is_generic_get : t -> bool
       val is_generic_set : t -> bool -> unit
       val has_nested_nodes : t -> bool
-      val nested_nodes_get : t -> (rw, builder_t_NestedNode_16050641862814319170, array_t) Capnp.Array.t
-      val nested_nodes_get_list : t -> builder_t_NestedNode_16050641862814319170 list
-      val nested_nodes_get_array : t -> builder_t_NestedNode_16050641862814319170 array
-      val nested_nodes_set : t -> (rw, builder_t_NestedNode_16050641862814319170, array_t) Capnp.Array.t -> (rw, builder_t_NestedNode_16050641862814319170, array_t) Capnp.Array.t
-      val nested_nodes_set_list : t -> builder_t_NestedNode_16050641862814319170 list -> (rw, builder_t_NestedNode_16050641862814319170, array_t) Capnp.Array.t
-      val nested_nodes_set_array : t -> builder_t_NestedNode_16050641862814319170 array -> (rw, builder_t_NestedNode_16050641862814319170, array_t) Capnp.Array.t
-      val nested_nodes_init : t -> int -> (rw, builder_t_NestedNode_16050641862814319170, array_t) Capnp.Array.t
+      val nested_nodes_get : t -> (rw, [`NestedNode_debf55bbfa0fc242] builder_t, array_t) Capnp.Array.t
+      val nested_nodes_get_list : t -> [`NestedNode_debf55bbfa0fc242] builder_t list
+      val nested_nodes_get_array : t -> [`NestedNode_debf55bbfa0fc242] builder_t array
+      val nested_nodes_set : t -> (rw, [`NestedNode_debf55bbfa0fc242] builder_t, array_t) Capnp.Array.t -> (rw, [`NestedNode_debf55bbfa0fc242] builder_t, array_t) Capnp.Array.t
+      val nested_nodes_set_list : t -> [`NestedNode_debf55bbfa0fc242] builder_t list -> (rw, [`NestedNode_debf55bbfa0fc242] builder_t, array_t) Capnp.Array.t
+      val nested_nodes_set_array : t -> [`NestedNode_debf55bbfa0fc242] builder_t array -> (rw, [`NestedNode_debf55bbfa0fc242] builder_t, array_t) Capnp.Array.t
+      val nested_nodes_init : t -> int -> (rw, [`NestedNode_debf55bbfa0fc242] builder_t, array_t) Capnp.Array.t
       val has_annotations : t -> bool
-      val annotations_get : t -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
-      val annotations_get_list : t -> builder_t_Annotation_17422339044421236034 list
-      val annotations_get_array : t -> builder_t_Annotation_17422339044421236034 array
-      val annotations_set : t -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
-      val annotations_set_list : t -> builder_t_Annotation_17422339044421236034 list -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
-      val annotations_set_array : t -> builder_t_Annotation_17422339044421236034 array -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
-      val annotations_init : t -> int -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
+      val annotations_get : t -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t
+      val annotations_get_list : t -> [`Annotation_f1c8950dab257542] builder_t list
+      val annotations_get_array : t -> [`Annotation_f1c8950dab257542] builder_t array
+      val annotations_set : t -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t
+      val annotations_set_list : t -> [`Annotation_f1c8950dab257542] builder_t list -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t
+      val annotations_set_array : t -> [`Annotation_f1c8950dab257542] builder_t array -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t
+      val annotations_init : t -> int -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
-      val to_reader : t -> reader_t
+      val to_reader : t -> struct_t reader_t
       val init_root : ?message_size:int -> unit -> t
       val init_pointer : pointer_t -> t
     end
     module Field : sig
-      type t = builder_t_Field_11145653318641710175
-      type reader_t = reader_t_Field_11145653318641710175
+      type struct_t = [`Field_9aad50a41f4af45f]
+      type t = struct_t builder_t
       module Slot : sig
-        type t = builder_t_Slot_14133145859926553711
-        type reader_t = reader_t_Slot_14133145859926553711
+        type struct_t = [`Slot_c42305476bb4746f]
+        type t = struct_t builder_t
         val offset_get : t -> Uint32.t
         val offset_get_int_exn : t -> int
         val offset_set : t -> Uint32.t -> unit
         val offset_set_int_exn : t -> int -> unit
         val has_type : t -> bool
-        val type_get : t -> builder_t_Type_15020482145304562784
-        val type_set_reader : t -> reader_t_Type_15020482145304562784 -> builder_t_Type_15020482145304562784
-        val type_set_builder : t -> builder_t_Type_15020482145304562784 -> builder_t_Type_15020482145304562784
-        val type_init : t -> builder_t_Type_15020482145304562784
+        val type_get : t -> [`Type_d07378ede1f9cc60] builder_t
+        val type_set_reader : t -> [`Type_d07378ede1f9cc60] reader_t -> [`Type_d07378ede1f9cc60] builder_t
+        val type_set_builder : t -> [`Type_d07378ede1f9cc60] builder_t -> [`Type_d07378ede1f9cc60] builder_t
+        val type_init : t -> [`Type_d07378ede1f9cc60] builder_t
         val has_default_value : t -> bool
-        val default_value_get : t -> builder_t_Value_14853958794117909659
-        val default_value_set_reader : t -> reader_t_Value_14853958794117909659 -> builder_t_Value_14853958794117909659
-        val default_value_set_builder : t -> builder_t_Value_14853958794117909659 -> builder_t_Value_14853958794117909659
-        val default_value_init : t -> builder_t_Value_14853958794117909659
+        val default_value_get : t -> [`Value_ce23dcd2d7b00c9b] builder_t
+        val default_value_set_reader : t -> [`Value_ce23dcd2d7b00c9b] reader_t -> [`Value_ce23dcd2d7b00c9b] builder_t
+        val default_value_set_builder : t -> [`Value_ce23dcd2d7b00c9b] builder_t -> [`Value_ce23dcd2d7b00c9b] builder_t
+        val default_value_init : t -> [`Value_ce23dcd2d7b00c9b] builder_t
         val had_explicit_default_get : t -> bool
         val had_explicit_default_set : t -> bool -> unit
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
-        val to_reader : t -> reader_t
+        val to_reader : t -> struct_t reader_t
         val init_root : ?message_size:int -> unit -> t
         val init_pointer : pointer_t -> t
       end
       module Group : sig
-        type t = builder_t_Group_14626792032033250577
-        type reader_t = reader_t_Group_14626792032033250577
+        type struct_t = [`Group_cafccddb68db1d11]
+        type t = struct_t builder_t
         val type_id_get : t -> Uint64.t
         val type_id_get_int_exn : t -> int
         val type_id_set : t -> Uint64.t -> unit
         val type_id_set_int_exn : t -> int -> unit
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
-        val to_reader : t -> reader_t
+        val to_reader : t -> struct_t reader_t
         val init_root : ?message_size:int -> unit -> t
         val init_pointer : pointer_t -> t
       end
       module Ordinal : sig
-        type t = builder_t_Ordinal_13515537513213004774
-        type reader_t = reader_t_Ordinal_13515537513213004774
+        type struct_t = [`Ordinal_bb90d5c287870be6]
+        type t = struct_t builder_t
         type unnamed_union_t =
           | Implicit
           | Explicit of int
@@ -876,7 +777,7 @@ module type S = sig
         val explicit_set_exn : t -> int -> unit
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
-        val to_reader : t -> reader_t
+        val to_reader : t -> struct_t reader_t
         val init_root : ?message_size:int -> unit -> t
         val init_pointer : pointer_t -> t
       end
@@ -894,66 +795,66 @@ module type S = sig
       val code_order_get : t -> int
       val code_order_set_exn : t -> int -> unit
       val has_annotations : t -> bool
-      val annotations_get : t -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
-      val annotations_get_list : t -> builder_t_Annotation_17422339044421236034 list
-      val annotations_get_array : t -> builder_t_Annotation_17422339044421236034 array
-      val annotations_set : t -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
-      val annotations_set_list : t -> builder_t_Annotation_17422339044421236034 list -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
-      val annotations_set_array : t -> builder_t_Annotation_17422339044421236034 array -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
-      val annotations_init : t -> int -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
+      val annotations_get : t -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t
+      val annotations_get_list : t -> [`Annotation_f1c8950dab257542] builder_t list
+      val annotations_get_array : t -> [`Annotation_f1c8950dab257542] builder_t array
+      val annotations_set : t -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t
+      val annotations_set_list : t -> [`Annotation_f1c8950dab257542] builder_t list -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t
+      val annotations_set_array : t -> [`Annotation_f1c8950dab257542] builder_t array -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t
+      val annotations_init : t -> int -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t
       val discriminant_value_get : t -> int
       val discriminant_value_set_exn : t -> int -> unit
       val ordinal_get : t -> Ordinal.t
       val ordinal_init : t -> Ordinal.t
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
-      val to_reader : t -> reader_t
+      val to_reader : t -> struct_t reader_t
       val init_root : ?message_size:int -> unit -> t
       val init_pointer : pointer_t -> t
     end
     module Enumerant : sig
-      type t = builder_t_Enumerant_10919677598968879693
-      type reader_t = reader_t_Enumerant_10919677598968879693
+      type struct_t = [`Enumerant_978a7cebdc549a4d]
+      type t = struct_t builder_t
       val has_name : t -> bool
       val name_get : t -> string
       val name_set : t -> string -> unit
       val code_order_get : t -> int
       val code_order_set_exn : t -> int -> unit
       val has_annotations : t -> bool
-      val annotations_get : t -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
-      val annotations_get_list : t -> builder_t_Annotation_17422339044421236034 list
-      val annotations_get_array : t -> builder_t_Annotation_17422339044421236034 array
-      val annotations_set : t -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
-      val annotations_set_list : t -> builder_t_Annotation_17422339044421236034 list -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
-      val annotations_set_array : t -> builder_t_Annotation_17422339044421236034 array -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
-      val annotations_init : t -> int -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
+      val annotations_get : t -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t
+      val annotations_get_list : t -> [`Annotation_f1c8950dab257542] builder_t list
+      val annotations_get_array : t -> [`Annotation_f1c8950dab257542] builder_t array
+      val annotations_set : t -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t
+      val annotations_set_list : t -> [`Annotation_f1c8950dab257542] builder_t list -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t
+      val annotations_set_array : t -> [`Annotation_f1c8950dab257542] builder_t array -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t
+      val annotations_init : t -> int -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
-      val to_reader : t -> reader_t
+      val to_reader : t -> struct_t reader_t
       val init_root : ?message_size:int -> unit -> t
       val init_pointer : pointer_t -> t
     end
     module Superclass : sig
-      type t = builder_t_Superclass_12220001500510083064
-      type reader_t = reader_t_Superclass_12220001500510083064
+      type struct_t = [`Superclass_a9962a9ed0a4d7f8]
+      type t = struct_t builder_t
       val id_get : t -> Uint64.t
       val id_get_int_exn : t -> int
       val id_set : t -> Uint64.t -> unit
       val id_set_int_exn : t -> int -> unit
       val has_brand : t -> bool
-      val brand_get : t -> builder_t_Brand_10391024731148337707
-      val brand_set_reader : t -> reader_t_Brand_10391024731148337707 -> builder_t_Brand_10391024731148337707
-      val brand_set_builder : t -> builder_t_Brand_10391024731148337707 -> builder_t_Brand_10391024731148337707
-      val brand_init : t -> builder_t_Brand_10391024731148337707
+      val brand_get : t -> [`Brand_903455f06065422b] builder_t
+      val brand_set_reader : t -> [`Brand_903455f06065422b] reader_t -> [`Brand_903455f06065422b] builder_t
+      val brand_set_builder : t -> [`Brand_903455f06065422b] builder_t -> [`Brand_903455f06065422b] builder_t
+      val brand_init : t -> [`Brand_903455f06065422b] builder_t
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
-      val to_reader : t -> reader_t
+      val to_reader : t -> struct_t reader_t
       val init_root : ?message_size:int -> unit -> t
       val init_pointer : pointer_t -> t
     end
     module Method : sig
-      type t = builder_t_Method_10736806783679155584
-      type reader_t = reader_t_Method_10736806783679155584
+      type struct_t = [`Method_9500cce23b334d80]
+      type t = struct_t builder_t
       val has_name : t -> bool
       val name_get : t -> string
       val name_set : t -> string -> unit
@@ -972,110 +873,110 @@ module type S = sig
       val param_struct_type_set : t -> Uint64.t -> unit
       val param_struct_type_set_int_exn : t -> int -> unit
       val has_param_brand : t -> bool
-      val param_brand_get : t -> builder_t_Brand_10391024731148337707
-      val param_brand_set_reader : t -> reader_t_Brand_10391024731148337707 -> builder_t_Brand_10391024731148337707
-      val param_brand_set_builder : t -> builder_t_Brand_10391024731148337707 -> builder_t_Brand_10391024731148337707
-      val param_brand_init : t -> builder_t_Brand_10391024731148337707
+      val param_brand_get : t -> [`Brand_903455f06065422b] builder_t
+      val param_brand_set_reader : t -> [`Brand_903455f06065422b] reader_t -> [`Brand_903455f06065422b] builder_t
+      val param_brand_set_builder : t -> [`Brand_903455f06065422b] builder_t -> [`Brand_903455f06065422b] builder_t
+      val param_brand_init : t -> [`Brand_903455f06065422b] builder_t
       val result_struct_type_get : t -> Uint64.t
       val result_struct_type_get_int_exn : t -> int
       val result_struct_type_set : t -> Uint64.t -> unit
       val result_struct_type_set_int_exn : t -> int -> unit
       val has_result_brand : t -> bool
-      val result_brand_get : t -> builder_t_Brand_10391024731148337707
-      val result_brand_set_reader : t -> reader_t_Brand_10391024731148337707 -> builder_t_Brand_10391024731148337707
-      val result_brand_set_builder : t -> builder_t_Brand_10391024731148337707 -> builder_t_Brand_10391024731148337707
-      val result_brand_init : t -> builder_t_Brand_10391024731148337707
+      val result_brand_get : t -> [`Brand_903455f06065422b] builder_t
+      val result_brand_set_reader : t -> [`Brand_903455f06065422b] reader_t -> [`Brand_903455f06065422b] builder_t
+      val result_brand_set_builder : t -> [`Brand_903455f06065422b] builder_t -> [`Brand_903455f06065422b] builder_t
+      val result_brand_init : t -> [`Brand_903455f06065422b] builder_t
       val has_annotations : t -> bool
-      val annotations_get : t -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
-      val annotations_get_list : t -> builder_t_Annotation_17422339044421236034 list
-      val annotations_get_array : t -> builder_t_Annotation_17422339044421236034 array
-      val annotations_set : t -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
-      val annotations_set_list : t -> builder_t_Annotation_17422339044421236034 list -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
-      val annotations_set_array : t -> builder_t_Annotation_17422339044421236034 array -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
-      val annotations_init : t -> int -> (rw, builder_t_Annotation_17422339044421236034, array_t) Capnp.Array.t
+      val annotations_get : t -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t
+      val annotations_get_list : t -> [`Annotation_f1c8950dab257542] builder_t list
+      val annotations_get_array : t -> [`Annotation_f1c8950dab257542] builder_t array
+      val annotations_set : t -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t
+      val annotations_set_list : t -> [`Annotation_f1c8950dab257542] builder_t list -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t
+      val annotations_set_array : t -> [`Annotation_f1c8950dab257542] builder_t array -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t
+      val annotations_init : t -> int -> (rw, [`Annotation_f1c8950dab257542] builder_t, array_t) Capnp.Array.t
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
-      val to_reader : t -> reader_t
+      val to_reader : t -> struct_t reader_t
       val init_root : ?message_size:int -> unit -> t
       val init_pointer : pointer_t -> t
     end
     module Type : sig
-      type t = builder_t_Type_15020482145304562784
-      type reader_t = reader_t_Type_15020482145304562784
+      type struct_t = [`Type_d07378ede1f9cc60]
+      type t = struct_t builder_t
       module List : sig
-        type t = builder_t_List_9792858745991129751
-        type reader_t = reader_t_List_9792858745991129751
+        type struct_t = [`List_87e739250a60ea97]
+        type t = struct_t builder_t
         val has_element_type : t -> bool
-        val element_type_get : t -> builder_t_Type_15020482145304562784
-        val element_type_set_reader : t -> reader_t_Type_15020482145304562784 -> builder_t_Type_15020482145304562784
-        val element_type_set_builder : t -> builder_t_Type_15020482145304562784 -> builder_t_Type_15020482145304562784
-        val element_type_init : t -> builder_t_Type_15020482145304562784
+        val element_type_get : t -> [`Type_d07378ede1f9cc60] builder_t
+        val element_type_set_reader : t -> [`Type_d07378ede1f9cc60] reader_t -> [`Type_d07378ede1f9cc60] builder_t
+        val element_type_set_builder : t -> [`Type_d07378ede1f9cc60] builder_t -> [`Type_d07378ede1f9cc60] builder_t
+        val element_type_init : t -> [`Type_d07378ede1f9cc60] builder_t
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
-        val to_reader : t -> reader_t
+        val to_reader : t -> struct_t reader_t
         val init_root : ?message_size:int -> unit -> t
         val init_pointer : pointer_t -> t
       end
       module Enum : sig
-        type t = builder_t_Enum_11389172934837766057
-        type reader_t = reader_t_Enum_11389172934837766057
+        type struct_t = [`Enum_9e0e78711a7f87a9]
+        type t = struct_t builder_t
         val type_id_get : t -> Uint64.t
         val type_id_get_int_exn : t -> int
         val type_id_set : t -> Uint64.t -> unit
         val type_id_set_int_exn : t -> int -> unit
         val has_brand : t -> bool
-        val brand_get : t -> builder_t_Brand_10391024731148337707
-        val brand_set_reader : t -> reader_t_Brand_10391024731148337707 -> builder_t_Brand_10391024731148337707
-        val brand_set_builder : t -> builder_t_Brand_10391024731148337707 -> builder_t_Brand_10391024731148337707
-        val brand_init : t -> builder_t_Brand_10391024731148337707
+        val brand_get : t -> [`Brand_903455f06065422b] builder_t
+        val brand_set_reader : t -> [`Brand_903455f06065422b] reader_t -> [`Brand_903455f06065422b] builder_t
+        val brand_set_builder : t -> [`Brand_903455f06065422b] builder_t -> [`Brand_903455f06065422b] builder_t
+        val brand_init : t -> [`Brand_903455f06065422b] builder_t
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
-        val to_reader : t -> reader_t
+        val to_reader : t -> struct_t reader_t
         val init_root : ?message_size:int -> unit -> t
         val init_pointer : pointer_t -> t
       end
       module Struct : sig
-        type t = builder_t_Struct_12410354185295152851
-        type reader_t = reader_t_Struct_12410354185295152851
+        type struct_t = [`Struct_ac3a6f60ef4cc6d3]
+        type t = struct_t builder_t
         val type_id_get : t -> Uint64.t
         val type_id_get_int_exn : t -> int
         val type_id_set : t -> Uint64.t -> unit
         val type_id_set_int_exn : t -> int -> unit
         val has_brand : t -> bool
-        val brand_get : t -> builder_t_Brand_10391024731148337707
-        val brand_set_reader : t -> reader_t_Brand_10391024731148337707 -> builder_t_Brand_10391024731148337707
-        val brand_set_builder : t -> builder_t_Brand_10391024731148337707 -> builder_t_Brand_10391024731148337707
-        val brand_init : t -> builder_t_Brand_10391024731148337707
+        val brand_get : t -> [`Brand_903455f06065422b] builder_t
+        val brand_set_reader : t -> [`Brand_903455f06065422b] reader_t -> [`Brand_903455f06065422b] builder_t
+        val brand_set_builder : t -> [`Brand_903455f06065422b] builder_t -> [`Brand_903455f06065422b] builder_t
+        val brand_init : t -> [`Brand_903455f06065422b] builder_t
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
-        val to_reader : t -> reader_t
+        val to_reader : t -> struct_t reader_t
         val init_root : ?message_size:int -> unit -> t
         val init_pointer : pointer_t -> t
       end
       module Interface : sig
-        type t = builder_t_Interface_17116997365232503999
-        type reader_t = reader_t_Interface_17116997365232503999
+        type struct_t = [`Interface_ed8bca69f7fb0cbf]
+        type t = struct_t builder_t
         val type_id_get : t -> Uint64.t
         val type_id_get_int_exn : t -> int
         val type_id_set : t -> Uint64.t -> unit
         val type_id_set_int_exn : t -> int -> unit
         val has_brand : t -> bool
-        val brand_get : t -> builder_t_Brand_10391024731148337707
-        val brand_set_reader : t -> reader_t_Brand_10391024731148337707 -> builder_t_Brand_10391024731148337707
-        val brand_set_builder : t -> builder_t_Brand_10391024731148337707 -> builder_t_Brand_10391024731148337707
-        val brand_init : t -> builder_t_Brand_10391024731148337707
+        val brand_get : t -> [`Brand_903455f06065422b] builder_t
+        val brand_set_reader : t -> [`Brand_903455f06065422b] reader_t -> [`Brand_903455f06065422b] builder_t
+        val brand_set_builder : t -> [`Brand_903455f06065422b] builder_t -> [`Brand_903455f06065422b] builder_t
+        val brand_init : t -> [`Brand_903455f06065422b] builder_t
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
-        val to_reader : t -> reader_t
+        val to_reader : t -> struct_t reader_t
         val init_root : ?message_size:int -> unit -> t
         val init_pointer : pointer_t -> t
       end
       module AnyPointer : sig
-        type t = builder_t_AnyPointer_14003731834718800369
-        type reader_t = reader_t_AnyPointer_14003731834718800369
+        type struct_t = [`AnyPointer_c2573fe8a23e49f1]
+        type t = struct_t builder_t
         module Unconstrained : sig
-          type t = builder_t_Unconstrained_10248890354574636630
-          type reader_t = reader_t_Unconstrained_10248890354574636630
+          type struct_t = [`Unconstrained_8e3b5f79fe593656]
+          type t = struct_t builder_t
           type unnamed_union_t =
             | AnyKind
             | Struct
@@ -1089,13 +990,13 @@ module type S = sig
           val capability_set : t -> unit
           val of_message : rw message_t -> t
           val to_message : t -> rw message_t
-          val to_reader : t -> reader_t
+          val to_reader : t -> struct_t reader_t
           val init_root : ?message_size:int -> unit -> t
           val init_pointer : pointer_t -> t
         end
         module Parameter : sig
-          type t = builder_t_Parameter_11372142272178113157
-          type reader_t = reader_t_Parameter_11372142272178113157
+          type struct_t = [`Parameter_9dd1f724f4614a85]
+          type t = struct_t builder_t
           val scope_id_get : t -> Uint64.t
           val scope_id_get_int_exn : t -> int
           val scope_id_set : t -> Uint64.t -> unit
@@ -1104,18 +1005,18 @@ module type S = sig
           val parameter_index_set_exn : t -> int -> unit
           val of_message : rw message_t -> t
           val to_message : t -> rw message_t
-          val to_reader : t -> reader_t
+          val to_reader : t -> struct_t reader_t
           val init_root : ?message_size:int -> unit -> t
           val init_pointer : pointer_t -> t
         end
         module ImplicitMethodParameter : sig
-          type t = builder_t_ImplicitMethodParameter_13470206089842057844
-          type reader_t = reader_t_ImplicitMethodParameter_13470206089842057844
+          type struct_t = [`ImplicitMethodParameter_baefc9120c56e274]
+          type t = struct_t builder_t
           val parameter_index_get : t -> int
           val parameter_index_set_exn : t -> int -> unit
           val of_message : rw message_t -> t
           val to_message : t -> rw message_t
-          val to_reader : t -> reader_t
+          val to_reader : t -> struct_t reader_t
           val init_root : ?message_size:int -> unit -> t
           val init_pointer : pointer_t -> t
         end
@@ -1130,7 +1031,7 @@ module type S = sig
         val implicit_method_parameter_init : t -> ImplicitMethodParameter.t
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
-        val to_reader : t -> reader_t
+        val to_reader : t -> struct_t reader_t
         val init_root : ?message_size:int -> unit -> t
         val init_pointer : pointer_t -> t
       end
@@ -1177,25 +1078,25 @@ module type S = sig
       val any_pointer_init : t -> AnyPointer.t
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
-      val to_reader : t -> reader_t
+      val to_reader : t -> struct_t reader_t
       val init_root : ?message_size:int -> unit -> t
       val init_pointer : pointer_t -> t
     end
     module Brand : sig
-      type t = builder_t_Brand_10391024731148337707
-      type reader_t = reader_t_Brand_10391024731148337707
+      type struct_t = [`Brand_903455f06065422b]
+      type t = struct_t builder_t
       module Scope : sig
-        type t = builder_t_Scope_12382423449155627977
-        type reader_t = reader_t_Scope_12382423449155627977
+        type struct_t = [`Scope_abd73485a9636bc9]
+        type t = struct_t builder_t
         type unnamed_union_t =
-          | Bind of (rw, builder_t_Binding_14439610327179913212, array_t) Capnp.Array.t
+          | Bind of (rw, [`Binding_c863cd16969ee7fc] builder_t, array_t) Capnp.Array.t
           | Inherit
           | Undefined of int
         val get : t -> unnamed_union_t
-        val bind_set : t -> (rw, builder_t_Binding_14439610327179913212, array_t) Capnp.Array.t -> (rw, builder_t_Binding_14439610327179913212, array_t) Capnp.Array.t
-        val bind_set_list : t -> builder_t_Binding_14439610327179913212 list -> (rw, builder_t_Binding_14439610327179913212, array_t) Capnp.Array.t
-        val bind_set_array : t -> builder_t_Binding_14439610327179913212 array -> (rw, builder_t_Binding_14439610327179913212, array_t) Capnp.Array.t
-        val bind_init : t -> int -> (rw, builder_t_Binding_14439610327179913212, array_t) Capnp.Array.t
+        val bind_set : t -> (rw, [`Binding_c863cd16969ee7fc] builder_t, array_t) Capnp.Array.t -> (rw, [`Binding_c863cd16969ee7fc] builder_t, array_t) Capnp.Array.t
+        val bind_set_list : t -> [`Binding_c863cd16969ee7fc] builder_t list -> (rw, [`Binding_c863cd16969ee7fc] builder_t, array_t) Capnp.Array.t
+        val bind_set_array : t -> [`Binding_c863cd16969ee7fc] builder_t array -> (rw, [`Binding_c863cd16969ee7fc] builder_t, array_t) Capnp.Array.t
+        val bind_init : t -> int -> (rw, [`Binding_c863cd16969ee7fc] builder_t, array_t) Capnp.Array.t
         val inherit_set : t -> unit
         val scope_id_get : t -> Uint64.t
         val scope_id_get_int_exn : t -> int
@@ -1203,45 +1104,45 @@ module type S = sig
         val scope_id_set_int_exn : t -> int -> unit
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
-        val to_reader : t -> reader_t
+        val to_reader : t -> struct_t reader_t
         val init_root : ?message_size:int -> unit -> t
         val init_pointer : pointer_t -> t
       end
       module Binding : sig
-        type t = builder_t_Binding_14439610327179913212
-        type reader_t = reader_t_Binding_14439610327179913212
+        type struct_t = [`Binding_c863cd16969ee7fc]
+        type t = struct_t builder_t
         type unnamed_union_t =
           | Unbound
           | Type of Type.t
           | Undefined of int
         val get : t -> unnamed_union_t
         val unbound_set : t -> unit
-        val type_set_reader : t -> Type.reader_t -> Type.t
+        val type_set_reader : t -> Type.struct_t reader_t -> Type.t
         val type_set_builder : t -> Type.t -> Type.t
         val type_init : t -> Type.t
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
-        val to_reader : t -> reader_t
+        val to_reader : t -> struct_t reader_t
         val init_root : ?message_size:int -> unit -> t
         val init_pointer : pointer_t -> t
       end
       val has_scopes : t -> bool
-      val scopes_get : t -> (rw, builder_t_Scope_12382423449155627977, array_t) Capnp.Array.t
-      val scopes_get_list : t -> builder_t_Scope_12382423449155627977 list
-      val scopes_get_array : t -> builder_t_Scope_12382423449155627977 array
-      val scopes_set : t -> (rw, builder_t_Scope_12382423449155627977, array_t) Capnp.Array.t -> (rw, builder_t_Scope_12382423449155627977, array_t) Capnp.Array.t
-      val scopes_set_list : t -> builder_t_Scope_12382423449155627977 list -> (rw, builder_t_Scope_12382423449155627977, array_t) Capnp.Array.t
-      val scopes_set_array : t -> builder_t_Scope_12382423449155627977 array -> (rw, builder_t_Scope_12382423449155627977, array_t) Capnp.Array.t
-      val scopes_init : t -> int -> (rw, builder_t_Scope_12382423449155627977, array_t) Capnp.Array.t
+      val scopes_get : t -> (rw, [`Scope_abd73485a9636bc9] builder_t, array_t) Capnp.Array.t
+      val scopes_get_list : t -> [`Scope_abd73485a9636bc9] builder_t list
+      val scopes_get_array : t -> [`Scope_abd73485a9636bc9] builder_t array
+      val scopes_set : t -> (rw, [`Scope_abd73485a9636bc9] builder_t, array_t) Capnp.Array.t -> (rw, [`Scope_abd73485a9636bc9] builder_t, array_t) Capnp.Array.t
+      val scopes_set_list : t -> [`Scope_abd73485a9636bc9] builder_t list -> (rw, [`Scope_abd73485a9636bc9] builder_t, array_t) Capnp.Array.t
+      val scopes_set_array : t -> [`Scope_abd73485a9636bc9] builder_t array -> (rw, [`Scope_abd73485a9636bc9] builder_t, array_t) Capnp.Array.t
+      val scopes_init : t -> int -> (rw, [`Scope_abd73485a9636bc9] builder_t, array_t) Capnp.Array.t
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
-      val to_reader : t -> reader_t
+      val to_reader : t -> struct_t reader_t
       val init_root : ?message_size:int -> unit -> t
       val init_pointer : pointer_t -> t
     end
     module Value : sig
-      type t = builder_t_Value_14853958794117909659
-      type reader_t = reader_t_Value_14853958794117909659
+      type struct_t = [`Value_ce23dcd2d7b00c9b]
+      type t = struct_t builder_t
       type unnamed_union_t =
         | Void
         | Bool of bool
@@ -1295,30 +1196,30 @@ module type S = sig
       val any_pointer_set_interface : t -> Uint32.t option -> unit
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
-      val to_reader : t -> reader_t
+      val to_reader : t -> struct_t reader_t
       val init_root : ?message_size:int -> unit -> t
       val init_pointer : pointer_t -> t
     end
     module Annotation : sig
-      type t = builder_t_Annotation_17422339044421236034
-      type reader_t = reader_t_Annotation_17422339044421236034
+      type struct_t = [`Annotation_f1c8950dab257542]
+      type t = struct_t builder_t
       val id_get : t -> Uint64.t
       val id_get_int_exn : t -> int
       val id_set : t -> Uint64.t -> unit
       val id_set_int_exn : t -> int -> unit
       val has_brand : t -> bool
       val brand_get : t -> Brand.t
-      val brand_set_reader : t -> Brand.reader_t -> Brand.t
+      val brand_set_reader : t -> Brand.struct_t reader_t -> Brand.t
       val brand_set_builder : t -> Brand.t -> Brand.t
       val brand_init : t -> Brand.t
       val has_value : t -> bool
       val value_get : t -> Value.t
-      val value_set_reader : t -> Value.reader_t -> Value.t
+      val value_set_reader : t -> Value.struct_t reader_t -> Value.t
       val value_set_builder : t -> Value.t -> Value.t
       val value_init : t -> Value.t
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
-      val to_reader : t -> reader_t
+      val to_reader : t -> struct_t reader_t
       val init_root : ?message_size:int -> unit -> t
       val init_pointer : pointer_t -> t
     end
@@ -1335,8 +1236,8 @@ module type S = sig
         | Undefined of int
     end
     module CapnpVersion : sig
-      type t = builder_t_CapnpVersion_15590670654532458851
-      type reader_t = reader_t_CapnpVersion_15590670654532458851
+      type struct_t = [`CapnpVersion_d85d305b7d839963]
+      type t = struct_t builder_t
       val major_get : t -> int
       val major_set_exn : t -> int -> unit
       val minor_get : t -> int
@@ -1345,19 +1246,19 @@ module type S = sig
       val micro_set_exn : t -> int -> unit
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
-      val to_reader : t -> reader_t
+      val to_reader : t -> struct_t reader_t
       val init_root : ?message_size:int -> unit -> t
       val init_pointer : pointer_t -> t
     end
     module CodeGeneratorRequest : sig
-      type t = builder_t_CodeGeneratorRequest_13818529054586492878
-      type reader_t = reader_t_CodeGeneratorRequest_13818529054586492878
+      type struct_t = [`CodeGeneratorRequest_bfc546f6210ad7ce]
+      type t = struct_t builder_t
       module RequestedFile : sig
-        type t = builder_t_RequestedFile_14981803260258615394
-        type reader_t = reader_t_RequestedFile_14981803260258615394
+        type struct_t = [`RequestedFile_cfea0eb02e810062]
+        type t = struct_t builder_t
         module Import : sig
-          type t = builder_t_Import_12560611460656617445
-          type reader_t = reader_t_Import_12560611460656617445
+          type struct_t = [`Import_ae504193122357e5]
+          type t = struct_t builder_t
           val id_get : t -> Uint64.t
           val id_get_int_exn : t -> int
           val id_set : t -> Uint64.t -> unit
@@ -1367,7 +1268,7 @@ module type S = sig
           val name_set : t -> string -> unit
           val of_message : rw message_t -> t
           val to_message : t -> rw message_t
-          val to_reader : t -> reader_t
+          val to_reader : t -> struct_t reader_t
           val init_root : ?message_size:int -> unit -> t
           val init_pointer : pointer_t -> t
         end
@@ -1379,22 +1280,22 @@ module type S = sig
         val filename_get : t -> string
         val filename_set : t -> string -> unit
         val has_imports : t -> bool
-        val imports_get : t -> (rw, builder_t_Import_12560611460656617445, array_t) Capnp.Array.t
-        val imports_get_list : t -> builder_t_Import_12560611460656617445 list
-        val imports_get_array : t -> builder_t_Import_12560611460656617445 array
-        val imports_set : t -> (rw, builder_t_Import_12560611460656617445, array_t) Capnp.Array.t -> (rw, builder_t_Import_12560611460656617445, array_t) Capnp.Array.t
-        val imports_set_list : t -> builder_t_Import_12560611460656617445 list -> (rw, builder_t_Import_12560611460656617445, array_t) Capnp.Array.t
-        val imports_set_array : t -> builder_t_Import_12560611460656617445 array -> (rw, builder_t_Import_12560611460656617445, array_t) Capnp.Array.t
-        val imports_init : t -> int -> (rw, builder_t_Import_12560611460656617445, array_t) Capnp.Array.t
+        val imports_get : t -> (rw, [`Import_ae504193122357e5] builder_t, array_t) Capnp.Array.t
+        val imports_get_list : t -> [`Import_ae504193122357e5] builder_t list
+        val imports_get_array : t -> [`Import_ae504193122357e5] builder_t array
+        val imports_set : t -> (rw, [`Import_ae504193122357e5] builder_t, array_t) Capnp.Array.t -> (rw, [`Import_ae504193122357e5] builder_t, array_t) Capnp.Array.t
+        val imports_set_list : t -> [`Import_ae504193122357e5] builder_t list -> (rw, [`Import_ae504193122357e5] builder_t, array_t) Capnp.Array.t
+        val imports_set_array : t -> [`Import_ae504193122357e5] builder_t array -> (rw, [`Import_ae504193122357e5] builder_t, array_t) Capnp.Array.t
+        val imports_init : t -> int -> (rw, [`Import_ae504193122357e5] builder_t, array_t) Capnp.Array.t
         val of_message : rw message_t -> t
         val to_message : t -> rw message_t
-        val to_reader : t -> reader_t
+        val to_reader : t -> struct_t reader_t
         val init_root : ?message_size:int -> unit -> t
         val init_pointer : pointer_t -> t
       end
       val has_capnp_version : t -> bool
       val capnp_version_get : t -> CapnpVersion.t
-      val capnp_version_set_reader : t -> CapnpVersion.reader_t -> CapnpVersion.t
+      val capnp_version_set_reader : t -> CapnpVersion.struct_t reader_t -> CapnpVersion.t
       val capnp_version_set_builder : t -> CapnpVersion.t -> CapnpVersion.t
       val capnp_version_init : t -> CapnpVersion.t
       val has_nodes : t -> bool
@@ -1406,16 +1307,16 @@ module type S = sig
       val nodes_set_array : t -> Node.t array -> (rw, Node.t, array_t) Capnp.Array.t
       val nodes_init : t -> int -> (rw, Node.t, array_t) Capnp.Array.t
       val has_requested_files : t -> bool
-      val requested_files_get : t -> (rw, builder_t_RequestedFile_14981803260258615394, array_t) Capnp.Array.t
-      val requested_files_get_list : t -> builder_t_RequestedFile_14981803260258615394 list
-      val requested_files_get_array : t -> builder_t_RequestedFile_14981803260258615394 array
-      val requested_files_set : t -> (rw, builder_t_RequestedFile_14981803260258615394, array_t) Capnp.Array.t -> (rw, builder_t_RequestedFile_14981803260258615394, array_t) Capnp.Array.t
-      val requested_files_set_list : t -> builder_t_RequestedFile_14981803260258615394 list -> (rw, builder_t_RequestedFile_14981803260258615394, array_t) Capnp.Array.t
-      val requested_files_set_array : t -> builder_t_RequestedFile_14981803260258615394 array -> (rw, builder_t_RequestedFile_14981803260258615394, array_t) Capnp.Array.t
-      val requested_files_init : t -> int -> (rw, builder_t_RequestedFile_14981803260258615394, array_t) Capnp.Array.t
+      val requested_files_get : t -> (rw, [`RequestedFile_cfea0eb02e810062] builder_t, array_t) Capnp.Array.t
+      val requested_files_get_list : t -> [`RequestedFile_cfea0eb02e810062] builder_t list
+      val requested_files_get_array : t -> [`RequestedFile_cfea0eb02e810062] builder_t array
+      val requested_files_set : t -> (rw, [`RequestedFile_cfea0eb02e810062] builder_t, array_t) Capnp.Array.t -> (rw, [`RequestedFile_cfea0eb02e810062] builder_t, array_t) Capnp.Array.t
+      val requested_files_set_list : t -> [`RequestedFile_cfea0eb02e810062] builder_t list -> (rw, [`RequestedFile_cfea0eb02e810062] builder_t, array_t) Capnp.Array.t
+      val requested_files_set_array : t -> [`RequestedFile_cfea0eb02e810062] builder_t array -> (rw, [`RequestedFile_cfea0eb02e810062] builder_t, array_t) Capnp.Array.t
+      val requested_files_init : t -> int -> (rw, [`RequestedFile_cfea0eb02e810062] builder_t, array_t) Capnp.Array.t
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
-      val to_reader : t -> reader_t
+      val to_reader : t -> struct_t reader_t
       val init_root : ?message_size:int -> unit -> t
       val init_pointer : pointer_t -> t
     end

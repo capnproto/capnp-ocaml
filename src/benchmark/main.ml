@@ -67,9 +67,7 @@ let () =
       let module BM = Methods.Benchmark
           (CapnpCarsales.TestCase)
           (CapnpCarsales.CS.Reader.ParkingLot)
-          (CapnpCarsales.CS.Builder.ParkingLot)
           (CapnpCarsales.CS.Reader.TotalValue)
-          (CapnpCarsales.CS.Builder.TotalValue)
       in
       let module BR = BenchmarkRunner(BM) in
       BR.f mode compression iters
@@ -81,9 +79,7 @@ let () =
       let module BM = Methods.Benchmark
           (CapnpCatrank.TestCase)
           (CapnpCatrank.CR.Reader.SearchResultList)
-          (CapnpCatrank.CR.Builder.SearchResultList)
           (CapnpCatrank.CR.Reader.SearchResultList)
-          (CapnpCatrank.CR.Builder.SearchResultList)
       in
       let module BR = BenchmarkRunner(BM) in
       BR.f mode compression iters
@@ -91,9 +87,7 @@ let () =
       let module BM = Methods.Benchmark
           (CapnpEval.TestCase)
           (CapnpEval.E.Reader.Expression)
-          (CapnpEval.E.Builder.Expression)
           (CapnpEval.E.Reader.EvaluationResult)
-          (CapnpEval.E.Builder.EvaluationResult)
       in
       let module BR = BenchmarkRunner(BM) in
       BR.f mode compression iters

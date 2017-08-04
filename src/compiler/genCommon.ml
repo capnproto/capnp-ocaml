@@ -287,7 +287,7 @@ let make_unique_enum_module_name ~context enum_node =
   (String.capitalize uq_name) ^ "_" ^ (Uint64.to_string node_id)
 
 
-let make_unique_typename ~context ~(mode : Mode.t) node =
+let make_unique_typename ?mode ~context node =
   match PS.Node.get node with
   | PS.Node.Enum _ ->
       (* Enums don't have unique type names, they have unique module names.  This
@@ -302,19 +302,20 @@ let make_unique_typename ~context ~(mode : Mode.t) node =
           ~child:node
       in
       let node_id = PS.Node.id_get node in
-      sprintf "interface_t_%s_%s" uq_name (Uint64.to_string node_id)
+      sprintf "[`%s_%Lx]" uq_name (Uint64.to_int64 node_id)
   | _ ->
-      let t_str =
+      let opt_mode =
         match mode with
-        | Mode.Reader  -> "reader_t"
-        | Mode.Builder -> "builder_t"
+        | None -> ""
+        | Some Mode.Reader -> " reader_t"
+        | Some Mode.Builder -> " builder_t"
       in
       let uq_name = get_unqualified_name
                     ~parent:(Context.node context (PS.Node.scope_id_get node))
                     ~child:node
       in
       let node_id = PS.Node.id_get node in
-      sprintf "%s_%s_%s" t_str uq_name (Uint64.to_string node_id)
+      sprintf "[`%s_%Lx]%s" uq_name (Uint64.to_int64 node_id) opt_mode
 
 
 (* Determines whether a simple name for [node], as given by
@@ -578,7 +579,10 @@ let make_disambiguated_type_name ~context ~(mode : Mode.t) ~(scope_mode : Mode.t
         (* This type comes from an import.  Emit a unique typename qualified
            with the proper import. *)
         let uq_name = make_unique_typename ~context ~mode node in
-        import.Context.schema_name ^ "." ^ uq_name
+        begin match PS.Node.get node with
+        | PS.Node.Struct _ | PS.Node.Interface _ -> uq_name     (* Polymorphic variant type *)
+        | _ -> import.Context.schema_name ^ "." ^ uq_name
+        end
     | None ->
         let module_name = get_scope_relative_name ~context scope node in
         let t_str =
@@ -593,55 +597,12 @@ let make_disambiguated_type_name ~context ~(mode : Mode.t) ~(scope_mode : Mode.t
               | (Mode.Builder, Mode.Builder) ->
                   ".t"
               | (Mode.Reader, Mode.Builder) ->
-                  ".reader_t"
+                  ".struct_t reader_t"
               | (Mode.Builder, Mode.Reader) ->
-                  ".builder_t"
+                  ".struct_t builder_t"
               end
         in
         module_name ^ t_str
-
-
-(* Determine whether the given type references an abstract type from
-   one of the imports.  (In that case GenModules will need to emit
-   Obj.magic to punch through the abstract type barrier.) *)
-let rec uses_imported_abstract_type ~context (tp : PS.Type.t) : bool =
-  let open PS.Type in
-  match get tp with
-  | Void       -> false
-  | Bool       -> false
-  | Int8       -> false
-  | Int16      -> false
-  | Int32      -> false
-  | Int64      -> false
-  | Uint8      -> false
-  | Uint16     -> false
-  | Uint32     -> false
-  | Uint64     -> false
-  | Float32    -> false
-  | Float64    -> false
-  | Text       -> false
-  | Data       -> false
-  | Enum _     -> false
-  | AnyPointer _ -> false
-  | List list_descr ->
-      let contained_type = List.element_type_get list_descr in
-      uses_imported_abstract_type ~context contained_type
-  | Struct struct_descr ->
-      let struct_id = Struct.type_id_get struct_descr in
-      let struct_node = Context.node context struct_id in
-      begin match find_import_providing_node ~context struct_node with
-      | Some _ -> true
-      | None -> false
-      end
-  | Interface iface_descr ->
-      let iface_id = Interface.type_id_get iface_descr in
-      let iface_node = Context.node context iface_id in
-      begin match find_import_providing_node ~context iface_node with
-      | Some _ -> true
-      | None -> false
-      end
-  | Undefined x ->
-      failwith (sprintf "Unknown Type union discriminant %d" x)
 
 
 (* Construct an ocaml name for the given schema-defined type.
@@ -815,50 +776,6 @@ let generate_enum_sig ?unique_module_name enum_def =
       match_case :: acc)
   in
   header @ variants
-
-
-(* Recurse through the schema, collecting unique type names and type
-   definitions for all the nodes. *)
-let rec collect_unique_types ?acc ~context node =
-  let child_type_names = List.concat_map (children_of ~context node)
-      ~f:(fun child -> collect_unique_types ~context child)
-  in
-  let names =
-    match acc with
-    | None   -> child_type_names
-    | Some x -> child_type_names @ x
-  in
-  match PS.Node.get node with
-  | PS.Node.File
-  | PS.Node.Const _
-  | PS.Node.Annotation _
-  | PS.Node.Enum _ ->
-      names
-  | PS.Node.Struct _ ->
-      let struct_name =
-        let uq_name =
-          get_unqualified_name
-            ~parent:(Context.node context (PS.Node.scope_id_get node))
-            ~child:node
-        in
-        let node_id = PS.Node.id_get node in
-        sprintf "struct_%s_%s" uq_name (Uint64.to_string node_id)
-      in
-      let reader_name = make_unique_typename ~context
-          ~mode:Mode.Reader node
-      in
-      let builder_name = make_unique_typename ~context
-          ~mode:Mode.Builder node
-      in
-      (builder_name, `Public (struct_name ^ " builder_t")) ::
-      (reader_name, `Public (struct_name ^ " reader_t")) ::
-      (struct_name, `Abstract) ::
-      names
-  | PS.Node.Interface _ ->
-      let interface_name = make_unique_typename ~context ~mode:Mode.Reader node in
-      (interface_name, `Abstract) :: names
-  | PS.Node.Undefined x ->
-      failwith (sprintf "Unknown Node union discriminant %u" x)
 
 
 (* Recurse through the schema, emitting uniquely-named modules for
