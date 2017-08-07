@@ -73,6 +73,21 @@ let sig_s_divide_reader_builder = [
   "    type pointer_t";
 ]
 
+let sig_s_client_header = [
+  "";
+  "  module Client : sig";
+]
+
+let sig_s_divide_client_service = [
+  "  end";
+  "";
+  "  module Service : sig";
+]
+
+let sig_s_service_footer = [
+  "  end";
+]
+
 let sig_s_footer = [
   "  end";
   "end";
@@ -80,9 +95,9 @@ let sig_s_footer = [
 ]
 
 
-let functor_sig ~context = [
-  "module Make (MessageWrapper : Capnp.MessageSig.S) :";
-  "  (S with type 'cap message_t = 'cap MessageWrapper.Message.t";
+let functor_sig ~context ~rpc = [
+  "module Make (MessageWrapper : Capnp.MessageSig.S) : sig";
+  "  include S with type 'cap message_t = 'cap MessageWrapper.Message.t";
   "    and type Reader.pointer_t = ro MessageWrapper.Slice.t option";
   "    and type Builder.pointer_t = rw MessageWrapper.Slice.t";
   "    and type 'a reader_t = 'a MessageWrapper.StructStorage.reader_t";
@@ -90,8 +105,8 @@ let functor_sig ~context = [
   (List.concat_map context.Context.imports ~f:(fun import -> [
         "    and module " ^ import.Context.schema_name ^ " = " ^
           import.Context.module_name ^ ".Make(MessageWrapper)";
-  ])) @ [
-  ")";
+  ])) @ rpc @ [
+  "end";
   "";
 ]
 
@@ -132,6 +147,18 @@ let mod_divide_reader_builder = [
   "    type reader_array_t = Reader.array_t";
   "    type pointer_t = rw MessageWrapper.Slice.t";
   "";
+]
+
+let mod_divide_builder_client = [
+  "  end";
+  "";
+  "  module Client = struct";
+]
+
+let mod_divide_client_service = [
+  "  end";
+  "";
+  "  module Service = struct";
 ]
 
 let mod_footer = [
@@ -230,7 +257,20 @@ let compile
       sig_s_footer
     in
     let sig_file_content =
-      string_of_lines (sig_s @ (functor_sig ~context))
+      let rpc =
+        sig_s_client_header @
+        (GenCommon.apply_indent ~indent:"    "
+           (GenSignatures.generate_clients ~suppress_module_wrapper:true ~context
+              ~scope:[] ~node_name:requested_filename
+              requested_file_node)) @
+        sig_s_divide_client_service @
+        (GenCommon.apply_indent ~indent:"    "
+           (GenSignatures.generate_services ~suppress_module_wrapper:true ~context
+              ~scope:[] ~node_name:requested_filename
+              requested_file_node)) @
+        sig_s_service_footer
+      in
+      string_of_lines (sig_s @ (functor_sig ~context ~rpc))
     in
     let mod_shared_content =
       let defaults_context =
@@ -255,6 +295,18 @@ let compile
       let reader_defaults = GenCommon.apply_indent ~indent:"  "
           (Defaults.gen_reader_defaults defaults_context)
       in
+      let client_body =
+        GenCommon.apply_indent ~indent:"    "
+          (GenModules.generate_clients ~suppress_module_wrapper:true ~context
+             ~scope:[] ~node_name:requested_filename
+             requested_file_node)
+      in
+      let service_body =
+        GenCommon.apply_indent ~indent:"    "
+          (GenModules.generate_services ~suppress_module_wrapper:true ~context
+             ~scope:[] ~node_name:requested_filename
+             requested_file_node)
+      in
       builder_defaults @
       (mod_header ~context) @
       mod_unique_enums @
@@ -263,6 +315,10 @@ let compile
       reader_body @
       mod_divide_reader_builder @
       builder_body @
+      mod_divide_builder_client @
+      client_body @
+      mod_divide_client_service @
+      service_body @
       mod_footer
     in
     let mod_file_content =

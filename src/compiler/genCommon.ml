@@ -287,7 +287,7 @@ let make_unique_enum_module_name ~context enum_node =
   (String.capitalize uq_name) ^ "_" ^ (Uint64.to_string node_id)
 
 
-let make_unique_typename ?mode ~context node =
+let make_unique_typename ?uq_name ?mode ~context node =
   match PS.Node.get node with
   | PS.Node.Enum _ ->
       (* Enums don't have unique type names, they have unique module names.  This
@@ -310,7 +310,10 @@ let make_unique_typename ?mode ~context node =
         | Some Mode.Reader -> " reader_t"
         | Some Mode.Builder -> " builder_t"
       in
-      let uq_name = get_unqualified_name
+      let uq_name =
+        match uq_name with
+        | Some x -> x
+        | None -> get_unqualified_name
                     ~parent:(Context.node context (PS.Node.scope_id_get node))
                     ~child:node
       in
@@ -680,6 +683,9 @@ let generate_union_type ~context ~(mode : Mode.t) scope fields =
         begin match PS.Type.get field_type with
         | PS.Type.Void ->
             ("  | " ^ field_name) :: acc
+        | PS.Type.Interface _ ->
+            (sprintf "  | %s of Uint32.t option" field_name)
+            :: acc
         | _ ->
             ("  | " ^ field_name ^ " of " ^
                (type_name ~context ~mode ~scope_mode:mode scope field_type))
@@ -825,3 +831,63 @@ let rec collect_unique_enums ?(toplevel = true) ~is_sig ~context node =
     all_decls
 
 
+module Method = struct
+  type phase = Params | Results
+
+  type t = {
+    interface_node : PS.Node.t;
+    method_id : int;
+    method_def : PS.Method.t;
+    context : Context.codegen_context_t;
+  }
+
+  let create ~context ~interface_node method_id method_def =
+    { interface_node; method_id; method_def; context }
+
+  let capnp_name t = PS.Method.name_get t.method_def
+
+  let uq_name t = String.capitalize (capnp_name t)
+
+  let ocaml_name t = underscore_name (capnp_name t)
+
+  let payload t = function
+    | Params -> PS.Method.param_struct_type_get t.method_def
+    | Results -> PS.Method.result_struct_type_get t.method_def
+
+  let auto_struct phase t =
+    let struct_id = payload t phase in
+    let struct_node = Context.node t.context struct_id in
+    match PS.Node.get struct_node with
+    | PS.Node.Struct struct_def ->
+      (* If scopeID is zero then the struct was auto-generated, and we should emit it. *)
+      if PS.Node.scope_id_get struct_node = Uint64.zero then (
+        let mod_name =
+          match phase with
+          | Params -> "Params"
+          | Results -> "Results"
+        in
+        `Auto (struct_node, struct_def, mod_name)
+      ) else `Existing struct_node
+    | _ -> failf "Method payload %s is not a struct!" (PS.Node.display_name_get struct_node)
+
+  let payload_module ~context ~mode phase t =
+    let mode_str =
+      match mode with
+      | Mode.Reader -> "Reader"
+      | Mode.Builder -> "Builder"
+    in
+    match auto_struct phase t with
+    | `Existing struct_node ->
+      mode_str ^ "." ^ get_fully_qualified_name ~context struct_node
+    | `Auto (_, _, mod_name) ->
+      sprintf "%s.%s.%s.%s"
+        mode_str
+        (get_fully_qualified_name ~context t.interface_node)
+        (String.capitalize (capnp_name t))
+        mod_name
+
+  let id t = t.method_id
+
+  let methods_of_interface ~context ~interface_node interface_def =
+    PS.Node.Interface.methods_get_list interface_def |> List.mapi ~f:(create ~interface_node ~context)
+end

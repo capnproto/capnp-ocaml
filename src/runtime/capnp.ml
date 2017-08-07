@@ -34,6 +34,7 @@ module BytesStorage = BytesStorage
 module BytesMessage = Message.BytesMessage
 module Codecs       = Codecs
 module IO           = IO
+module RPC          = RPC
 module Runtime = struct
   module BuilderInc      = BuilderInc
   module BuilderOps      = BuilderOps

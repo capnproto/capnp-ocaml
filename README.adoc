@@ -363,6 +363,107 @@ val init_root : ?message_size:int -> unit -> Bar.t
 val to_message : t -> rw message_t
 --------------------------------------------------------------------------------
 
+Interfaces
+~~~~~~~~~~
+
+A struct field `foo` which is of interface type will result in generation of
+the following accessors:
+[source,ocaml]
+--------------------------------------------------------------------------------
+(* Assuming that field foo contains interfaces of type Foo... *)
+
+val foo_get : t -> Uint32.t option
+val foo_set : t -> Uint32.t option -> unit
+--------------------------------------------------------------------------------
+
+Each interface `Foo` generates a module `Foo`. There will be one submodule for
+each method, with `Params` and `Results` submodules for any implicit structs
+needed for the method arguments and results:
+
+[source,ocaml]
+--------------------------------------------------------------------------------
+module Reader : sig
+  module Foo : sig
+    type t = [`Foo_c36d76740ee15e68]
+    module MyMethod : sig
+      module Params : sig
+        type struct_t = [`MyMethod_b104a8c98610c556]
+        type t = struct_t reader_t
+        val arg1_get : t -> string
+        [...]
+      end
+      module Results : sig
+        type struct_t = [`MyMethod_c6367b042fce8e87]
+        type t = struct_t reader_t
+        val result_get : t -> string
+        [...]
+      end
+    end
+  end
+end
+--------------------------------------------------------------------------------
+
+[source,ocaml]
+--------------------------------------------------------------------------------
+module Builder : sig
+  module Foo : sig
+    type t = [`Foo_c36d76740ee15e68]
+    module MyMethod : sig
+      module Params : sig
+	type struct_t = [`MyMethod_b104a8c98610c556]
+	type t = struct_t builder_t
+	val arg1_set : t -> string -> unit
+        [...]
+      end
+      module Results : sig
+	type struct_t = [`MyMethod_c6367b042fce8e87]
+	type t = struct_t builder_t
+	val result_set : t -> string -> unit
+        [...]
+      end
+    end
+  end
+end
+--------------------------------------------------------------------------------
+
+The generated file will also contain `Client` and `Service` top-level modules:
+
+
+[source,ocaml]
+--------------------------------------------------------------------------------
+  module Client : sig
+    module Foo : sig
+      type t = [`Foo_c36d76740ee15e68]
+      val interface_id : Uint64.t
+      module MyMethod : sig
+        module Params = Builder.Foo.MyMethod.Params
+        module Results = Reader.Foo.MyMethod.Results
+        val method_id : (t, Params.t, Results.t) Capnp.RPC.MethodID.t
+      end
+    end
+  end
+
+  module Service : sig
+    module Foo : sig
+      type t = [`Foo_c36d76740ee15e68]
+      val interface_id : Uint64.t
+      module MyMethod : sig
+        module Params = Reader.Foo.MyMethod.Params
+        module Results = Builder.Foo.MyMethod.Results
+      end
+    end
+  end
+--------------------------------------------------------------------------------
+
+The `Client` module is for use by clients. Each method links to a *builder* for
+the parameters and a *reader* for the results (in the `Service` section they are
+the other way around). The client section also includes the method's globally-unique
+ID. This is just a `(Uint64.t * int)` pair, but its type gives the type of the
+interface and of the request and response structs.
+
+Inheritance is not currently supported.
+
+
 Generating Code
 ---------------
 You will need to
