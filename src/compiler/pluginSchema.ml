@@ -4,9 +4,10 @@ type ro = Capnp.Message.ro
 type rw = Capnp.Message.rw
 
 module type S = sig
-  type 'cap message_t
-  type 'a reader_t
-  type 'a builder_t
+  module MessageWrapper : Capnp.RPC.S
+  type 'cap message_t = 'cap MessageWrapper.Message.t
+  type 'a reader_t = 'a MessageWrapper.StructStorage.reader_t
+  type 'a builder_t = 'a MessageWrapper.StructStorage.builder_t
 
   module ElementSize_15102134695616452902 : sig
     type t =
@@ -24,7 +25,7 @@ module type S = sig
   module Reader : sig
     type array_t
     type builder_array_t
-    type pointer_t
+    type pointer_t = ro MessageWrapper.Slice.t option
     val of_pointer : pointer_t -> 'a reader_t
     module Node : sig
       type struct_t = [`Node_e682ab4cf923a417]
@@ -75,8 +76,10 @@ module type S = sig
         type t = struct_t reader_t
         val has_type : t -> bool
         val type_get : t -> [`Type_d07378ede1f9cc60] reader_t
+        val type_get_pipelined : struct_t MessageWrapper.StructRef.t -> [`Type_d07378ede1f9cc60] MessageWrapper.StructRef.t
         val has_value : t -> bool
         val value_get : t -> [`Value_ce23dcd2d7b00c9b] reader_t
+        val value_get_pipelined : struct_t MessageWrapper.StructRef.t -> [`Value_ce23dcd2d7b00c9b] MessageWrapper.StructRef.t
         val of_message : 'cap message_t -> t
         val of_builder : struct_t builder_t -> t
       end
@@ -85,6 +88,7 @@ module type S = sig
         type t = struct_t reader_t
         val has_type : t -> bool
         val type_get : t -> [`Type_d07378ede1f9cc60] reader_t
+        val type_get_pipelined : struct_t MessageWrapper.StructRef.t -> [`Type_d07378ede1f9cc60] MessageWrapper.StructRef.t
         val targets_file_get : t -> bool
         val targets_const_get : t -> bool
         val targets_enum_get : t -> bool
@@ -161,8 +165,10 @@ module type S = sig
         val offset_get_int_exn : t -> int
         val has_type : t -> bool
         val type_get : t -> [`Type_d07378ede1f9cc60] reader_t
+        val type_get_pipelined : struct_t MessageWrapper.StructRef.t -> [`Type_d07378ede1f9cc60] MessageWrapper.StructRef.t
         val has_default_value : t -> bool
         val default_value_get : t -> [`Value_ce23dcd2d7b00c9b] reader_t
+        val default_value_get_pipelined : struct_t MessageWrapper.StructRef.t -> [`Value_ce23dcd2d7b00c9b] MessageWrapper.StructRef.t
         val had_explicit_default_get : t -> bool
         val of_message : 'cap message_t -> t
         val of_builder : struct_t builder_t -> t
@@ -224,6 +230,7 @@ module type S = sig
       val id_get_int_exn : t -> int
       val has_brand : t -> bool
       val brand_get : t -> [`Brand_903455f06065422b] reader_t
+      val brand_get_pipelined : struct_t MessageWrapper.StructRef.t -> [`Brand_903455f06065422b] MessageWrapper.StructRef.t
       val of_message : 'cap message_t -> t
       val of_builder : struct_t builder_t -> t
     end
@@ -241,10 +248,12 @@ module type S = sig
       val param_struct_type_get_int_exn : t -> int
       val has_param_brand : t -> bool
       val param_brand_get : t -> [`Brand_903455f06065422b] reader_t
+      val param_brand_get_pipelined : struct_t MessageWrapper.StructRef.t -> [`Brand_903455f06065422b] MessageWrapper.StructRef.t
       val result_struct_type_get : t -> Uint64.t
       val result_struct_type_get_int_exn : t -> int
       val has_result_brand : t -> bool
       val result_brand_get : t -> [`Brand_903455f06065422b] reader_t
+      val result_brand_get_pipelined : struct_t MessageWrapper.StructRef.t -> [`Brand_903455f06065422b] MessageWrapper.StructRef.t
       val has_annotations : t -> bool
       val annotations_get : t -> (ro, [`Annotation_f1c8950dab257542] reader_t, array_t) Capnp.Array.t
       val annotations_get_list : t -> [`Annotation_f1c8950dab257542] reader_t list
@@ -260,6 +269,7 @@ module type S = sig
         type t = struct_t reader_t
         val has_element_type : t -> bool
         val element_type_get : t -> [`Type_d07378ede1f9cc60] reader_t
+        val element_type_get_pipelined : struct_t MessageWrapper.StructRef.t -> [`Type_d07378ede1f9cc60] MessageWrapper.StructRef.t
         val of_message : 'cap message_t -> t
         val of_builder : struct_t builder_t -> t
       end
@@ -270,6 +280,7 @@ module type S = sig
         val type_id_get_int_exn : t -> int
         val has_brand : t -> bool
         val brand_get : t -> [`Brand_903455f06065422b] reader_t
+        val brand_get_pipelined : struct_t MessageWrapper.StructRef.t -> [`Brand_903455f06065422b] MessageWrapper.StructRef.t
         val of_message : 'cap message_t -> t
         val of_builder : struct_t builder_t -> t
       end
@@ -280,6 +291,7 @@ module type S = sig
         val type_id_get_int_exn : t -> int
         val has_brand : t -> bool
         val brand_get : t -> [`Brand_903455f06065422b] reader_t
+        val brand_get_pipelined : struct_t MessageWrapper.StructRef.t -> [`Brand_903455f06065422b] MessageWrapper.StructRef.t
         val of_message : 'cap message_t -> t
         val of_builder : struct_t builder_t -> t
       end
@@ -290,6 +302,7 @@ module type S = sig
         val type_id_get_int_exn : t -> int
         val has_brand : t -> bool
         val brand_get : t -> [`Brand_903455f06065422b] reader_t
+        val brand_get_pipelined : struct_t MessageWrapper.StructRef.t -> [`Brand_903455f06065422b] MessageWrapper.StructRef.t
         val of_message : 'cap message_t -> t
         val of_builder : struct_t builder_t -> t
       end
@@ -428,8 +441,10 @@ module type S = sig
       val id_get_int_exn : t -> int
       val has_brand : t -> bool
       val brand_get : t -> Brand.t
+      val brand_get_pipelined : struct_t MessageWrapper.StructRef.t -> Brand.struct_t MessageWrapper.StructRef.t
       val has_value : t -> bool
       val value_get : t -> Value.t
+      val value_get_pipelined : struct_t MessageWrapper.StructRef.t -> Value.struct_t MessageWrapper.StructRef.t
       val of_message : 'cap message_t -> t
       val of_builder : struct_t builder_t -> t
     end
@@ -483,6 +498,7 @@ module type S = sig
       end
       val has_capnp_version : t -> bool
       val capnp_version_get : t -> CapnpVersion.t
+      val capnp_version_get_pipelined : struct_t MessageWrapper.StructRef.t -> CapnpVersion.struct_t MessageWrapper.StructRef.t
       val has_nodes : t -> bool
       val nodes_get : t -> (ro, Node.t, array_t) Capnp.Array.t
       val nodes_get_list : t -> Node.t list
@@ -499,7 +515,7 @@ module type S = sig
   module Builder : sig
     type array_t = Reader.builder_array_t
     type reader_array_t = Reader.array_t
-    type pointer_t
+    type pointer_t = rw MessageWrapper.Slice.t
     module Node : sig
       type struct_t = [`Node_e682ab4cf923a417]
       type t = struct_t builder_t
@@ -1185,15 +1201,15 @@ module type S = sig
       val data_set : t -> string -> unit
       val list_set : t -> pointer_t -> pointer_t
       val list_set_reader : t -> Reader.pointer_t -> pointer_t
-      val list_set_interface : t -> Uint32.t option -> unit
+      val list_set_interface : t -> 'a MessageWrapper.Capability.t option -> unit
       val enum_set_exn : t -> int -> unit
       val struct_set : t -> pointer_t -> pointer_t
       val struct_set_reader : t -> Reader.pointer_t -> pointer_t
-      val struct_set_interface : t -> Uint32.t option -> unit
+      val struct_set_interface : t -> 'a MessageWrapper.Capability.t option -> unit
       val interface_set : t -> unit
       val any_pointer_set : t -> pointer_t -> pointer_t
       val any_pointer_set_reader : t -> Reader.pointer_t -> pointer_t
-      val any_pointer_set_interface : t -> Uint32.t option -> unit
+      val any_pointer_set_interface : t -> 'a MessageWrapper.Capability.t option -> unit
       val of_message : rw message_t -> t
       val to_message : t -> rw message_t
       val to_reader : t -> struct_t reader_t
@@ -1323,7 +1339,7 @@ module type S = sig
   end
 end
 
-module Make (MessageWrapper : Capnp.MessageSig.S) = struct
+module MakeRPC(MessageWrapper : Capnp.RPC.S) = struct
   type 'a reader_t = 'a MessageWrapper.StructStorage.reader_t
   type 'a builder_t = 'a MessageWrapper.StructStorage.builder_t
   module CamlBytes = Bytes
@@ -1474,10 +1490,14 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           RA_.has_field x 3
         let type_get x =
           RA_.get_struct x 3
+        let type_get_pipelined x =
+          MessageWrapper.Untyped.struct_field x 3
         let has_value x =
           RA_.has_field x 4
         let value_get x =
           RA_.get_struct x 4
+        let value_get_pipelined x =
+          MessageWrapper.Untyped.struct_field x 4
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
       end
@@ -1488,6 +1508,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           RA_.has_field x 3
         let type_get x =
           RA_.get_struct x 3
+        let type_get_pipelined x =
+          MessageWrapper.Untyped.struct_field x 3
         let targets_file_get x =
           RA_.get_bit ~default:false x ~byte_ofs:14 ~bit_ofs:0
         let targets_const_get x =
@@ -1621,10 +1643,14 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           RA_.has_field x 2
         let type_get x =
           RA_.get_struct x 2
+        let type_get_pipelined x =
+          MessageWrapper.Untyped.struct_field x 2
         let has_default_value x =
           RA_.has_field x 3
         let default_value_get x =
           RA_.get_struct x 3
+        let default_value_get_pipelined x =
+          MessageWrapper.Untyped.struct_field x 3
         let had_explicit_default_get x =
           RA_.get_bit ~default:false x ~byte_ofs:16 ~bit_ofs:0
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
@@ -1722,6 +1748,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         RA_.has_field x 0
       let brand_get x =
         RA_.get_struct x 0
+      let brand_get_pipelined x =
+        MessageWrapper.Untyped.struct_field x 0
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       let of_builder x = Some (RA_.StructStorage.readonly x)
     end
@@ -1750,6 +1778,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         RA_.has_field x 2
       let param_brand_get x =
         RA_.get_struct x 2
+      let param_brand_get_pipelined x =
+        MessageWrapper.Untyped.struct_field x 2
       let result_struct_type_get x =
         RA_.get_uint64 ~default:Uint64.zero x 16
       let result_struct_type_get_int_exn x =
@@ -1758,6 +1788,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         RA_.has_field x 3
       let result_brand_get x =
         RA_.get_struct x 3
+      let result_brand_get_pipelined x =
+        MessageWrapper.Untyped.struct_field x 3
       let has_annotations x =
         RA_.has_field x 1
       let annotations_get x = 
@@ -1779,6 +1811,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           RA_.has_field x 0
         let element_type_get x =
           RA_.get_struct x 0
+        let element_type_get_pipelined x =
+          MessageWrapper.Untyped.struct_field x 0
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
       end
@@ -1793,6 +1827,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           RA_.has_field x 0
         let brand_get x =
           RA_.get_struct x 0
+        let brand_get_pipelined x =
+          MessageWrapper.Untyped.struct_field x 0
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
       end
@@ -1807,6 +1843,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           RA_.has_field x 0
         let brand_get x =
           RA_.get_struct x 0
+        let brand_get_pipelined x =
+          MessageWrapper.Untyped.struct_field x 0
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
       end
@@ -1821,6 +1859,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           RA_.has_field x 0
         let brand_get x =
           RA_.get_struct x 0
+        let brand_get_pipelined x =
+          MessageWrapper.Untyped.struct_field x 0
         let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
         let of_builder x = Some (RA_.StructStorage.readonly x)
       end
@@ -1991,6 +2031,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
           RA_.has_field x 0
         let type_get x =
           RA_.get_struct x 0
+        let type_get_pipelined x =
+          MessageWrapper.Untyped.struct_field x 0
         type unnamed_union_t =
           | Unbound
           | Type of Type.t
@@ -2128,10 +2170,14 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         RA_.has_field x 1
       let brand_get x =
         RA_.get_struct x 1
+      let brand_get_pipelined x =
+        MessageWrapper.Untyped.struct_field x 1
       let has_value x =
         RA_.has_field x 0
       let value_get x =
         RA_.get_struct x 0
+      let value_get_pipelined x =
+        MessageWrapper.Untyped.struct_field x 0
       let of_message x = RA_.get_root_struct (RA_.Message.readonly x)
       let of_builder x = Some (RA_.StructStorage.readonly x)
     end
@@ -2202,6 +2248,8 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         RA_.has_field x 2
       let capnp_version_get x =
         RA_.get_struct x 2
+      let capnp_version_get_pipelined x =
+        MessageWrapper.Untyped.struct_field x 2
       let has_nodes x =
         RA_.has_field x 0
       let nodes_get x = 
@@ -4025,5 +4073,13 @@ module Make (MessageWrapper : Capnp.MessageSig.S) = struct
         BA_.init_struct_pointer ptr ~data_words:0 ~pointer_words:3
     end
   end
+
+  module Client = struct
+  end
+
+  module Service = struct
+  end
+  module MessageWrapper = MessageWrapper
 end [@@inline]
 
+module Make(M:Capnp.MessageSig.S) = MakeRPC[@inlined](Capnp.RPC.None(M)) [@@inline]

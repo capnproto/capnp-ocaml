@@ -52,7 +52,8 @@ end
 
    Most of the builder operations are tied to the RWM types.  The exceptional
    cases are functions that make a copy from a source to a destination. *)
-module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
+module Make (ROM : MessageSig.S) (RWM : RPC.S) = struct
+  module ROM = RPC.None(ROM)
   module ROC = CommonInc.Make[@inlined](ROM)
   module RWC = CommonInc.Make[@inlined](RWM)
   module RReader = ReaderInc.Make[@inlined](RWM)
@@ -769,8 +770,9 @@ module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
         deep_zero_list list_storage
     | RWM.Object.Struct struct_storage ->
         deep_zero_struct struct_storage
-    | RWM.Object.Capability _ ->
-        ()
+    | RWM.Object.Capability index ->
+        let attachments = RWM.Message.get_attachments pointer_bytes.RWM.Slice.msg in
+        RWM.Untyped.clear_cap attachments index
 
   and deep_zero_list
       (list_storage : rw RWM.ListStorage.t)
