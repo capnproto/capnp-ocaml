@@ -272,7 +272,7 @@ let generate_accessors ~context ~scope ~mode
 (* Generate the OCaml type signature corresponding to a struct definition.  [scope] is a
  * stack of scope IDs corresponding to this lexical context, and is used to figure
  * out what module prefixes are required to properly qualify a type. *)
-let generate_struct_node ~context ~scope ~nested_modules
+let generate_struct_node ?uq_name ~context ~scope ~nested_modules
     ~mode ~node struct_def : string list =
   let unsorted_fields =
     C.Array.to_list (PS.Node.Struct.fields_get struct_def)
@@ -303,7 +303,7 @@ let generate_struct_node ~context ~scope ~nested_modules
     in
     generate_accessors ~context ~scope ~mode ~f:selector non_union_fields
   in
-  let unique_struct = GenCommon.make_unique_typename ~context node in
+  let unique_struct = GenCommon.make_unique_typename ?uq_name ~context node in
   let header =
     match mode with
     | Mode.Reader -> [
@@ -334,6 +334,77 @@ let generate_struct_node ~context ~scope ~nested_modules
     union_accessors @
     non_union_accessors @
     footer
+
+let generate_method_struct ~context ~scope ~nested_modules ~mode ~interface_node interface_def : string list =
+  let module Method = GenCommon.Method in
+  let methods = Method.methods_of_interface ~context ~interface_node interface_def in
+  (* todo: superclasses *)
+  let make_auto m phase =
+    match Method.auto_struct phase m with
+    | `Existing _ -> []
+    | `Auto (struct_node, struct_def, mod_name) ->
+      let uq_name = Method.uq_name m in
+      let body = generate_struct_node
+          ~uq_name ~context ~scope ~nested_modules:[] ~mode ~node:struct_node struct_def
+      in
+      [ "module " ^ mod_name ^ " : sig" ] @
+      (apply_indent ~indent:"  " body) @
+      [ "end" ]
+  in
+  let structs =
+    List.map methods ~f:(fun m ->
+        let mod_name = String.capitalize (Method.capnp_name m) in
+        ["module " ^ mod_name ^ " : sig"] @
+        apply_indent ~indent:"  " (
+            make_auto m Method.Params @
+            make_auto m Method.Results
+        ) @
+        ["end"]
+      )
+    |> List.concat
+  in
+  nested_modules @ structs
+
+
+let generate_client ~context ~nested_modules ~interface_node interface_def : string list =
+  let module Method = GenCommon.Method in
+  let methods = Method.methods_of_interface ~context ~interface_node interface_def in
+  let method_mods = 
+    List.map methods ~f:(fun m ->
+        let params = Method.(payload_module Params) ~context ~mode:Mode.Builder m in
+        let results = Method.(payload_module Results) ~context ~mode:Mode.Reader m in
+        let mod_name = String.capitalize (Method.capnp_name m) in
+        ["module " ^ mod_name ^ " : sig"] @
+        apply_indent ~indent:"  " [
+          "module Params = " ^ params;
+          "module Results = " ^ results;
+          sprintf "val method_id : (t, Params.t, Results.t) Capnp.RPC.MethodID.t";
+        ] @
+        ["end"]
+      )
+    |> List.concat
+  in
+  nested_modules @ method_mods
+
+
+let generate_service ~context ~nested_modules ~interface_node interface_def : string list =
+  let module Method = GenCommon.Method in
+  let methods = Method.methods_of_interface ~context ~interface_node interface_def in
+  let method_mods = 
+    List.map methods ~f:(fun m ->
+        let params = Method.(payload_module Params) ~context ~mode:Mode.Reader m in
+        let results = Method.(payload_module Results) ~context ~mode:Mode.Builder m in
+        let mod_name = String.capitalize (Method.capnp_name m) in
+        ["module " ^ mod_name ^ " : sig"] @
+        apply_indent ~indent:"  " [
+          "module Params = " ^ params;
+          "module Results = " ^ results;
+        ] @
+        ["end"]
+      )
+    |> List.concat
+  in
+  nested_modules @ method_mods
 
 
 (* Generate the OCaml type signature corresponding to a node.  [scope] is
@@ -388,8 +459,12 @@ let rec generate_node
         [ "module " ^ node_name ^ " : sig" ] @
           (apply_indent ~indent:"  " body) @
           [ "end" ]
-  | Interface _ ->
-      let body = generate_nested_modules () in
+  | Interface iface_def ->
+      let nested_modules = generate_nested_modules () in
+      let unique_type = GenCommon.make_unique_typename ~context node in
+      let body =
+        ("type t = " ^ unique_type) ::
+        generate_method_struct ~context ~scope ~nested_modules ~mode ~interface_node:node iface_def in
       if suppress_module_wrapper then
         body
       else
@@ -408,4 +483,53 @@ let rec generate_node
       failwith (sprintf "Unknown Node union discriminant %u" x)
 
 
+let rec generate_interfaces fn
+    ~(suppress_module_wrapper : bool)
+    ~(context : Context.codegen_context_t)
+    ~(scope : Uint64.t list)
+    ~(node_name : string)
+    (node : PS.Node.t)
+: string list =
+  let open PS.Node in
+  let generate_nested_modules () =
+    let child_nodes = GenCommon.children_of ~context node in
+    List.concat_map child_nodes ~f:(fun child ->
+        let child_name = GenCommon.get_unqualified_name ~parent:node ~child in
+        let child_node_id = id_get child in
+        generate_interfaces fn ~suppress_module_wrapper:false ~context
+          ~scope:(child_node_id :: scope) ~node_name:child_name child)
+  in
+  match get node with
+  | File ->
+      generate_nested_modules ()
+  | Struct _ ->
+      let nested_modules = generate_nested_modules () in
+      if suppress_module_wrapper || nested_modules = [] then
+        nested_modules
+      else
+        [ "module " ^ node_name ^ " : sig" ] @
+        (apply_indent ~indent:"  " nested_modules) @
+        [ "end" ]
+  | Enum _ -> []
+  | Interface iface_def ->
+      let nested_modules = generate_nested_modules () in
+      let unique_type = GenCommon.make_unique_typename ~context node in
+      let body = [
+        "type t = " ^ unique_type;
+        "val interface_id : Uint64.t";
+      ] @ fn ~context ~nested_modules ~interface_node:node iface_def
+      in
+      if suppress_module_wrapper then
+        body
+      else
+        [ "module " ^ node_name ^ " : sig" ] @
+          (apply_indent ~indent:"  " body) @
+          [ "end" ]
+  | Const _ -> []
+  | Annotation _ ->
+      generate_nested_modules ()
+  | Undefined x ->
+      failwith (sprintf "Unknown Node union discriminant %u" x)
 
+let generate_clients = generate_interfaces generate_client
+let generate_services = generate_interfaces generate_service
