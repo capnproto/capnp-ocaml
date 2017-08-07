@@ -52,7 +52,8 @@ end
 
    Most of the builder operations are tied to the RWM types.  The exceptional
    cases are functions that make a copy from a source to a destination. *)
-module Make (ROM : MessageSig.S) (RWM : MessageSig.S) = struct
+module Make (ROM : MessageSig.S) (RWM : RPC.S) = struct
+  module ROM = RPC.None(ROM)
   module ROC = CommonInc.Make[@inlined](ROM)
   module RWC = CommonInc.Make[@inlined](RWM)
   module RReader = ReaderInc.Make[@inlined](RWM)

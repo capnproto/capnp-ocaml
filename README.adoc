@@ -222,6 +222,11 @@ val foo_init : t -> Foo.t
     @raise Message.Invalid_message if the message is ill-formatted *)
 val foo_get : t -> Foo.t
 
+(** [foo_get_pipelined s] is a reference to the field [foo] in the
+     (possibly not yet received) struct [t]. Only available in the Reader
+     section. *)
+val foo_get_pipelined : t RPC.StructRef.t -> Foo.t RPC.StructRef.t
+
 (** [foo_set_reader s v] sets the content of field [foo] by making a deep
     copy of the Reader-typed structure.
 
@@ -358,6 +363,14 @@ val to_reader : Builder.Bar.t -> Reader.Bar.t
     @return a reference to the content of the root struct *)
 val init_root : ?message_size:int -> unit -> Bar.t
 
+(** [init_pointer p]
+    initializes an instance of this struct type inside [p]'s message
+    and updates [p] to point to the new struct. This is useful when
+    dealing with AnyPointer fields.
+
+    @return a reference to the content of the struct *)
+val init_pointer : pointer_t -> t
+
 (** [to_message s] retrieves the underlying message which is used as
     the backing store for struct [s]. *)
 val to_message : t -> rw message_t
@@ -368,12 +381,22 @@ Interfaces
 
 A struct field `foo` which is of interface type will result in generation of
 the following accessors:
+
 [source,ocaml]
 --------------------------------------------------------------------------------
 (* Assuming that field foo contains interfaces of type Foo... *)
 
-val foo_get : t -> Uint32.t option
-val foo_set : t -> Uint32.t option -> unit
+(** The caller is responsible for freeing the result. *)
+val foo_get : t -> Foo.t Capability.t option
+
+(** [foo_get_pipelined t] is a capability that can be used to invoke methods
+    on the object in the [foo] field of [t], which might not have arrived yet.
+    The caller is responsible for freeing the result. *)
+val foo_get_pipelined : t StructRef.t -> Foo.t Capability.t
+
+(** [foo_set t c] sets the field to capability [c], increasing [c]'s ref-count
+    (i.e. the caller is still responsible for freeing [c]). *)
+val foo_set : t -> Foo.t Capability.t option -> unit
 --------------------------------------------------------------------------------
 
 Each interface `Foo` generates a module `Foo`. There will be one submodule for
@@ -451,6 +474,15 @@ The generated file will also contain `Client` and `Service` top-level modules:
         module Params = Reader.Foo.MyMethod.Params
         module Results = Builder.Foo.MyMethod.Results
       end
+      class virtual service : object
+        inherit MessageWrapper.Untyped.generic_service
+
+        method as_capability : t MessageWrapper.Capability.t
+
+        method virtual my_method_impl :
+          (MyMethod.Params.t, MyMethod.Results.t) MessageWrapper.Service.method_t
+      end
+      val local : #service -> t MessageWrapper.Capability.t
     end
   end
 --------------------------------------------------------------------------------
@@ -459,7 +491,12 @@ The `Client` module is for use by clients. Each method links to a *builder* for
 the parameters and a *reader* for the results (in the `Service` section they are
 the other way around). The client section also includes the method's globally-unique
 ID. This is just a `(Uint64.t * int)` pair, but its type gives the type of the
-interface and of the request and response structs.
+interface and of the request and response structs. Consult your RPC library's
+documentation for information about how to call the method.
+
+To implement a service, inherit from the generated virtual service class and
+implement the virtual methods. Use the `as_capability` method to use your
+service as a capability.
 
 Inheritance is not currently supported.
 

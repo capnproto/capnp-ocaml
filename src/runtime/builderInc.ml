@@ -43,7 +43,7 @@ let invalid_msg = Message.invalid_msg
 let sizeof_uint64 = 8
 
 (* Functor parameter: NM == "native message" *)
-module Make (NM : MessageSig.S) = struct
+module Make (NM : RPC.S) = struct
   module RA_ = struct
     include ReaderInc.Make[@inlined](NM)
   end
@@ -782,7 +782,7 @@ module Make (NM : MessageSig.S) = struct
     let get_interface
         (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
-      : Uint32.t option =
+      : 'a option =
       let pointers = struct_storage.NM.StructStorage.pointers in
       let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
       (* Struct should have already been upgraded to at least the
@@ -797,7 +797,8 @@ module Make (NM : MessageSig.S) = struct
       | Pointer.Null ->
           None
       | Pointer.Other (OtherPointer.Capability index) ->
-          Some index
+          let attachments = NM.Message.get_attachments pointers.NM.Slice.msg in
+          Some (NM.Untyped.get_cap attachments index)
       | _ ->
           invalid_msg "decoded non-capability pointer where capability was expected"
 
@@ -1099,7 +1100,7 @@ module Make (NM : MessageSig.S) = struct
         ?(discr : Discr.t option)
         (struct_storage : (rw, _) NM.StructStorage.t)
         (pointer_word : int)
-        (value : Uint32.t option)
+        (value : 'a option)
       : unit =
       let pointers = struct_storage.NM.StructStorage.pointers in
       let num_pointers = pointers.NM.Slice.len / sizeof_uint64 in
@@ -1111,10 +1112,17 @@ module Make (NM : MessageSig.S) = struct
         NM.Slice.start = pointers.NM.Slice.start + (pointer_word * sizeof_uint64);
         NM.Slice.len   = sizeof_uint64;
       } in
-      let () = set_opt_discriminant struct_storage.NM.StructStorage.data discr in
-      let () = BOps.deep_zero_pointer pointer_bytes in
+      let attachments = NM.Message.get_attachments pointers.NM.Slice.msg in
+      (* Release any interface set previously *)
+      begin match NC.decode_pointer pointer_bytes with
+      | Pointer.Other (OtherPointer.Capability index) -> NM.Untyped.clear_cap attachments index
+      | _ -> ()
+      end;
+      set_opt_discriminant struct_storage.NM.StructStorage.data discr;
+      BOps.deep_zero_pointer pointer_bytes;
       match value with
-      | Some index ->
+      | Some v ->
+          let index = NM.Untyped.add_cap attachments v in
           NM.Slice.set_int64 pointer_bytes 0
             (OtherPointer.encode (OtherPointer.Capability index))
       | None ->

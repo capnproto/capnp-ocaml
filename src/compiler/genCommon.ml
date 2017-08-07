@@ -30,7 +30,7 @@
 
 open Core_kernel.Std
 
-module M   = Capnp.BytesMessage
+module M   = Capnp.RPC.None(Capnp.BytesMessage)
 module PS_ = PluginSchema.Make(M)
 module PS  = PS_.Reader
 module C   = Capnp
@@ -684,7 +684,9 @@ let generate_union_type ~context ~(mode : Mode.t) scope fields =
         | PS.Type.Void ->
             ("  | " ^ field_name) :: acc
         | PS.Type.Interface _ ->
-            (sprintf "  | %s of Uint32.t option" field_name)
+            (sprintf "  | %s of %s MessageWrapper.Capability.t option"
+             field_name
+             (type_name ~context ~mode ~scope_mode:mode scope field_type))
             :: acc
         | _ ->
             ("  | " ^ field_name ^ " of " ^

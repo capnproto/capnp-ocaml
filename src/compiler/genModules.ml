@@ -1058,6 +1058,8 @@ let generate_one_field_accessors ~context ~node_id ~scope
                   sprintf "  RA_.has_field x %u" field_ofs;
                   "let " ^ field_name ^ "_get x =";
                   sprintf "  RA_.get_struct%s x %u" reader_default_str field_ofs;
+                  "let " ^ field_name ^ "_get_pipelined x =";
+                  sprintf "  MessageWrapper.Untyped.struct_field x %u" field_ofs;
                 ]
               | Mode.Builder -> [
                   "let has_" ^ field_name ^ " x =";
@@ -1096,12 +1098,12 @@ let generate_one_field_accessors ~context ~node_id ~scope
             let getters = [
               "let " ^ field_name ^ "_get x =";
               sprintf "  %s.get_interface x %u" api_module field_ofs;
+              "let " ^ field_name ^ "_get_pipelined x = ";
+              sprintf "  MessageWrapper.Untyped.capability_field x %u" field_ofs;
             ] in
             let setters = [
               "let " ^ field_name ^ "_set x v =";
-              sprintf "  BA_.set_interface %sx %u v"
-                discr_str
-                field_ofs;
+              sprintf "  BA_.set_interface %sx %u v" discr_str field_ofs;
             ] in
             (getters, setters)
         | (PS.Type.AnyPointer _, PS.Value.AnyPointer pointer_slice_opt) ->
@@ -1142,7 +1144,7 @@ let generate_one_field_accessors ~context ~node_id ~scope
               "let " ^ field_name ^ "_set_interface x v =";
               sprintf "  BA_.set_interface %sx %u v"
                 discr_str
-                field_ofs;
+                field_ofs
             ] in
             (getters, setters)
         | (PS.Type.Undefined x, _) ->
@@ -1768,7 +1770,7 @@ let generate_client ~context ~nested_modules ~node_name ~interface_node interfac
   nested_modules @ client
 
 
-let generate_service ~context ~nested_modules ~node_name:_ ~interface_node interface_def : string list =
+let generate_service ~context ~nested_modules ~node_name ~interface_node interface_def : string list =
   let module Method = GenCommon.Method in
   let methods = Method.methods_of_interface ~context ~interface_node interface_def in
   let method_mods =
@@ -1785,7 +1787,38 @@ let generate_service ~context ~nested_modules ~node_name:_ ~interface_node inter
       )
     |> List.concat
   in
-  nested_modules @ method_mods
+  let service =
+    let body =
+      List.map methods ~f:(fun m ->
+          let meth_mod_name = String.capitalize (Method.capnp_name m) in
+          sprintf "method virtual %s_impl : (%s.Params.t, %s.Results.t) MessageWrapper.Service.method_t"
+            (Method.ocaml_name m)
+            meth_mod_name
+            meth_mod_name
+        )
+    in
+    let dispatch_body =
+      List.map methods ~f:(fun m ->
+          sprintf "| %d -> MessageWrapper.Untyped.abstract_method self#%s_impl"
+            (Method.id m)
+            (Method.ocaml_name m)
+        )
+    in
+    [ "class virtual service = object (self)";
+      "  method release = ()";
+      "  method as_capability : t MessageWrapper.Capability.t = MessageWrapper.Untyped.local self";
+      "  method dispatch ~interface_id:i ~method_id =";
+      "    if i <> interface_id then MessageWrapper.Untyped.unknown_interface ~interface_id";
+      "    else match method_id with";
+    ] @ apply_indent ~indent:"    " dispatch_body @
+    [ "    | x -> MessageWrapper.Untyped.unknown_method ~interface_id ~method_id";
+      sprintf "  method pp f = Format.pp_print_string f %S" node_name;
+    ] @
+    (apply_indent ~indent:"  " body) @
+    [ "end";
+    ]
+  in
+  nested_modules @ method_mods @ service
 
 
 let rec generate_interfaces fn
