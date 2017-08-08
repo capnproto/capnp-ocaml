@@ -1,6 +1,5 @@
 opam-version: "1.2"
 name: "capnp"
-version: "2.1.1"
 homepage: "https://github.com/pelzlpj/capnp-ocaml"
 bug-reports: "https://github.com/pelzlpj/capnp-ocaml/issues"
 dev-repo: "https://github.com/pelzlpj/capnp-ocaml.git"
