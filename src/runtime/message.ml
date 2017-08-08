@@ -75,37 +75,51 @@ module Make (Storage : MessageStorage.S) = struct
       bytes_consumed : int;
     }
 
-    type -'cap t = storage_descr_t Res.Array.t
+    type -'cap t = {
+      segments : storage_descr_t Res.Array.t;
+      attachments : MessageSig.attachments;
+    }
 
     let create size =
       let segment = Storage.alloc (Util.round_up_mult_8 size) in
-      Res.Array.create 1 {segment; bytes_consumed = 0}
+      let segments = Res.Array.create 1 {segment; bytes_consumed = 0} in
+      { segments; attachments = MessageSig.No_attachments }
 
     let release m =
-      let () = Res.Array.iter (fun descr -> Storage.release descr.segment) m in
-      Res.Array.clear m
+      let () = Res.Array.iter (fun descr -> Storage.release descr.segment) m.segments in
+      Res.Array.clear m.segments
 
-    let num_segments = Res.Array.length
+    let num_segments m = Res.Array.length m.segments
 
     let total_size m =
-      Res.Array.fold_left (fun acc x -> acc + x.bytes_consumed) 0 m
+      Res.Array.fold_left (fun acc x -> acc + x.bytes_consumed) 0 m.segments
 
     let total_alloc_size m =
-      Res.Array.fold_left (fun acc x -> acc + (Segment.length x.segment)) 0 m
+      Res.Array.fold_left (fun acc x -> acc + (Segment.length x.segment)) 0 m.segments
 
-    let get_segment m i = (Res.Array.get m i).segment
+    let get_segment m i = (Res.Array.get m.segments i).segment
 
-    let readonly m = m
+    let get_segment_descr m i = Res.Array.get m.segments i
+
+    let add_segment m new_seg =
+      let new_seg_descr = {segment = new_seg; bytes_consumed = 0} in
+      Res.Array.add_one m.segments new_seg_descr;
+      new_seg_descr
+
+    let readonly m = (m :> ro t)
 
     let of_storage ms =
-      let arr = Res.Array.empty () in
+      let segments = Res.Array.empty () in
       let () = List.iter ms ~f:(fun x ->
-          Res.Array.add_one arr {segment = x; bytes_consumed = Storage.length x}) in
-      arr
+          Res.Array.add_one segments {segment = x; bytes_consumed = Storage.length x}) in
+      { segments; attachments = MessageSig.No_attachments }
 
-    let to_storage m = Res.Array.fold_right (fun x acc -> x :: acc) m []
+    let to_storage m = Res.Array.fold_right (fun x acc -> x :: acc) m.segments []
 
     let with_message m ~f = Exn.protectx m ~f ~finally:release
+
+    let with_attachments attachments m = { m with attachments }
+    let get_attachments m = m.attachments
   end   (* module Message *)
 
   module Slice = struct
@@ -127,8 +141,8 @@ module Make (Storage : MessageStorage.S) = struct
          very efficiently. *)
       let size = Util.round_up_mult_8 size in
       let segment_id, segment_descr =
-        let last_seg_id = Res.Array.length m - 1 in
-        let last_seg_descr = Res.Array.get m last_seg_id in
+        let last_seg_id = Message.num_segments m - 1 in
+        let last_seg_descr = Message.get_segment_descr m last_seg_id in
         let bytes_avail = Storage.length last_seg_descr.Message.segment -
           last_seg_descr.Message.bytes_consumed
         in
@@ -139,8 +153,7 @@ module Make (Storage : MessageStorage.S) = struct
              that message sizes will be exponentially distributed. *)
           let min_alloc_size = Message.total_alloc_size m in
           let new_seg = Storage.alloc (max min_alloc_size size) in
-          let new_seg_descr = {Message.segment = new_seg; Message.bytes_consumed = 0} in
-          let () = Res.Array.add_one m new_seg_descr in
+          let new_seg_descr = Message.add_segment m new_seg in
           last_seg_id + 1, new_seg_descr
       in
       let slice = {
@@ -150,7 +163,7 @@ module Make (Storage : MessageStorage.S) = struct
         start = segment_descr.Message.bytes_consumed;
         len = size;
       } in
-      let () = Res.Array.set m segment_id
+      let () = Res.Array.set m.segments segment_id
         { segment_descr with
           Message.bytes_consumed = slice.start + slice.len }
       in
@@ -160,7 +173,7 @@ module Make (Storage : MessageStorage.S) = struct
 
     let alloc_in_segment m segment_id size =
       let size = Util.round_up_mult_8 size in
-      let seg_descr = Res.Array.get m segment_id in
+      let seg_descr = Message.get_segment_descr m segment_id in
       let bytes_avail = Storage.length seg_descr.Message.segment -
           seg_descr.Message.bytes_consumed
       in
@@ -172,7 +185,7 @@ module Make (Storage : MessageStorage.S) = struct
           start = seg_descr.Message.bytes_consumed;
           len = size;
         } in
-        let () = Res.Array.set m segment_id
+        let () = Res.Array.set m.segments segment_id
           { seg_descr with
             Message.bytes_consumed = slice.start + slice.len }
         in
@@ -351,6 +364,16 @@ module Make (Storage : MessageStorage.S) = struct
       data     = Slice.readonly struct_storage.data;
       pointers = Slice.readonly struct_storage.pointers;
     }
+
+    let with_attachments (a : MessageSig.attachments) (struct_storage : ('cap, 'a) t) =
+      let msg = Message.with_attachments a struct_storage.data.Slice.msg in
+      {
+        data     = { struct_storage.data with Slice.msg };
+        pointers = { struct_storage.pointers with Slice.msg };
+      }
+
+    let get_attachments (struct_storage : ('cap, 'a) t) =
+      Message.get_attachments struct_storage.data.Slice.msg
 
     let v ~data ~pointers = { data; pointers }
 

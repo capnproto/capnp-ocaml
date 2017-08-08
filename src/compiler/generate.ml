@@ -44,14 +44,15 @@ let sig_s_header ~context = [
   "type rw = Capnp.Message.rw";
   "";
   "module type S = sig";
-  "  type 'cap message_t";
-  "  type 'a reader_t";
-  "  type 'a builder_t";
+  "  module MessageWrapper : Capnp.RPC.S";
+  "  type 'cap message_t = 'cap MessageWrapper.Message.t";
+  "  type 'a reader_t = 'a MessageWrapper.StructStorage.reader_t";
+  "  type 'a builder_t = 'a MessageWrapper.StructStorage.builder_t";
   "";
 ] @ (List.concat_map context.Context.imports ~f:(fun import -> [
       "  module " ^ import.Context.schema_name ^ " : " ^
         import.Context.module_name ^ ".S with";
-      "    type 'cap message_t = 'cap message_t";
+      "    module MessageWrapper = MessageWrapper";
       "";
     ]))
 
@@ -60,7 +61,7 @@ let sig_s_reader_header = [
   "  module Reader : sig";
   "    type array_t";
   "    type builder_array_t";
-  "    type pointer_t";
+  "    type pointer_t = ro MessageWrapper.Slice.t option";
   "    val of_pointer : pointer_t -> 'a reader_t";
 ]
 
@@ -70,7 +71,7 @@ let sig_s_divide_reader_builder = [
   "  module Builder : sig";
   "    type array_t = Reader.builder_array_t";
   "    type reader_array_t = Reader.array_t";
-  "    type pointer_t";
+  "    type pointer_t = rw MessageWrapper.Slice.t";
 ]
 
 let sig_s_client_header = [
@@ -96,22 +97,19 @@ let sig_s_footer = [
 
 
 let functor_sig ~context ~rpc = [
-  "module Make (MessageWrapper : Capnp.MessageSig.S) : sig";
-  "  include S with type 'cap message_t = 'cap MessageWrapper.Message.t";
-  "    and type Reader.pointer_t = ro MessageWrapper.Slice.t option";
-  "    and type Builder.pointer_t = rw MessageWrapper.Slice.t";
-  "    and type 'a reader_t = 'a MessageWrapper.StructStorage.reader_t";
-  "    and type 'a builder_t = 'a MessageWrapper.StructStorage.builder_t"; ] @
+  "module MakeRPC(MessageWrapper : Capnp.RPC.S) : sig";
+  "  include S with module MessageWrapper = MessageWrapper"; ] @
   (List.concat_map context.Context.imports ~f:(fun import -> [
         "    and module " ^ import.Context.schema_name ^ " = " ^
-          import.Context.module_name ^ ".Make(MessageWrapper)";
+          import.Context.module_name ^ ".MakeRPC(MessageWrapper)";
   ])) @ rpc @ [
   "end";
   "";
+  "module Make(M : Capnp.MessageSig.S) : module type of MakeRPC(Capnp.RPC.None(M))";
 ]
 
 let mod_functor_header = [
-  "module Make (MessageWrapper : Capnp.MessageSig.S) = struct";
+  "module MakeRPC(MessageWrapper : Capnp.RPC.S) = struct";
   "  type 'a reader_t = 'a MessageWrapper.StructStorage.reader_t";
   "  type 'a builder_t = 'a MessageWrapper.StructStorage.builder_t";
   "  module CamlBytes = Bytes";
@@ -125,7 +123,7 @@ let mod_header ~context = [
   "  type 'cap message_t = 'cap MessageWrapper.Message.t";
   ""; ] @ (List.concat_map context.Context.imports ~f:(fun import -> [
       "  module " ^ import.Context.schema_name ^ " = " ^
-          import.Context.module_name ^ ".Make(MessageWrapper)";
+          import.Context.module_name ^ ".MakeRPC(MessageWrapper)";
       "";
     ]))
 
@@ -166,8 +164,10 @@ let mod_footer = [
 ]
 
 let mod_functor_footer = [
+  "  module MessageWrapper = MessageWrapper";
   "end [@@inline]";
   "";
+  "module Make(M:Capnp.MessageSig.S) = MakeRPC[@inlined](Capnp.RPC.None(M)) [@@inline]";
 ]
 
 

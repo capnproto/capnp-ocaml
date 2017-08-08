@@ -38,7 +38,7 @@ let sizeof_uint64 = 8
 
 open Message
 
-module Make (MessageWrapper : MessageSig.S) = struct
+module Make (MessageWrapper : RPC.S) = struct
   module RC = CommonInc.Make[@inlined](MessageWrapper)
   include RC
 
@@ -657,7 +657,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
   let get_interface
       (struct_storage_opt : ('cap, _) StructStorage.t option)
       (pointer_word : int)
-    : Uint32.t option =
+    : 'a option =
     match struct_storage_opt with
     | Some struct_storage ->
         let pointers = struct_storage.StructStorage.pointers in
@@ -673,7 +673,8 @@ module Make (MessageWrapper : MessageSig.S) = struct
           | Pointer.Null ->
               None
           | Pointer.Other (OtherPointer.Capability index) ->
-              Some index
+              let attachments = Message.get_attachments pointers.Slice.msg in
+              Some (MessageWrapper.Untyped.get_cap attachments index)
           | _ ->
               invalid_msg "decoded non-capability pointer where capability was expected"
         else

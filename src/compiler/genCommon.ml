@@ -30,7 +30,7 @@
 
 open Core_kernel.Std
 
-module M   = Capnp.BytesMessage
+module M   = Capnp.RPC.None(Capnp.BytesMessage)
 module PS_ = PluginSchema.Make(M)
 module PS  = PS_.Reader
 module C   = Capnp
@@ -549,7 +549,7 @@ let filter_interesting_imports ~context root_node : Context.codegen_context_t =
  * emitted in an unambiguous form which cannot be confused with Foo.Bar.Nested.
  * The test here is "at this scope, are there multiple nodes present with the
  * same name as the target node"? *)
-let make_disambiguated_type_name ~context ~(mode : Mode.t) ~(scope_mode : Mode.t)
+let make_disambiguated_type_name ~context ?(mode : Mode.t option) ~(scope_mode : Mode.t)
     ~scope ~tp node =
   let node_id = PS.Node.id_get node in
   let scope_position =
@@ -567,21 +567,21 @@ let make_disambiguated_type_name ~context ~(mode : Mode.t) ~(scope_mode : Mode.t
   in
   if target_position > scope_position then
     (* The target is defined later in the file. Emit an unambiguous type. *)
-    make_unique_typename ~context ~mode node
+    make_unique_typename ~context ?mode node
   else if List.mem ~equal:uint64_equal scope node_id then
     (* The node of interest is a parent node of the node being generated.
        this is a case where an unambiguous type is emitted. *)
-    make_unique_typename ~context ~mode node
+    make_unique_typename ~context ?mode node
   else if is_node_naming_collision ~context ~scope node then
     (* A scope-relative name would be ambiguous due to the presence of
        another node with the same name.  Emit an unambiguous type. *)
-    make_unique_typename ~context ~mode node
+    make_unique_typename ~context ?mode node
   else
     match find_import_providing_node ~context node with
     | Some import ->
         (* This type comes from an import.  Emit a unique typename qualified
            with the proper import. *)
-        let uq_name = make_unique_typename ~context ~mode node in
+        let uq_name = make_unique_typename ~context ?mode node in
         begin match PS.Node.get node with
         | PS.Node.Struct _ | PS.Node.Interface _ -> uq_name     (* Polymorphic variant type *)
         | _ -> import.Context.schema_name ^ "." ^ uq_name
@@ -596,12 +596,13 @@ let make_disambiguated_type_name ~context ~(mode : Mode.t) ~(scope_mode : Mode.t
               ".t"
           | `Struct ->
               begin match (mode, scope_mode) with
-              | (Mode.Reader, Mode.Reader)
-              | (Mode.Builder, Mode.Builder) ->
+              | None, _ -> ".struct_t"
+              | (Some Mode.Reader, Mode.Reader)
+              | (Some Mode.Builder, Mode.Builder) ->
                   ".t"
-              | (Mode.Reader, Mode.Builder) ->
+              | (Some Mode.Reader, Mode.Builder) ->
                   ".struct_t reader_t"
-              | (Mode.Builder, Mode.Reader) ->
+              | (Some Mode.Builder, Mode.Reader) ->
                   ".struct_t builder_t"
               end
         in
@@ -684,7 +685,9 @@ let generate_union_type ~context ~(mode : Mode.t) scope fields =
         | PS.Type.Void ->
             ("  | " ^ field_name) :: acc
         | PS.Type.Interface _ ->
-            (sprintf "  | %s of Uint32.t option" field_name)
+            (sprintf "  | %s of %s MessageWrapper.Capability.t option"
+             field_name
+             (type_name ~context ~mode ~scope_mode:mode scope field_type))
             :: acc
         | _ ->
             ("  | " ^ field_name ^ " of " ^
