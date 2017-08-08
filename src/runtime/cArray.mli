@@ -105,7 +105,7 @@ val count : ('cap, 'a, 'arr) t -> f:('a -> bool) -> int
     to [true]. *)
 val find : ('cap, 'a, 'arr) t -> f:('a -> bool) -> 'a option
 
-(** find_map a ~f] returns the first evaluation of [f] that returns [Some], and
+(** [find_map a ~f] returns the first evaluation of [f] that returns [Some], and
     returns [None] if there is no such element. *)
 val find_map : ('cap, 'a, 'arr) t -> f:('a -> 'b option) -> 'b option
 
