@@ -169,7 +169,7 @@ module type MESSAGE = sig
   val total_alloc_size : 'cap t -> int
 
   (** [get_segment m i] gets zero-indexed segment [i] associated with message [m].
-      @raise [Invalid_argument] if the index is out of bounds. *)
+      @raise Invalid_argument if the index is out of bounds. *)
   val get_segment : 'cap t -> int -> 'cap segment_t
 
   (** [readonly m] obtains a view of message [m] which is read-only qualified. *)

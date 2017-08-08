@@ -9,3 +9,6 @@ clean:
 
 benchmark:
 	python src/benchmark/test.py
+
+doc:
+	jbuilder build @doc
