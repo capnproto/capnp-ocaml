@@ -4,5 +4,5 @@
  ((name main)
   (public_name capnpc-ocaml)
   (flags (:standard -w -53-55))
-  (libraries (capnp))
+  (libraries (capnp capnp_unix))
 ))

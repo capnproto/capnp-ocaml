@@ -6,7 +6,7 @@ let config = {|
 
 (executable
  ((name main)
-  (libraries (capnp fast_rand core))
+  (libraries (capnp capnp_unix fast_rand core))
   (flags (:standard -w -53-55))
   (ocamlopt_flags (:standard # -inline 2000))
 ))

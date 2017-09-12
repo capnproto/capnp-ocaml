@@ -5,10 +5,10 @@ let config = {|
 (jbuild_version 1)
 
 (library (
-  (name capnp)
-  (public_name capnp)
-  (synopsis "Runtime support library for capnp-ocaml")
-  (libraries (core_kernel uint ocplib-endian res))
+  (name capnp_unix)
+  (public_name capnp.unix)
+  (synopsis "Runtime support library for capnp-ocaml (Unix)")
+  (libraries (capnp extunix))
   (flags (:standard -w -50-53-55))
   (ocamlopt_flags (:standard # -inline 1000))
 ))
