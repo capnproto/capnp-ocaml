@@ -195,7 +195,6 @@ let is_int64_zero i64 =
    by directly representing a boolean as an integer.  The only
    way to do this in pure OCaml is to use a conditional. *)
 let int_of_bool (x : bool) : int = Obj.magic x
-let bool_of_int (x : int) : bool = Obj.magic x
 
 
 (* The standard bit twiddling logic for "give me bit N of this byte"
