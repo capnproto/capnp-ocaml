@@ -27,6 +27,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
+open Capnp
 
 exception Unsupported_message_frame
 

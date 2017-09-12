@@ -33,6 +33,7 @@ open Capnp
 
 module M  = BytesMessage
 module PS = GenCommon.PS
+module IO = Capnp_unix.IO
 
 module ExitCode = struct
   let success       = 0

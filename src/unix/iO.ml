@@ -30,6 +30,7 @@
 (* Workaround for missing Caml.Bytes in Core 112.35.00 *)
 module CamlBytes = Bytes
 
+open Capnp
 open Core_kernel.Std
 module Bytes = CamlBytes
 
