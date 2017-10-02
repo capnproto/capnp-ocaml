@@ -73,8 +73,9 @@ let round_up_mult_8 (x : int) : int =
    This variant parallels the behavior of Python's slicing operator. *)
 let str_slice ?(start : int option) ?(stop : int option) (s : string)
   : string =
-  let norm s i = Core_kernel.Ordered_collection_common.normalize
-      ~length_fun:String.length s i
+  let norm s i =
+    let len = String.length s in
+    if i >= 0 then i else len + i
   in
   let real_start =
     match start with
@@ -86,7 +87,7 @@ let str_slice ?(start : int option) ?(stop : int option) (s : string)
     | Some x -> norm s x
     | None   -> String.length s
   in
-  Core_kernel.Std.String.sub s ~pos:real_start ~len:(real_stop - real_start)
+  StringLabels.sub s ~pos:real_start ~len:(real_stop - real_start)
 
 
 let int_of_int32_exn : int32 -> int =

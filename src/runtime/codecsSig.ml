@@ -64,6 +64,6 @@ module type DECODER = sig
       frame as a [string list] with one list element for every segment within
       the message. *)
   val get_next_frame : t ->
-    (Message.rw Message.BytesMessage.Message.t, FramingError.t) Core_kernel.Std.Result.t
+    (Message.rw Message.BytesMessage.Message.t, FramingError.t) Result.result
 end
 

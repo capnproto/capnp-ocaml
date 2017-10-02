@@ -80,7 +80,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
     if Util.is_int64_zero pointer64 then
       Pointer.Null
     else
-      let pointer_int = Caml.Int64.to_int pointer64 in
+      let pointer_int = Int64.to_int pointer64 in
       let tag = pointer_int land Pointer.Bitfield.tag_mask in
       (* OCaml won't match an int against let-bound variables,
          only against constants. *)
@@ -178,7 +178,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
             invalid_msg "composite list pointer describes invalid tag region"
           else
             let pointer64 = Segment.get_int64 segment segment_offset in
-            let pointer_int = Caml.Int64.to_int pointer64 in
+            let pointer_int = Int64.to_int pointer64 in
             let tag = pointer_int land Pointer.Bitfield.tag_mask in
             if tag = Pointer.Bitfield.tag_val_struct then
               let struct_pointer = StructPointer.decode pointer64 in
@@ -274,7 +274,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
       Object.None
     else
       let pointer64 = Slice.get_int64 pointer_bytes 0 in
-      let tag_bits = Caml.Int64.to_int pointer64 in
+      let tag_bits = Int64.to_int pointer64 in
       let tag = tag_bits land Pointer.Bitfield.tag_mask in
       (* OCaml won't match an int against let-bound variables,
          only against constants. *)
