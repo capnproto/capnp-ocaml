@@ -466,7 +466,7 @@ module Make (MessageWrapper : RPC.S) = struct
         if start + len <= pointers.Slice.len then
           (* Fast path. *)
           let pointer64 = Slice.get_int64 pointers start in
-          let pointer_int = Caml.Int64.to_int pointer64 in
+          let pointer_int = Int64.to_int pointer64 in
           let tag = pointer_int land Pointer.Bitfield.tag_mask in
           if tag = Pointer.Bitfield.tag_val_list then
             let list_pointer = ListPointer.decode pointer64 in

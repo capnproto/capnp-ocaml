@@ -114,7 +114,10 @@ module Make (Storage : MessageStorage.S) = struct
 
     let to_storage m = Res.Array.fold_right (fun x acc -> x :: acc) m.segments []
 
-    let with_message m ~f = Core_kernel.Exn.protectx m ~f ~finally:release
+    let with_message m ~f =
+      match f m with
+      | x -> release m; x
+      | exception ex -> release m; raise ex
 
     let with_attachments attachments m = { m with attachments }
     let get_attachments m = m.attachments

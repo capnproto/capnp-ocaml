@@ -28,9 +28,6 @@
  ******************************************************************************)
 
 
-module Result = Core_kernel.Result
-
-
 type compression_t = [ `None | `Packing ]
 
 module FramingError = struct

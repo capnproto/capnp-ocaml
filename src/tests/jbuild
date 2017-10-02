@@ -2,7 +2,7 @@
 
 (executable
  ((name run_tests)
-  (libraries (capnp oUnit))
+  (libraries (capnp oUnit core_kernel))
   (flags (:standard -w -53))
 ))
 
