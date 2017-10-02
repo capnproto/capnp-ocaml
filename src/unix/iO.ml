@@ -30,7 +30,6 @@
 open Capnp
 
 module Deque = Core_kernel.Deque
-module Result = Core_kernel.Result
 
 type compression_t = [ `None | `Packing ]
 
