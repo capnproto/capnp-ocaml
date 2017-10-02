@@ -156,8 +156,17 @@ let find_map a ~f =
   in
   loop 0
 
+let list_init len ~f =
+  let rec aux acc = function
+    | 0 -> acc
+    | i ->
+      let i = i - 1 in
+      aux (f i :: acc) i
+  in
+  aux [] len
+
 let to_list a =
-  Core_kernel.List.init (length a) ~f:(fun i -> get a i)
+  list_init (length a) ~f:(fun i -> get a i)
 
 let to_array a =
   Core_kernel.Std.Array.init (length a) ~f:(fun i -> get a i)
@@ -174,6 +183,4 @@ let map_array a ~f =
   Core_kernel.Std.Array.init (length a) ~f:(fun i -> f (get a i))
 
 let map_list a ~f =
-  Core_kernel.List.init (length a) ~f:(fun i -> f (get a i))
-
-
+  list_init (length a) ~f:(fun i -> f (get a i))
