@@ -31,11 +31,12 @@
 exception Out_of_int_range of string
 let out_of_int_range s = raise (Out_of_int_range s)
 
+let int_size = Sys.word_size - 1        (* For OCaml < 4.03 *)
 
 (* Decode [num] as a signed integer of width [n] bits, using two's complement
    representation of negative numbers. *)
 let decode_signed n num =
-  let () = assert (n < Sys.int_size) in
+  let () = assert (n < int_size) in
   let power_of_two = 1 lsl (n - 1) in
   let is_signed = (num land power_of_two) <> 0 in
   if is_signed then
@@ -47,7 +48,7 @@ let decode_signed n num =
 (* Encode signed integer [num] into [n] bits, using two's complement
    representation of negative numbers. *)
 let encode_signed n num =
-  let () = assert (n < Sys.int_size) in
+  let () = assert (n < int_size) in
   if num >= 0 then
     num
   else
