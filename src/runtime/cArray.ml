@@ -169,7 +169,7 @@ let to_list a =
   list_init (length a) ~f:(fun i -> get a i)
 
 let to_array a =
-  Core_kernel.Std.Array.init (length a) ~f:(fun i -> get a i)
+  Array.init (length a) (get a)
 
 let set_list a lst =
   let () = init a (List.length lst) in
@@ -180,7 +180,7 @@ let set_array a arr =
   ArrayLabels.iteri arr ~f:(fun i x -> set a i x)
 
 let map_array a ~f =
-  Core_kernel.Std.Array.init (length a) ~f:(fun i -> f (get a i))
+  Array.init (length a) (fun i -> f (get a i))
 
 let map_list a ~f =
   list_init (length a) ~f:(fun i -> f (get a i))
