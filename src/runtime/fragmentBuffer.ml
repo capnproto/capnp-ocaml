@@ -35,8 +35,7 @@ type fragment = {
 
 type t = {
   id : int;
-  mutable ends : fragment option;     (* Next data to consume *)
-  mutable back : fragment option;      (* New items go here *)
+  mutable ends : (fragment * fragment) option;     (* Front, back *)
 
   (** Total byte count of the fragments *)
   mutable fragments_size : int;
@@ -48,51 +47,62 @@ let empty () =
   incr id;
   {
     id = !id;
-    front = None;
-    back = None;
+    ends = None;
     fragments_size = 0;
   }
 
 let pp_list f fs =
-  let rec aux = function
+  let rec aux x =
+    Format.fprintf f "%d " (String.length x.data);
+    match x.next with
     | None -> ()
-    | Some x ->
-      Format.fprintf f "%d " (String.length x.data);
-      aux x.next
+    | Some x -> aux x
   in
   aux fs
 
 let pp_state f s =
-  Format.fprintf f "%d: len=%d [%a]" s.id s.fragments_size pp_list s.front
+  match s.ends with
+  | None -> Format.fprintf f "%d: len=%d empty" s.id s.fragments_size
+  | Some (front, _back) ->
+    Format.fprintf f "%d: len=%d [%a]" s.id s.fragments_size pp_list front
 
 let add_fragment stream data =
   let len = String.length data in
   Format.printf "add_fragment(%d): %a@.%!" len pp_state stream;
   if len > 0 then (
     let fragment = { data; next = None } in
-    begin match stream.back with
-      | Some old_back -> old_back.next <- Some fragment
-      | None -> stream.front <- Some fragment
+    begin match stream.ends with
+      | Some (old_front, old_back) ->
+        old_back.next <- Some fragment;
+        stream.ends <- Some (old_front, fragment)
+      | None ->
+        stream.ends <- Some (fragment, fragment)
     end;
-    stream.back <- Some fragment;
     stream.fragments_size <- stream.fragments_size + len
   )
 
 let enqueue_front stream data =
-  let fragment = { data; next = stream.front } in
-  if stream.front = None then stream.back <- Some fragment;
-  stream.front <- Some fragment
+  match stream.ends with
+  | None ->
+    let fragment = { data; next = None } in
+    stream.ends <- Some (fragment, fragment)
+  | Some (old_front, old_back) ->
+    let fragment = { data; next = Some old_front } in
+    stream.ends <- Some (fragment, old_back)
 
 (* Note: does not update [fragments_size] *)
 let pop stream =
   Format.printf "pop: %a@.%!" pp_state stream;
-  match stream.front with
+  match stream.ends with
   | None ->
     assert (stream.fragments_size = 0);
     assert false
-  | Some fragment ->
+  | Some (fragment, old_back) ->
     let data = fragment.data in
-    stream.front <- fragment.next;
+    begin match fragment.next with
+    | None -> stream.ends <- None
+    | Some new_front -> stream.ends <- Some (new_front, old_back)
+    end;
     data
 
 let of_string s =
@@ -126,7 +136,7 @@ let remove_exact stream size =
       done;
       stream.fragments_size <- stream.fragments_size - size;
     in
-    assert ((stream.front = None) = (stream.fragments_size = 0));
+    assert ((stream.ends = None) = (stream.fragments_size = 0));
     Some (Bytes.unsafe_to_string buf)
 
 let remove_at_least stream size =
@@ -139,7 +149,7 @@ let remove_at_least stream size =
       Buffer.add_string buffer (pop stream)
     done;
     stream.fragments_size <- stream.fragments_size - (Buffer.length buffer);
-    assert ((stream.front = None) = (stream.fragments_size = 0));
+    assert ((stream.ends = None) = (stream.fragments_size = 0));
     Some (Buffer.contents buffer)
   end
 
@@ -149,7 +159,7 @@ let unremove stream data =
   if len > 0 then (
     enqueue_front stream data;
     stream.fragments_size <- stream.fragments_size + len;
-    assert ((stream.front = None) = (stream.fragments_size = 0));
+    assert ((stream.ends = None) = (stream.fragments_size = 0));
   )
 
 let peek_exact stream size =
