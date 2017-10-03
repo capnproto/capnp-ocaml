@@ -34,21 +34,40 @@ type fragment = {
 }
 
 type t = {
-  mutable front : fragment option;     (* Next data to consume *)
+  id : int;
+  mutable ends : fragment option;     (* Next data to consume *)
   mutable back : fragment option;      (* New items go here *)
 
   (** Total byte count of the fragments *)
   mutable fragments_size : int;
 }
 
-let empty () = {
-  front = None;
-  back = None;
-  fragments_size = 0;
-}
+let id = ref 0
+
+let empty () =
+  incr id;
+  {
+    id = !id;
+    front = None;
+    back = None;
+    fragments_size = 0;
+  }
+
+let pp_list f fs =
+  let rec aux = function
+    | None -> ()
+    | Some x ->
+      Format.fprintf f "%d " (String.length x.data);
+      aux x.next
+  in
+  aux fs
+
+let pp_state f s =
+  Format.fprintf f "%d: len=%d [%a]" s.id s.fragments_size pp_list s.front
 
 let add_fragment stream data =
   let len = String.length data in
+  Format.printf "add_fragment(%d): %a@.%!" len pp_state stream;
   if len > 0 then (
     let fragment = { data; next = None } in
     begin match stream.back with
@@ -66,8 +85,11 @@ let enqueue_front stream data =
 
 (* Note: does not update [fragments_size] *)
 let pop stream =
+  Format.printf "pop: %a@.%!" pp_state stream;
   match stream.front with
-  | None -> assert false
+  | None ->
+    assert (stream.fragments_size = 0);
+    assert false
   | Some fragment ->
     let data = fragment.data in
     stream.front <- fragment.next;
@@ -81,6 +103,7 @@ let of_string s =
 let byte_count stream = stream.fragments_size
 
 let remove_exact stream size =
+  Format.printf "remove_exact(%d): %a@.%!" size pp_state stream;
   if stream.fragments_size < size then
     None
   else
@@ -103,9 +126,11 @@ let remove_exact stream size =
       done;
       stream.fragments_size <- stream.fragments_size - size;
     in
+    assert ((stream.front = None) = (stream.fragments_size = 0));
     Some (Bytes.unsafe_to_string buf)
 
 let remove_at_least stream size =
+  Format.printf "remove_at_least(%d): %a@.%!" size pp_state stream;
   if stream.fragments_size < size then
     None
   else begin
@@ -114,17 +139,21 @@ let remove_at_least stream size =
       Buffer.add_string buffer (pop stream)
     done;
     stream.fragments_size <- stream.fragments_size - (Buffer.length buffer);
+    assert ((stream.front = None) = (stream.fragments_size = 0));
     Some (Buffer.contents buffer)
   end
 
 let unremove stream data =
   let len = String.length data in
+  Format.printf "unremove(%d): %a@.%!" len pp_state stream;
   if len > 0 then (
     enqueue_front stream data;
-    stream.fragments_size <- stream.fragments_size + len
+    stream.fragments_size <- stream.fragments_size + len;
+    assert ((stream.front = None) = (stream.fragments_size = 0));
   )
 
 let peek_exact stream size =
+  Format.printf "peek_exact(%d): %a@.%!" size pp_state stream;
   match remove_exact stream size with
   | None -> None
   | Some bytes ->
