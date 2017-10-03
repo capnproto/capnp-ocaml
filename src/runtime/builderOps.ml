@@ -30,9 +30,6 @@
 (* Builder operations.  This provides most of the support code required for
    the builder interface. *)
 
-(* Workaround for missing Caml.Bytes in Core 112.35.00 *)
-module CamlBytes = Bytes
-
 type ro = Message.ro
 type rw = Message.rw
 

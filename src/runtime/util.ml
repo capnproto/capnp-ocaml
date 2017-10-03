@@ -27,20 +27,16 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
-(* Workaround for missing Caml.Bytes in Core 112.35.00 *)
-module CamlBytes = Bytes
-
-open Core_kernel.Std
-module Bytes = CamlBytes
 
 exception Out_of_int_range of string
 let out_of_int_range s = raise (Out_of_int_range s)
 
+let int_size = Sys.word_size - 1        (* For OCaml < 4.03 *)
 
 (* Decode [num] as a signed integer of width [n] bits, using two's complement
    representation of negative numbers. *)
 let decode_signed n num =
-  let () = assert (n < Int.num_bits) in
+  let () = assert (n < int_size) in
   let power_of_two = 1 lsl (n - 1) in
   let is_signed = (num land power_of_two) <> 0 in
   if is_signed then
@@ -52,7 +48,7 @@ let decode_signed n num =
 (* Encode signed integer [num] into [n] bits, using two's complement
    representation of negative numbers. *)
 let encode_signed n num =
-  let () = assert (n < Int.num_bits) in
+  let () = assert (n < int_size) in
   if num >= 0 then
     num
   else
@@ -78,8 +74,9 @@ let round_up_mult_8 (x : int) : int =
    This variant parallels the behavior of Python's slicing operator. *)
 let str_slice ?(start : int option) ?(stop : int option) (s : string)
   : string =
-  let norm s i = Core_kernel.Ordered_collection_common.normalize
-      ~length_fun:String.length s i
+  let norm s i =
+    let len = String.length s in
+    if i >= 0 then i else len + i
   in
   let real_start =
     match start with
@@ -91,35 +88,35 @@ let str_slice ?(start : int option) ?(stop : int option) (s : string)
     | Some x -> norm s x
     | None   -> String.length s
   in
-  String.sub s ~pos:real_start ~len:(real_stop - real_start)
+  StringLabels.sub s ~pos:real_start ~len:(real_stop - real_start)
 
 
 let int_of_int32_exn : int32 -> int =
   if Sys.word_size = 32 then
-    let max_val = Int32.of_int_exn Int.max_value in
-    let min_val = Int32.of_int_exn Int.min_value in
+    let max_val = Int32.of_int max_int in
+    let min_val = Int32.of_int min_int in
     (fun i32 ->
        if Int32.compare i32 min_val < 0 ||
           Int32.compare i32 max_val > 0 then
          out_of_int_range "Int32"
        else
-         Caml.Int32.to_int i32)
+         Int32.to_int i32)
   else
-    Caml.Int32.to_int
+    Int32.to_int
 
 let int_of_int64_exn : int64 -> int =
-  let max_val = Int64.of_int_exn Int.max_value in
-  let min_val = Int64.of_int_exn Int.min_value in
+  let max_val = Int64.of_int max_int in
+  let min_val = Int64.of_int min_int in
   (fun i64 ->
      if Int64.compare i64 min_val < 0 ||
         Int64.compare i64 max_val > 0 then
        out_of_int_range "Int64"
      else
-       Caml.Int64.to_int i64)
+       Int64.to_int i64)
 
 let int_of_uint32_exn : Uint32.t -> int =
   if Sys.word_size = 32 then
-    let max_val = Uint32.of_int Int.max_value in
+    let max_val = Uint32.of_int max_int in
     (fun u32 ->
        if Uint32.compare u32 max_val > 0 then
          out_of_int_range "UInt32"
@@ -129,7 +126,7 @@ let int_of_uint32_exn : Uint32.t -> int =
     Uint32.to_int
 
 let int_of_uint64_exn : Uint64.t -> int =
-  let max_val = Uint64.of_int Int.max_value in
+  let max_val = Uint64.of_int max_int in
   (fun u64 ->
      if Uint64.compare u64 max_val > 0 then
        out_of_int_range "UInt64"
@@ -138,15 +135,15 @@ let int_of_uint64_exn : Uint64.t -> int =
 
 let int32_of_int_exn : int -> int32 =
   if Sys.word_size = 64 then
-    let max_val = Int32.to_int_exn (Int32.max_value) in
-    let min_val = Int32.to_int_exn (Int32.min_value) in
+    let max_val = Int32.to_int Int32.max_int in
+    let min_val = Int32.to_int Int32.min_int in
     (fun i ->
        if i < min_val || i > max_val then
          invalid_arg "Int32.of_int"
        else
-         Caml.Int32.of_int i)
+         Int32.of_int i)
   else
-    Caml.Int32.of_int
+    Int32.of_int
 
 let uint32_of_int_exn : int -> Uint32.t =
   if Sys.word_size = 64 then
@@ -176,7 +173,7 @@ let hex_table = [|
 let make_hex_literal s =
   let result = Bytes.create ((String.length s) * 4) in
   for i = 0 to String.length s - 1 do
-    let byte = Char.to_int s.[i] in
+    let byte = Char.code s.[i] in
     let upper_nibble = (byte lsr 4) land 0xf in
     let lower_nibble = byte land 0xf in
     Bytes.set result ((4 * i) + 0) '\\';
@@ -188,14 +185,13 @@ let make_hex_literal s =
 
 
 let is_int64_zero i64 =
-  (Caml.Int64.float_of_bits i64) = 0.0
+  (Int64.float_of_bits i64) = 0.0
 
 
 (* There are some cases where we can generate tighter assembly
    by directly representing a boolean as an integer.  The only
    way to do this in pure OCaml is to use a conditional. *)
 let int_of_bool (x : bool) : int = Obj.magic x
-let bool_of_int (x : int) : bool = Obj.magic x
 
 
 (* The standard bit twiddling logic for "give me bit N of this byte"
@@ -203,7 +199,7 @@ let bool_of_int (x : int) : bool = Obj.magic x
    integer representation (which interacts poorly with bit shifts).
    It turns out to be more efficient to do table lookups. *)
 
-let get_bit_lookup = Array.create ~len:(256 * 8) false
+let get_bit_lookup = Array.make (256 * 8) false
 let () =
   for byte = 0 to 0xff do
     for bit = 0 to 7 do

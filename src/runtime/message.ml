@@ -28,8 +28,6 @@
  ******************************************************************************)
 
 
-open Core_kernel.Std
-
 type ro = MessageSig.ro
 type rw = MessageSig.rw
 
@@ -110,13 +108,16 @@ module Make (Storage : MessageStorage.S) = struct
 
     let of_storage ms =
       let segments = Res.Array.empty () in
-      let () = List.iter ms ~f:(fun x ->
+      let () = ListLabels.iter ms ~f:(fun x ->
           Res.Array.add_one segments {segment = x; bytes_consumed = Storage.length x}) in
       { segments; attachments = MessageSig.No_attachments }
 
     let to_storage m = Res.Array.fold_right (fun x acc -> x :: acc) m.segments []
 
-    let with_message m ~f = Exn.protectx m ~f ~finally:release
+    let with_message m ~f =
+      match f m with
+      | x -> release m; x
+      | exception ex -> release m; raise ex
 
     let with_attachments attachments m = { m with attachments }
     let get_attachments m = m.attachments

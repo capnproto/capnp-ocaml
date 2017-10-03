@@ -2,7 +2,7 @@
 
 module CamlBytes = Bytes
 open Core.Std
-module IO = Capnp.IO
+module IO = Capnp_unix.IO
 module Codecs = Capnp.Codecs
 
 let message_of_builder = Capnp.BytesMessage.StructStorage.message_of_builder

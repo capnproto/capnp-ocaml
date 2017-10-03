@@ -27,8 +27,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
-open Core_kernel.Std
-
 type ro = Message.ro
 type rw = Message.rw
 
@@ -158,24 +156,31 @@ let find_map a ~f =
   in
   loop 0
 
+let list_init len ~f =
+  let rec aux acc = function
+    | 0 -> acc
+    | i ->
+      let i = i - 1 in
+      aux (f i :: acc) i
+  in
+  aux [] len
+
 let to_list a =
-  List.init (length a) ~f:(fun i -> get a i)
+  list_init (length a) ~f:(fun i -> get a i)
 
 let to_array a =
-  Core_kernel.Std.Array.init (length a) ~f:(fun i -> get a i)
+  Array.init (length a) (get a)
 
 let set_list a lst =
   let () = init a (List.length lst) in
-  List.iteri lst ~f:(fun i x -> set a i x)
+  ListLabels.iteri lst ~f:(fun i x -> set a i x)
 
 let set_array a arr =
   let () = init a (Array.length arr) in
-  Array.iteri arr ~f:(fun i x -> set a i x)
+  ArrayLabels.iteri arr ~f:(fun i x -> set a i x)
 
 let map_array a ~f =
-  Core_kernel.Std.Array.init (length a) ~f:(fun i -> f (get a i))
+  Array.init (length a) (fun i -> f (get a i))
 
 let map_list a ~f =
-  List.init (length a) ~f:(fun i -> f (get a i))
-
-
+  list_init (length a) ~f:(fun i -> f (get a i))

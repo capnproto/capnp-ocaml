@@ -29,10 +29,6 @@
 
 (* Runtime support which is common to both Reader and Builder interfaces. *)
 
-module CamlBytes = Bytes
-
-open Core_kernel.Std
-
 let sizeof_uint32 = 4
 let sizeof_uint64 = 8
 
@@ -84,7 +80,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
     if Util.is_int64_zero pointer64 then
       Pointer.Null
     else
-      let pointer_int = Caml.Int64.to_int pointer64 in
+      let pointer_int = Int64.to_int pointer64 in
       let tag = pointer_int land Pointer.Bitfield.tag_mask in
       (* OCaml won't match an int against let-bound variables,
          only against constants. *)
@@ -182,7 +178,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
             invalid_msg "composite list pointer describes invalid tag region"
           else
             let pointer64 = Segment.get_int64 segment segment_offset in
-            let pointer_int = Caml.Int64.to_int pointer64 in
+            let pointer_int = Int64.to_int pointer64 in
             let tag = pointer_int land Pointer.Bitfield.tag_mask in
             if tag = Pointer.Bitfield.tag_val_struct then
               let struct_pointer = StructPointer.decode pointer64 in
@@ -278,7 +274,7 @@ module Make (MessageWrapper : MessageSig.S) = struct
       Object.None
     else
       let pointer64 = Slice.get_int64 pointer_bytes 0 in
-      let tag_bits = Caml.Int64.to_int pointer64 in
+      let tag_bits = Int64.to_int pointer64 in
       let tag = tag_bits land Pointer.Bitfield.tag_mask in
       (* OCaml won't match an int against let-bound variables,
          only against constants. *)
@@ -914,12 +910,12 @@ module Make (MessageWrapper : MessageSig.S) = struct
           else
             list_storage.num_elements
         in
-        let buf = CamlBytes.create result_byte_count in
+        let buf = Bytes.create result_byte_count in
         Slice.blit_to_bytes
           ~src:list_storage.storage ~src_pos:0
           ~dst:buf ~dst_pos:0
           ~len:result_byte_count;
-        CamlBytes.unsafe_to_string buf
+        Bytes.unsafe_to_string buf
     | _ ->
         invalid_msg "decoded non-UInt8 list where string data was expected"
 

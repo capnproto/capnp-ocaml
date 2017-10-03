@@ -27,33 +27,60 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
-(* Workaround for missing Caml.Bytes in Core 112.35.00 *)
-module CamlBytes = Bytes
 
-open Core_kernel.Std
-module Bytes = CamlBytes
-
+type fragment = {
+  data : string;
+  mutable next : fragment option;
+}
 
 type t = {
   (** String fragments stored in FIFO order *)
-  fragments : string Deque.t;
+  mutable ends : (fragment * fragment) option;     (* Front, back *)
 
   (** Total byte count of the fragments *)
   mutable fragments_size : int;
 }
 
 let empty () = {
-  fragments = Deque.create ();
+  ends = None;
   fragments_size = 0;
 }
 
-let add_fragment stream fragment =
-  let len = String.length fragment in
-  if len = 0 then
-    ()
-  else
-    let () = Deque.enqueue_back stream.fragments fragment in
+let add_fragment stream data =
+  let len = String.length data in
+  if len > 0 then (
+    let fragment = { data; next = None } in
+    begin match stream.ends with
+      | Some (old_front, old_back) ->
+        old_back.next <- Some fragment;
+        stream.ends <- Some (old_front, fragment)
+      | None ->
+        stream.ends <- Some (fragment, fragment)
+    end;
     stream.fragments_size <- stream.fragments_size + len
+  )
+
+let enqueue_front stream data =
+  match stream.ends with
+  | None ->
+    let fragment = { data; next = None } in
+    stream.ends <- Some (fragment, fragment)
+  | Some (old_front, old_back) ->
+    let fragment = { data; next = Some old_front } in
+    stream.ends <- Some (fragment, old_back)
+
+(* Note: does not update [fragments_size] *)
+let pop stream =
+  match stream.ends with
+  | None ->
+    assert (stream.fragments_size = 0);
+    assert false
+  | Some (fragment, old_back) ->
+    begin match fragment.next with
+    | None -> stream.ends <- None
+    | Some new_front -> stream.ends <- Some (new_front, old_back)
+    end;
+    fragment.data
 
 let of_string s =
   let stream = empty () in
@@ -71,7 +98,7 @@ let remove_exact stream size =
       let ofs = ref 0 in
       while !ofs < size do
         let bytes_remaining = size - !ofs in
-        let fragment = Deque.dequeue_front_exn stream.fragments in
+        let fragment = pop stream in
         let bytes_from_fragment = min bytes_remaining (String.length fragment) in
         Bytes.blit
           (Bytes.unsafe_of_string fragment) 0
@@ -79,7 +106,7 @@ let remove_exact stream size =
           bytes_from_fragment;
         begin if bytes_from_fragment < String.length fragment then
           let remainder = Util.str_slice ~start:bytes_from_fragment fragment in
-          Deque.enqueue_front stream.fragments remainder
+          enqueue_front stream remainder
         end;
         ofs := !ofs + bytes_from_fragment;
       done;
@@ -93,27 +120,22 @@ let remove_at_least stream size =
   else begin
     let buffer = Buffer.create size in
     while Buffer.length buffer < size do
-      Buffer.add_string buffer (Deque.dequeue_front_exn stream.fragments)
+      Buffer.add_string buffer (pop stream)
     done;
     stream.fragments_size <- stream.fragments_size - (Buffer.length buffer);
     Some (Buffer.contents buffer)
   end
 
+let unremove stream data =
+  let len = String.length data in
+  if len > 0 then (
+    enqueue_front stream data;
+    stream.fragments_size <- stream.fragments_size + len;
+  )
+
 let peek_exact stream size =
   match remove_exact stream size with
   | Some bytes ->
-      let () = Deque.enqueue_front stream.fragments bytes in
-      let () = stream.fragments_size <- stream.fragments_size + size in
-      Some bytes
-  | None ->
-      None
-
-let unremove stream bytes =
-  let len = String.length bytes in
-  if len = 0 then
-    ()
-  else
-    let () = Deque.enqueue_front stream.fragments bytes in
-    stream.fragments_size <- stream.fragments_size + len
-
-
+    unremove stream bytes;
+    Some bytes
+  | None -> None
