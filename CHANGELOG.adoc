@@ -1,3 +1,18 @@
+== capnp-ocaml 3.1.0
+
+=== Backwards-incompatible changes
+
+* The Unix-specific `IO` module has been moved from `Capnp.IO` to `Capnp_unix.IO`,
+  and is now part of the new `capnp.unix` ocamlfind library.
+  Both `capnp` and `capnp.unix` ocamlfind libraries are provided by the `capnp`
+  opam package.
+
+=== New features
+
+* The core `capnp` library no longer depends on `Core_kernel` or `Unix`.
+  This makes binaries using the library several MB smaller and allows
+  capnp to be used in https://mirage.io/[Mirage unikernels].
+
 == capnp-ocaml 3.0.0
 
 === Backwards-incompatible changes
