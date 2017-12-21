@@ -53,7 +53,7 @@ let main () : int =
           let () = Generate.compile request in
           ExitCode.success
         with (Failure _) as e ->
-          let bs = Exn.backtrace () in
+          let bs = Printexc.get_backtrace () in
           let es = Exn.to_string e in
           let () = prerr_endline es in
           let () = prerr_endline bs in

@@ -12,7 +12,7 @@ build-test: ["jbuilder" "build" "@runtest" "@src/benchmark/benchmarks"]
 depends: [
   "jbuilder" {build}
   "result"
-  "core_kernel" {>= "112.24.00"}
+  "core_kernel" {>= "v0.10.0"}
   "extunix"
   "ocplib-endian" {>= "0.7"}
   "res"
