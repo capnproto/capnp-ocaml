@@ -188,7 +188,7 @@ let create_write_context_for_fd ?(restart = true) ~compression fd =
 
 let create_write_context_for_channel ~compression chan =
   let chan_write chan' ~buf ~pos ~len =
-    let () = Core_kernel.Out_channel.output chan' ~buf ~pos ~len in
+    let () = Core_kernel.Out_channel.output_substring chan' ~buf ~pos ~len in
     len
   in
   WriteContext.create ~write:chan_write ~compression chan
