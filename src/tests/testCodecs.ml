@@ -183,7 +183,8 @@ let random_packing_suite =
 let message_gen =
   let open Quickcheck.Generator.Monad_infix in
   let segment_gen = capnp_string_gen >>| Bytes.unsafe_of_string in
-  List.gen' ~length:(`Between_inclusive (1, 25)) segment_gen
+  Int.gen_uniform_incl 1 25 >>= fun length ->
+  List.gen_with_length length segment_gen
   >>| Capnp.BytesMessage.Message.of_storage
 
 let test_random_serialize_deserialize _ctx =
