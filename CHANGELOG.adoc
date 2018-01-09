@@ -1,3 +1,17 @@
+== capnp-ocaml 3.2.0
+
+=== Backwards-incompatible changes
+
+* The `capnp` opam package no longer depends on the C++ compiler (#47).
+  If your project compiles schema files, you should add
+  `"conf-capnproto" {build}` to your opam dependencies.
+
+=== Other changes
+
+* Add support for OCaml 4.06 (#45).
+
+* Update for API changes in Base and Core_kernel (#44).
+
 == capnp-ocaml 3.1.0
 
 === Backwards-incompatible changes
