@@ -28,7 +28,7 @@
  ******************************************************************************)
 
 module CamlBytes = Bytes
-open Core_kernel.Std
+open Core_kernel
 module Bytes = CamlBytes
 
 open OUnit2

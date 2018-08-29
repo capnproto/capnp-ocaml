@@ -1,7 +1,7 @@
 
 module E = Eval.Make[@inlined](Capnp.BytesMessage)
 
-open Core_kernel.Std
+open Core_kernel
 
 module TestCase = struct
   type request_t     = E.Reader.Expression.struct_t
