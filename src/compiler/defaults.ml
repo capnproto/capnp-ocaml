@@ -55,7 +55,7 @@
 (* Workaround for missing Caml.Bytes in Core 112.35.00 *)
 module CamlBytes = Bytes
 
-open Core_kernel.Std
+open Core_kernel
 
 module Copier = Capnp.Runtime.BuilderOps.Make(GenCommon.M)(GenCommon.M)
 module M = GenCommon.M

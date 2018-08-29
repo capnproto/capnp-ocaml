@@ -30,7 +30,7 @@
 (* Inspired by encoding-test.c++, as found in the capnproto source. *)
 
 module CamlBytes = Bytes
-open Core_kernel.Std
+open Core_kernel
 module Bytes = CamlBytes
 
 module BM  = Capnp.BytesMessage

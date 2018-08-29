@@ -3,7 +3,7 @@ module CamlBytes = Bytes
 
 module CR = Catrank.Make[@inlined](Capnp.BytesMessage)
 
-open Core_kernel.Std
+open Core_kernel
 
 module TestCase = struct
   type request_t     = CR.Reader.SearchResultList.struct_t
@@ -117,7 +117,7 @@ module TestCase = struct
         }
       done;
 
-      Array.sort scored_results ~cmp:ScoredResult.compare;
+      Array.sort scored_results ~compare:ScoredResult.compare;
 
       let response = CR.Builder.SearchResultList.init_root () in
       let results = CR.Builder.SearchResultList.results_init response num_results in

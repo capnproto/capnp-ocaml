@@ -30,7 +30,7 @@
 (* Workaround for missing Caml.Bytes in Core 112.35.00 *)
 module CamlBytes = Bytes
 
-open Core_kernel.Std
+open Core_kernel
 
 module PS        = GenCommon.PS
 module Context   = GenCommon.Context
@@ -1415,7 +1415,7 @@ let rec generate_struct_node ?uq_name ~context ~scope ~nested_modules ~mode
     C.Array.to_list (PS.Node.Struct.fields_get struct_def)
   in
   (* Sorting in reverse code order allows us to avoid a List.rev *)
-  let all_fields = List.sort unsorted_fields ~cmp:(fun x y ->
+  let all_fields = List.sort unsorted_fields ~compare:(fun x y ->
     - (Int.compare (PS.Field.code_order_get x) (PS.Field.code_order_get y)))
   in
   let union_fields, non_union_fields = List.partition_tf all_fields
