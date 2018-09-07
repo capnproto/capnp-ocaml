@@ -1,3 +1,9 @@
+== capnp-ocaml 3.2.1
+
+=== Other changes
+
+* Update for API changes in Base and Core_kernel (#52).
+
 == capnp-ocaml 3.2.0
 
 === Backwards-incompatible changes
