@@ -5,7 +5,7 @@ authors: "Paul Pelzl <pelzlpj@gmail.com>"
 homepage: "https://github.com/capnproto/capnp-ocaml"
 bug-reports: "https://github.com/capnproto/capnp-ocaml/issues"
 depends: [
-  "ocaml" {>= "4.02.0"}
+  "ocaml" {>= "4.03.0"}
   "jbuilder" {build}
   "result"
   "core_kernel" {>= "v0.11.0"}

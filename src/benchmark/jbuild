@@ -1,14 +1,10 @@
-(* -*- tuareg -*- *)
-
-let config = {|
-
 (jbuild_version 1)
 
 (executable
  ((name main)
   (libraries (capnp capnp_unix fast_rand core))
   (flags (:standard -w -53-55))
-  (ocamlopt_flags (:standard # -inline 2000))
+  (ocamlopt_flags (:standard -O3 -inline 2000))
 ))
 
 (rule
@@ -45,15 +41,3 @@ let config = {|
  ((name benchmarks)
   (deps (carsales catrank eval))
 ))
-
-|}
-
-let () =
-  let hash = String.index config '#' in
-  let opt = if Jbuild_plugin.V1.ocaml_version >= "4.03" then "-O3" else "" in
-  let config =
-    String.sub config 0 hash ^
-    opt ^
-    String.sub config (hash + 1) (String.length config - hash - 1)
-  in
-  Jbuild_plugin.V1.send config
