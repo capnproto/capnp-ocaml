@@ -6,7 +6,7 @@ homepage: "https://github.com/capnproto/capnp-ocaml"
 bug-reports: "https://github.com/capnproto/capnp-ocaml/issues"
 depends: [
   "ocaml" {>= "4.03.0"}
-  "jbuilder" {build}
+  "dune" {build & >= "1.0"}
   "result"
   "core_kernel" {>= "v0.11.0"}
   "extunix"
@@ -18,7 +18,7 @@ depends: [
   "conf-capnproto" {with-test}
 ]
 build: [
-  ["jbuilder" "build" "-p" name "-j" jobs]
-  ["jbuilder" "build" "@runtest" "@src/benchmark/benchmarks"] {with-test}
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "build" "-p" name "-j" jobs "@runtest" "@src/benchmark/benchmarks"] {with-test}
 ]
 dev-repo: "git+https://github.com/capnproto/capnp-ocaml.git"
