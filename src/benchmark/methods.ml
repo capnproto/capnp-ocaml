@@ -1,7 +1,11 @@
 [@@@ocaml.warning "-3"]
 
 module CamlBytes = Bytes
-open Core.Std
+module Unix = Core.Unix
+module List = Core.List
+module Queue = Core.Queue
+module Bytes = Core.Bytes
+module Int64 = Core.Int64
 module IO = Capnp_unix.IO
 module Codecs = Capnp.Codecs
 
