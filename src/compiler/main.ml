@@ -27,8 +27,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
+module Exn = Base.Exn
+module In_channel = Stdio.In_channel
 
-open Core_kernel
 open Capnp
 
 module M  = BytesMessage

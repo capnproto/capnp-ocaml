@@ -8,7 +8,9 @@ depends: [
   "ocaml" {>= "4.03.0"}
   "dune" {build & >= "1.0"}
   "result"
-  "core_kernel" {>= "v0.11.0"}
+  "base"
+  "stdio"
+  "core_kernel" {with-test & >= "v0.11.0"}
   "extunix"
   "ocplib-endian" {>= "0.7"}
   "res"
