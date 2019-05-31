@@ -115,8 +115,9 @@ let packing_suite =
 (* Generator for characters with a distribution that resembles real
    cap'n proto data, with lots of zeros. *)
 let random_char_generator =
+  let open Quickcheck.Generator.Monad_infix in
   Quickcheck.Generator.weighted_union [
-    1.0, Char.gen;
+    1.0, Int.gen_uniform_incl 0 255 >>| Char.of_int_exn;
     5.0, Quickcheck.Generator.singleton '\x00';
   ]
 

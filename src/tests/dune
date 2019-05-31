@@ -1,0 +1,51 @@
+(executable
+ (name run_tests)
+ (libraries capnp oUnit core_kernel)
+ (flags :standard -w -53))
+
+(rule
+ (targets test.ml test.mli)
+ (deps
+  (:< test.capnp)
+  ../compiler/main.bc)
+ (action
+  (run capnpc -o ../compiler/main.bc %{<})))
+
+(rule
+ (targets test_import.ml test_import.mli)
+ (deps
+  (:< test-import.capnp)
+  ../compiler/main.bc)
+ (action
+  (run capnpc -o ../compiler/main.bc %{<})))
+
+(rule
+ (targets c2b2b.ml c2b2b.mli)
+ (deps
+  (:< c++.capnp)
+  ../compiler/main.bc)
+ (action
+  (run capnpc -o ../compiler/main.bc %{<})))
+
+(rule
+ (targets testLists.ml testLists.mli)
+ (deps
+  (:< testLists.capnp)
+  ../compiler/main.bc)
+ (action
+  (run capnpc -o ../compiler/main.bc %{<})))
+
+(rule
+ (targets testCycles.ml testCycles.mli)
+ (deps
+  (:< testCycles.capnp)
+  ../compiler/main.bc)
+ (action
+  (run capnpc -o ../compiler/main.bc %{<})))
+
+(alias
+ (name runtest)
+ (deps
+  (:< run_tests.bc))
+ (action
+  (run %{<})))

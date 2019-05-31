@@ -1,0 +1,7 @@
+(library
+ (name capnp_unix)
+ (public_name capnp.unix)
+ (synopsis "Runtime support library for capnp-ocaml (Unix)")
+ (libraries capnp extunix core_kernel)
+ (flags :standard -w -50-53-55)
+ (ocamlopt_flags :standard -O3 -inline 1000))

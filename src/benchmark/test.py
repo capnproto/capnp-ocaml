@@ -3,7 +3,7 @@ import subprocess, os, csv, time, sys
 my_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
 os.chdir(my_dir)
 
-subprocess.check_call(["jbuilder", "build", "--dev", "carsales", "catrank", "eval"])
+subprocess.check_call(["dune", "build", "carsales", "catrank", "eval"])
 bin_dir = os.path.join(my_dir, '../../_build/default/src/benchmark')
 
 switch = subprocess.check_output(["opam", "sw", "show"]).strip()
