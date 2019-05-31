@@ -13,7 +13,6 @@ depends: [
   "ocplib-endian" {>= "0.7"}
   "res"
   "uint"
-  "core" {with-test}
   "ounit" {with-test}
   "conf-capnproto" {with-test}
 ]

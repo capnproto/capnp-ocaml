@@ -1,11 +1,10 @@
 [@@@ocaml.warning "-3"]
 
 module CamlBytes = Bytes
-module Unix = Core.Unix
-module List = Core.List
-module Queue = Core.Queue
-module Bytes = Core.Bytes
-module Int64 = Core.Int64
+module List = Base.List
+module Queue = Base.Queue
+module Bytes = Base.Bytes
+module Int64 = Base.Int64
 module IO = Capnp_unix.IO
 module Codecs = Capnp.Codecs
 
@@ -15,14 +14,17 @@ let message_of_builder = Capnp.BytesMessage.StructStorage.message_of_builder
    counting the number of bytes written. *)
 module CountingOutputStream = struct
   type t = {
-    fd : Unix.File_descr.t;
+    fd : Unix.file_descr;
     mutable throughput : int;
   }
 
-  let write chan ~buf ~pos ~len =
-    let bytes_written = Unix.single_write_substring ~restart:true ~buf ~pos ~len chan.fd in
-    let () = chan.throughput <- chan.throughput + bytes_written in
-    bytes_written
+  let rec write chan ~buf ~pos ~len =
+    try
+      let bytes_written = UnixLabels.single_write_substring ~buf ~pos ~len chan.fd in
+      let () = chan.throughput <- chan.throughput + bytes_written in
+      bytes_written
+    with Unix.Unix_error (EINTR, _, _) ->
+      write chan ~buf ~pos ~len
 
   let wrap_write_context ~compression stream =
     IO.WriteContext.create ~write ~compression stream
@@ -30,19 +32,23 @@ end
 
 
 module type BENCHMARK_SIG = sig
-  val sync_client : input_fd:Unix.File_descr.t -> output_fd:Unix.File_descr.t ->
+  val sync_client : input_fd:Unix.file_descr -> output_fd:Unix.file_descr ->
     compression:Codecs.compression_t -> iters:int -> int
 
-  val async_client : input_fd:Unix.File_descr.t -> output_fd:Unix.File_descr.t ->
+  val async_client : input_fd:Unix.file_descr -> output_fd:Unix.file_descr ->
     compression:Codecs.compression_t -> iters:int -> int
 
-  val server : input_fd:Unix.File_descr.t -> output_fd:Unix.File_descr.t ->
+  val server : input_fd:Unix.file_descr -> output_fd:Unix.file_descr ->
     compression:Codecs.compression_t -> iters:int -> int
 
   val pass_by_object : iters:int -> int
 
   val pass_by_bytes : compression:Codecs.compression_t -> iters:int -> int
 end
+
+let rec select ~read ~write =
+  try UnixLabels.select ~read ~write ~timeout:(-1.0)    (* (never timeout) *)
+  with Unix.Unix_error (EINTR, _, _) -> select ~read ~write
 
 module Benchmark
     (TestCase : TestCaseSig.TEST_CASE)
@@ -54,8 +60,8 @@ module Benchmark
   (* [sync_client] issues a randomized request and waits for the response,
      looping up to the specified number of iterations. *)
   let sync_client
-      ~(input_fd : Unix.File_descr.t)
-      ~(output_fd : Unix.File_descr.t)
+      ~(input_fd : Unix.file_descr)
+      ~(output_fd : Unix.file_descr)
       ~(compression : Codecs.compression_t)
       ~(iters : int)
     : int =
@@ -87,8 +93,8 @@ module Benchmark
      benchmark, this runs in a single thread and uses a [select] loop to
      determine appropriate times to write and read. *)
   let async_client
-      ~(input_fd : Unix.File_descr.t)
-      ~(output_fd : Unix.File_descr.t)
+      ~(input_fd : Unix.file_descr)
+      ~(output_fd : Unix.file_descr)
       ~(compression : Codecs.compression_t)
       ~(iters : int)
     : int =
@@ -106,11 +112,11 @@ module Benchmark
     let final_send_complete = ref false in
     while !num_sent < iters || (not (Queue.is_empty expectations)) do
       let write_watch_fds = if !final_send_complete then [] else [output_fd] in
-      let ready = Unix.select ~restart:true
-          ~read:[input_fd] ~write:write_watch_fds ~except:[input_fd] ~timeout:`Never ()
+      let (ready_read, ready_write, _) = select
+          ~read:[input_fd] ~write:write_watch_fds ~except:[input_fd]
       in
 
-      if not (List.is_empty ready.Unix.Select_fds.read) then begin
+      if not (List.is_empty ready_read) then begin
         let (_ : int) = IO.ReadContext.read in_context in
         let rec loop () =
           match IO.ReadContext.dequeue_message in_context with
@@ -127,7 +133,7 @@ module Benchmark
         loop ()
       end;
 
-      if not (List.is_empty ready.Unix.Select_fds.write) then begin
+      if not (List.is_empty ready_write) then begin
         begin try
           while IO.WriteContext.write out_context > 0 do () done
         with
@@ -158,8 +164,8 @@ module Benchmark
   (* [server] receives incoming requests one at a time, immediately writing
      a response for each request in turn. *)
   let server
-      ~(input_fd : Unix.File_descr.t)
-      ~(output_fd : Unix.File_descr.t)
+      ~(input_fd : Unix.file_descr)
+      ~(output_fd : Unix.file_descr)
       ~(compression : Codecs.compression_t)
       ~(iters : int)
     : int =
@@ -254,6 +260,13 @@ module Benchmark
 
 end
 
+let rec read fd ~buf =
+  try Unix.read fd buf 0 (Bytes.length buf)
+  with Unix.Unix_error (EINTR, _, _) -> read fd ~buf
+
+let rec write fd ~buf =
+  try Unix.single_write fd buf 0 (Bytes.length buf)
+  with Unix.Unix_error (EINTR, _, _) -> write fd ~buf
 
 (* [pass_by_pipe] forks off a child (client) process connected to the current
    (server) process by a pipe.  The [client_func] and [server_func] are then
@@ -262,8 +275,9 @@ let pass_by_pipe client_func server_func : int =
   let (client_to_server_read, client_to_server_write) = Unix.pipe () in
   let (server_to_client_read, server_to_client_write) = Unix.pipe () in
   match Unix.fork () with
-  | `In_the_child ->
-      (* client *)
+  | err when err < 0 -> failwith "fork failed!"
+  | 0 ->
+      (* child/client *)
       Unix.close client_to_server_read;
       Unix.close server_to_client_write;
 
@@ -273,10 +287,10 @@ let pass_by_pipe client_func server_func : int =
       let tp64 = Int64.of_int throughput in
       let buf = CamlBytes.create 8 in
       let () = EndianBytes.LittleEndian.set_int64 buf 0 tp64 in
-      let bytes_written = Unix.write client_to_server_write ~buf in
+      let bytes_written = write client_to_server_write ~buf in
       assert (bytes_written = 8);
       exit 0
-  | `In_the_parent child_pid ->
+  | child_pid ->
       (* server *)
       Unix.close client_to_server_write;
       Unix.close server_to_client_read;
@@ -286,7 +300,7 @@ let pass_by_pipe client_func server_func : int =
       in
 
       let tp64_buf = Bytes.create 8 in
-      let bytes_read = Unix.read client_to_server_read ~buf:tp64_buf in
+      let bytes_read = read client_to_server_read ~buf:tp64_buf in
       assert (bytes_read = 8);
       let tp64_buf = Bytes.unsafe_to_string ~no_mutation_while_string_reachable:tp64_buf in
       let tp64 = EndianString.LittleEndian.get_int64 tp64_buf 0 in
@@ -294,7 +308,8 @@ let pass_by_pipe client_func server_func : int =
       Unix.close client_to_server_read;
       Unix.close server_to_client_write;
 
-      let () = Unix.waitpid_exn child_pid in
-      throughput
-
-
+      let pid, status = Unix.waitpid [] child_pid in
+      assert (pid = child_pid);
+      match status with
+      | WEXITED 0 -> throughput
+      | _ -> failwith "waitpid: child process failed!"
