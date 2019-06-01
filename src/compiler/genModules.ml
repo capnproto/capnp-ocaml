@@ -30,7 +30,8 @@
 (* Workaround for missing Caml.Bytes in Core 112.35.00 *)
 module CamlBytes = Bytes
 
-open Core_kernel
+module Int = Base.Int
+module List = Base.List
 
 module PS        = GenCommon.PS
 module Context   = GenCommon.Context
@@ -1199,7 +1200,7 @@ let generate_union_getter ~context ~scope ~mode struct_def fields =
       let cases = List.fold_left fields ~init:[] ~f:(fun acc field ->
         let field_name = PS.Field.name_get field in
         let us_field_name = GenCommon.underscore_name field_name in
-        let ctor_name = String.capitalize field_name in
+        let ctor_name = String.capitalize_ascii field_name in
         let field_value = PS.Field.discriminant_value_get field in
         let field_has_void_type =
           match PS.Field.get field with
@@ -1361,12 +1362,12 @@ let generate_constant ~context ~scope ~node ~node_name const_def =
         GenCommon.get_scope_relative_name ~context scope enum_node in
       if enum_val >= C.Array.length enumerants then
         [ sprintf "%s.%s %u" scope_relative_name
-            (String.capitalize undefined_name) enum_val ]
+            (String.capitalize_ascii undefined_name) enum_val ]
       else
         let enumerant = C.Array.get enumerants enum_val in
         [ sprintf "%s.%s"
             scope_relative_name
-            (String.capitalize (PS.Enumerant.name_get enumerant)) ]
+            (String.capitalize_ascii (PS.Enumerant.name_get enumerant)) ]
   | (Type.Struct _, Value.Struct _) ->
       let node_id = PS.Node.id_get node in
       let name = GenCommon.underscore_name node_name in
@@ -1492,7 +1493,7 @@ and generate_methods ~context ~scope ~nested_modules ~mode ~interface_node inter
   in
   let structs =
     List.map methods ~f:(fun m ->
-        let mod_name = String.capitalize (Method.capnp_name m) in
+        let mod_name = String.capitalize_ascii (Method.capnp_name m) in
         ["module " ^ mod_name ^ " = struct"] @
         apply_indent ~indent:"  " (
             make_auto m Method.Params @
@@ -1742,7 +1743,7 @@ let generate_client ~context ~nested_modules ~node_name ~interface_node interfac
     List.map methods ~f:(fun m ->
         let params = Method.(payload_module Params) ~context ~mode:Mode.Builder m in
         let results = Method.(payload_module Results) ~context ~mode:Mode.Reader m in
-        let mod_name = String.capitalize (Method.capnp_name m) in
+        let mod_name = String.capitalize_ascii (Method.capnp_name m) in
         ["module " ^ mod_name ^ " = struct"] @
         apply_indent ~indent:"  " [
           "module Params = " ^ params;
@@ -1779,7 +1780,7 @@ let generate_service ~context ~nested_modules ~node_name ~interface_node interfa
     List.map methods ~f:(fun m ->
         let params = Method.(payload_module Params) ~context ~mode:Mode.Reader m in
         let results = Method.(payload_module Results) ~context ~mode:Mode.Builder m in
-        let mod_name = String.capitalize (Method.capnp_name m) in
+        let mod_name = String.capitalize_ascii (Method.capnp_name m) in
         ["module " ^ mod_name ^ " = struct"] @
         apply_indent ~indent:"  " [
           "module Params = " ^ params;
@@ -1792,7 +1793,7 @@ let generate_service ~context ~nested_modules ~node_name ~interface_node interfa
   let service =
     let body =
       List.map methods ~f:(fun m ->
-          let meth_mod_name = String.capitalize (Method.capnp_name m) in
+          let meth_mod_name = String.capitalize_ascii (Method.capnp_name m) in
           sprintf "method virtual %s_impl : (%s.Params.t, %s.Results.t) MessageWrapper.Service.method_t"
             (Method.ocaml_name m)
             meth_mod_name

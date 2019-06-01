@@ -27,8 +27,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
-
-open Core_kernel
+module List = Base.List
+module Int = Base.Int
 
 module PS      = GenCommon.PS
 module Context = GenCommon.Context
@@ -380,7 +380,7 @@ let generate_method_struct ~context ~scope ~nested_modules ~mode ~interface_node
   in
   let structs =
     List.map methods ~f:(fun m ->
-        let mod_name = String.capitalize (Method.capnp_name m) in
+        let mod_name = String.capitalize_ascii (Method.capnp_name m) in
         ["module " ^ mod_name ^ " : sig"] @
         apply_indent ~indent:"  " (
             make_auto m Method.Params @
@@ -400,7 +400,7 @@ let generate_client ~context ~nested_modules ~interface_node interface_def : str
     List.map methods ~f:(fun m ->
         let params = Method.(payload_module Params) ~context ~mode:Mode.Builder m in
         let results = Method.(payload_module Results) ~context ~mode:Mode.Reader m in
-        let mod_name = String.capitalize (Method.capnp_name m) in
+        let mod_name = String.capitalize_ascii (Method.capnp_name m) in
         ["module " ^ mod_name ^ " : sig"] @
         apply_indent ~indent:"  " [
           "module Params = " ^ params;
@@ -421,7 +421,7 @@ let generate_service ~context ~nested_modules ~interface_node interface_def : st
     List.map methods ~f:(fun m ->
         let params = Method.(payload_module Params) ~context ~mode:Mode.Reader m in
         let results = Method.(payload_module Results) ~context ~mode:Mode.Builder m in
-        let mod_name = String.capitalize (Method.capnp_name m) in
+        let mod_name = String.capitalize_ascii (Method.capnp_name m) in
         ["module " ^ mod_name ^ " : sig"] @
         apply_indent ~indent:"  " [
           "module Params = " ^ params;
@@ -434,7 +434,7 @@ let generate_service ~context ~nested_modules ~interface_node interface_def : st
   let server =
     let body =
       List.map methods ~f:(fun m ->
-          let meth_mod_name = String.capitalize (Method.capnp_name m) in
+          let meth_mod_name = String.capitalize_ascii (Method.capnp_name m) in
           sprintf "method virtual %s_impl : (%s.Params.t, %s.Results.t) MessageWrapper.Service.method_t"
             (Method.ocaml_name m)
             meth_mod_name
@@ -491,7 +491,7 @@ let rec generate_node
           [ "end" ]
   | Enum enum_def ->
       let unique_module_name =
-        (String.capitalize node_name) ^ "_" ^ (Uint64.to_string node_id)
+        (String.capitalize_ascii node_name) ^ "_" ^ (Uint64.to_string node_id)
       in
       let body =
         (generate_nested_modules ()) @

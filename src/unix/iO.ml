@@ -29,7 +29,7 @@
 
 open Capnp
 
-module Deque = Core_kernel.Deque
+module Queue = Base.Queue
 
 type compression_t = [ `None | `Packing ]
 
@@ -47,7 +47,7 @@ module WriteContext = struct
     write : 'a -> buf:string -> pos:int -> len:int -> int;
 
     (** Data remaining to write to the descriptor *)
-    fragments : string Deque.t;
+    fragments : string Queue.t;
 
     (** Total number of bytes stored in [fragments] *)
     mutable fragments_size : int;
@@ -60,23 +60,23 @@ module WriteContext = struct
     fd;
     comp = compression;
     write;
-    fragments = Deque.create ();
+    fragments = Queue.create ();
     fragments_size = 0;
     first_fragment_pos = 0;
   }
 
   let enqueue_message context message =
     Codecs.serialize_iter message ~compression:context.comp ~f:(fun buf ->
-      Deque.enqueue_back context.fragments buf;
+      Queue.enqueue context.fragments buf;
       context.fragments_size <- context.fragments_size + (String.length buf))
 
   let bytes_remaining context = context.fragments_size - context.first_fragment_pos
 
   let write context =
-    if Deque.is_empty context.fragments then
+    if Queue.is_empty context.fragments then
       0
     else
-      let first_fragment = Deque.peek_front_exn context.fragments in
+      let first_fragment = Queue.peek_exn context.fragments in
       let first_fragment_remaining =
         String.length first_fragment - context.first_fragment_pos
       in
@@ -86,7 +86,7 @@ module WriteContext = struct
       in
       let () =
         if bytes_written = first_fragment_remaining then
-          let (_ : string) = Deque.dequeue_front_exn context.fragments in
+          let (_ : string) = Queue.dequeue_exn context.fragments in
           let () = context.fragments_size <-
               context.fragments_size - (String.length first_fragment)
           in
@@ -188,7 +188,7 @@ let create_write_context_for_fd ?(restart = true) ~compression fd =
 
 let create_write_context_for_channel ~compression chan =
   let chan_write chan' ~buf ~pos ~len =
-    let () = Core_kernel.Out_channel.output_substring chan' ~buf ~pos ~len in
+    let () = Stdio.Out_channel.output_substring chan' ~buf ~pos ~len in
     len
   in
   WriteContext.create ~write:chan_write ~compression chan
@@ -236,7 +236,7 @@ let write_message_to_channel ~compression message chan =
 
 
 let write_message_to_file ?perm ~compression message filename =
-  Core_kernel.Out_channel.with_file filename ~binary:true ?perm ~f:(fun oc ->
+  Stdio.Out_channel.with_file filename ~binary:true ?perm ~f:(fun oc ->
     write_message_to_channel ~compression message oc)
 
 
@@ -246,9 +246,9 @@ let write_message_to_file_robust ?perm ~compression message filename =
   let (tmp_filename, tmp_oc) = Filename.open_temp_file
       ~mode:[Open_binary] ~temp_dir:parent_dir tmp_prefix ""
   in
-  let () = Core_kernel.Exn.protectx tmp_oc ~finally:Core_kernel.Out_channel.close ~f:(fun oc ->
+  let () = Base.Exn.protectx tmp_oc ~finally:Stdio.Out_channel.close ~f:(fun oc ->
       let () = write_message_to_channel ~compression message oc in
-      let () = Core_kernel.Out_channel.flush oc in
+      let () = Stdio.Out_channel.flush oc in
       let fd = UnixLabels.descr_of_out_channel tmp_oc in
       ExtUnix.Specific.fsync fd)
   in
@@ -266,7 +266,7 @@ let write_message_to_file_robust ?perm ~compression message filename =
      suppress errors. *)
   try
     let fd = UnixLabels.openfile parent_dir ~mode:[UnixLabels.O_RDONLY] ~perm:0o600 in
-    Core_kernel.Exn.protectx fd ~finally:UnixLabels.close ~f:ExtUnix.Specific.fsync
+    Base.Exn.protectx fd ~finally:UnixLabels.close ~f:ExtUnix.Specific.fsync
   with Unix.Unix_error (_, _, _) ->
     ()
 
@@ -319,7 +319,7 @@ let read_single_message_from_channel ~compression chan =
 
 
 let read_message_from_file ~compression filename =
-  Core_kernel.In_channel.with_file filename ~binary:true ~f:(fun ic ->
+  Stdio.In_channel.with_file filename ~binary:true ~f:(fun ic ->
     read_single_message_from_channel ~compression ic)
 
 

@@ -28,7 +28,10 @@
  ******************************************************************************)
 
 
-open Core_kernel
+module String = Base.String
+module List = Base.List
+module Char = Base.Char
+module Hashtbl = Base.Hashtbl
 
 module M   = Capnp.RPC.None(Capnp.BytesMessage)
 module PS_ = PluginSchema.Make(M)

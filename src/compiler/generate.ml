@@ -27,8 +27,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
-
-open Core_kernel
+module List = Base.List
+module String = Base.String
+module Hashtbl = Base.Hashtbl
+module Out_channel = Stdio.Out_channel
 
 module PS   = GenCommon.PS
 module C    = Capnp
