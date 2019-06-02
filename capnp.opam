@@ -11,7 +11,6 @@ depends: [
   "base"
   "stdio"
   "core_kernel" {with-test & >= "v0.11.0"}
-  "extunix"
   "ocplib-endian" {>= "0.7"}
   "res"
   "uint"

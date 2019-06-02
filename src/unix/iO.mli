@@ -170,18 +170,6 @@ val write_message_to_file : ?perm:int -> compression:Codecs.compression_t ->
   'cap Message.BytesMessage.Message.t -> string -> unit
 
 
-(** As [write_message_to_file], but the file is constructed transactionally
-    by writing to a temporary file and renaming to the [filename], and
-    [Unix.fsync] is used carefully to ensure durability of the write.
-
-    The overhead of [rename] and [fsync] may lead to reduced throughput
-    relative to [write_message_to_file].
-
-    @raise Unix.Unix_error if [write], [fsync], or [rename] operations fail. *)
-val write_message_to_file_robust : ?perm:int -> compression:Codecs.compression_t ->
-  'cap Message.BytesMessage.Message.t -> string -> unit
-
-
 (** [read_single_message_from_fd ~compression fd] attempts to read a single
     message from the specified file descriptor, using the given [compression]
     method.  If [restart] is set to [true] (default), then writes failing
