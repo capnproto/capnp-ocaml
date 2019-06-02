@@ -73,5 +73,5 @@ let main () : int =
       ExitCode.general_error
 
 
-let () = Pervasives.exit (main ())
+let () = exit (main ())
 

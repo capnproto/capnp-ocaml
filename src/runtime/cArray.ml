@@ -74,7 +74,7 @@ let mem ?equal a x =
     | Some user_equal ->
         user_equal
     | None ->
-        Pervasives.(=)
+        (=)
   in
   let rec loop i =
     if i = len then

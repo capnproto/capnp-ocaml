@@ -204,7 +204,7 @@ let create_read_context_for_fd ?(restart = true) ~compression fd =
 
 let create_read_context_for_channel ~compression chan =
   let in_chan_read ic ~buf ~pos ~len =
-    Pervasives.input ic buf pos len
+    input ic buf pos len
   in
   ReadContext.create ~read:in_chan_read ~compression chan
 
