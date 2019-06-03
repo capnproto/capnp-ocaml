@@ -3,7 +3,9 @@ module CamlBytes = Bytes
 
 module CR = Catrank.Make[@inlined](Capnp.BytesMessage)
 
-open Core_kernel
+module Array = Base.Array
+module Char = Base.Char
+module Float = Base.Float
 
 module TestCase = struct
   type request_t     = CR.Reader.SearchResultList.struct_t

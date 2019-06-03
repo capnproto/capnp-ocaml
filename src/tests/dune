@@ -1,6 +1,6 @@
 (executable
  (name run_tests)
- (libraries capnp oUnit core_kernel)
+ (libraries capnp oUnit base_quickcheck)
  (flags :standard -w -53))
 
 (rule

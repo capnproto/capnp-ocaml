@@ -1,6 +1,6 @@
 (executable
  (name main)
- (libraries capnp capnp_unix fast_rand core_kernel)
+ (libraries capnp capnp_unix fast_rand base)
  (flags :standard -w -53-55)
  (ocamlopt_flags :standard -O3 -inline 2000))
 

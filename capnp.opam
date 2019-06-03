@@ -10,7 +10,7 @@ depends: [
   "result"
   "base"
   "stdio"
-  "core_kernel" {with-test & >= "v0.11.0"}
+  "base_quickcheck" {with-test}
   "ocplib-endian" {>= "0.7"}
   "res"
   "uint"

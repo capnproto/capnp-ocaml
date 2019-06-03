@@ -27,12 +27,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
-module CamlBytes = Bytes
-open Core_kernel
-module Bytes = CamlBytes
-
 open OUnit2
-module Quickcheck = Core_kernel.Quickcheck
+module Quickcheck = Base_quickcheck
 
 
 let expect_packs_to unpacked packed =
@@ -117,20 +113,21 @@ let packing_suite =
 let random_char_generator =
   let open Quickcheck.Generator.Monad_infix in
   Quickcheck.Generator.weighted_union [
-    1.0, Int.gen_uniform_incl 0 255 >>| Char.of_int_exn;
-    5.0, Quickcheck.Generator.singleton '\x00';
+    1.0, Base_quickcheck.Generator.int_uniform_inclusive 0 255 >>| char_of_int;
+    5.0, Quickcheck.Generator.return '\x00';
   ]
 
 let capnp_string_gen =
   let open Quickcheck.Generator.Monad_infix in
-  String.gen' random_char_generator >>| fun s ->
+  Quickcheck.Generator.string_of random_char_generator >>| fun s ->
   (* input string must be word-aligned *)
   Capnp.Runtime.Util.str_slice ~stop:((String.length s) land (lnot 0x7)) s
 
 
 let laws_exn name trials gen fn =
-  Quickcheck.iter ~trials gen ~f:(fun x ->
-      if not (fn x) then failwith name
+  let config = Quickcheck.Test.{default_config with Config.test_count = trials } in
+  Quickcheck.Test.with_sample_exn ~config gen ~f:(fun s ->
+      Base.Sequence.iter s ~f:(fun x -> if not (fn x) then failwith name)
     )
 
 let test_random_pack_unpack _ctx =
@@ -184,13 +181,13 @@ let random_packing_suite =
 let message_gen =
   let open Quickcheck.Generator.Monad_infix in
   let segment_gen = capnp_string_gen >>| Bytes.unsafe_of_string in
-  Int.gen_uniform_incl 1 25 >>= fun length ->
-  List.gen_with_length length segment_gen
+  Quickcheck.Generator.int_uniform_inclusive 1 25 >>= fun length ->
+  Quickcheck.Generator.list_with_length ~length segment_gen
   >>| Capnp.BytesMessage.Message.of_storage
 
 let test_random_serialize_deserialize _ctx =
   laws_exn "deserialize(fragment(serialize(x))) = x"
-      2000 (Quickcheck.Generator.tuple2 message_gen capnp_string_gen) (fun (m, trailing_data) ->
+      2000 (Quickcheck.Generator.both message_gen capnp_string_gen) (fun (m, trailing_data) ->
     let open Capnp.Runtime in
     let serialized = Codecs.serialize ~compression:`None m in
     let ser_fragments = Codecs.FramedStream.empty `None in

@@ -1,9 +1,7 @@
-
-open Core_kernel
+module Int = Base.Int
 
 let printf = Printf.printf
 let fprintf = Printf.fprintf
-
 
 module BenchmarkRunner(BM : Methods.BENCHMARK_SIG) = struct
 
@@ -63,7 +61,7 @@ let () =
     if name = "carsales" then
       (* Carsales benefits a small amount from tuning the GC to
          increase the space overhead. *)
-      let () = Gc.tune ~space_overhead:1000 () in
+      let () = Gc.(set {(get ()) with space_overhead = 1000}) in
       let module BM = Methods.Benchmark
           (CapnpCarsales.TestCase)
           (CapnpCarsales.CS.Reader.ParkingLot)
@@ -75,7 +73,7 @@ let () =
       (* Catrank allocates relatively large messages.  It benefits from
          tuning the GC to increase the space overhead and thus reduce
          the major collection rate. *)
-      let () = Gc.tune ~space_overhead:10000 () in
+      let () = Gc.(set {(get ()) with space_overhead = 1000}) in
       let module BM = Methods.Benchmark
           (CapnpCatrank.TestCase)
           (CapnpCatrank.CR.Reader.SearchResultList)
