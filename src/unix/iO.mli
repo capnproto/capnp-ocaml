@@ -125,7 +125,7 @@ val create_write_context_for_fd : ?restart:bool -> compression:Codecs.compressio
     writing messages to the given buffered output channel using the specified
     [compression] format. *)
 val create_write_context_for_channel : compression:Codecs.compression_t ->
-  Pervasives.out_channel -> Pervasives.out_channel WriteContext.t
+  out_channel -> out_channel WriteContext.t
 
 
 (** [create_read_context_for_fd ~compression fd] creates a context for reading
@@ -140,7 +140,7 @@ val create_read_context_for_fd : ?restart:bool -> compression:Codecs.compression
     reading messages from the given input channel using the specified
     [compression] method. *)
 val create_read_context_for_channel : compression:Codecs.compression_t ->
-  Pervasives.in_channel -> Pervasives.in_channel ReadContext.t
+  in_channel -> in_channel ReadContext.t
 
 
 (** [write_message_to_fd ~compression message fd] writes the specified [message] to
@@ -159,7 +159,7 @@ val write_message_to_fd : ?restart:bool -> compression:Codecs.compression_t ->
     [message] to the given buffered I/O channel, using the specified [compression]
     method. *)
 val write_message_to_channel : compression:Codecs.compression_t ->
-  'cap Message.BytesMessage.Message.t -> Pervasives.out_channel -> unit
+  'cap Message.BytesMessage.Message.t -> out_channel -> unit
 
 
 (** [write_message_to_file ~compression message filename] writes the specified
@@ -167,18 +167,6 @@ val write_message_to_channel : compression:Codecs.compression_t ->
     [compression] method.  The optional [perm] specifies the file creation
     mode, in case a new file must be created. *)
 val write_message_to_file : ?perm:int -> compression:Codecs.compression_t ->
-  'cap Message.BytesMessage.Message.t -> string -> unit
-
-
-(** As [write_message_to_file], but the file is constructed transactionally
-    by writing to a temporary file and renaming to the [filename], and
-    [Unix.fsync] is used carefully to ensure durability of the write.
-
-    The overhead of [rename] and [fsync] may lead to reduced throughput
-    relative to [write_message_to_file].
-
-    @raise Unix.Unix_error if [write], [fsync], or [rename] operations fail. *)
-val write_message_to_file_robust : ?perm:int -> compression:Codecs.compression_t ->
   'cap Message.BytesMessage.Message.t -> string -> unit
 
 
@@ -220,7 +208,7 @@ val read_single_message_from_fd : ?restart:bool -> compression:Codecs.compressio
     @raise Unsupported_message_frame if the frame header describes a segment
     count or segment size that is too large for the implementation *)
 val read_single_message_from_channel : compression:Codecs.compression_t ->
-  Pervasives.in_channel -> Message.rw Message.BytesMessage.Message.t option
+  in_channel -> Message.rw Message.BytesMessage.Message.t option
 
 
 (** [read_message_from_file ~compression filename] attempts to read a

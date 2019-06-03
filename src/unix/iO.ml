@@ -204,7 +204,7 @@ let create_read_context_for_fd ?(restart = true) ~compression fd =
 
 let create_read_context_for_channel ~compression chan =
   let in_chan_read ic ~buf ~pos ~len =
-    Pervasives.input ic buf pos len
+    input ic buf pos len
   in
   ReadContext.create ~read:in_chan_read ~compression chan
 
@@ -238,37 +238,6 @@ let write_message_to_channel ~compression message chan =
 let write_message_to_file ?perm ~compression message filename =
   Stdio.Out_channel.with_file filename ~binary:true ?perm ~f:(fun oc ->
     write_message_to_channel ~compression message oc)
-
-
-let write_message_to_file_robust ?perm ~compression message filename =
-  let parent_dir = Filename.dirname filename in
-  let tmp_prefix = (Filename.basename filename) ^ "-tmp" in
-  let (tmp_filename, tmp_oc) = Filename.open_temp_file
-      ~mode:[Open_binary] ~temp_dir:parent_dir tmp_prefix ""
-  in
-  let () = Base.Exn.protectx tmp_oc ~finally:Stdio.Out_channel.close ~f:(fun oc ->
-      let () = write_message_to_channel ~compression message oc in
-      let () = Stdio.Out_channel.flush oc in
-      let fd = UnixLabels.descr_of_out_channel tmp_oc in
-      ExtUnix.Specific.fsync fd)
-  in
-  let () = UnixLabels.rename ~src:tmp_filename ~dst:filename in
-  let () =
-    (* [open_temp_file] always creates as 0o600, so we may need to touch up permissions *)
-    match perm with
-    | Some perm ->
-        UnixLabels.chmod filename ~perm
-    | None ->
-        ()
-  in
-  (* Attempt to sync directory metadata, so the rename is durably
-     recorded.  May not work as expected on all platforms, so
-     suppress errors. *)
-  try
-    let fd = UnixLabels.openfile parent_dir ~mode:[UnixLabels.O_RDONLY] ~perm:0o600 in
-    Base.Exn.protectx fd ~finally:UnixLabels.close ~f:ExtUnix.Specific.fsync
-  with Unix.Unix_error (_, _, _) ->
-    ()
 
 
 let read_single_message_from_fd ?(restart = true) ~compression fd =
