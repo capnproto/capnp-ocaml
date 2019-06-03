@@ -1,3 +1,51 @@
+# capnp-ocaml 3.3.0
+
+This release is mostly about reducing the number of dependencies.
+The only API change is that `write_message_to_file_robust` has gone.
+
+* Remove `extunix` dependency (#57).
+  `write_message_to_file_robust` was its only user, and wasn't used by anything.
+  Using `fsync` to ensure a file is written to disk is a general function that
+  should be handled by the user of capnp where needed.
+  Removing `extunix` also removes the indirect dependency on `camlp4`,
+  which in turn allows `capnp` to build with OCaml 4.08 (and to build faster on all versions).
+
+* Remove `Pervasives` qualifier (#57).
+  This is needed to support OCaml 4.08 without warnings.
+
+* Remove dependency on `Core` from benchmarks (#55).
+  This was the only remaining use of the library.
+
+* Replace uses of `Core_kernel` with plain `Base` and `Stdio` in the compiler (#56)
+  and tests (#59).
+  This greatly reduces the number of libraries you need to install to install capnp.
+
+* Update tests for the current quickcheck API (#54).
+
+* Switch from jbuilder to dune (#54).
+
+* Require OCaml >= 4.03 (#54).
+  This allows us to drop some complexity from the jbuilder files,
+  allowing them to be upgraded automatically by dune.
+
+* Upgrade to opam 2 format (#54).
+
+* Convert the changelog to markdown (#58).
+  This allows it to be used with dune-release.
+
+With these changes, the following 49 libraries that were needed to install
+capnp-ocaml 3.2.1 are no longer required: `base_bigstring`, `base_quickcheck`,
+`bin_prot`, `camlp4`, `core_kernel`, `extunix`, `fieldslib`,
+`jane-street-headers`, `jst-config`, `num`, `ocaml-compiler-libs`,
+`ocaml-migrate-parsetree`, `octavius`, `parsexp`, `ppx_assert`, `ppx_base`,
+`ppx_bench`, `ppx_bin_prot`, `ppx_compare`, `ppx_custom_printf`,
+`ppx_derivers`, `ppx_enumerate`, `ppx_expect`, `ppx_fail`, `ppx_fields_conv`,
+`ppx_hash`, `ppx_here`, `ppx_inline_test`, `ppx_jane`, `ppx_js_style`,
+`ppx_let`, `ppxlib`, `ppx_module_timer`, `ppx_optcomp`, `ppx_optional`,
+`ppx_pipebang`, `ppx_sexp_conv`, `ppx_sexp_message`, `ppx_sexp_value`,
+`ppx_stable`, `ppx_typerep_conv`, `ppx_variants_conv`, `re`, `seq`, `sexplib`,
+`splittable_random`, `time_now`, `typerep` and `variantslib`.
+
 # capnp-ocaml 3.2.1
 
 ## Other changes
