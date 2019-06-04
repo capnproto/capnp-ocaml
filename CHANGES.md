@@ -1,4 +1,4 @@
-# capnp-ocaml 3.3.0
+# v3.3.0
 
 This release is mostly about reducing the number of dependencies.
 The only API change is that `write_message_to_file_robust` has gone.
@@ -46,13 +46,13 @@ capnp-ocaml 3.2.1 are no longer required: `base_bigstring`, `base_quickcheck`,
 `ppx_stable`, `ppx_typerep_conv`, `ppx_variants_conv`, `re`, `seq`, `sexplib`,
 `splittable_random`, `time_now`, `typerep` and `variantslib`.
 
-# capnp-ocaml 3.2.1
+# v3.2.1
 
 ## Other changes
 
 * Update for API changes in Base and Core\_kernel (#52).
 
-# capnp-ocaml 3.2.0
+# v3.2.0
 
 ## Backwards-incompatible changes
 
@@ -66,7 +66,7 @@ capnp-ocaml 3.2.1 are no longer required: `base_bigstring`, `base_quickcheck`,
 
 * Update for API changes in Base and Core\_kernel (#44).
 
-# capnp-ocaml 3.1.0
+# v3.1.0
 
 ## Backwards-incompatible changes
 
@@ -81,7 +81,7 @@ capnp-ocaml 3.2.1 are no longer required: `base_bigstring`, `base_quickcheck`,
   This makes binaries using the library several MB smaller and allows
   capnp to be used in [Mirage unikernels](https://mirage.io/).
 
-# capnp-ocaml 3.0.0
+# v3.0.0
 
 ## Backwards-incompatible changes
 
@@ -166,7 +166,7 @@ capnp-ocaml 3.2.1 are no longer required: `base_bigstring`, `base_quickcheck`,
   A missing space prevented the generated files from compiling.
   Added Travis CI tests to detect this kind of thing automatically.
 
-# capnp-ocaml 2.1.1
+# v2.1.1
 
 * Fix `Not_found` exception when a capnp import is not referenced within the schema file.
 
@@ -175,19 +175,19 @@ capnp-ocaml 3.2.1 are no longer required: `base_bigstring`, `base_quickcheck`,
   module with the confusing name of `C2b2b`, and there should no longer be a need to
   separately compile that imported schema file.
 
-# capnp-ocaml 2.1.0
+# v2.1.0
 
 * Depend on Core\_kernel rather than Core. Thanks to Matthew Maurer for
   driving this change.
 
 * Fix compatibility issue when building against Core 112.35.00.
 
-# capnp-ocaml 2.0.1
+# v2.0.1
 
 * Invoke OCaml scripts using `-I $OCAML_TOPLEVEL_PATH`, to avoid missing
   `topfind`.
 
-# capnp-ocaml 2.0.0
+# v2.0.0
 
 ## Backwards-incompatible changes
 
@@ -221,11 +221,11 @@ capnp-ocaml 3.2.1 are no longer required: `base_bigstring`, `base_quickcheck`,
 
 * Significant performance improvements across the board.
 
-# capnp-ocaml 1.0.1
+# v1.0.1
 
 * Avoid use of GNU `install` features in `omake install`.  This corrects installation
   problems on OS X and (most likely) other BSDs.
 
-# capnp-ocaml 1.0.0
+# v1.0.0
 
 * Initial release.
