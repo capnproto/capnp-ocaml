@@ -377,7 +377,7 @@ module Check_test_message
       assert_float32_equal 5555.5 (Capnp.Array.get list_reader 0);
       assert_equal Float.infinity (Capnp.Array.get list_reader 1);
       assert_equal Float.neg_infinity (Capnp.Array.get list_reader 2);
-      assert_equal (Pervasives.compare Float.nan (Capnp.Array.get list_reader 3)) 0
+      assert_equal (compare Float.nan (Capnp.Array.get list_reader 3)) 0
     in
     let () =
       let list_reader = float64_list_get s in
@@ -385,7 +385,7 @@ module Check_test_message
       assert_float64_equal 7777.75 (Capnp.Array.get list_reader 0);
       assert_equal Float.infinity (Capnp.Array.get list_reader 1);
       assert_equal Float.neg_infinity (Capnp.Array.get list_reader 2);
-      assert_equal (Pervasives.compare Float.nan (Capnp.Array.get list_reader 3)) 0
+      assert_equal (compare Float.nan (Capnp.Array.get list_reader 3)) 0
     in
     assert_equal [ "plugh"; "xyzzy"; "thud" ] (text_list_get_list s);
     assert_equal [ "oops"; "exhausted"; "rfc3092" ] (data_list_get_list s);
