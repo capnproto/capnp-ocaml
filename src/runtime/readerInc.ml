@@ -31,6 +31,8 @@
    here will modify the underlying message; derefencing null pointers and
    reading from truncated structs both lead to default data being returned. *)
 
+module Uint32 = Stdint.Uint32
+module Uint64 = Stdint.Uint64
 
 let sizeof_uint64 = 8
 

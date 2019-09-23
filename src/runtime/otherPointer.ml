@@ -27,6 +27,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
+module Uint32 = Stdint.Uint32
 
 type t =
   | Capability of Uint32.t

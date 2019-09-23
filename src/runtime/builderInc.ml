@@ -34,6 +34,9 @@
    pointer will cause struct storage to be immediately allocated if that pointer
    was null). *)
 
+module Uint32 = Stdint.Uint32
+module Uint64 = Stdint.Uint64
+
 type ro = Message.ro
 type rw = Message.rw
 let invalid_msg = Message.invalid_msg

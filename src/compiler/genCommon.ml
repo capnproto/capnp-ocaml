@@ -27,6 +27,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
+module Uint32 = Stdint.Uint32
+module Uint64 = Stdint.Uint64
 
 module String = Base.String
 module List = Base.List
@@ -628,8 +630,8 @@ let rec type_name ~context ~(mode : Mode.t) ~(scope_mode : Mode.t)
   | Int64   -> "int64"
   | Uint8   -> "int"
   | Uint16  -> "int"
-  | Uint32  -> "Uint32.t"
-  | Uint64  -> "Uint64.t"
+  | Uint32  -> "Stdint.Uint32.t"
+  | Uint64  -> "Stdint.Uint64.t"
   | Float32 -> "float"
   | Float64 -> "float"
   | Text    -> "string"

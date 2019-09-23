@@ -27,6 +27,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
+module Uint32 = Stdint.Uint32
+module Uint64 = Stdint.Uint64
+
 module List = Base.List
 module Int = Base.Int
 
@@ -98,15 +101,15 @@ let generate_one_field_accessors ~context ~scope ~mode field
           Setter [ "val " ^ field_name ^ "_set_int : t -> int -> unit"; ];
         ]
       | Uint32 -> [
-          Getter [ "val " ^ field_name ^ "_get : t -> Uint32.t"; ];
+          Getter [ "val " ^ field_name ^ "_get : t -> Stdint.Uint32.t"; ];
           Getter [ "val " ^ field_name ^ "_get_int_exn : t -> int"; ];
-          Setter [ "val " ^ field_name ^ "_set : t -> Uint32.t -> unit"; ];
+          Setter [ "val " ^ field_name ^ "_set : t -> Stdint.Uint32.t -> unit"; ];
           Setter [ "val " ^ field_name ^ "_set_int_exn : t -> int -> unit"; ]
         ]
       | Uint64 -> [
-          Getter [ "val " ^ field_name ^ "_get : t -> Uint64.t"; ];
+          Getter [ "val " ^ field_name ^ "_get : t -> Stdint.Uint64.t"; ];
           Getter [ "val " ^ field_name ^ "_get_int_exn : t -> int"; ];
-          Setter [ "val " ^ field_name ^ "_set : t -> Uint64.t -> unit"; ];
+          Setter [ "val " ^ field_name ^ "_set : t -> Stdint.Uint64.t -> unit"; ];
           Setter [ "val " ^ field_name ^ "_set_int_exn : t -> int -> unit"; ];
         ]
       | Void -> [
@@ -560,7 +563,7 @@ let rec generate_interfaces fn
       let unique_type = GenCommon.make_unique_typename ~context node in
       let body = [
         "type t = " ^ unique_type;
-        "val interface_id : Uint64.t";
+        "val interface_id : Stdint.Uint64.t";
       ] @ fn ~context ~nested_modules ~interface_node:node iface_def
       in
       if suppress_module_wrapper then

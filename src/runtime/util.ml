@@ -27,6 +27,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
+module Uint32 = Stdint.Uint32
+module Uint64 = Stdint.Uint64
 
 exception Out_of_int_range of string
 let out_of_int_range s = raise (Out_of_int_range s)

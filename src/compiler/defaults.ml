@@ -52,6 +52,8 @@
    from string storage into this new message of the correct type.
 *)
 
+module Uint64 = Stdint.Uint64
+
 (* Workaround for missing Caml.Bytes in Core 112.35.00 *)
 module CamlBytes = Bytes
 

@@ -29,6 +29,9 @@
 
 (* Inspired by encoding-test.c++, as found in the capnproto source. *)
 
+module Uint32 = Stdint.Uint32
+module Uint64 = Stdint.Uint64
+
 module Int = Base.Int
 module Int64 = Base.Int64
 module Float = Base.Float
