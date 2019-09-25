@@ -6,6 +6,7 @@
 (rule
  (targets
   test.ml               test.mli
+  test_iface_import.ml  test_iface_import.mli
   test_import.ml        test_import.mli
   c2b2b.ml              c2b2b.mli
   testLists.ml          testLists.mli
@@ -14,6 +15,7 @@
   c++.capnp
   test.capnp
   test-import.capnp
+  test-iface-import.capnp
   testLists.capnp
   testCycles.capnp)
  (action

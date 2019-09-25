@@ -41,6 +41,7 @@ module BM  = Capnp.BytesMessage
 module T   = Test.Make(BM)
 module TL  = TestLists.Make(BM)
 module TI  = Test_import.Make(BM)
+module TII = Test_iface_import.Make(BM)
 
 open OUnit2
 
@@ -1451,6 +1452,14 @@ let test_imports _ctx =
   in
   ()
 
+let test_iface_imports _ctx =
+  let module Builder = TII.Builder.TestIfaceImport.M0.Params in
+  let root = Builder.init_root () in
+  init_test_message (Builder.x_init root);
+  let reader = Builder.to_reader root in
+  let module Reader = TII.Reader.TestIfaceImport.M0.Params in
+  Reader_check_test_message.f (Reader.x_get reader)
+
 let test_constants _ctx =
   let open T.Reader.TestConstants in
   assert_equal () void_const;
@@ -1666,6 +1675,7 @@ let encoding_suite =
     "upgrade list in builder" >:: test_upgrade_list_in_builder;
     "nested types encoding" >:: test_nested_types_encoding;
     "test imports" >:: test_imports;
+    "test iface imports" >:: test_iface_imports;
     "test constants" >:: test_constants;
     "test global constants" >:: test_global_constants;
     "test int accessors" >:: test_int_accessors;
