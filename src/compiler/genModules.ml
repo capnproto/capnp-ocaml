@@ -27,6 +27,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
+module Uint32 = Stdint.Uint32
+module Uint64 = Stdint.Uint64
+
 (* Workaround for missing Caml.Bytes in Core 112.35.00 *)
 module CamlBytes = Bytes
 
@@ -872,9 +875,9 @@ let generate_one_field_accessors ~context ~node_id ~scope
         | (PS.Type.Uint32, PS.Value.Uint32 a) ->
             let default =
               if Uint32.compare a Uint32.zero = 0 then
-                "Uint32.zero"
+                "Stdint.Uint32.zero"
               else
-                sprintf "(Uint32.of_string \"%s\")" (Uint32.to_string a)
+                sprintf "(Stdint.Uint32.of_string \"%s\")" (Uint32.to_string a)
             in
             let getters = [
               "let " ^ field_name ^ "_get x =";
@@ -898,9 +901,9 @@ let generate_one_field_accessors ~context ~node_id ~scope
         | (PS.Type.Uint64, PS.Value.Uint64 a) ->
             let default =
               if Uint64.compare a Uint64.zero = 0 then
-                "Uint64.zero"
+                "Stdint.Uint64.zero"
               else
-                sprintf "(Uint64.of_string \"%s\")" (Uint64.to_string a)
+                sprintf "(Stdint.Uint64.of_string \"%s\")" (Uint64.to_string a)
             in
             let getters = [
               "let " ^ field_name ^ "_get x =";
@@ -1326,9 +1329,9 @@ let generate_constant ~context ~scope ~node ~node_name const_def =
   | (Type.Int64, Value.Int64 a) ->
       [ (Int64.to_string a) ^ "L" ]
   | (Type.Uint32, Value.Uint32 a) ->
-      [ sprintf "(Uint32.of_string \"%s\")" (Uint32.to_string a) ]
+      [ sprintf "(Stdint.Uint32.of_string \"%s\")" (Uint32.to_string a) ]
   | (Type.Uint64, Value.Uint64 a) ->
-      [ sprintf "(Uint64.of_string \"%s\")" (Uint64.to_string a) ]
+      [ sprintf "(Stdint.Uint64.of_string \"%s\")" (Uint64.to_string a) ]
   | (Type.Float32, Value.Float32 a) ->
       [ sprintf "(Int32.float_of_bits (%sl))"
           (Int32.to_string (Int32.bits_of_float a)) ]
@@ -1858,7 +1861,7 @@ let rec generate_interfaces fn
       let unique_type = GenCommon.make_unique_typename ~context node in
       let body = [
         "type t = " ^ unique_type;
-        sprintf "let interface_id = Uint64.of_string %S" (Uint64.to_string_hex (PS.Node.id_get node));
+        sprintf "let interface_id = Stdint.Uint64.of_string %S" (Uint64.to_string_hex (PS.Node.id_get node));
       ] @
         fn ~context ~nested_modules ~node_name ~interface_node:node iface_def
       in

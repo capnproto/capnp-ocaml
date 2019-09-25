@@ -1,3 +1,6 @@
+module Uint32 = Stdint.Uint32
+module Uint64 = Stdint.Uint64
+
 module Registry : sig
   (** Handy central registry of all known interfaces, for logging. *)
 

@@ -27,6 +27,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
+module Uint32 = Stdint.Uint32
+module Uint64 = Stdint.Uint64
 
 module SM = Capnp.Message.Make(Capnp.BytesStorage)
 open OUnit2

@@ -1,5 +1,8 @@
 [@@@ocaml.warning "-27-32-37-60"]
 
+module Uint32 = Stdint.Uint32
+module Uint64 = Stdint.Uint64
+
 type ro = Capnp.Message.ro
 type rw = Capnp.Message.rw
 

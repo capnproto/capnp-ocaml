@@ -29,6 +29,9 @@
 
 open EndianBytes
 
+module Uint32 = Stdint.Uint32
+module Uint64 = Stdint.Uint64
+
 type t = Bytes.t
 
 let alloc size = Bytes.make size '\x00'

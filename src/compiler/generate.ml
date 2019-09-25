@@ -27,6 +27,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  ******************************************************************************)
 
+module Uint64 = Stdint.Uint64
+
 module List = Base.List
 module String = Base.String
 module Hashtbl = Base.Hashtbl

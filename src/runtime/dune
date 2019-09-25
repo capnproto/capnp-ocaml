@@ -2,6 +2,6 @@
  (name capnp)
  (public_name capnp)
  (synopsis "Runtime support library for capnp-ocaml")
- (libraries result uint ocplib-endian res)
+ (libraries result stdint ocplib-endian res)
  (flags :standard -w -50-53-55)
  (ocamlopt_flags :standard -O3 -inline 1000))

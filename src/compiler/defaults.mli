@@ -33,6 +33,7 @@
    objects into a StringStorage-based message, so we can easily serialize
    the string contents right into the generated code. *)
 
+module Uint64 = Stdint.Uint64
 
 type t
 type ident_t
