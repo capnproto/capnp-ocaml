@@ -427,17 +427,7 @@ and union_imports_for_type ~visited_node_ids ~import_ids ~context (tp : PS.Type.
       begin match Hashtbl.add visited_node_ids ~key:struct_id ~data:() with
       | `Ok ->
           let struct_node = Context.node context struct_id in
-          let () = begin match PS.Node.get struct_node with
-          | PS.Node.Struct struct_descr ->
-              union_imports_for_struct_fields ~visited_node_ids ~import_ids
-                ~context struct_descr
-          | _ ->
-              failwith "found non-struct node where struct node was expected"
-          end in
-          begin match find_import_providing_node ~context struct_node with
-          | Some import -> Hashtbl.set import_ids ~key:import.Context.id ~data:()
-          | None -> ()
-          end
+          union_imports_for_struct ~visited_node_ids ~import_ids ~context struct_node
       | `Duplicate ->
           ()
       end
@@ -451,6 +441,19 @@ and union_imports_for_type ~visited_node_ids ~import_ids ~context (tp : PS.Type.
       end
   | Undefined x ->
       failwith (sprintf "Unknown Type union discriminant %d" x)
+
+
+and union_imports_for_struct ~visited_node_ids ~import_ids ~context struct_node =
+  match PS.Node.get struct_node with
+  | PS.Node.Struct struct_descr ->
+    union_imports_for_struct_fields ~visited_node_ids ~import_ids
+      ~context struct_descr;
+    begin match find_import_providing_node ~context struct_node with
+      | Some import -> Hashtbl.set import_ids ~key:import.Context.id ~data:()
+      | None -> ()
+    end
+  | _ ->
+    failwith "found non-struct node where struct node was expected"
 
 
 (** Not all imports contain interesting content.  In particular, the
