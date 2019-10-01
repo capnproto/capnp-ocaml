@@ -1,3 +1,17 @@
+# v3.4.0
+
+* Upgrade from uint to stdint (@talex5, #64). From uint 2.0.1, these are
+  compatible. Projects using the schema compiler should either upgrade to
+  stdint themselves, or add a lower bound of `uint >= 2.0.1`. Otherwise,
+  the build may fail because of a missing dependency on stdint.
+
+* Require `base >= 0.11` for `Base.Queue` (@talex5, #61).
+
+* Fix compilation on OCaml 4.08 (@talex5, #63).
+
+* Fix generated files when one interface imports another (@talex5, #65,
+  reported by TealG).
+
 # v3.3.0
 
 This release is mostly about reducing the number of dependencies.
