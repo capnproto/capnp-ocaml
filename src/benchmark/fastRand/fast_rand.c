@@ -32,7 +32,9 @@
 
 // This code is designed for use on a 64-bit platform, where a uint32_t
 // always fits inside an OCaml int.
-static char requires_sixtyfour_bit_platform[sizeof(long) == 8 ? 1 : -1];
+#ifndef ARCH_SIXTYFOUR
+#error "This code is designed for use on a 64-bit platform"
+#endif
 
 // Use a 128-bit Xorshift algorithm.
 static inline uint32_t nextFastRand() {
