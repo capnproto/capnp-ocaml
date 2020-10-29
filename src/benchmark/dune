@@ -28,7 +28,7 @@
   (:< carsales.capnp)
   ../compiler/main.bc)
  (action
-  (run capnpc -o ../compiler/main.bc %{<})))
+  (run capnp compile -o ../compiler/main.bc %{<})))
 
 (rule
  (targets catrank.ml catrank.mli)
@@ -36,7 +36,7 @@
   (:< catrank.capnp)
   ../compiler/main.bc)
  (action
-  (run capnpc -o ../compiler/main.bc %{<})))
+  (run capnp compile -o ../compiler/main.bc %{<})))
 
 (rule
  (targets eval.ml eval.mli)
@@ -44,7 +44,7 @@
   (:< eval.capnp)
   ../compiler/main.bc)
  (action
-  (run capnpc -o ../compiler/main.bc %{<})))
+  (run capnp compile -o ../compiler/main.bc %{<})))
 
 (alias
  (name benchmarks)

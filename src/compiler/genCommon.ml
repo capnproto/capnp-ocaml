@@ -177,7 +177,7 @@ let children_of
  * So we have to implement a little search logic to get a programmatic name for
  * a node.
  *
- * Raises: Failure if we can't find the node in its parent.  (This means that capnpc
+ * Raises: Failure if we can't find the node in its parent.  (This means that capnp compile
  * emitted a schema that we don't fully understand...) *)
 let get_unqualified_name
     ~(parent : PS.Node.t)
