@@ -81,7 +81,7 @@ let init_test_message (s : T.Builder.TestAllTypes.t) : unit =
   int64_field_set s (-123456789012345L);
   u_int8_field_set_exn s 234;
   u_int16_field_set_exn s 45678;
-  u_int32_field_set s (Uint32.of_int 3456789012);
+  u_int32_field_set s (Uint32.of_string "3456789012");
   u_int64_field_set s (Uint64.of_string "12345678901234567890");
   float32_field_set s 1234.5;
   float64_field_set s (-123e45);
@@ -97,7 +97,7 @@ let init_test_message (s : T.Builder.TestAllTypes.t) : unit =
     int64_field_set sub 56789012345678L;
     u_int8_field_set_exn sub 90;
     u_int16_field_set_exn sub 1234;
-    u_int32_field_set sub (Uint32.of_int 56789012);
+    u_int32_field_set sub (Uint32.of_string "56789012");
     u_int64_field_set sub (Uint64.of_string "345678901234567890");
     float32_field_set sub (-1.25e-10);
     float64_field_set sub 345.0;
@@ -121,7 +121,7 @@ let init_test_message (s : T.Builder.TestAllTypes.t) : unit =
     let _ = u_int8_list_set_list sub [ 12; 34; 0; 0xff ] in
     let _ = u_int16_list_set_list sub [ 1234; 5678; 0; 0xffff ] in
     let _ = u_int32_list_set_list sub [
-        Uint32.of_int 12345678; Uint32.of_int 90123456;
+        Uint32.of_string "12345678"; Uint32.of_string "90123456";
         Uint32.of_int 0; Uint32.of_string "0xffffffff";
       ]
     in
@@ -157,7 +157,7 @@ let init_test_message (s : T.Builder.TestAllTypes.t) : unit =
   let _ = int64_list_set_list s [ 1111111111111111111L; -1111111111111111111L ] in
   let _ = u_int8_list_set_list s [ 111; 222 ] in
   let _ = u_int16_list_set_list s [ 33333; 44444 ] in
-  let _ = u_int32_list_set_list s [ Uint32.of_int 3333333333 ] in
+  let _ = u_int32_list_set_list s [ Uint32.of_string "3333333333" ] in
   let _ = u_int64_list_set_list s [ Uint64.of_string "11111111111111111111" ] in
   let _ = float32_list_set_list s [ 5555.5; Float.infinity; Float.neg_infinity; Float.nan ] in
   let _ = float64_list_set_list s [ 7777.75; Float.infinity; Float.neg_infinity; Float.nan ] in
@@ -319,7 +319,7 @@ module Check_test_message
       assert_equal 56789012345678L (int64_field_get sub);
       assert_equal 90 (u_int8_field_get sub);
       assert_equal 1234 (u_int16_field_get sub);
-      assert_equal (Uint32.of_int 56789012) (u_int32_field_get sub);
+      assert_equal (Uint32.of_string "56789012") (u_int32_field_get sub);
       assert_equal (Uint64.of_string "345678901234567890") (u_int64_field_get sub);
       assert_float32_equal (-1.25e-10) (float32_field_get sub);
       assert_float64_equal 345.0 (float64_field_get sub);
@@ -1008,8 +1008,8 @@ let init_list_defaults (lists : T.Builder.TestLists.t) =
   Struct8.f_set_exn (Capnp.Array.get list8 1) 45;
   Struct16.f_set_exn (Capnp.Array.get list16 0) 12345;
   Struct16.f_set_exn (Capnp.Array.get list16 1) 6789;
-  Struct32.f_set (Capnp.Array.get list32 0) (Uint32.of_int 123456789);
-  Struct32.f_set (Capnp.Array.get list32 1) (Uint32.of_int 234567890);
+  Struct32.f_set (Capnp.Array.get list32 0) (Uint32.of_string "123456789");
+  Struct32.f_set (Capnp.Array.get list32 1) (Uint32.of_string "234567890");
   Struct64.f_set (Capnp.Array.get list64 0) (Uint64.of_string "1234567890123456");
   Struct64.f_set (Capnp.Array.get list64 1) (Uint64.of_string "2345678901234567");
   StructP.f_set (Capnp.Array.get listp 0) "foo";
@@ -1076,9 +1076,9 @@ module Check_test_list
     assert_equal 45  (TL.Struct8.f_get (Capnp.Array.get (TL.list8_get lists) 1));
     assert_equal 12345 (TL.Struct16.f_get (Capnp.Array.get (TL.list16_get lists) 0));
     assert_equal 6789  (TL.Struct16.f_get (Capnp.Array.get (TL.list16_get lists) 1));
-    assert_equal (Uint32.of_int 123456789)
+    assert_equal (Uint32.of_string "123456789")
       (TL.Struct32.f_get (Capnp.Array.get (TL.list32_get lists) 0));
-    assert_equal (Uint32.of_int 234567890)
+    assert_equal (Uint32.of_string "234567890")
       (TL.Struct32.f_get (Capnp.Array.get (TL.list32_get lists) 1));
     assert_equal (Uint64.of_string "1234567890123456")
       (TL.Struct64.f_get (Capnp.Array.get (TL.list64_get lists) 0));
@@ -1334,8 +1334,8 @@ let test_upgrade_list_in_builder _ctx =
   in
 
   let () =
-    let u32_list = (List.map ~f:Uint32.of_int
-        [ 0x17595612; 0x29347823; 0x5923ab32; 0x1a39cd45 ])
+    let u32_list = (List.map ~f:Uint32.of_string
+        [ "0x17595612"; "0x29347823"; "0x5923ab32"; "0x1a39cd45" ])
     in
     let root = TL.Builder.UInt32List.init_root () in
     let a = TL.Builder.UInt32List.a_set_list root u32_list in
@@ -1350,8 +1350,8 @@ let test_upgrade_list_in_builder _ctx =
   in
 
   let () =
-    let u64_list = (List.map ~f:Uint64.of_int
-        [0x1234abcd8735fe21; 0x7173bc0e1923af36])
+    let u64_list = (List.map ~f:Uint64.of_string
+        ["0x1234abcd8735fe21"; "0x7173bc0e1923af36"])
     in
     let root = TL.Builder.UInt64List.init_root () in
     let a = TL.Builder.UInt64List.a_set_list root u64_list in
@@ -1470,7 +1470,7 @@ let test_constants _ctx =
   assert_equal (-123456789012345L) int64_const;
   assert_equal 234 uint8_const;
   assert_equal 45678 uint16_const;
-  assert_equal (Uint32.of_int 3456789012) uint32_const;
+  assert_equal (Uint32.of_string "3456789012") uint32_const;
   assert_equal (Uint64.of_string "12345678901234567890") uint64_const;
   assert_float32_equal 1234.5 float32_const;
   assert_float64_equal (-123e45) float64_const;
@@ -1486,7 +1486,7 @@ let test_constants _ctx =
     assert_equal 56789012345678L (int64_field_get struct_const);
     assert_equal 90 (u_int8_field_get struct_const);
     assert_equal 1234 (u_int16_field_get struct_const);
-    assert_equal (Uint32.of_int 56789012) (u_int32_field_get struct_const);
+    assert_equal (Uint32.of_string "56789012") (u_int32_field_get struct_const);
     assert_equal (Uint64.of_string "345678901234567890") (u_int64_field_get struct_const);
     assert_float32_equal (-1.25e-10) (float32_field_get struct_const);
     assert_float64_equal 345.0 (float64_field_get struct_const);
@@ -1624,15 +1624,17 @@ let test_int_accessors _ctx =
 
   (* Assuming tests are running on 64-bit... *)
 
-  B.int32_field_set_int_exn root (-0x80000000);
-  B.int32_field_set_int_exn root 0x7fffffff;
-  assert_raises_invalid_arg (fun () -> B.int32_field_set_int_exn root (-0x80000001));
-  assert_raises_invalid_arg (fun () -> B.int32_field_set_int_exn root 0x80000000);
+  if Sys.word_size > 32 then (
+    B.int32_field_set root (Int32.of_string "-0x80000000");
+    B.int32_field_set_int_exn root 0x7fffffff;
+    assert_raises_invalid_arg (fun () -> B.int32_field_set_int_exn root (Int.of_string "-0x80000001"));
+    assert_raises_invalid_arg (fun () -> B.int32_field_set_int_exn root (Int.of_string "0x80000000"));
 
-  B.u_int32_field_set_int_exn root 0;
-  B.u_int32_field_set_int_exn root 0xffffffff;
-  assert_raises_invalid_arg (fun () -> B.u_int32_field_set_int_exn root 0x100000000);
-  assert_raises_invalid_arg (fun () -> B.u_int32_field_set_int_exn root (-1));
+    B.u_int32_field_set_int_exn root 0;
+    B.u_int32_field_set_int_exn root (Int.of_string "0xffffffff");
+    assert_raises_invalid_arg (fun () -> B.u_int32_field_set_int_exn root (Int.of_string "0x100000000"));
+    assert_raises_invalid_arg (fun () -> B.u_int32_field_set_int_exn root (-1));
+  );
 
   B.u_int64_field_set_int_exn root 0;
   B.u_int64_field_set_int_exn root Int.max_value;
