@@ -13,7 +13,7 @@ depends: [
   "base_quickcheck" {with-test}
   "ocplib-endian" {>= "0.7"}
   "res"
-  "stdint"
+  "stdint" {>= "0.5.1"}
   "ounit" {with-test}
   "conf-capnproto" {with-test}
 ]
