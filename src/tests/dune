@@ -19,7 +19,7 @@
   testLists.capnp
   testCycles.capnp)
  (action
-  (run capnpc -o %{bin:capnpc-ocaml} %{deps})))
+  (run capnp compile -o %{bin:capnpc-ocaml} %{deps})))
 
 (alias
  (name runtest)
