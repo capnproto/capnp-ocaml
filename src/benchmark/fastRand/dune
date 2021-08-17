@@ -1,6 +1,9 @@
 (library
+ (enabled_if (= %{architecture} amd64))
+ (foreign_stubs
+  (language c)
+  (names fast_rand)
+  (flags :standard -O3))
  (name fast_rand)
  (wrapped false)
- (c_names fast_rand)
- (c_flags :standard -O3)
  (flags :standard -w -3))
