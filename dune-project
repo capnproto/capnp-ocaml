@@ -1,2 +1,5 @@
-(lang dune 1.0)
+(lang dune 2.3)
+
 (name capnp)
+
+(formatting disabled)

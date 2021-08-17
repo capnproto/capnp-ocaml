@@ -1,7 +1,7 @@
-(executable
+(test
  (name run_tests)
  (libraries capnp oUnit base_quickcheck)
- (flags :standard -w -53))
+ (flags :standard -w -53-55))
 
 (rule
  (targets
@@ -20,7 +20,3 @@
   testCycles.capnp)
  (action
   (run capnp compile -o %{bin:capnpc-ocaml} %{deps})))
-
-(alias
- (name runtest)
- (action (run %{exe:run_tests.bc})))

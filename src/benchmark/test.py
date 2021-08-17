@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import subprocess, os, csv, time, sys
 my_dir = os.path.abspath(os.path.dirname(sys.argv[0]))
 os.chdir(my_dir)
@@ -8,7 +8,7 @@ bin_dir = os.path.join(my_dir, '../../_build/default/src/benchmark')
 
 switch = subprocess.check_output(["opam", "sw", "show"]).strip()
 
-print "Current switch: %s" % switch
+print("Current switch: %s" % switch)
 
 baseline = {
         ('./carsales', 'pipe', 'none'): 67433620.95888832,
@@ -30,7 +30,7 @@ def run(cmd, base_iters, scale):
     rate = throughput / t
     frac = 100 * rate / base
     cmd = " ".join(cmd)
-    print "%6.2f%% of baseline: %3.1f x %s" % (frac, scale, key)
+    print("%6.2f%% of baseline: %3.1f x %s" % (frac, scale, key))
     if scale not in results: results[scale] = {}
     results[scale][key] = frac
 
