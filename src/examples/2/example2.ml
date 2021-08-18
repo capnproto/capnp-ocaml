@@ -1,6 +1,4 @@
-module BM = Capnp.BytesMessage
-module BS = Capnp.BytesStorage
-module Shape = Shape.Make(BM)
+module Shape = Shape.Make(Capnp.BytesMessage)
 
 let rect_str =
   let open Shape in
@@ -15,7 +13,7 @@ let rect_str =
 let circle_str =
   let open Shape in
   let rw = Builder.Shape.init_root() in
-  Builder.Shape.colour_set rw Builder.Shape.Colour.Blue;
+  Builder.Shape.colour_set rw Builder.Shape.Colour.Green;
   let circle = Builder.Shape.circle_init rw in 
   Builder.Shape.Circle.radius_set circle 3.0;
   let message = Builder.Shape.to_message rw in 
@@ -35,10 +33,10 @@ let decode_exn shape_str =
   let stream = Capnp.Codecs.FramedStream.of_string ~compression:`None shape_str in 
   let res = Capnp.Codecs.FramedStream.get_next_frame stream in 
   let shape = match res with 
-    | (Result.Ok message) -> Reader.Shape.of_message message 
-    | (Result.Error _) -> failwith "Could not read string"
+    | Result.Ok message -> Reader.Shape.of_message message 
+    | Result.Error _ -> failwith "Could not read string"
   in
-  match (Reader.Shape.get shape) with 
+  match Reader.Shape.get shape with 
   | Reader.Shape.Circle c -> 
     Printf.printf "%s circle with a radius of %f\n"
       (colour_to_string (Reader.Shape.colour_get shape))
@@ -48,8 +46,8 @@ let decode_exn shape_str =
       (colour_to_string (Reader.Shape.colour_get shape))
       (Reader.Shape.Rectangle.width_get r)
       (Reader.Shape.Rectangle.height_get r)
-  | _ -> failwith "Could not read type"
+  | Reader.Shape.Undefined _ -> failwith "Could not read type"
 
-let _ =
+let () =
   decode_exn rect_str;
-  decode_exn circle_str;
+  decode_exn circle_str
