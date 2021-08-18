@@ -548,10 +548,13 @@ about speed.
 
 I Need to See an Example
 ------------------------
-I should really put together some trivial example code.  But in the meantime,
-the https://github.com/pelzlpj/capnp-ocaml/tree/master/src/tests[tests]
-and https://github.com/pelzlpj/capnp-ocaml/tree/master/src/benchmark[benchmark]
-subdirectories may be helpful to look at.
+There are some simple examples in the https://github.com/capnproto/capnp-ocaml/tree/master/src/examples[examples] directory.
+
+The https://github.com/capnproto/capnp-ocaml/tree/master/src/tests[tests]
+and https://github.com/capnproto/capnp-ocaml/tree/master/src/benchmark[benchmark]
+subdirectories may also be helpful to look at.
+
+The https://github.com/mirage/capnp-rpc/blob/master/README.md[RPC tutorial] also contains many examples.
 
 
 Installation
