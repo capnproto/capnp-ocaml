@@ -13,6 +13,9 @@ Documentation:
 
 Build system:
 
+* Remove compiler flags for flambda (@talex5, #83).
+  This was very slow to compile on OCaml 4.14, and the performance benefit is minimal.
+
 * Update to dune 2 (@talex5, #77).
 
 * Dune should not be a build dependency (@talex5, #67).
