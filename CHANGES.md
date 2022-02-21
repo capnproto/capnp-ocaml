@@ -1,3 +1,31 @@
+# v3.5.0
+
+New features:
+
+* Add Codecs.serialize_{fold,iter}_copyless (@Cjen1, #71).
+  Avoids a copy when writing out fragments.
+
+Documentation:
+
+* Add example of how to use the library (@rottened23, #62).
+
+* Extract LICENSE and identify as BSD-2-Clause (@tmcgilchrist, #80).
+
+Build system:
+
+* Update to dune 2 (@talex5, #77).
+
+* Dune should not be a build dependency (@talex5, #67).
+
+* Replace `Uint32.of_int` in unit-tests with `of_string` (@talex5, #73).
+  Fixed tests on 32-bit systems.
+
+* Remove Travis CI (@talex5, #74). Replaced by ocaml-ci.
+
+* Switch from "capnpc" to "capnp compile" (@talex5, #75).
+
+* Benchmarks: remove incorrect test for 64-bit on Windows (@dra27, #72).
+
 # v3.4.0
 
 * Upgrade from uint to stdint (@talex5, #64). From uint 2.0.1, these are
