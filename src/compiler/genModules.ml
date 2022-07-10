@@ -1813,7 +1813,7 @@ let generate_service ~context ~nested_modules ~node_name ~interface_node interfa
     [ "class virtual service = object (self)";
       "  method release = ()";
       "  method dispatch ~interface_id:i ~method_id =";
-      "    if i <> interface_id then MessageWrapper.Untyped.unknown_interface ~interface_id";
+      "    if i <> interface_id then MessageWrapper.Untyped.unknown_interface ~interface_id:i";
       "    else match method_id with";
     ] @ apply_indent ~indent:"    " dispatch_body @
     [ "    | x -> MessageWrapper.Untyped.unknown_method ~interface_id ~method_id";
