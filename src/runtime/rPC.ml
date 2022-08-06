@@ -11,6 +11,8 @@ module Registry : sig
       It prints out qualified names, suitable for logging
       (e.g. "Foo.bar") *)
   val pp_method : Format.formatter -> Uint64.t * int -> unit
+
+  val pp_interface : Format.formatter -> Uint64.t -> unit
 end = struct
   type interface = {
     name : string;
@@ -34,6 +36,11 @@ end = struct
         Format.fprintf f "%s.%s" interface.name method_name
       | None ->
         Format.fprintf f "%s.<method-%d>" interface.name method_id
+
+  let pp_interface f interface_id =
+    match Hashtbl.find interfaces interface_id with
+    | exception Not_found -> Format.fprintf f "<interface %a>" Uint64.printer interface_id
+    | interface           -> Format.fprintf f "%s" interface.name
 end
 
 module MethodID : sig
