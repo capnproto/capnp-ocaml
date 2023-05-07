@@ -39,7 +39,7 @@ let sizeof_uint64 = 8
 open Message
 
 module Make (MessageWrapper : RPC.S) = struct
-  module RC = CommonInc.Make[@inlined](MessageWrapper)
+  module RC = CommonInc.Make(MessageWrapper)
   include RC
 
   (* Given a pointer which is expected to be a list pointer, compute the

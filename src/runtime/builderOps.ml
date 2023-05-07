@@ -51,9 +51,9 @@ end
    cases are functions that make a copy from a source to a destination. *)
 module Make (ROM : MessageSig.S) (RWM : RPC.S) = struct
   module ROM = RPC.None(ROM)
-  module ROC = CommonInc.Make[@inlined](ROM)
-  module RWC = CommonInc.Make[@inlined](RWM)
-  module RReader = ReaderInc.Make[@inlined](RWM)
+  module ROC = CommonInc.Make(ROM)
+  module RWC = CommonInc.Make(RWM)
+  module RReader = ReaderInc.Make(RWM)
 
 
   (* Given storage for a struct, get the pointer bytes for the given

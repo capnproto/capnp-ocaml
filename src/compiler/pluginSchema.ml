@@ -1358,7 +1358,7 @@ module MakeRPC(MessageWrapper : Capnp.RPC.S) = struct
 
   let invalid_msg = Capnp.Message.invalid_msg
 
-  include Capnp.Runtime.BuilderInc.Make[@inlined](MessageWrapper)
+  include Capnp.Runtime.BuilderInc.Make(MessageWrapper)
 
   type 'cap message_t = 'cap MessageWrapper.Message.t
 
@@ -4085,4 +4085,4 @@ module MakeRPC(MessageWrapper : Capnp.RPC.S) = struct
   module MessageWrapper = MessageWrapper
 end [@@inline]
 
-module Make(M:Capnp.MessageSig.S) = MakeRPC[@inlined](Capnp.RPC.None(M)) [@@inline]
+module Make(M:Capnp.MessageSig.S) = MakeRPC(Capnp.RPC.None(M)) [@@inline]

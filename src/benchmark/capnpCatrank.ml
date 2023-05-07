@@ -1,7 +1,7 @@
 
 module CamlBytes = Bytes
 
-module CR = Catrank.Make[@inlined](Capnp.BytesMessage)
+module CR = Catrank.Make(Capnp.BytesMessage)
 
 module Array = Base.Array
 module Char = Base.Char
