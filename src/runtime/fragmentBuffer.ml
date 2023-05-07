@@ -34,11 +34,11 @@ type fragment = {
 }
 
 type t = {
-  (** String fragments stored in FIFO order *)
   mutable ends : (fragment * fragment) option;     (* Front, back *)
+  (** String fragments stored in FIFO order *)
 
-  (** Total byte count of the fragments *)
   mutable fragments_size : int;
+  (** Total byte count of the fragments *)
 }
 
 let empty () = {

@@ -37,23 +37,23 @@ exception Unsupported_message_frame
 
 module WriteContext = struct
   type 'a t = {
-    (** File descriptor we're writing to *)
     fd : 'a;
+    (** File descriptor we're writing to *)
 
-    (** Compression format *)
     comp : compression_t;
+    (** Compression format *)
 
-    (** Function for writing to the descriptor *)
     write : 'a -> buf:string -> pos:int -> len:int -> int;
+    (** Function for writing to the descriptor *)
 
-    (** Data remaining to write to the descriptor *)
     fragments : string Queue.t;
+    (** Data remaining to write to the descriptor *)
 
-    (** Total number of bytes stored in [fragments] *)
     mutable fragments_size : int;
+    (** Total number of bytes stored in [fragments] *)
 
-    (** Position within the first fragment where writing should begin *)
     mutable first_fragment_pos : int;
+    (** Position within the first fragment where writing should begin *)
   }
 
   let create ~write ~compression fd = {
@@ -108,17 +108,17 @@ end
 
 module ReadContext = struct
   type 'a t = {
-    (** File descriptor we're writing to *)
     fd : 'a;
+    (** File descriptor we're writing to *)
 
-    (** Stream format *)
     stream : Codecs.FramedStream.t;
+    (** Stream format *)
 
-    (** Function for reading from the descriptor *)
     read : 'a -> buf:Bytes.t -> pos:int -> len:int -> int;
+    (** Function for reading from the descriptor *)
 
-    (** Persistent read buffer *)
     read_buf : Bytes.t;
+    (** Persistent read buffer *)
   }
 
   let create ~read ~compression fd = {

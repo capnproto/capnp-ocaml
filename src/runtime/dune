@@ -3,4 +3,4 @@
  (public_name capnp)
  (synopsis "Runtime support library for capnp-ocaml")
  (libraries result stdint ocplib-endian res)
- (flags :standard -w -50-53-55))
+ (flags :standard -w -53-55))

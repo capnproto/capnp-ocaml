@@ -2,24 +2,24 @@
 let sizeof_uint64 = 8
 
 type t =
-  (** list(void), no storage required *)
   | Empty
+  (** list(void), no storage required *)
 
-  (** list(bool), tightly packed bits *)
   | Bit
+  (** list(bool), tightly packed bits *)
 
-  (** either primitive values or a data-only struct *)
   | Bytes1
   | Bytes2
   | Bytes4
   | Bytes8
+  (** either primitive values or a data-only struct *)
 
-  (** either a pointer to an external object, or a pointer-only struct *)
   | Pointer
+  (** either a pointer to an external object, or a pointer-only struct *)
 
+  | Composite of int * int
   (** typical struct; parameters are per-element word size for data section
       and pointers section, respectively *)
-  | Composite of int * int
 
 let get_byte_count storage_type =
   match storage_type with
