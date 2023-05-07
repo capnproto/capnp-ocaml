@@ -50,11 +50,11 @@ module UncompStream = struct
     | IncompleteFrame of incomplete_frame_t
 
   type t = {
-    (** Primary storage for incoming stream segments. *)
     fragment_buffer : FragmentBuffer.t;
+    (** Primary storage for incoming stream segments. *)
 
-    (** Partially-decoded frame information *)
     mutable decoder_state : decoder_state_t;
+    (** Partially-decoded frame information *)
   }
 
   let empty () = {
@@ -164,11 +164,11 @@ end
 module PackedStream = struct
 
   type t = {
-    (** Packed fragments waiting to be unpacked *)
     packed : FragmentBuffer.t;
+    (** Packed fragments waiting to be unpacked *)
 
-    (** Unpacked fragments waiting to be decoded as messages *)
     unpacked : UncompStream.t;
+    (** Unpacked fragments waiting to be decoded as messages *)
   }
 
   let empty () = {

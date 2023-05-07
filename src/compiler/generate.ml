@@ -122,7 +122,7 @@ let mod_functor_header = [
 let mod_header ~context = [
   "  let invalid_msg = Capnp.Message.invalid_msg";
   "";
-  "  include Capnp.Runtime.BuilderInc.Make[@inlined](MessageWrapper)";
+  "  include Capnp.Runtime.BuilderInc.Make(MessageWrapper)";
   "";
   "  type 'cap message_t = 'cap MessageWrapper.Message.t";
   ""; ] @ (List.concat_map context.Context.imports ~f:(fun import -> [
@@ -169,7 +169,7 @@ let mod_footer = [
 
 let mod_functor_footer = [
   "  module MessageWrapper = MessageWrapper";
-  "end [@@inline]";
+  "end";
   "";
   "module Make(M:Capnp.MessageSig.S) = MakeRPC[@inlined](Capnp.RPC.None(M)) [@@inline]";
 ]

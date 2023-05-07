@@ -11,16 +11,16 @@ type element_type_t =
 
 
 type t = {
+  offset : int;
   (** Signed offset in words from end of the pointer to start of the first
       list element. *)
-  offset : int;
 
-  (** Type of data stored for each list element. *)
   element_type : element_type_t;
+  (** Type of data stored for each list element. *)
 
+  num_elements : int;
   (** Number of elements in the list.  For Composite list data, this is the number
       of words in the list. *)
-  num_elements : int;
 }
 
 

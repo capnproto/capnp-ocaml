@@ -46,7 +46,7 @@ let sizeof_uint64 = 8
 (* Functor parameter: NM == "native message" *)
 module Make (NM : RPC.S) = struct
   module RA_ = struct
-    include ReaderInc.Make[@inlined](NM)
+    include ReaderInc.Make(NM)
   end
 
   module BA_ = struct
@@ -56,7 +56,7 @@ module Make (NM : RPC.S) = struct
     module DM = Message.BytesMessage
 
     module NC = struct
-      include CommonInc.Make[@inlined](NM)
+      include CommonInc.Make(NM)
     end
 
     (* DefaultsCopier will provide algorithms for making deep copies of default

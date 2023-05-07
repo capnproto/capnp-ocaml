@@ -136,11 +136,11 @@ module type MESSAGE = sig
   type storage_t
 
   type storage_descr_t = {
-    (** Storage for one of the message segments *)
     segment : storage_t;
+    (** Storage for one of the message segments *)
 
-    (** Number of bytes actually consumed in this segment *)
     bytes_consumed : int;
+    (** Number of bytes actually consumed in this segment *)
   }
 
   type -'cap segment_t

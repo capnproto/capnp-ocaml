@@ -29,15 +29,15 @@
 
 
 type t = {
+  offset : int;
   (** Signed offset in words from end of the pointer to start of struct
       data region. *)
-  offset : int;
 
-  (** Size of struct data region, in words. *)
   data_words : int;
+  (** Size of struct data region, in words. *)
 
-  (** Size of struct pointers region, in words. *)
   pointer_words : int;
+  (** Size of struct pointers region, in words. *)
 }
 
 

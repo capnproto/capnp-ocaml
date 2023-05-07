@@ -33,15 +33,15 @@ type landing_pad_t =
   | TaggedFarPointer
 
 type t = {
-  (** Type of landing pad which this far pointer points to. *)
   landing_pad : landing_pad_t;
+  (** Type of landing pad which this far pointer points to. *)
 
+  offset : int;
   (** Unsigned offset in words from start of the segment to start of
       the landing pad. *)
-  offset : int;
 
-  (** Segment ID where the landing pad is located. *)
   segment_id : int
+  (** Segment ID where the landing pad is located. *)
 }
 
 
