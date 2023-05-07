@@ -15,7 +15,7 @@ depends: [
   "ocplib-endian" {>= "0.7"}
   "res"
   "stdint" {>= "0.5.1"}
-  "ounit" {with-test}
+  "ounit2" {with-test}
   "conf-capnproto" {with-test}
 ]
 build: [
