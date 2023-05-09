@@ -1,7 +1,6 @@
 (executable
   (name example2)
-  (libraries capnp)
-  (flags :standard -w -55))
+  (libraries capnp))
 
 (rule
   (targets shape.ml shape.mli)

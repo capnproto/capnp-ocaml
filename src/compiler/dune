@@ -1,5 +1,4 @@
 (executable
  (name main)
  (public_name capnpc-ocaml)
- (flags :standard -w -55)
  (libraries capnp capnp_unix))

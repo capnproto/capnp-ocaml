@@ -2,7 +2,6 @@
  (name main)
  (enabled_if (= %{architecture} amd64))
  (libraries capnp capnp_unix fast_rand base)
- (flags :standard -w -55)
  (ocamlopt_flags :standard -O3 -inline 2000))
 
 (rule

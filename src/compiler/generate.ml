@@ -171,7 +171,7 @@ let mod_functor_footer = [
   "  module MessageWrapper = MessageWrapper";
   "end";
   "";
-  "module Make(M:Capnp.MessageSig.S) = MakeRPC[@inlined](Capnp.RPC.None(M)) [@@inline]";
+  "module Make(M:Capnp.MessageSig.S) = MakeRPC(Capnp.RPC.None(M))";
 ]
 
 

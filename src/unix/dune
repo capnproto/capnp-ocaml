@@ -2,5 +2,4 @@
  (name capnp_unix)
  (public_name capnp.unix)
  (synopsis "Runtime support library for capnp-ocaml (Unix)")
- (libraries capnp unix base stdio)
- (flags :standard -w -55))
+ (libraries capnp unix base stdio))
