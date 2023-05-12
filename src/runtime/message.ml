@@ -415,7 +415,7 @@ module Make (Storage : MessageStorage.S) = struct
 
 end [@@inline]
 
-module BytesMessage = Make[@inlined](BytesStorage)
+module BytesMessage = Make(BytesStorage)
 
 
 exception Invalid_message of string

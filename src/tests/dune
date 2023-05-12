@@ -1,7 +1,6 @@
 (test
  (name run_tests)
- (libraries capnp ounit2 base_quickcheck)
- (flags :standard -w -55))
+ (libraries capnp ounit2 base_quickcheck))
 
 (rule
  (targets

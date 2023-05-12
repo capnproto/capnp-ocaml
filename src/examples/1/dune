@@ -1,9 +1,6 @@
 (executable
   (name example1)
-  (libraries capnp)
-  ; We disable warning 55 as this relates to inlining certain functions. For inlining please see the README.md 
-  ; and the benchmarks for examples.
-  (flags :standard -w -55))
+  (libraries capnp))
 
 ; This rule tells dune how to generate foo.ml and foo.mli by compiling foo.capnp against the CAP'N PROTO compiler
 ; PLEASE NOTE that capnpc must exist on your computer for this to work (https://capnproto.org/install.html)
