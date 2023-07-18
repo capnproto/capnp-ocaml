@@ -1,3 +1,19 @@
+# v3.6.0
+
+- Update README to talk about stdint, not uint (reported by @liyishuai).  
+  Also, remove out-of-date list of runtime packages needed. The build system can sort that out.
+
+- Remove all `inlined` attributes (@talex5 #87 #88).  
+  These cause confusing compiler warnings for users, which can't be disabled automatically,
+  and the inlining isn't being used anyway since https://github.com/capnproto/capnp-ocaml/pull/83.
+
+- Fix "Unknown interface" error (@talex5 #85).  
+  It reported the UUID of the actual object, not the UUID that was requested.
+  Also, add `Registry.pp_interface` for better error messages.
+
+- Minor opam fixes (@talex5 #84).  
+  Depend on dune >= 2.3 and don't try to build benchmarks; that only works on some platforms.
+
 # v3.5.0
 
 New features:
