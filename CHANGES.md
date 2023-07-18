@@ -14,6 +14,9 @@
 - Minor opam fixes (@talex5 #84).  
   Depend on dune >= 2.3 and don't try to build benchmarks; that only works on some platforms.
 
+- Bump minimum OCaml version to 4.08.  
+  4.07 doesn't work due to https://github.com/janestreet/base/issues/94.
+
 # v3.5.0
 
 New features:

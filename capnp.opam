@@ -6,7 +6,7 @@ homepage: "https://github.com/capnproto/capnp-ocaml"
 bug-reports: "https://github.com/capnproto/capnp-ocaml/issues"
 license: "BSD-2-Clause"
 depends: [
-  "ocaml" {>= "4.03.0"}
+  "ocaml" {>= "4.08.0"}
   "dune" {>= "2.3"}
   "result"
   "base" {>= "v0.11"}
