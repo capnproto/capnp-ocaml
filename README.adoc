@@ -37,8 +37,8 @@ The Cap\'n Proto types are mapped to OCaml types as follows:
 | `Int64`           | `int64`
 | `UInt8`           | `int`
 | `UInt16`          | `int`
-| `UInt32`          | `Uint32.t` (from https://github.com/andrenth/ocaml-uint[`uint`] library)
-| `UInt64`          | `Uint64.t` (from https://github.com/andrenth/ocaml-uint[`uint`] library)
+| `UInt32`          | `Uint32.t` (from https://github.com/andrenth/ocaml-stdint[`stdint`] library)
+| `UInt64`          | `Uint64.t` (from https://github.com/andrenth/ocaml-stdint[`stdint`] library)
 | `Float32`         | `float`
 | `Float64`         | `float`
 | `Text`            | `string`
@@ -504,8 +504,7 @@ http://kentonv.github.io/capnproto/install.html[install the Cap\'n Proto compile
 Once the Cap\'n Proto compiler and capnp-ocaml are both installed, you should be
 able to use `capnp compile -o ocaml yourSchemaFile.capnp` in order to generate
 `yourSchemaFile.mli` and `yourSchemaFile.ml`.  These modules will link against
-OCaml packages `core_kernel`, `extunix`, `uint`, `ocplib-endian`, `res`, and of
-course `capnp`.
+the `capnp` library.
 
 Instantiating the Modules
 -------------------------
